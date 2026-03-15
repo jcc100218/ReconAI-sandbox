@@ -1579,7 +1579,7 @@ Rules:
 - Know current FantasyPros, PFF, and ESPN consensus rankings
 
 Team context: ${ctx}`;
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
+  const res=await fetch('https://fragrant-brook-c770.jacobcrusinberry.workers.dev/',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01'},
     body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages})
@@ -1909,7 +1909,7 @@ async function sendDraftMsg(){
   try{
     drChatHistory.push({role:'user',content:text});
     const sys=`You are a dynasty draft assistant. Round ${round}, pick ${pickPos}/${teams}. Drafted: ${drafted||'none'}. My picks: ${myPicks||'none'}. Scoring: ${buildScoringStr()}. Team context: ${buildCtx()}. Be concise and specific.`;
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:sys,messages:drChatHistory.slice(-10)})});
+    const res=await fetch('https://fragrant-brook-c770.jacobcrusinberry.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':S.apiKey,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:sys,messages:drChatHistory.slice(-10)})});
     const data=await res.json();
     const reply=data.content?.map(c=>c.text||'').join('')||'No response.';
     drChatHistory.push({role:'assistant',content:reply});
