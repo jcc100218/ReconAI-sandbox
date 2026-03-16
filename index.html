@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#08090b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Dynasty HQ — Agentic</title>
+<title>Dynasty HQ — Your AI General Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -432,11 +432,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .mobile-nav-item svg{width:22px;height:22px;stroke-width:1.5;transition:all .2s}
 .mobile-nav-more{position:relative}
 .nav-badge{position:absolute;top:6px;right:18%;width:7px;height:7px;background:var(--accent);border-radius:50%;border:1.5px solid var(--bg2);box-shadow:0 0 6px rgba(124,107,248,0.5)}
-.mobile-more-menu{display:none;position:fixed;bottom:70px;right:8px;left:8px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);border:1px solid var(--glass-border);border-radius:var(--rxl);padding:8px;z-index:300;max-height:70vh;overflow-y:auto;box-shadow:0 -12px 48px rgba(0,0,0,.6)}
-.mobile-more-menu.open{display:block;animation:menuIn .2s ease}
-@keyframes menuIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.mobile-more-item{display:block;padding:11px 16px;font-size:14px;color:var(--text2);cursor:pointer;border-radius:10px;transition:all .15s;font-weight:500}
-.mobile-more-item:hover,.mobile-more-item.active{background:var(--bg3);color:var(--text)}
+.mobile-more-menu{display:none}
+.mobile-more-item{display:none}
 
 @media(max-width:768px){
   body{padding-bottom:64px}
@@ -508,6 +505,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <span id="agent-txt">idle</span>
       </div>
       <button class="btn btn-ghost btn-sm" id="switch-league-btn" style="display:none;font-size:10px;padding:2px 8px" onclick="switchLeagueMode()">Switch</button>
+      <button onclick="switchTab('roster')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s" title="My Roster"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></button>
+      <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
   </div>
 
@@ -520,24 +519,24 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <div style="text-align:center;position:relative">
           <div style="font-size:44px;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(124,107,248,0.2))">🏈</div>
           <h3 style="font-size:22px;font-weight:800;letter-spacing:-.04em;margin-bottom:4px">Dynasty HQ</h3>
-          <div style="font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.02em;margin-bottom:14px">AI-POWERED DYNASTY COMMAND CENTER</div>
-          <p style="max-width:380px;margin:0 auto 20px;text-align:center;font-size:13px;color:var(--text2);line-height:1.7">Connect your Sleeper league and get personalized trade targets, waiver picks, draft strategy, and IDP insights — all powered by AI.</p>
+          <div style="font-size:13px;color:var(--accent);font-weight:600;letter-spacing:.02em;margin-bottom:14px">YOUR AI GENERAL MANAGER</div>
+          <p style="max-width:380px;margin:0 auto 20px;text-align:center;font-size:13px;color:var(--text2);line-height:1.7">Connect your Sleeper league. Dynasty HQ scours every roster, scores every player in your scoring system, and feeds you proactive moves — trades, waivers, and draft strategy you'd miss on your own.</p>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
           <div style="background:var(--bg3);border-radius:var(--r);padding:12px 10px;text-align:center">
-            <div style="font-size:18px;margin-bottom:4px">📊</div>
-            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">Smart Feed</div>
-            <div style="font-size:10px;color:var(--text3);line-height:1.4">AI scans your league daily</div>
+            <div style="font-size:18px;margin-bottom:4px">⚡</div>
+            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">Proactive Feed</div>
+            <div style="font-size:10px;color:var(--text3);line-height:1.4">Moves you should make right now</div>
           </div>
           <div style="background:var(--bg3);border-radius:var(--r);padding:12px 10px;text-align:center">
-            <div style="font-size:18px;margin-bottom:4px">🤝</div>
-            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">Trade War Room</div>
-            <div style="font-size:10px;color:var(--text3);line-height:1.4">Scout opponents & draft offers</div>
+            <div style="font-size:18px;margin-bottom:4px">🔍</div>
+            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">League Intel</div>
+            <div style="font-size:10px;color:var(--text3);line-height:1.4">Knows every team's weaknesses</div>
           </div>
           <div style="background:var(--bg3);border-radius:var(--r);padding:12px 10px;text-align:center">
             <div style="font-size:18px;margin-bottom:4px">🧠</div>
-            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">IDP Analytics</div>
-            <div style="font-size:10px;color:var(--text3);line-height:1.4">Your league's actual scoring</div>
+            <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">Your Scoring</div>
+            <div style="font-size:10px;color:var(--text3);line-height:1.4">IDP + SF + your exact settings</div>
           </div>
         </div>
         <div class="row" style="max-width:380px;margin:0 auto">
@@ -546,7 +545,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         </div>
         <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
         <div class="prog" id="prog" style="display:none;max-width:380px;margin:0 auto"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>
-        <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--text3)">Works with any Sleeper dynasty league · IDP + SF supported · No data stored on servers</div>
+        <div style="text-align:center;margin-top:14px;font-size:10px;color:var(--text3)">Sleeper dynasty leagues · IDP + Superflex · Loads in seconds · Nothing stored on servers</div>
       </div>
 
       <!-- Home feed — post-connection -->
@@ -557,7 +556,11 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             <div style="font-size:18px;font-weight:800;letter-spacing:-.03em" id="home-team-name">Dynasty HQ</div>
             <div style="font-size:11px;color:var(--text3);margin-top:2px" id="home-league-meta"></div>
           </div>
-          <button class="btn btn-ghost btn-sm" onclick="runSmartFeed()" id="feed-refresh-btn" style="font-size:11px">Refresh ↺</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost btn-sm" onclick="switchTab('roster')" style="font-size:11px">Roster</button>
+            <button class="btn btn-ghost btn-sm" onclick="switchTab('memory')" style="font-size:11px">Memory</button>
+            <button class="btn btn-ghost btn-sm" onclick="runSmartFeed()" id="feed-refresh-btn" style="font-size:11px">Refresh ↺</button>
+          </div>
         </div>
         <!-- Snapshot pills -->
         <div id="home-snapshot" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
@@ -571,10 +574,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             </button>
           </div>
           <div style="padding:6px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;background:var(--bg3)">
-            <button class="chip" onclick="homeAsk('Best waiver add for my roster right now?')">Best waiver add?</button>
-            <button class="chip" onclick="homeAsk('Who should I target in a trade and why?')">Trade target?</button>
-            <button class="chip" onclick="homeAsk('How does my roster look heading into the rookie draft?')">Draft readiness?</button>
-            <button class="chip" onclick="homeAsk('Any breaking news affecting my players?')">News check</button>
+            <button class="chip" onclick="homeAsk('What moves should I make this week?')">What should I do?</button>
+            <button class="chip" onclick="homeAsk('Who is the best available player I should add and why?')">Best pickup?</button>
+            <button class="chip" onclick="homeAsk('Which team has a weakness I can exploit in a trade?')">Trade exploit?</button>
+            <button class="chip" onclick="homeAsk('Where is my roster weakest heading into the rookie draft?')">Roster gaps?</button>
           </div>
         </div>
         <!-- Feed -->
@@ -656,7 +659,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div class="sec" style="margin-top:16px">Waiver advisor chat <div class="sec-line"></div></div>
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
         <div id="wq-chat-msgs" style="height:220px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-          <div class="hc-msg-a" style="font-size:12px">I'm your waiver advisor. Ask me about any available player, FAAB strategy, or who to drop. I know your roster and league.</div>
+          <div class="hc-msg-a" style="font-size:12px">I've scanned every free agent in your league and scored them in your scoring system. Ask me who to grab, what to bid, or who to drop.</div>
         </div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
           <input type="text" id="wq-chat-in" placeholder="Should I add [player]? What's a fair FAAB bid? Who should I drop?" style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendWaiverChat()"/>
@@ -712,7 +715,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
           <div style="font-size:16px;font-weight:800;letter-spacing:-.03em">Trades</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px">Select a team · get war room analysis · AI drafts your Sleeper DM</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">Scout any team's roster · find their weakness · AI drafts your Sleeper DM</div>
         </div>
         <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/trade-calculator.html" target="_blank"
            class="btn btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:11px">
@@ -737,7 +740,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Trade advisor</div>
         <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
           <div id="trade-chat-msgs" style="max-height:220px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-            <div class="hc-msg-a" style="font-size:12px">Ask me about any trade — who to target, what to offer, whether a deal makes sense for your rebuild.</div>
+            <div class="hc-msg-a" style="font-size:12px">I've scouted every roster in your league. Tell me what you need and I'll find the right trade partner and draft the message.</div>
           </div>
           <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;align-items:center;background:var(--bg3)">
             <input type="text" id="trade-chat-in" placeholder="Should I trade Kelce? What can I get for my 1st?" style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendTradeChat()"/>
@@ -746,8 +749,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             </button>
           </div>
           <div style="padding:6px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;background:var(--bg3)">
-            <button class="chip" onclick="sendTradeChatMsg('Who should I target in a trade given my roster gaps?')">Who to target?</button>
-            <button class="chip" onclick="sendTradeChatMsg('What is my most tradeable asset right now?')">What to sell?</button>
+            <button class="chip" onclick="sendTradeChatMsg('Which team is the best trade partner for me right now?')">Best trade partner?</button>
+            <button class="chip" onclick="sendTradeChatMsg('What is my most tradeable asset and what can I get for it?')">What can I sell?</button>
             <button class="chip" onclick="sendTradeChatMsg('Draft a trade offer I can copy into Sleeper')">Draft an offer</button>
           </div>
         </div>
@@ -893,7 +896,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div class="sec" style="margin-top:16px">Draft chat <div class="sec-line"></div></div>
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
         <div id="draft-msgs" style="height:180px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-          <div class="hc-msg-a" style="font-size:12px">Ask me anything about the rookie class — comparisons, positional value, which slots to target or trade up/down.</div>
+          <div class="hc-msg-a" style="font-size:12px">I know your roster gaps, your pick slots, and your league's draft tendencies. Tell me what you're thinking and I'll tell you if it's right.</div>
         </div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
           <input type="text" id="draft-chat-in" placeholder="Who's the best RB? Should I trade up for 1.01?" style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
@@ -916,16 +919,14 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div class="chat-wrap">
         <div class="chips">
           <div class="chip" onclick="sc(this)">What should I do right now?</div>
-          <div class="chip" onclick="sc(this)">Best waiver adds?</div>
-          <div class="chip" onclick="sc(this)">IDP targets to add or trade for</div>
-          <div class="chip" onclick="sc(this)">Who should I trade away?</div>
+          <div class="chip" onclick="sc(this)">Who should I trade for?</div>
           <div class="chip" onclick="sc(this)">Am I a contender or rebuilding?</div>
-          <div class="chip" onclick="sc(this)">Analyze my roster strengths and weaknesses</div>
+          <div class="chip" onclick="sc(this)">Analyze my biggest weakness</div>
           <div class="chip" onclick="sc(this)">Draft a trade message for Sleeper</div>
           <div class="chip" onclick="sc(this)">Search latest player news</div>
         </div>
         <div class="chat-msgs" id="chat-msgs">
-          <div class="msg msg-a" style="line-height:1.7">Hey! I'm your Dynasty HQ agent — connected to Sleeper's full API plus live web search for FantasyPros, PFF, and ESPN rankings. Connect your account and I'll have your complete roster context. I can draft trade messages, find waiver targets, analyze your dynasty outlook, and pull the latest injury news.</div>
+          <div class="msg msg-a" style="line-height:1.7">I'm your AI general manager. I've analyzed every roster in your league, know your scoring settings inside out, and I'm watching the wire. Ask me anything — I'll tell you what I'd actually do, not just give you options.</div>
         </div>
         <div class="chat-in-row">
           <input type="text" class="chat-in" id="chat-in" placeholder="Ask anything about your dynasty team..." onkeydown="if(event.key==='Enter')sendMessage()"/>
@@ -1119,10 +1120,6 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     Home
   </button>
-  <button class="mobile-nav-item" id="mnav-draft" onclick="mobileTab('draftroom',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    Draft
-  </button>
   <button class="mobile-nav-item" id="mnav-waivers" onclick="mobileTab('waivers',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     Waivers
@@ -1131,17 +1128,9 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
     Trades
   </button>
-  <button class="mobile-nav-item mobile-nav-more" id="mnav-more" onclick="toggleMobileMore()">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-    More
-    <div class="mobile-more-menu" id="mobile-more-menu">
-      <div style="padding:8px 12px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">My team</div>
-      <div class="mobile-more-item" onclick="mobileTab('roster',null);toggleMobileMore()">Roster + Picks</div>
-      <div style="padding:8px 12px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Tools</div>
-      <div class="mobile-more-item" onclick="mobileTab('agent',null);toggleMobileMore()">AI Agent</div>
-      <div class="mobile-more-item" onclick="mobileTab('memory',null);toggleMobileMore()">Memory</div>
-      <div class="mobile-more-item" onclick="mobileTab('settings',null);toggleMobileMore()">Settings</div>
-    </div>
+  <button class="mobile-nav-item" id="mnav-draft" onclick="mobileTab('draftroom',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Draft
   </button>
 </div>
 
