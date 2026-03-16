@@ -790,6 +790,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             <div style="flex:1;min-width:0;padding-bottom:6px">
               <div id="pm-name" style="font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1.1;margin-bottom:3px"></div>
               <div id="pm-idp-badge" style="margin:4px 0"></div>
+              <div id="pm-insight" style="margin:6px 0"></div>
       <div id="pm-bio" style="font-size:12px;color:var(--text2);margin-bottom:8px"></div>
               <div style="display:flex;gap:6px;flex-wrap:wrap" id="pm-tags"></div>
             </div>
@@ -3149,35 +3150,23 @@ function renderPicks(){
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
   const totalRounds=league?.settings?.draft_rounds||5;
 
-  // Build complete pick picture: own picks + traded picks
+  // Build complete pick picture using the same logic as renderDraftNeeds
   const myPicks=[];
 
   years.forEach(yr=>{
     for(let rd=1;rd<=totalRounds;rd++){
-      // Check if this pick exists in tradedPicks data
-      const traded=all.find(p=>parseInt(p.season)===yr&&p.round===rd&&p.roster_id===S.myRosterId);
-      if(traded){
-        // This is originally my pick — check if I still own it
-        if(traded.owner_id===S.myRosterId){
-          myPicks.push({season:yr,round:rd,from:'Own pick',mine:true,original:true});
-        }
-        // else: I traded it away, don't show it
-      } else {
-        // Check if someone else's pick was traded TO me
-        const acquired=all.find(p=>parseInt(p.season)===yr&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
-        if(acquired){
-          const origOwner=getUser(S.rosters.find(r=>r.roster_id===acquired.roster_id)?.owner_id);
-          myPicks.push({season:yr,round:rd,from:origOwner,mine:true,original:false});
-        }
-      }
-    }
-    // Also add any picks I own that aren't in tradedPicks at all (my own untraded picks)
-    for(let rd=1;rd<=totalRounds;rd++){
-      const alreadyAdded=myPicks.some(p=>p.season===yr&&p.round===rd);
-      const tradedAway=all.find(p=>parseInt(p.season)===yr&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
-      if(!alreadyAdded&&!tradedAway){
+      // Check if I traded away my OWN pick this round
+      const myTradedAway=all.find(p=>parseInt(p.season)===yr&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
+      // If not traded away, I still own my own pick
+      if(!myTradedAway){
         myPicks.push({season:yr,round:rd,from:'Own pick',mine:true,original:true});
       }
+      // Find ALL picks acquired from other rosters at this round (could be multiple!)
+      const acquired=all.filter(p=>parseInt(p.season)===yr&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
+      acquired.forEach(acq=>{
+        const origOwner=getUser(S.rosters.find(r=>r.roster_id===acq.roster_id)?.owner_id);
+        myPicks.push({season:yr,round:rd,from:origOwner,mine:true,original:false,fromRosterId:acq.roster_id});
+      });
     }
   });
 
@@ -4615,6 +4604,70 @@ function openPlayerModal(playerId){
     }
   }
   const idpPPGModal=isIDPModal&&rawModal?+(calcIDPScore(rawModal,scModal)/Math.max(1,rawModal.gp||17)).toFixed(1):null;
+
+  // ── Value insight blurb — one sentence explaining WHY this player is valued here ──
+  const insightEl=$('pm-insight');
+  if(insightEl){
+    const meta=LI_LOADED?LI.playerMeta?.[playerId]:null;
+    if(meta&&val>0){
+      const mappedPos=meta.pos||pos;
+      const [peakStart,peakEnd]=(LI.peakWindows||{})[mappedPos]||[23,29];
+      const yrsPast=Math.max(0,age-peakEnd);
+      const trend=meta.trend||0;
+      const gp=meta.recentGP||17;
+      const yrsExp=p.years_exp||0;
+
+      let blurb='',blurbColor='var(--amber)';
+
+      if(meta.source==='FC_ROOKIE'){
+        blurb=`Incoming rookie with ${meta.peakYrsLeft||'?'} peak years ahead. Value based on FantasyCalc dynasty consensus — no NFL production yet.`;
+        blurbColor='var(--green)';
+      }else if(meta.sitMult<=0.45){
+        blurb=`Not rostered by anyone in the league and no NFL team. ${yrsPast>=2?'Likely retired or out of football.':'Needs a landing spot to have any value.'}`;
+        blurbColor='var(--red)';
+      }else if(yrsPast>=5){
+        const extra=gp<=12?` Only played ${gp} games last year.`:'';
+        const trendNote=trend<=-15?` Production down ${Math.abs(trend)}%.`:'';
+        blurb=`${yrsExp>8?yrsExp+'-year veteran, ':''}${yrsPast} years past ${mappedPos} prime at age ${age}. On borrowed time — sell if anyone's buying.${extra}${trendNote}`;
+        blurbColor='var(--red)';
+      }else if(yrsPast>=2){
+        const trendNote=trend<=-20?` PPG dropped ${Math.abs(trend)}% last season.`:trend>=15?` Still trending up ${trend}% — defying age.`:'';
+        const gpNote=gp<=12?` Durability concern — only ${gp} games.`:'';
+        blurb=`${yrsPast} years past ${mappedPos} peak at age ${age}. ${meta.starterSeasons>=4?'Proven producer but ':''}Dynasty value declining.${trendNote}${gpNote}`;
+        blurbColor='var(--red)';
+      }else if(yrsPast===1){
+        const trendNote=trend<=-20?` PPG fell ${Math.abs(trend)}% — the decline may be starting.`:trend>=15?` Still improving (+${trend}%) — could have more in the tank.`:' Watch closely this season.';
+        blurb=`Just exited ${mappedPos} peak window at age ${age}.${trendNote}`;
+        blurbColor='var(--amber)';
+      }else if(age<=peakStart&&meta.peakYrsLeft>=5){
+        const prodNote=meta.starterSeasons>=2?` Already a ${meta.starterSeasons}-year starter at just ${age} — rare.`:meta.starterSeasons===1?' Showed starter-level production in year one.':' Still developing.';
+        const trendNote=trend>=20?` PPG up ${trend}% — breakout trajectory.`:'';
+        blurb=`${meta.peakYrsLeft} peak years ahead at age ${age}.${prodNote}${trendNote} Dynasty stock rising.`;
+        blurbColor='var(--green)';
+      }else if(meta.peakYrsLeft>=3){
+        const eliteNote=meta.sitMult>=1.30&&age<=25?' Elite young producer — exactly what dynasty is about.':'';
+        const trendNote=trend>=20?` PPG up ${trend}% year-over-year.`:'';
+        blurb=`In prime with ${meta.peakYrsLeft} peak years left. ${meta.starterSeasons>=3?meta.starterSeasons+'-year proven starter. ':''}${eliteNote}${trendNote}`;
+        blurbColor='var(--green)';
+      }else if(meta.peakYrsLeft>=1){
+        const trendNote=trend<=-20?` Production declining (${trend}%).`:'';
+        blurb=`${meta.peakYrsLeft} peak year${meta.peakYrsLeft>1?'s':''} left at age ${age}. Window closing${meta.starterSeasons>=3?' but still a reliable starter':''}.${trendNote}`;
+        blurbColor='var(--amber)';
+      }else{
+        blurb=`At the edge of ${mappedPos} peak at age ${age}. Value peaks now — it only goes down from here.`;
+        blurbColor='var(--amber)';
+      }
+
+      // Injury/availability overlay
+      if(gp<=8&&gp>0&&!blurb.includes('games'))blurb+=` ⚠️ Only ${gp} games last season.`;
+
+      if(blurb){
+        const bg=blurbColor==='var(--red)'?'rgba(248,113,113,.06)':blurbColor==='var(--green)'?'rgba(52,211,153,.06)':'rgba(251,191,36,.06)';
+        insightEl.innerHTML=`<div style="font-size:11px;color:${blurbColor};line-height:1.5;padding:8px 12px;background:${bg};border-radius:8px">${blurb}</div>`;
+      }else insightEl.innerHTML='';
+    }else insightEl.innerHTML='';
+  }
+
   // Tags
   const tags=[];
   if(p.injury_status)tags.push(`<span style="background:var(--redL);color:var(--red);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">${p.injury_status}</span>`);
