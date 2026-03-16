@@ -649,7 +649,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
               <th class="rt-th rt-sortable" onclick="sortRoster('name')" style="min-width:140px">Player</th>
               <th class="rt-th rt-sortable" onclick="sortRoster('pos')" style="width:36px">Pos</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('age')">Age</th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('value')" style="min-width:64px">FC Value</th>
+              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('value')" style="min-width:64px">DHQ Value</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('avg')">PPG</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('prev')" id="th-prev">'24avg</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('peak')">Peak</th>
@@ -2640,6 +2640,7 @@ function getAvailablePlayers(){
 let _availCache=null;
 let _availCacheKey='';
 let availSortDir=-1;
+let availSortKey='value';
 
 function availSort(key){
   availSortKey=key;
@@ -3540,7 +3541,7 @@ function buildCtx(){
   const memCtx=buildMemoryCtx();
 
   return [
-    S.user.display_name+'|#'+rank+'/'+S.rosters.length+'|'+(s.wins||0)+'-'+(s.losses||0)+'|FC total:'+totalVal.toLocaleString(),
+    S.user.display_name+'|#'+rank+'/'+S.rosters.length+'|'+(s.wins||0)+'-'+(s.losses||0)+'|DHQ total:'+totalVal.toLocaleString(),
     'STARTERS:'+starters.join(';'),
     bench.length?'BENCH(top8):'+bench.join(';'):'',
     gaps.length?'NEEDS:'+gaps.join(','):'',
@@ -3851,7 +3852,7 @@ function openPlayerModal(playerId){
   const trendLabel=fcTrend>100?'▲ Rising':fcTrend<-100?'▼ Falling':'Stable';
   const trendCol=fcTrend>100?'var(--green)':fcTrend<-100?'var(--red)':'var(--text3)';
   const statBoxes=[
-    {val:val>0?val.toLocaleString():'—',lbl:'FC Value',col:col},
+    {val:val>0?val.toLocaleString():'—',lbl:'DHQ Value',col:col},
     {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
     {val:stats.prevAvg?.toFixed(1)||stats.seasonAvg?.toFixed(1)||'—',lbl:`'${prevYr} PPG`,col:stats.prevAvg>15?'var(--green)':stats.prevAvg&&stats.prevAvg<8?'var(--red)':'var(--text)'},
     {val:stats.prevTotal?Math.round(stats.prevTotal):'—',lbl:`'${prevYr} Total`,col:'var(--text2)'},
