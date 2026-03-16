@@ -1387,15 +1387,15 @@ function buildRosterTable(){
   });
 
   // Filter
-  if(rosterFilterMode==='OFF')rows=rows.filter(r=>offPos.has(r.pos));
-  if(rosterFilterMode==='IDP')rows=rows.filter(r=>idpPos.has(r.pos));
-  if(rosterFilterMode==='taxi')rows=rows.filter(r=>r.isTaxi);
+  if(rosterFilter==='OFF')rows=rows.filter(r=>offPos.has(r.pos));
+  if(rosterFilter==='IDP')rows=rows.filter(r=>idpPos.has(r.pos));
+  if(rosterFilter==='taxi')rows=rows.filter(r=>r.isTaxi);
 
   // Sort
   const posOrder2=['QB','RB','WR','TE','DL','LB','DB','K','DEF','IDP','FLEX','SF'];
   rows.sort((a,b)=>{
     // Always: starters first, then bench, then taxi, then reserve (unless filtering taxi)
-    if(rosterFilterMode!=='taxi'){
+    if(rosterFilter!=='taxi'){
       const sec=r=>r.isReserve?3:r.isTaxi?2:r.isStarter?0:1;
       const sd=sec(a)-sec(b);if(sd!==0)return sd;
     }
