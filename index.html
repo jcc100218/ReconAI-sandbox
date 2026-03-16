@@ -1406,10 +1406,11 @@ function peakYears(pid){
   const pos=pPos(pid);const age=pAge(pid)||0;
   const peaks={QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
   const [lo,hi]=peaks[pos]||[24,29];
-  if(!age)return'—';
-  if(age<lo)return'Pre-peak';
-  if(age<=hi)return'Peak';
-  return'Post-peak';
+  if(!age)return{label:'—',desc:'',cls:''};
+  const yrsLeft=hi-age;
+  if(age<lo)return{label:'Pre-peak',desc:(lo-age)+'yr to peak',cls:'near'};
+  if(age<=hi)return{label:'Peak',desc:yrsLeft<=1?'last yr':'~'+yrsLeft+'yr left',cls:'hi'};
+  return{label:'Post-peak',desc:(age-hi)+'yr past',cls:'decline'};
 }
 
 // Roster sort/filter stubs
