@@ -290,9 +290,12 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .rt-val.acc{color:var(--accent);font-weight:600}
 .rt-val.dim{color:var(--text3)}
 .rt-inj{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--redL);color:var(--red)}
-.rt-peak{font-size:11px;color:var(--green);font-weight:600}
-.rt-peak.decline{color:var(--red)}
-.rt-peak.near{color:var(--amber)}
+.rt-peak{font-size:11px;font-weight:600}
+.rt-peak.seedling{color:rgba(96,165,250,.8)}
+.rt-peak.rising{color:rgba(52,211,153,.7)}
+.rt-peak.peak{color:var(--green)}
+.rt-peak.veteran{color:var(--amber)}
+.rt-peak.declining{color:var(--red)}
 .rt-section-row td{background:var(--bg3);font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:5px 8px}
 .rfbtn{font-size:11px;padding:3px 10px;border:1px solid var(--border2);border-radius:20px;background:var(--bg2);color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s}
 .rfbtn.active,.rfbtn:hover{background:var(--accentL);color:var(--accent);border-color:rgba(108,99,245,.3)}
@@ -524,7 +527,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 <div class="app">
   <div class="header">
     <div class="logo" style="font-size:16px;font-weight:800;letter-spacing:-.03em">Dynasty<span style="-webkit-text-fill-color:var(--accent)">HQ</span></div>
-    <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" target="_blank" style="font-size:10px;color:var(--text3);text-decoration:none;padding:3px 8px;border:1px solid var(--border2);border-radius:6px;white-space:nowrap;transition:all .15s" onmouseover="this.style.color='var(--accent)';this.style.borderColor='rgba(124,107,248,.3)'" onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border2)'">War Room ↗</a>
+    <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" target="_blank" style="font-size:10px;color:#fff;text-decoration:none;padding:4px 10px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:6px;white-space:nowrap;font-weight:700;letter-spacing:.02em;box-shadow:0 2px 6px rgba(245,158,11,.25)">⚔️ War Room</a>
     <div class="spacer"></div>
     <div style="display:flex;align-items:center;gap:5px;flex-shrink:1;min-width:0;overflow:hidden">
       <span class="pill pd" id="league-pill" style="font-size:10px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:120px" onclick="switchLeagueMode()">Not connected</span>
@@ -697,36 +700,21 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         </div>
       </div>
 
-      <!-- Available players -->
-      <div class="sec" style="margin-top:16px">Available players <div class="sec-line"></div>
-        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
-          <select id="avail-pos-sel" style="font-size:11px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2)" onchange="renderAvailable()">
-            <option value="">All</option>
-            <option value="QB">QB</option><option value="RB">RB</option><option value="WR">WR</option>
-            <option value="TE">TE</option><option value="DL">DL</option><option value="LB">LB</option>
-            <option value="DB">DB</option>
-          </select>
-          <button class="rfbtn active" onclick="availSort('value')" id="avail-sort-val">Value</button>
-          <button class="rfbtn" onclick="availSort('age')" id="avail-sort-age">Age</button>
-        </div>
+      <!-- Top available by position — compact, no heavy table -->
+      <div class="sec" style="margin-top:16px">Top available by position <div class="sec-line"></div>
+        <select id="avail-pos-sel" style="font-size:11px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2)" onchange="renderAvailable()">
+          <option value="">All</option>
+          <option value="QB">QB</option><option value="RB">RB</option><option value="WR">WR</option>
+          <option value="TE">TE</option><option value="DL">DL</option><option value="LB">LB</option>
+          <option value="DB">DB</option>
+        </select>
+        <span id="available-count" style="font-size:10px;color:var(--text3);margin-left:4px"></span>
       </div>
-      <div style="overflow-x:auto">
-        <table class="roster-table" id="avail-table">
-          <thead>
-            <tr>
-              <th class="rt-th" style="width:28px"></th>
-              <th class="rt-th" style="min-width:120px">Player</th>
-              <th class="rt-th" style="width:32px">Pos</th>
-              <th class="rt-th rt-num">Age</th>
-              <th class="rt-th rt-num">FC Value</th>
-              <th class="rt-th rt-num">PPG</th>
-              <th class="rt-th rt-num">Trend</th>
-              <th class="rt-th" style="width:50px"></th>
-            </tr>
-          </thead>
-          <tbody id="avail-tbody"><tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text3)">Connect to see available players.</td></tr></tbody>
-        </table>
+      <div id="avail-tbody-wrap">
+        <div id="avail-tbody" style="display:flex;flex-direction:column;gap:4px"><div class="empty">Connect to see available players.</div></div>
       </div>
+      <!-- Keep hidden table element for any JS that references it -->
+      <table id="avail-table" style="display:none"><tbody></tbody></table>
     </div>
 
     <!-- TRADE FINDER -->
@@ -1405,13 +1393,20 @@ async function renderRoster(){
 // Peak age range helper (loadPeakCurves removed — use static defaults)
 function peakYears(pid){
   const pos=pPos(pid);const age=pAge(pid)||0;
-  const peaks={QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
-  const [lo,hi]=peaks[pos]||[24,29];
-  if(!age)return{label:'—',desc:'',cls:''};
+  // Research-backed peak ranges (EPA study 2014-2024)
+  const peaks={QB:[28,33],RB:[25,27],WR:[26,30],TE:[27,30],DL:[25,29],LB:[24,28],DB:[25,29]};
+  const [lo,hi]=peaks[pos]||[25,29];
+  if(!age)return{label:'—',desc:'',cls:'',color:'var(--text3)'};
+  const yrsToPeak=lo-age;
   const yrsLeft=hi-age;
-  if(age<lo)return{label:'Pre-peak',desc:(lo-age)+'yr to peak',cls:'near'};
-  if(age<=hi)return{label:'Peak',desc:yrsLeft<=1?'last yr':'~'+yrsLeft+'yr left',cls:'hi'};
-  return{label:'Post-peak',desc:(age-hi)+'yr past',cls:'decline'};
+  const yrsPast=age-hi;
+
+  // Bloom → Peak → Fade lifecycle
+  if(age<lo-3)return{label:'Seedling',desc:(lo-age)+'yr to peak',cls:'seedling',color:'rgba(96,165,250,.7)'}; // light blue - young prospect
+  if(age<lo)return{label:'Rising',desc:yrsToPeak+'yr to peak',cls:'rising',color:'rgba(52,211,153,.7)'}; // green - approaching prime
+  if(age<=hi)return{label:'Peak',desc:yrsLeft<=0?'final yr':'~'+yrsLeft+'yr left',cls:'peak',color:'var(--green)'}; // bright green - prime
+  if(age<=hi+2)return{label:'Veteran',desc:yrsPast+'yr past peak',cls:'veteran',color:'rgba(251,191,36,.8)'}; // amber - still productive
+  return{label:'Declining',desc:yrsPast+'yr past peak',cls:'declining',color:'rgba(248,113,113,.8)'}; // red - sell window
 }
 
 // Roster sort/filter stubs
@@ -3611,12 +3606,18 @@ function openPlayerModal(playerId){
   ];
   $('pm-stats-bar').innerHTML=statBoxes.map(s=>`<div class="pm-stat-box"><div class="pm-stat-box-val" style="color:${s.col}">${s.val}</div><div class="pm-stat-box-lbl">${s.lbl}</div></div>`).join('');
 
-  // Age curve
+  // Age curve — bloom/peak/fade lifecycle
   const ages=Array.from({length:17},(_,i)=>i+20);
-  const segColor=a=>{const d=Math.abs(a-peak);if(d===0)return'var(--green)';if(d<=1)return'rgba(52,211,153,.6)';if(d<=2)return'rgba(251,191,36,.5)';if(a>peak+3)return'rgba(248,113,113,.4)';return'rgba(96,165,250,.4)';};
-  $('pm-curve').innerHTML=ages.map(a=>`<div class="acb-seg" style="background:${segColor(a)};opacity:${a===age?1:0.5};outline:${a===age?'2px solid white':'none'};outline-offset:-1px" title="Age ${a}">${a===age?age:''}</div>`).join('');
+  const segColor=a=>{
+    if(a<pLo-3)return'rgba(96,165,250,.3)'; // seedling - faint blue
+    if(a<pLo)return'rgba(52,211,153,.5)'; // rising - light green
+    if(a>=pLo&&a<=pHi)return'rgba(52,211,153,.8)'; // peak - bright green
+    if(a<=pHi+2)return'rgba(251,191,36,.5)'; // veteran - amber
+    return'rgba(248,113,113,.4)'; // declining - red
+  };
+  $('pm-curve').innerHTML=ages.map(a=>`<div class="acb-seg" style="background:${segColor(a)};opacity:${a===age?1:0.6};outline:${a===age?'2px solid white':'none'};outline-offset:-1px" title="Age ${a}">${a===age?age:''}</div>`).join('');
   $('pm-curve-lbl').innerHTML=`<span>20</span><span>Peak ${pLo}–${pHi}</span><span>36</span>`;
-  $('pm-peak-tag').textContent=`Currently age ${age} · ${pk.desc}`;
+  $('pm-peak-tag').textContent=`Currently age ${age} · ${pk.label} · ${pk.desc}`;
 
   // Sparkline
   const weeklyPts=stats.weeklyPts||[];
@@ -3750,18 +3751,8 @@ async function getPlayerFullCard(playerId){
   $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px">🔍 Searching live web for latest news...</div>';
   try{
     const isIDP=['DL','LB','DB'].includes(pos);
-    const reply=await callClaude([{role:'user',content:`Search the web RIGHT NOW for the very latest news on ${name} (${pos}, ${fullTeam(team)}, age ${age}).
-
-Search for:
-1. Any news from the last 7 days on ESPN, NFL.com, FantasyPros, PFF
-2. Recent posts from Adam Schefter (@AdamSchefter), Ian Rapoport (@RapSheet), Tom Pelissero (@TomPelissero), Field Yates (@FieldYates) about this player
-3. ${isIDP?'DynastyLeagueFootball.com (DLF) IDP dynasty ranking context':'FantasyPros and KTC dynasty value context'}
-4. Any injury, depth chart, contract, or role changes
-
-Then write one punchy @DynastyHQ_AI X post (max 280 chars) with a specific dynasty take and hashtags.
-
-JSON: {"news":[{"source":"ESPN|NFL.com|Schefter|Rapoport|FantasyPros|PFF|DLF","reporter":"@handle or null","text":"specific news item","url":"link or null","date":"approximate date"}],"tweet":"X post text"}
-Return ONLY JSON.`}],true);
+    const reply=await callClaude([{role:'user',content:`Latest news on ${name} (${pos}, ${fullTeam(team)}, age ${age}). Search web. Return max 3 news items + one X post.
+JSON only: {"news":[{"source":"source","text":"news item","date":"date"}],"tweet":"@DynastyHQ_AI X post with dynasty take, max 280 chars"}`}],true,1,500);
 
     let data={news:[],tweet:''};
     try{
@@ -3770,7 +3761,7 @@ Return ONLY JSON.`}],true);
       if(start>=0)data=JSON.parse(clean.substring(start,end+1));
     }catch(e){$('pm-news').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;return;}
 
-    $('pm-news').innerHTML=data.news?.length?data.news.map(n=>`
+    $('pm-news').innerHTML=data.news?.length?data.news.slice(0,3).map(n=>`
       <div style="padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
           <span style="font-size:10px;color:var(--accent);font-weight:600">${n.source||'NFL'}${n.reporter?' '+n.reporter:''}</span>
