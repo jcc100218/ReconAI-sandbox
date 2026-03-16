@@ -558,9 +558,15 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" onclick="switchTab('roster')" style="font-size:11px">Roster</button>
-            <button class="btn btn-ghost btn-sm" onclick="switchTab('memory')" style="font-size:11px">Memory</button>
             <button class="btn btn-ghost btn-sm" onclick="runSmartFeed()" id="feed-refresh-btn" style="font-size:11px">Refresh ↺</button>
           </div>
+        </div>
+        <!-- Data sync status -->
+        <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text3);align-items:center">
+          <span id="sync-fc" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>FC values</span>
+          <span id="sync-stats" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Stats</span>
+          <span id="sync-li" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Intel</span>
+          <button onclick="resyncAllData()" style="background:none;border:1px solid var(--border2);border-radius:5px;color:var(--text3);font-size:10px;padding:2px 8px;cursor:pointer;font-family:inherit;margin-left:auto">Resync ↺</button>
         </div>
         <!-- Snapshot pills -->
         <div id="home-snapshot" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
@@ -812,52 +818,37 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       </div>
     </div>
 
-    <!-- OPPONENT SCOUTING -->
-    <!-- TRADE BLOCK -->
     <!-- DRAFT SCOUTING -->
     <div class="panel" id="panel-draftroom">
       <!-- Header -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
         <div style="flex:1">
-          <div style="font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft Scouting</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px">Personalized pick recommendations based on your roster needs, pick assets, and league context</div>
+          <div style="font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">AI-powered pick recommendations for your roster</div>
         </div>
         <select id="draft-year-sel" onchange="renderDraftNeeds()" style="font-size:12px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2)">
-          <option value="2026">2026 Rookie Draft</option>
-          <option value="2025">2025 Rookie Draft</option>
-          <option value="2027">2027 Rookie Draft</option>
+          <option value="2026">2026</option>
+          <option value="2025">2025</option>
+          <option value="2027">2027</option>
         </select>
         <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn">Scout ↗</button>
       </div>
 
+      <!-- AI draft board — primary -->
+      <div id="draft-scout-content"><div class="card"><div class="empty">Click Scout ↗ to get personalized rookie draft recommendations.</div></div></div>
+
       <!-- Your picks -->
-      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:14px">
-        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your picks in this draft</div>
-        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px"><span style="color:var(--text3);font-size:12px">Connect to see your pick assets</span></div>
+      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin:14px 0">
+        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your picks</div>
+        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px"><span style="color:var(--text3);font-size:12px">Connect to see picks</span></div>
       </div>
 
-      <!-- Legend -->
-      <div style="display:flex;flex-wrap:wrap;gap:10px;font-size:10px;color:var(--text3);margin-bottom:10px;padding:0 2px">
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:3px"></span>NFL Starter</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:3px"></span>Depth only</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--amber);margin-right:3px;opacity:.8"></span>Needs starter</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:3px"></span>No starter</span>
-        <span>⭐ Elite (top 5 at position)</span>
-      </div>
-
-      <!-- Roster summary — compact overview -->
+      <!-- Roster summary -->
       <div id="draft-summary" style="display:none;margin-bottom:14px">
-        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Your roster at a glance</div>
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Roster at a glance</div>
         <div id="draft-summary-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;display:flex;flex-direction:column;gap:10px"></div>
       </div>
-      <!-- Hidden element for renderDraftNeeds compatibility -->
       <div id="draft-needs" style="display:none"></div>
-
-      <!-- AI draft board — the main event -->
-      <div class="sec">AI draft board <div class="sec-line"></div>
-        <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn2" style="margin-left:6px">Scout ↗</button>
-      </div>
-      <div id="draft-scout-content"><div class="card"><div class="empty">Click Scout ↗ to get personalized rookie draft recommendations based on your roster and picks.</div></div></div>
 
       <!-- Draft chat -->
       <div class="sec" style="margin-top:16px">Draft chat <div class="sec-line"></div></div>
@@ -904,64 +895,30 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 
     <!-- ANALYTICS -->
     <!-- STATS EXPLORER -->
-    <!-- MEMORY -->
+    <!-- MEMORY — merged: notes + AI summary + past sessions -->
     <div class="panel" id="panel-memory">
-      <div class="sec">Trade journal <div class="sec-line"></div> <button class="btn btn-ghost btn-sm" onclick="openAddTrade()">+ Log trade</button></div>
-      <div id="trade-journal"></div>
+      <div style="font-size:16px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px">GM Memory</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Notes and AI-generated insights that persist between sessions.</div>
 
-      <div class="sec" style="margin-top:4px">Waiver log <div class="sec-line"></div> <button class="btn btn-ghost btn-sm" onclick="openAddWaiver()">+ Log add</button></div>
-      <div id="waiver-log"></div>
-
-      <div class="sec" style="margin-top:4px">Agent notes <div class="sec-line"></div></div>
+      <div class="sec">Notes <div class="sec-line"></div></div>
       <div class="card" id="agent-notes-card">
         <textarea id="agent-notes-ta" placeholder="Free-form notes about your team, strategy, player valuations, league tendencies..." style="width:100%;min-height:120px;background:transparent;border:none;color:var(--text);font-size:12px;line-height:1.6;outline:none;resize:vertical" oninput="saveNotes()"></textarea>
       </div>
 
-      <div class="sec" style="margin-top:4px">AI memory summary <div class="sec-line"></div> <button class="btn btn-ghost btn-sm" onclick="generateMemorySummary()">Summarize ↗</button></div>
-      <div class="card" id="memory-summary"><div class="empty">Click Summarize to have the AI generate insights from your trade history and notes.</div></div>
+      <div class="sec">AI session summary <div class="sec-line"></div> <button class="btn btn-ghost btn-sm" onclick="generateMemorySummary()">Summarize ↗</button></div>
+      <div class="card" id="memory-summary"><div class="empty">Click Summarize to generate insights from your notes and conversations.</div></div>
 
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-ghost btn-sm" onclick="exportMemory()">Export JSON</button>
-        <button class="btn btn-ghost btn-sm" onclick="clearMemory()">Clear all</button>
+        <button class="btn btn-ghost btn-sm" onclick="switchTab('settings')">Edit strategy →</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportMemory()">Export</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="clearMemory()">Clear all</button>
       </div>
 
-      <!-- Trade log modal -->
-      <div id="trade-log-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000;align-items:center;justify-content:center;padding:16px">
-        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:100%;max-width:440px;padding:24px;box-shadow:0 16px 64px rgba(0,0,0,.5);animation:modalIn .3s ease">
-          <div style="font-size:15px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em">Log a trade</div>
-          <div style="display:grid;gap:10px">
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Date</div><input type="date" id="tl-date" style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">I gave</div><input type="text" id="tl-gave" placeholder="Player names, picks..." style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">I received</div><input type="text" id="tl-got" placeholder="Player names, picks..." style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Opponent</div><input type="text" id="tl-opp" placeholder="Team name" style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Verdict</div>
-              <select id="tl-verdict" style="width:100%"><option value="win">I won this trade</option><option value="fair">Fair trade</option><option value="loss">I lost this trade</option><option value="pending">Too early to tell</option></select>
-            </div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Notes</div><textarea id="tl-notes" placeholder="Why I made this trade, what I was thinking..." style="width:100%;min-height:60px"></textarea></div>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:14px">
-            <button class="btn" onclick="saveTrade()">Save</button>
-            <button class="btn btn-ghost" onclick="closeTradeModal()">Cancel</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Waiver log modal -->
-      <div id="waiver-log-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000;align-items:center;justify-content:center;padding:16px">
-        <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:100%;max-width:380px;padding:24px;box-shadow:0 16px 64px rgba(0,0,0,.5);animation:modalIn .3s ease">
-          <div style="font-size:15px;font-weight:700;margin-bottom:16px;letter-spacing:-.02em">Log a waiver add</div>
-          <div style="display:grid;gap:10px">
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Date</div><input type="date" id="wl-date" style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Added</div><input type="text" id="wl-added" placeholder="Player name" style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Dropped</div><input type="text" id="wl-dropped" placeholder="Player name or none" style="width:100%"/></div>
-            <div><div style="font-size:10px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Reason</div><input type="text" id="wl-reason" placeholder="Why I made this move" style="width:100%"/></div>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:14px">
-            <button class="btn" onclick="saveWaiver()">Save</button>
-            <button class="btn btn-ghost" onclick="closeWaiverModal()">Cancel</button>
-          </div>
-        </div>
-      </div>
+      <!-- Hidden elements for JS compatibility -->
+      <div id="trade-journal" style="display:none"></div>
+      <div id="waiver-log" style="display:none"></div>
+      <div id="trade-log-modal" style="display:none"></div>
+      <div id="waiver-log-modal" style="display:none"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -1834,23 +1791,33 @@ async function loadRosterStats(){
       sf(`/stats/nfl/regular/${prevSeason}`).catch(()=>({})),
     ]);
 
+    // If prev season is empty, try one more year back (e.g. 2025 may not be finalized yet, fallback to 2024)
+    let effectivePrev=prevAgg;
+    let effectivePrevSeason=prevSeason;
+    if(!Object.keys(prevAgg).length){
+      const fallbackSeason=String(parseInt(prevSeason)-1);
+      console.log('Previous season stats empty for '+prevSeason+', trying '+fallbackSeason);
+      effectivePrev=await sf(`/stats/nfl/regular/${fallbackSeason}`).catch(()=>({}));
+      effectivePrevSeason=fallbackSeason;
+    }
+
     // Process ALL players from the aggregate response (not just rostered)
     // This ensures free agent IDP players also get stats for waiver recommendations
-    const allStatPids=new Set([...allLeaguePlayers,...Object.keys(prevAgg),...Object.keys(curAgg||{})]);
+    const allStatPids=new Set([...allLeaguePlayers,...Object.keys(effectivePrev),...Object.keys(curAgg||{})]);
     allStatPids.forEach(pid=>{
-      if(!S.players[pid])return; // skip unknown player IDs
+      if(!S.players[pid])return;
       const pos=S.players[pid]?.position;
-      if(!pos||['K','DEF','P'].includes(pos))return; // skip kickers/defense/punters
+      if(!pos||['K','DEF','P'].includes(pos))return;
       if(!S.playerStats[pid])S.playerStats[pid]={};
 
-      // Previous season (2024) — always available
-      const prev=prevAgg[pid];
+      // Previous season — always available
+      const prev=effectivePrev[pid];
       if(prev){
         const pts=calcFantasyPts(prev,sc);
         const gp=prev.gp||prev.games_played||17;
         S.playerStats[pid].prevTotal=+pts.toFixed(1);
         S.playerStats[pid].prevAvg=gp>0?+(pts/gp).toFixed(1):+(pts/17).toFixed(1);
-        S.playerStats[pid].prevSeason=prevSeason;
+        S.playerStats[pid].prevSeason=effectivePrevSeason;
         S.playerStats[pid].prevRawStats=prev;
       }
 
@@ -1872,8 +1839,8 @@ async function loadRosterStats(){
 
     // Update column header with prev season year
     const thPrev=$('th-prev');const thPrevTot=$('th-prevtot');
-    if(thPrev)thPrev.textContent=`'${prevSeason.slice(2)}avg`;
-    if(thPrevTot)thPrevTot.textContent=`'${prevSeason.slice(2)}tot`;
+    if(thPrev)thPrev.textContent=`'${effectivePrevSeason.slice(2)}avg`;
+    if(thPrevTot)thPrevTot.textContent=`'${effectivePrevSeason.slice(2)}tot`;
 
     // Positional ranks — all rostered players sorted by pts
     const posPts={};
@@ -1889,7 +1856,8 @@ async function loadRosterStats(){
 
     buildRosterTable();
     renderDraftNeeds();
-  }catch(e){console.warn('Stats load error:',e);}
+    updateSyncStatus();
+  }catch(e){console.warn('Stats load error:',e);updateSyncStatus();}
 }
 
 
@@ -1931,11 +1899,22 @@ const BASE_PICK_VALUES={
 };
 
 function pickValue(season,round,totalTeams){
-  // Future picks get slight discount per year out
   const curSeason=parseInt(S.season)||2025;
   const pickSeason=parseInt(season)||curSeason;
+
+  // Try FC pick values first (most accurate, from real trade data)
+  if(window.FC_PICK_VALUES&&Object.keys(window.FC_PICK_VALUES).length){
+    const pos=pickSeason===curSeason?'mid':'mid'; // could refine based on standings
+    const key=pickSeason+'_'+round+'_'+pos;
+    const fcVal=window.FC_PICK_VALUES[key];
+    if(fcVal>0)return fcVal;
+    // Try without position qualifier
+    const anyKey=Object.keys(window.FC_PICK_VALUES).find(k=>k.startsWith(pickSeason+'_'+round+'_'));
+    if(anyKey&&window.FC_PICK_VALUES[anyKey]>0)return window.FC_PICK_VALUES[anyKey];
+  }
+
+  // Fallback to hardcoded values with year discount
   const yearDiscount=Math.pow(0.92,Math.max(0,pickSeason-curSeason));
-  // Use mid-round as default position when unknown
   const midPick=Math.ceil((totalTeams||12)/2);
   const key=`${round}.${String(midPick).padStart(2,'0')}`;
   const base=BASE_PICK_VALUES[key]||BASE_PICK_VALUES[`${round}.06`]||500;
@@ -2314,6 +2293,19 @@ function availSort(key){
 function renderAvailable(){
   const tbody=$('avail-tbody');if(!tbody)return;
 
+  if(!FC_LOADED){
+    tbody.innerHTML=`<tr><td colspan="8" style="padding:12px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="skeleton" style="height:14px;width:70%"></div>
+        <div class="skeleton" style="height:14px;width:55%"></div>
+        <div class="skeleton" style="height:14px;width:65%"></div>
+        <div class="skeleton" style="height:14px;width:50%"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">Loading FantasyCalc values...</div>
+    </td></tr>`;
+    return;
+  }
+
   // Cache key = FC loaded state + roster hash
   const cacheKey=FC_LOADED+'_'+(S.rosters?.length||0)+'_'+(Object.keys(S.playerStats||{}).length);
   let avail;
@@ -2326,7 +2318,7 @@ function renderAvailable(){
   }
 
   if(!avail.length){
-    tbody.innerHTML=`<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text3)">${FC_LOADED?'No dynasty-relevant players available.':'Loading FantasyCalc values...'}</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--text3)">No available players found.</td></tr>`;
     return;
   }
   const posFilter=$('avail-pos-sel')?.value||'';
@@ -2597,8 +2589,43 @@ function saveFCCache(values){
   try{localStorage.setItem(FC_CACHE_KEY,JSON.stringify({ts:Date.now(),values}));}catch(e){}
 }
 
+function updateSyncStatus(){
+  const fcEl=$('sync-fc');const statsEl=$('sync-stats');const liEl=$('sync-li');
+  if(fcEl){
+    const dot=fcEl.querySelector('span');
+    if(FC_LOADED){dot.style.background='var(--green)';fcEl.style.color='var(--text2)';fcEl.lastChild.textContent=' FC ✓ ('+Object.keys(FC_VALUES).length+')';}
+    else{dot.style.background='var(--red)';fcEl.style.color='var(--red)';fcEl.lastChild.textContent=' FC ✗';}
+  }
+  if(statsEl){
+    const dot=statsEl.querySelector('span');
+    const count=Object.keys(S.playerStats||{}).length;
+    if(count>0){dot.style.background='var(--green)';statsEl.style.color='var(--text2)';statsEl.lastChild.textContent=' Stats ✓ ('+count+')';}
+    else{dot.style.background='var(--amber)';statsEl.style.color='var(--amber)';statsEl.lastChild.textContent=' Stats (offseason)';}
+  }
+  if(liEl){
+    const dot=liEl.querySelector('span');
+    if(LI_LOADED){dot.style.background='var(--green)';liEl.style.color='var(--text2)';liEl.lastChild.textContent=' Intel ✓';}
+    else{dot.style.background='var(--text3)';liEl.lastChild.textContent=' Intel...';}
+  }
+}
+
+async function resyncAllData(){
+  if(!S.currentLeagueId){showToast('Connect first');return;}
+  showToast('Resyncing...');
+  // Clear caches
+  try{localStorage.removeItem(FC_CACHE_KEY);localStorage.removeItem('dhq_leagueintel_v2');}catch(e){}
+  FC_LOADED=false;FC_VALUES={};_availCache=null;LI_LOADED=false;LI={};
+  updateSyncStatus();
+  // Re-fetch everything
+  await Promise.all([loadRosterStats(),fetchFantasyCalcValues()]);
+  updateSyncStatus();
+  buildRosterTable();renderAvailable();renderPicks();
+  setTimeout(()=>loadLeagueIntel().then(updateSyncStatus),500);
+  showToast('Data refreshed ✓');
+}
+
 async function fetchFantasyCalcValues(){
-  if(loadFCCache()){updateDataFreshness();buildRosterTable();renderAvailable();return;}
+  if(loadFCCache()){updateDataFreshness();updateSyncStatus();buildRosterTable();renderAvailable();return;}
   try{
     // League format detection
     const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
@@ -2611,6 +2638,7 @@ async function fetchFantasyCalcValues(){
     const data=await fetch(url).then(r=>r.ok?r.json():[]).catch(()=>[]);
     if(!data.length){console.warn('FantasyCalc returned no data');return;}
     const values={};
+    const pickValues={}; // "2026_1" -> value
     data.forEach(d=>{
       if(d.player?.sleeperId){
         values[String(d.player.sleeperId)]={
@@ -2620,8 +2648,24 @@ async function fetchFantasyCalcValues(){
           trend:d.trend30Day||0,
         };
       }
+      // Capture pick values — FC returns these as entries without sleeperId
+      if(d.player?.position==='PICK'||(!d.player?.sleeperId&&d.player?.name)){
+        const name=d.player?.name||'';
+        // FC pick names like "2026 1st", "2026 Mid 2nd", etc
+        const m=name.match(/(\d{4})\s*(early|mid|late)?\s*(\d+)/i);
+        if(m){
+          const yr=m[1];const pos=(m[2]||'mid').toLowerCase();const rd=m[3];
+          const key=yr+'_'+rd+'_'+pos;
+          pickValues[key]=Math.max(0,d.value||0);
+        }
+      }
     });
     FC_VALUES=values;FC_LOADED=true;
+    // Store pick values globally
+    window.FC_PICK_VALUES=pickValues;
+    if(Object.keys(pickValues).length){
+      console.log('FC pick values:',Object.keys(pickValues).length,'picks captured');
+    }
     _availCache=null; // invalidate available players cache
     saveFCCache(values);
     updateDataFreshness();
@@ -2633,7 +2677,8 @@ async function fetchFantasyCalcValues(){
         th.innerHTML='Value <span style="font-size:8px;color:var(--green)">FC</span>';
     });
     console.log(`FantasyCalc: ${Object.keys(values).length} players (.5PPR, ${teams} teams, ${numQbs}QB)`);
-  }catch(e){console.warn('FantasyCalc fetch failed:',e);updateDataFreshness();}
+    updateSyncStatus();
+  }catch(e){console.warn('FantasyCalc fetch failed:',e);updateDataFreshness();updateSyncStatus();}
 }
 
 // ── Player Value (FantasyCalc only) ───────────────────────────
@@ -2696,11 +2741,22 @@ function renderHomeSnapshot(){
   const my=myR();if(!my)return;
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
   const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
-  const rank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
   const s=my.settings||{};
   const faab=getFAAB();
   const sessions=loadConvMemory();
   const lastSession=sessions.length?sessions[sessions.length-1]:null;
+
+  // Calculate avg PPG for my team and league
+  const myPts=((s.fpts||0)+(s.fpts_decimal||0)/100);
+  const weeks=Math.max(1,(s.wins||0)+(s.losses||0)+(s.ties||0));
+  const myAvg=weeks>0?(myPts/weeks).toFixed(1):'—';
+  const leagueAvgs=S.rosters.map(r=>{
+    const rs=r.settings||{};
+    const pts=(rs.fpts||0)+(rs.fpts_decimal||0)/100;
+    const w=Math.max(1,(rs.wins||0)+(rs.losses||0)+(rs.ties||0));
+    return pts/w;
+  }).filter(v=>v>0);
+  const leagueAvg=leagueAvgs.length?(leagueAvgs.reduce((a,b)=>a+b,0)/leagueAvgs.length).toFixed(1):'—';
 
   const el=$('home-snapshot');if(!el)return;
   el.innerHTML=`
@@ -2711,12 +2767,16 @@ function renderHomeSnapshot(){
       </div>
       <div style="margin-left:auto;display:flex;gap:12px;flex-wrap:wrap">
         <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
-          <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">#${rank}</div>
-          <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Rank</div>
-        </div>
-        <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${s.wins||0}-${s.losses||0}</div>
           <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Record</div>
+        </div>
+        <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
+          <div style="font-size:22px;font-weight:800;color:${myAvg!=='—'&&parseFloat(myAvg)>=parseFloat(leagueAvg)?'var(--green)':'var(--amber)'};font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${myAvg}</div>
+          <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">My PPG</div>
+        </div>
+        <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
+          <div style="font-size:22px;font-weight:800;color:var(--text2);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${leagueAvg}</div>
+          <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Lg Avg</div>
         </div>
         ${faab.budget>0?`<div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">$${faab.remaining}</div>
@@ -2935,10 +2995,10 @@ async function sendHomeChat(){
 
     try{
       homeChatHistory.push({role:'user',content:text});
-      if(homeChatHistory.length>12)homeChatHistory=homeChatHistory.slice(-12);
+      if(homeChatHistory.length>6)homeChatHistory=homeChatHistory.slice(-6);
       const ctxStr=buildCtx()+'\n'+buildMentalityCtx();
       const msgs=homeChatHistory.map((m,i)=>{
-        if(i===0)return{role:m.role,content:'My dynasty team context:\n'+ctxStr+'\n\nQuestion: '+m.content};
+        if(i===0)return{role:m.role,content:'Team:\n'+ctxStr+'\n\n'+m.content};
         return m;
       });
       const needsSearch=/news|breaking|injury|injur|trade rumor|sign|cut|release|depth chart|waiver wire|free agent|latest|update|today|recent/i.test(text);
@@ -2970,40 +3030,23 @@ async function sendHomeChat(){
     const myPlayers=myR()?.players||[];
     const myPosCounts={};
     myPlayers.forEach(pid=>{const pos=pPos(pid);if(pos)myPosCounts[pos]=(myPosCounts[pos]||0)+1;});
-    const topAvailStr=top20.map(({id,p,val,proj})=>{
-      const isTrending=[].slice(0,50).some(t=>String(t.player_id)===String(id));
-      const own=S.ownership?.[String(id)];
-      const ownPct=own?.owned_by!=null?`,own${(own.owned_by*100).toFixed(0)}%`:'';
-      return`${pName(id)}(${p.position},${p.age||'?'}y,${p.team||'FA'},v${val}${proj?`,p${proj.toFixed(0)}`:''}${ownPct}${isTrending?',🔥':''})`;
+    const topAvailStr=top20.slice(0,10).map(({id,p,val})=>{
+      return`${pName(id)}(${p.position},${p.age||'?'},${p.team||'FA'},FC${val})`;
     }).join(';');
-    const slotsToFill=Math.max(1,Math.min(6,slots.openBench>0?slots.openBench:1));
-    const faabFields=isFAAB?(()=>{
-      // Use real league FAAB history if available
-      return '"faab_low":0,"faab_high":0,"faab_rationale":"based on league history",';
-    })():"";
-    // Build FAAB context from LeagueIntel
+    const slotsToFill=Math.max(1,Math.min(4,slots.openBench>0?slots.openBench:1));
+    const faabFields=isFAAB?'"faab_low":0,"faab_high":0,':'';
     const faabCtxStr=LI_LOADED&&LI.faabByPos?
-      'LEAGUE FAAB HISTORY BY POSITION:\n'+Object.entries(LI.faabByPos).map(([pos,d])=>
-        `  ${pos}: avg $${d.avg}, median $${d.median}, win-bid $${d.p75} (${d.count} claims)`
-      ).join('\n'):'No FAAB history yet.';
-    const prompt=`Dynasty waiver agent. Offseason ${S.season} — focus on DYNASTY value, age curves, and depth building (no in-season stats context). Week ${S.currentWeek}.
+      Object.entries(LI.faabByPos).slice(0,4).map(([pos,d])=>`${pos}:avg$${d.avg}(${d.count}claims)`).join(';'):'';
+    const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+    const prompt=`Waiver agent. ${S.season} offseason. FC values 0-10000 scale.
 ${buildMentalityCtx()}
-ROSTER: ${slots.openBench} open bench slot(s), max ${slots.rosterMax}, active ${slots.activePlayers}.
-${isFAAB?`FAAB: I have $${faab.remaining} remaining of $${faab.budget}. League avg remaining: $${leagueFaab.avg}.`:'Waiver priority system (no FAAB).'}
-${faabCtxStr}
-MY ROSTER POS COUNTS: ${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')||'unknown'}
-WAIVER PRIORITY: #${myR()?.settings?.waiver_position||'?'}
-AVAILABLE PLAYERS (top 40 by dynasty value, not on any roster):
-${topAvailStr||'No available players found — may still be loading.'}
-
-Recommend ${slotsToFill} waiver add(s) in priority order.
-${slots.openBench===0?'ROSTER IS FULL — only suggest adding if clearly worth a drop. You must specify who to drop.':'Do NOT suggest drops, roster has open slots.'}
-${isFAAB?`For each add, give a FAAB bid range. Use this real historical data from MY league:\n${faabCtxStr}\nMy remaining budget: $${faab.remaining}.`:''}
-Be specific about WHY each player fits my team and mentality. Reference their role, age, and upside.
-IDP SCORING CONTEXT: sacks=${sc.idp_sack||4}pts, INT=${sc.idp_int||5}pts, PassDef=${sc.idp_pass_def||3}pts, TKLsolo=${sc.idp_tkl_solo||0.5}pts, QBhit=${sc.idp_qb_hit||1.25}pts. DBs with INT/PD upside are most valuable. Avoid pure volume tacklers (LBs) unless elite.
-
-Respond with ONLY this JSON (no markdown, no explanation):
-{"recommendations":[{"name":"exact player name","position":"QB/RB/WR/TE/DL/LB/DB","team":"NFL team abbr","rank":1,"age":25,"dynastyValue":5000,"reason":"2 specific sentences about fit and why","drop":null,"drop_reason":null,${faabFields}"copyText":"Hi [owner], putting in a waiver claim for [player]. Happy to discuss."}]}`;
+ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
+${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
+AVAILABLE(top10):${topAvailStr||'still loading'}
+IDP:sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3}
+${slots.openBench===0?'ROSTER FULL — must suggest who to drop.':''}
+Recommend ${slotsToFill} adds. Name players, cite FC values, explain fit. JSON only:
+{"recommendations":[{"name":"player","position":"POS","team":"TM","rank":1,"age":0,"dynastyValue":0,"reason":"why",${faabFields}"copyText":"Sleeper msg"}]}`;
     const reply=await callClaude([{role:'user',content:prompt}]);
     let data={recommendations:[]};
     try{
@@ -3072,45 +3115,10 @@ async function sendTradeChat(){
   msgsEl.appendChild(lm);msgsEl.scrollTop=99999;
   try{
     tradeChatHistory.push({role:'user',content:text});
-    if(tradeChatHistory.length>10)tradeChatHistory=tradeChatHistory.slice(-10);
-    const oppId=$('trade-opp-sel')&&$('trade-opp-sel').value;
-    const oppRoster=oppId?S.rosters.find(r=>r.roster_id===parseInt(oppId)):null;
-    const oppName=oppRoster?getUser(oppRoster.owner_id):'unknown';
-    const sc6=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
-    const oppCtx=oppRoster?(()=>{
-      // IDP thresholds based on actual league scoring (not traditional pts)
-  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
-  // A "startable" IDP player = someone who scored in top 60% of their position
-  // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
-  // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
-  // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
-  const startThresh={QB:18,RB:10,WR:10,TE:8,
-    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
-    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
-    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
-  };
-      const rp=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.roster_positions||[];
-      const slots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
-      rp.forEach(s=>{if(s in slots)slots[s]++;else if(s==='FLEX'){slots.RB+=0.4;slots.WR+=0.4;slots.TE+=0.2;}else if(s==='IDP_FLEX'){slots.DL+=0.35;slots.LB+=0.35;slots.DB+=0.3;}});
-      Object.keys(slots).forEach(p=>slots[p]=Math.round(slots[p]));
-      const gaps=[],surplus=[];
-      Object.keys(slots).forEach(pos=>{
-        const need=slots[pos];if(!need)return;
-        const thresh=startThresh[pos]||10;
-        const startable=(oppRoster.players||[]).filter(p=>pPos(p)===pos&&(S.playerStats?.[p]?.seasonAvg||0)>=thresh).length;
-        if(startable<need)gaps.push(pos+'('+(need-startable)+' short)');
-        else if(startable>need+1)surplus.push(pos+'(+'+(startable-need)+')');
-      });
-      const picks=S.tradedPicks.filter(p=>p.owner_id===oppRoster.roster_id).map(p=>p.season+'R'+p.round).join(',');
-      return 'OPPONENT: '+oppName+' | Record: '+(oppRoster.settings?.wins||0)+'-'+(oppRoster.settings?.losses||0)
-        +(gaps.length?' | NEEDS: '+gaps.join(','):'')
-        +(surplus.length?' | SURPLUS: '+surplus.join(','):'')
-        +(picks?' | Their picks: '+picks:'')
-        +' | IDP scoring: sack='+((sc6.idp_sack)||4)+'pts,INT='+((sc6.idp_int)||5)+'pts,PD='+((sc6.idp_pass_def)||3)+'pts';
-    })():'';
-    const ctx=buildCtx()+(oppCtx?'\n'+oppCtx:'');
+    if(tradeChatHistory.length>6)tradeChatHistory=tradeChatHistory.slice(-6);
+    const ctx=buildCtx()+'\n'+buildMentalityCtx();
     const msgs=tradeChatHistory.map(function(m,i){
-      if(i===0)return{role:m.role,content:'You are an elite dynasty fantasy football advisor with full knowledge of this team.\n\n'+ctx+'\n\n'+buildMentalityCtx()+'\n\nIDP scoring context: sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)||4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)||5)+'pts, PD='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)||3)+'pts. DBs with INT/PD upside are premium. Edge rushers with sack ceiling are premium.\n\nFor trade values, reference FantasyCalc (dynastyValue function). Draft Sleeper-ready messages when asked. Be direct and specific — name players, give numbers.\n\nQuestion: '+m.content};
+      if(i===0)return{role:m.role,content:'Dynasty trade advisor. FC values are 0-10000 scale (not dollars). Draft Sleeper-ready messages when asked.\n\n'+ctx+'\n\nQuestion: '+m.content};
       return m;
     });
     const tradeNeedsSearch=/news|value|worth|ranking|trade for|trade away|market|recent/i.test(tradeChatHistory[tradeChatHistory.length-1]?.content||'');
@@ -3247,7 +3255,7 @@ function buildCtx(){
     surpluses.length?'SURPLUS:'+surpluses.join(','):'',
     picks?'PICKS:'+picks:'',
     'IDP:sack='+((sc.idp_sack)||4)+',INT='+((sc.idp_int)||5)+',PD='+((sc.idp_pass_def)||3)+',TKL='+((sc.idp_tkl_solo)||0.5),
-    'Trade values=FantasyCalc(FC). Use FC numbers for trade discussions.',
+    'Trade values=FantasyCalc(FC:0-10000 scale, NOT dollars). Higher=better. 7000+=elite, 4000+=starter, 2000+=depth.',
     memCtx||'',
   ].filter(Boolean).join('\n');
 }
@@ -3278,7 +3286,7 @@ async function sendMessage(){
   input.value='';addMsg(text,'u');const lid=addLoading();
   try{
     S.chatHistory.push({role:'user',content:text});
-    if(S.chatHistory.length>10)S.chatHistory=S.chatHistory.slice(-10);
+    if(S.chatHistory.length>6)S.chatHistory=S.chatHistory.slice(-6);
     // Inject context as a system-like prefix on the first user message only
     const msgs=S.chatHistory.map((m,i)=>
       (i===0&&m.role==='user')?{role:'user',content:`My team context: ${buildCtx()}\n\n${m.content}`}:m
@@ -3346,11 +3354,11 @@ function updateProviderHint(){
   if(el){el.textContent=h.text;el.style.color=h.color;}
 }
 
-async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=800){
+async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
   const provider = S.aiProvider || 'anthropic';
   const apiKey = S.apiKey;
   const model = S.aiModel || PROVIDERS[provider]?.defaultModel || 'claude-sonnet-4-20250514';
-  const sys = 'Expert dynasty fantasy football agent. Trade values from FantasyCalc (api.fantasycalc.com, live). Rankings: FantasyPros, PFF, DLF (IDP). News: Schefter/Rapaport/Pelissero. Be specific with player names; trades→Sleeper copy-paste messages.';
+  const sys = 'Dynasty FF advisor. Values from FantasyCalc (0-10000 scale, NOT dollars). Be specific with player names and FC values. Sleeper-ready messages when asked.';
   // Web search only works with Anthropic — silently disable for other providers
   if(provider !== 'anthropic') useWebSearch = false;
 
@@ -3536,13 +3544,18 @@ function openPlayerModal(playerId){
   if(p.height||p.weight)tags.push(`<span style="background:var(--bg4);color:var(--text3);font-size:10px;padding:2px 7px;border-radius:20px">${[(p.height?Math.floor((p.height||0)/12)+"'"+(( p.height||0)%12)+'"':''),p.weight?p.weight+'lbs':''].filter(Boolean).join(' · ')}</span>`);
   $('pm-tags').innerHTML=tags.join('');
 
-  // Stats bar (5 columns)
+  // Stats bar — show what we actually have, prioritize offseason-relevant data
+  const prevYr=String(parseInt(S.season)-1).slice(2);
+  const fcRankData=getPlayerRank(playerId);
+  const fcTrend=fcRankData?.trend||0;
+  const trendLabel=fcTrend>100?'▲ Rising':fcTrend<-100?'▼ Falling':'Stable';
+  const trendCol=fcTrend>100?'var(--green)':fcTrend<-100?'var(--red)':'var(--text3)';
   const statBoxes=[
-    {val:stats.seasonAvg?.toFixed(1)||'—',lbl:'Avg/wk',col:stats.seasonAvg>15?'var(--green)':stats.seasonAvg&&stats.seasonAvg<8?'var(--red)':'var(--text)'},
-    {val:stats.trail3?.toFixed(1)||'—',lbl:'L3 avg',col:'var(--text)'},
-    {val:stats.prevAvg?.toFixed(1)||'—',lbl:`'${String(parseInt(S.season)-1).slice(2)} avg`,col:'var(--text2)'},
-    {val:stats.prevTotal?Math.round(stats.prevTotal):'—',lbl:`'${String(parseInt(S.season)-1).slice(2)} total`,col:'var(--text2)'},
-    {val:proj?.toFixed(1)||'—',lbl:'Wk proj',col:'var(--accent)'},
+    {val:val>0?val.toLocaleString():'—',lbl:'FC Value',col:col},
+    {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
+    {val:stats.prevAvg?.toFixed(1)||stats.seasonAvg?.toFixed(1)||'—',lbl:`'${prevYr} PPG`,col:stats.prevAvg>15?'var(--green)':stats.prevAvg&&stats.prevAvg<8?'var(--red)':'var(--text)'},
+    {val:stats.prevTotal?Math.round(stats.prevTotal):'—',lbl:`'${prevYr} Total`,col:'var(--text2)'},
+    {val:trendLabel,lbl:'30d Trend',col:trendCol},
   ];
   $('pm-stats-bar').innerHTML=statBoxes.map(s=>`<div class="pm-stat-box"><div class="pm-stat-box-val" style="color:${s.col}">${s.val}</div><div class="pm-stat-box-lbl">${s.lbl}</div></div>`).join('');
 
@@ -3567,8 +3580,8 @@ function openPlayerModal(playerId){
   }else{$('pm-spark-wrap').style.display='none';}
 
   // Trade value + peak
-  $('pm-trade-val').textContent=val.toLocaleString();
-  $('pm-trade-tier').innerHTML=`<span style="color:${col}">${tier}</span>`;
+  $('pm-trade-val').textContent=val>0?val.toLocaleString():FC_LOADED?'No FC value':'Loading...';
+  $('pm-trade-tier').innerHTML=val>0?`<span style="color:${col}">${tier}</span>${fcRankData?' · Overall #'+fcRankData.overall:''}`:FC_LOADED?'<span style="color:var(--text3)">Not tracked by FantasyCalc</span>':'<span style="color:var(--text3)">FantasyCalc loading...</span>';
   $('pm-peak-years').textContent=pk.label;
   $('pm-peak-desc').textContent=pk.desc;
 
@@ -4335,7 +4348,7 @@ async function sendDraftChat(){
   $('draft-msgs').appendChild(loading);$('draft-msgs').scrollTop=99999;
   try{
     draftChatHistory.push({role:'user',content:text});
-    if(draftChatHistory.length>10)draftChatHistory=draftChatHistory.slice(-10);
+    if(draftChatHistory.length>6)draftChatHistory=draftChatHistory.slice(-6);
     const msgs=draftChatHistory.map((m,i)=>
       i===0?{role:m.role,content:`${year} rookie draft context. My team: ${buildCtx()}. Scoring: ${'PPR:'+(sc.rec||0)+',passTD:'+(sc.pass_td||4)+',sack:'+(sc.idp_sack||4)+',INT:'+(sc.idp_int||5)}.\n\n${m.content}`}:m
     );
