@@ -1507,7 +1507,7 @@ function buildRosterTable(){
       <td><div class="rt-name">${pName(pid)}${isStarter?'<span class="rt-slot">'+posLabel(slot,pid)+'</span>':''}</div><div class="rt-team">${fullTeam(pTeam(pid))}</div></td>
       <td><span class="pos ${pc}" style="font-size:9px">${pos}</span></td>
       <td class="rt-num-cell rt-val">${age||'—'}</td>
-      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+trendHtml:LI_LOADED?'<span style="font-size:9px;color:var(--text3)">—</span>':'...'}</td>
+      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:7px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:9px;color:var(--text3)">—</span>':'...'}</td>
       <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}</td>
       <td class="rt-num-cell rt-val dim">${prev?prev.toFixed(1):'—'}</td>
       <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:9px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
@@ -2217,6 +2217,49 @@ async function loadLeagueIntel(){
     });
 
     // ═══════════════════════════════════════════════════════════════
+    // STEP 12: Import ROOKIE values from FantasyCalc
+    //   FC is used ONLY for players with zero NFL production (incoming rookies)
+    //   DHQ handles all veteran players from league history
+    // ═══════════════════════════════════════════════════════════════
+    let rookieCount=0;
+    try{
+      const fcUrl=`https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${isSF?2:1}&numTeams=${totalTeams}&ppr=0.5`;
+      const fcData=await fetch(fcUrl).then(r=>r.ok?r.json():[]).catch(()=>[]);
+      if(fcData.length){
+        // Find the FC-to-DHQ scale factor by comparing top players
+        // FC top player value vs our top player value
+        const fcTop=Math.max(...fcData.filter(d=>d.player?.sleeperId).map(d=>d.value||0),1);
+        const dhqTop=Math.max(...Object.values(playerScores),1);
+        const scaleFactor=dhqTop/fcTop; // e.g., 9230/10513 = 0.878
+
+        fcData.forEach(d=>{
+          const sid=d.player?.sleeperId;
+          const pos=d.player?.position;
+          const val=d.value||0;
+          if(!sid||!pos||pos==='PICK'||val<=0)return;
+          // ONLY import if this player has NO DHQ score (zero NFL production)
+          if(playerScores[sid])return;
+          // Must be a real position
+          const mappedPos=posMap(pos);
+          if(!positions.includes(mappedPos)&&pos!=='K')return;
+          // Scale FC value to DHQ range
+          const dhqVal=Math.round(val*scaleFactor);
+          if(dhqVal<100)return; // too low to matter
+          playerScores[sid]=dhqVal;
+          playerMeta[sid]={
+            pos:mappedPos,ppg:0,age:S.players[sid]?.age||21,
+            ageFactor:1.0,sitMult:1.0,
+            peakYrsLeft:(peakWindows[mappedPos]||[23,29])[1]-(S.players[sid]?.age||21),
+            starterSeasons:0,recentGP:0,
+            source:'FC_ROOKIE',fcValue:val,fcRank:d.overallRank||999
+          };
+          rookieCount++;
+        });
+        console.log(`FC rookies imported: ${rookieCount} players (scale factor: ${scaleFactor.toFixed(3)})`);
+      }
+    }catch(e){console.warn('FC rookie import failed:',e);}
+
+    // ═══════════════════════════════════════════════════════════════
     // STORE EVERYTHING
     // ═══════════════════════════════════════════════════════════════
     LI={
@@ -2245,6 +2288,7 @@ async function loadLeagueIntel(){
       // Meta
       totalPicks:allDraftPicks.length,
       totalFAABTxns:faabTxns.length,
+      rookieCount,
       leagueYears:uniqueYears,
       builtAt:new Date().toISOString(),
     };
@@ -2253,7 +2297,7 @@ async function loadLeagueIntel(){
 
     const topPlayer=recentPlayers[0];
     console.log(`LeagueIntel COMPLETE:
-  ${Object.keys(playerScores).length} players valued
+  ${Object.keys(playerScores).length} players valued (${rookieCount} rookies from FC)
   ${allDraftPicks.length} draft picks analyzed (${draftMeta.length} drafts)
   ${faabTxns.length} FAAB transactions
   ${uniqueYears.length} seasons scored (${uniqueYears.join(',')})
@@ -3127,7 +3171,7 @@ function updateSyncStatus(){
     if(LI_LOADED){
       const dCount=LI.totalPicks||0;
       dot.style.background='var(--green)';liEl.style.color='var(--text2)';
-      liEl.lastChild.textContent=` Intel ✓ (${dCount} picks, ${LI.leagueYears?.length||0}yr)`;
+      liEl.lastChild.textContent=` Intel ✓ (${dCount} picks, ${LI.leagueYears?.length||0}yr${LI.rookieCount?' + '+LI.rookieCount+' rookies':''})`;
     }
     else{dot.style.background='var(--text3)';liEl.lastChild.textContent=' Intel...';}
   }
