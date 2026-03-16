@@ -3906,7 +3906,41 @@ function checkApiWarn(){$('api-warn').style.display=S.apiKey?'none':'block';}
     }
   }catch(e){}
 })();
-function reconnect(){const u=$('s-user-in').value.trim();if(u)$('u-input').value=u;switchTab('digest');connect();}
+function reconnect(){
+  const u=$('s-user-in')?.value?.trim();
+  if(!u){showToast('Enter a username first');return;}
+  // Reset app state
+  S.user=null;S.leagues=[];S.rosters=[];S.myRosterId=null;
+  S.playerStats={};S.posRanks={};LI_LOADED=false;LI={};window._liLoading=false;
+  _availCache=null;
+  // Clear caches for clean reconnect
+  try{localStorage.removeItem('dhq_leagueintel_v3');
+    Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  // Restore the setup block with the connect form
+  const sb=$('setup-block');
+  if(sb){
+    sb.style.display='block';
+    sb.innerHTML=`<div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:28px;margin-bottom:8px">🔄</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:4px">Switching account</div>
+      <div style="font-size:12px;color:var(--text3)">Connecting as <strong style="color:var(--accent)">${u}</strong></div>
+    </div>
+    <div class="row" style="max-width:380px;margin:0 auto">
+      <input type="text" id="u-input" value="${u}" placeholder="Sleeper username" style="font-size:14px;padding:12px 16px;border-radius:12px" onkeydown="if(event.key==='Enter')connect()"/>
+      <button class="btn" id="conn-btn" onclick="connect()" style="padding:12px 24px;font-size:13px;font-weight:700;border-radius:12px">Connect</button>
+    </div>
+    <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
+    <div class="prog" id="prog" style="display:none;max-width:380px;margin:0 auto"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>`;
+  }
+  // Hide dashboard
+  const dc=$('digest-content');if(dc)dc.style.display='none';
+  // Save new username
+  try{localStorage.setItem('dynastyhq_username',u);}catch(e){}
+  // Switch to home tab and connect
+  switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
+  setTimeout(()=>connect(),100); // small delay to let DOM update
+}
 function reloadSeason(){
   S.season=$('season-sel').value;
   S.leagues=[];S.matchups={};S.transactions={};S.rosters=[];
