@@ -1095,16 +1095,7 @@ const posClass=s=>{const p=posMap[s]||s||'FLEX';return{QB:'pQB',RB:'pRB',WR:'pWR
 // For display label — show actual position, never 'FL' or 'BN'
 const posLabel=(slot,pid)=>{const mapped=posMap[slot];if(mapped&&mapped!=='BN'&&mapped!=='FLEX')return mapped;return pPos(pid)||slot||'?';};
 const pName=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;if(p.position==='DEF')return(p.full_name||id)+' D/ST';return p.full_name||`${p.first_name||''} ${p.last_name||''}`.trim()||id};
-const pTeam=id=>S.players[id]?.team||'';
-function fmtHeight(h){
-  if(!h)return'';
-  const n=parseInt(h);
-  if(isNaN(n))return h; // already a string like "6'2\""
-  const ft=Math.floor(n/12);const inn=n%12;
-  return`${ft}'${inn}"`;
-}
-
-const NFL_TEAMS={
+const pTeam=id=>S.players[id]?.team||'';const NFL_TEAMS={
   ARI:'Arizona Cardinals',ATL:'Atlanta Falcons',BAL:'Baltimore Ravens',BUF:'Buffalo Bills',
   CAR:'Carolina Panthers',CHI:'Chicago Bears',CIN:'Cincinnati Bengals',CLE:'Cleveland Browns',
   DAL:'Dallas Cowboys',DEN:'Denver Broncos',DET:'Detroit Lions',GB:'Green Bay Packers',
@@ -1239,9 +1230,12 @@ async function selectLeague(leagueId,userId){
     // Show home feed immediately
     renderHomeSnapshot();
     // Fire all non-AI data loads in parallel
-    fetchFantasyCalcValues();
-    // Stats first — then AI after data is ready
-    loadRosterStats().then(()=>{
+    // Stats + FC values load in parallel, smart feed fires when both done
+    // Load stats and FC values in parallel, fire smart feed when both ready
+    Promise.all([
+      loadRosterStats(),
+      fetchFantasyCalcValues(),
+    ]).then(()=>{
       if(S.apiKey) runSmartFeed();
     });
   }catch(e){
@@ -1267,16 +1261,7 @@ async function loadLeague(leagueId,userId){
     loadMatchups(leagueId,S.currentWeek),
     loadTxns(leagueId,S.currentWeek),
   ]);
-  renderAll();
-}
-
-async function loadMatchups(lid,week){
-  const key='w'+week;if(S.matchups[key])return;
-  S.matchups[key]=await sf(`/league/${lid}/matchups/${week}`).catch(()=>[]);
-}
-async function loadTxns(lid,week){
-  const key='w'+week;if(S.transactions[key])return;
-  S.transactions[key]=await sf(`/league/${lid}/transactions/${week}`).catch(()=>[]);
+  renderRoster();renderWaivers();renderTrades();renderPicks();initScoutDropdown();
 }async function loadOwnership(){
   // /players/nfl/research/regular/{season}/{week} returns ownership% and rostering%
   // keyed by player_id: {owned_by: N, rostered_by: N, started_by: N, ...}
@@ -1286,13 +1271,6 @@ async function loadTxns(lid,week){
     S.ownership=data;
   }catch(e){S.ownership={};}
 }
-
-function renderAll(){
-  renderRoster();renderWaivers();
-  renderTrades();renderPicks();
-  initScoutDropdown();
-}
-
 // ── Roster ─────────────────────────────────────────────────────
 function getDcLabel(pid){
   const p=S.players[pid];const team=pTeam(pid);
@@ -1563,35 +1541,7 @@ function pickValue(season,round,totalTeams){
   const key=`${round}.${String(midPick).padStart(2,'0')}`;
   const base=BASE_PICK_VALUES[key]||BASE_PICK_VALUES[`${round}.06`]||500;
   return Math.round(base*yearDiscount);
-}
-
-function pickLabel(p){
-  return`${p.season} Round ${p.round}`;
-}
-
-function renderPickValueTable(){
-  const teams=S.rosters.length||12;
-  const rounds=[1,2,3,4,5];
-  const years=[parseInt(S.season)||2025,(parseInt(S.season)||2025)+1,(parseInt(S.season)||2025)+2];
-  $('pick-value-table').innerHTML=`
-    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Values based on mid-round pick. Future picks discounted ~8%/year. Source: DLF/KTC approximation.</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="border-bottom:1px solid var(--border)">
-        <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">Round</th>
-        ${years.map(y=>`<th style="text-align:right;padding:4px 8px;font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase">${y}</th>`).join('')}
-      </tr></thead>
-      <tbody>${rounds.map(r=>`<tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px 8px;font-weight:500">Round ${r}</td>
-        ${years.map(y=>{
-          const v=pickValue(y,r,teams);
-          const col=v>4000?'var(--green)':v>2000?'var(--amber)':v>800?'var(--text2)':'var(--text3)';
-          return`<td style="padding:6px 8px;text-align:right;font-weight:600;color:${col}">${v.toLocaleString()}</td>`;
-        }).join('')}
-      </tr>`).join('')}</tbody>
-    </table>`;
-}
-
-// ── Trade Finder Mode ──────────────────────────────────────────
+}// ── Trade Finder Mode ──────────────────────────────────────────
 
 let extraTeams=[];
 document.addEventListener('change',e=>{
@@ -1627,15 +1577,6 @@ document.addEventListener('change',e=>{
 }
 
 // ── Power Rankings ─────────────────────────────────────────────
-
-function setPowerSnapshot(mode,btn){
-  powerSnapshot=mode;
-  document.querySelectorAll('.rfbtn').forEach(b=>{if([' Current','Preseason','3yr Proj','5yr Proj'].some(t=>b.textContent.trim().startsWith(t.trim())))b.classList.remove('active');});
-  // simpler: deactivate all rfbtns in power panel
-  btn.classList.add('active');
-  
-}
-
 function avatarUrl(user){
   if(user?.avatar)return`https://sleepercdn.com/avatars/thumbs/${user.avatar}`;
   return null;
@@ -1694,44 +1635,7 @@ function getRosterSlots(){
   const activePlayers=(my?.players||[]).filter(p=>!(my?.taxi||[]).includes(p)&&!(my?.reserve||[]).includes(p)).length;
   const openBench=Math.max(0,benchSlots-(activePlayers-(positions.filter(p=>p!=='BN'&&p!=='IR'&&p!=='Taxi').length)));
   return{totalSlots,benchSlots,openBench,taxiSlots,irSlots,taxiUsed,irUsed,rosterMax,activePlayers};
-}
-
-function getLeagueFAABStats(){
-  // Returns avg remaining FAAB and spend patterns per team
-  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  const budget=league?.settings?.waiver_budget||100;
-  const teams=S.rosters.map(r=>{
-    const spent=r.settings?.waiver_budget_used||0;
-    return{name:getUser(r.owner_id),remaining:budget-spent,spent,me:r.roster_id===S.myRosterId};
-  });
-  const avg=teams.length?Math.round(teams.reduce((s,t)=>s+t.remaining,0)/teams.length):budget;
-  return{teams,avg,budget};
-}
-
-function getLeagueWaiverHistory(){
-  // Analyze past claims to build spend averages by position
-  const allClaims=Object.values(S.transactions).flatMap(w=>(w||[]).filter(t=>
-    (t.type==='free_agent'||t.type==='waiver')&&t.settings?.waiver_bid>0
-  ));
-  const byPos={};
-  allClaims.forEach(t=>{
-    const bid=t.settings?.waiver_bid||0;
-    Object.keys(t.adds||{}).forEach(pid=>{
-      const pos=pPos(pid)||'?';
-      if(!byPos[pos])byPos[pos]={bids:[],total:0,count:0};
-      byPos[pos].bids.push(bid);
-      byPos[pos].total+=bid;
-      byPos[pos].count++;
-    });
-  });
-  const avgByPos={};
-  Object.entries(byPos).forEach(([pos,d])=>{
-    const sorted=[...d.bids].sort((a,b)=>a-b);
-    avgByPos[pos]={avg:Math.round(d.total/d.count),median:sorted[Math.floor(sorted.length/2)]||0,max:sorted[sorted.length-1]||0,count:d.count};
-  });
-  return avgByPos;
-}
-function loadMentality(){
+}function loadMentality(){
   const m=getMemory('mentality',{mentality:'balanced',priority:'auto',notes:'',tradePrefs:'',neverDrop:''});
   const sel=$('mentality-sel');const pri=$('priority-sel');
   const notes=$('mentality-notes');const tp=$('trade-prefs');const nd=$('never-drop');
@@ -1980,7 +1884,7 @@ function renderWaivers(){
 
   // FAAB status bar
   if(S.myRosterId){
-    const faab=getFAAB();
+    const faab=getFAAB();const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const slots=getRosterSlots();
     const leagueFaab=getLeagueFAABStats();
     const bar=$('faab-bar');if(bar)bar.style.display='flex';
@@ -2263,77 +2167,116 @@ function renderHomeSnapshot(){
 async function runSmartFeed(){
   if(!S.apiKey)return;
   const btn=$('feed-refresh-btn');
-  if(btn){btn.textContent='Thinking...';btn.disabled=true;}
-  $('feed-cards').innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Analyzing your league...</div>';
+  if(btn){btn.textContent='Analyzing...';btn.disabled=true;}
+  $('feed-cards').innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Scouting your league...</div>';
+
   try{
-    const my=myR();const s=my?.settings||{};
-    const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+    const my=myR();const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+    const sc=league?.scoring_settings||{};
+    const rp=league?.roster_positions||[];
     const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
     const myRank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
+    const teams=S.rosters.length||12;
 
-    // Starter slots from roster positions
-    const rp=league?.roster_positions||[];
-    const startSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
-    rp.forEach(function(slot){
-      if(slot in startSlots)startSlots[slot]++;
-      else if(slot==='FLEX'){startSlots.RB+=0.4;startSlots.WR+=0.4;startSlots.TE+=0.2;}
-      else if(slot==='SUPER_FLEX'){startSlots.QB+=0.6;startSlots.WR+=0.4;}
-      else if(slot==='IDP_FLEX'){startSlots.DL+=0.35;startSlots.LB+=0.35;startSlots.DB+=0.3;}
+    // Starter slots
+    const slots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+    rp.forEach(slot=>{
+      if(slot in slots)slots[slot]++;
+      else if(slot==='FLEX'){slots.RB+=0.4;slots.WR+=0.4;slots.TE+=0.2;}
+      else if(slot==='SUPER_FLEX'){slots.QB+=0.5;slots.WR+=0.25;slots.RB+=0.25;}
+      else if(slot==='IDP_FLEX'){slots.DL+=0.35;slots.LB+=0.35;slots.DB+=0.3;}
+    });
+    Object.keys(slots).forEach(p=>slots[p]=Math.round(slots[p]));
+
+    // IDP thresholds based on actual scoring
+    const idpEliteSeason={
+      DL:{idp_sack:10,idp_tkl_solo:40,idp_tkl_ast:20,idp_tkl_loss:8,idp_qb_hit:25,idp_ff:3},
+      LB:{idp_tkl_solo:80,idp_tkl_ast:30,idp_sack:5,idp_tkl_loss:10,idp_ff:3,idp_int:2,idp_pass_def:5},
+      DB:{idp_int:5,idp_pass_def:15,idp_tkl_solo:60,idp_tkl_ast:20,idp_def_td:1,idp_ff:2,idp_pass_def_3p:2},
+    };
+    const idpThresh={};
+    ['DL','LB','DB'].forEach(pos=>{
+      idpThresh[pos]=Math.round(calcIDPScore(idpEliteSeason[pos],sc)*0.4);
+    });
+    const offThresh={QB:18,RB:10,WR:10,TE:8};
+
+    // My roster gaps
+    const players=my?.players||[];
+    const myGaps=[];
+    ['QB','RB','WR','TE','DL','LB','DB'].forEach(pos=>{
+      const need=slots[pos]||0;if(!need)return;
+      const thresh=idpThresh[pos]||offThresh[pos]||10;
+      const mine=players.filter(p=>pPos(p)===pos);
+      const startable=mine.filter(p=>(S.playerStats?.[p]?.seasonAvg||0)>=thresh);
+      if(startable.length<need)myGaps.push({pos,need,have:startable.length,gap:need-startable.length});
     });
 
-    // Roster gaps — positions needing more startable players
-    const thresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
-    const rosterGaps=Object.keys(startSlots).map(function(pos){
-      const need=Math.round(startSlots[pos]);if(!need)return null;
-      const mine=(my&&my.players||[]).filter(function(pid){return pPos(pid)===pos;});
-      const startable=mine.filter(function(pid){return (S.playerStats&&S.playerStats[pid]&&(S.playerStats[pid].seasonAvg||S.playerStats[pid].prevAvg)||0)>=thresh[pos];}).length;
-      const gap=need-startable;
-      return gap>0?pos+': need '+gap+' more starter'+(gap>1?'s':''):null;
-    }).filter(Boolean).join(', ')||'no critical gaps';
+    // Available players with IDP scoring applied
+    const avail=getAvailablePlayers().slice(0,15).map(({id,p,val})=>{
+      const stats=S.playerStats?.[id];
+      const isIDP=['DL','LB','DB'].includes(p.position);
+      const avg=isIDP&&stats?.prevRawStats
+        ?calcIDPScore(stats.prevRawStats,sc)/(stats.prevRawStats?.gp||17)
+        :(stats?.seasonAvg||0);
+      return{id,pos:p.position,age:p.age||0,val,avg:+avg.toFixed(1),name:pName(id)};
+    });
 
-    const myPicks=S.tradedPicks.filter(function(p){return p.owner_id===S.myRosterId;}).map(function(p){return p.season+'R'+p.round;}).join(',');
-
-    // What the league is adding (hot players)
+    // League recent adds — what are smart managers picking up
     const recentAdds={};
-    Object.values(S.transactions).flat().filter(function(t){return t.type==='waiver'||t.type==='free_agent';}).slice(-30)
-      .forEach(function(t){Object.keys(t.adds||{}).forEach(function(id){recentAdds[id]=(recentAdds[id]||0)+1;});});
-    const hotPlayers=Object.entries(recentAdds).sort(function(a,b){return b[1]-a[1];}).slice(0,6)
-      .map(function(e){return pName(e[0])+'('+pPos(e[0])+','+e[1]+'adds)';}).join(';');
+    Object.values(S.transactions).flat()
+      .filter(t=>t.type==='waiver'||t.type==='free_agent')
+      .slice(-30)
+      .forEach(t=>Object.keys(t.adds||{}).forEach(id=>{recentAdds[id]=(recentAdds[id]||0)+1;}));
+    const hotStr=Object.entries(recentAdds).sort((a,b)=>b[1]-a[1]).slice(0,5)
+      .map(([id,n])=>pName(id)+'('+pPos(id)+','+n+'x)').join(',');
 
-    const avail=getAvailablePlayers().slice(0,10)
-      .map(function(d){return pName(d.id)+'('+d.p.position+','+(d.p.age||'?')+'y,v'+d.val+')';}).join(';');
-
-    // Trade leverage — opponents weak at my strong positions
-    const myStrong=Object.keys(startSlots).filter(function(pos){
-      const need=Math.round(startSlots[pos]);if(!need)return false;
-      const mine=(my&&my.players||[]).filter(function(pid){return pPos(pid)===pos;});
-      const startable=mine.filter(function(pid){return (S.playerStats&&S.playerStats[pid]&&S.playerStats[pid].seasonAvg||0)>=thresh[pos];}).length;
-      return startable>need+1;
+    // My surplus positions — potential trade chips
+    const mySurplus=[];
+    ['WR','TE','DL','DB'].forEach(pos=>{
+      const need=slots[pos]||0;if(!need)return;
+      const thresh=idpThresh[pos]||offThresh[pos]||10;
+      const startable=players.filter(p=>pPos(p)===pos&&(S.playerStats?.[p]?.seasonAvg||0)>=thresh).length;
+      if(startable>need+1)mySurplus.push(pos+'(+'+(startable-need)+' starters)');
     });
-    const tradeTargets=S.rosters.filter(function(r){return r.roster_id!==S.myRosterId;}).map(function(r){
-      const weak=myStrong.filter(function(pos){
-        const their=(r.players||[]).filter(function(pid){return pPos(pid)===pos;});
-        return their.length<Math.round(startSlots[pos]);
-      });
-      if(!weak.length)return null;
-      return (getUser(r.owner_id)&&getUser(r.owner_id).display_name||'Team')+' weak at '+weak.join('/');
-    }).filter(Boolean).slice(0,3).join('; ');
+
+    // Best IDP available — key differentiator
+    const idpAvail=avail.filter(p=>['DL','LB','DB'].includes(p.pos))
+      .sort((a,b)=>b.val-a.val).slice(0,5)
+      .map(p=>`${p.name}(${p.pos},age${p.age},v${p.val},avg${p.avg})`).join(';');
+
+    // Picks
+    const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
+      .map(p=>p.season+'R'+p.round).join(',');
 
     const m=loadMentality();
-    const promptParts=[
-      'Dynasty fantasy football. 3 smart recommendations.',
-      'MY TEAM: '+(S.user&&S.user.display_name)+', '+(s.wins||0)+'-'+(s.losses||0)+', rank #'+myRank+'/'+S.rosters.length+', '+(m.mentality||'balanced')+' mentality',
-      'ROSTER GAPS: '+rosterGaps,
-      'MY PICKS: '+(myPicks||'own picks only'),
-      'LEAGUE ADDING MOST: '+(hotPlayers||'no data'),
-      'BEST AVAILABLE (FC): '+avail,
-      'TRADE LEVERAGE: '+(tradeTargets||'none identified'),
-      m.neverDrop?'NEVER DROP: '+m.neverDrop:'',
-      'Each rec must name a SPECIFIC player or pick slot, explain WHY using the data, tie to my mentality.',
-      'JSON only: {"recs":[{"type":"waiver|trade|draft|roster","headline":"sharp 1-sentence action","body":"2 sentences with specific reasoning","cta_label":"short label","cta_action":"waiver|trade|draft|info","copy":"Sleeper message or null"},{"type":"...","headline":"...","body":"...","cta_label":"...","cta_action":"...","copy":"..."},{"type":"...","headline":"...","body":"...","cta_label":"...","cta_action":"...","copy":"..."}]}'
-    ].filter(Boolean).join('\n');
+    const idpCtx=`League IDP scoring: sack=${sc.idp_sack||4}, INT=${sc.idp_int||5}, PD=${sc.idp_pass_def||3}, TKL=${sc.idp_tkl_solo||0.5}, QBhit=${sc.idp_qb_hit||1.25}. DBs most valuable (INT+PD+potential TD). Edge rushers premium (sack+QBhit). LBs need high volume.`;
 
-    const reply=await callClaude([{role:'user',content:promptParts}],false,2,600);
+    const prompt=[
+      'Dynasty fantasy football. You are an elite GM advisor. Generate exactly 4 targeted recommendations.',
+      '',
+      'MY SITUATION: '+S.user.display_name+', rank #'+myRank+'/'+teams+', '+m.mentality+' mentality',
+      myGaps.length?'ROSTER GAPS (urgent): '+myGaps.map(g=>g.pos+' need '+g.gap+' more starter'+(g.gap>1?'s':'')).join(', '):'No critical gaps',
+      mySurplus.length?'MY TRADE CHIPS: '+mySurplus.join(', '):'',
+      'BEST AVAILABLE FREE AGENTS: '+avail.slice(0,8).map(p=>p.name+'('+p.pos+',age'+p.age+',v'+p.val+',avg'+p.avg+')').join(';'),
+      'BEST AVAILABLE IDP: '+idpAvail,
+      hotStr?'LEAGUE ADDING: '+hotStr:'',
+      myPicks?'MY PICKS: '+myPicks:'',
+      m.neverDrop?'NEVER TOUCH: '+m.neverDrop:'',
+      '',
+      idpCtx,
+      '',
+      'REQUIRED: Return exactly 4 cards covering these angles:',
+      '1. type:waiver — Best free agent add right now with specific FAAB range',
+      '2. type:idp — IDP-specific insight using scoring weights (INT/sack/PD value). Name a specific player to add, trade for, or target in draft.',
+      '3. type:trade — Specific trade to propose using my surplus. Name both players.',
+      '4. type:draft — Offseason rookie draft priority given my gaps.',
+      '',
+      'Each must: name real players, cite actual values/ages, be non-obvious.',
+      '',
+      'JSON only: {"recs":[{"type":"waiver|idp|trade|draft","headline":"sharp action sentence","body":"2 sentences with specific data and IDP scoring context where relevant","cta_label":"short label","cta_action":"waiver|info|trade|draft","copy":"ready Sleeper message or null"}]}',
+    ].filter(v=>v!==null).join('\n');
+
+    const reply=await callClaude([{role:'user',content:prompt}],false,2,700);
     let data={recs:[]};
     try{
       const clean=reply.replace(/```json|```/g,'').trim();
@@ -2341,35 +2284,37 @@ async function runSmartFeed(){
       if(si>=0)data=JSON.parse(clean.substring(si,ei+1));
     }catch(pe){}
 
-    if(!data.recs||!data.recs.length){
-      $('feed-cards').innerHTML='<div class="card"><div class="empty">No recommendations yet. Try refreshing once your stats load.</div></div>';
+    if(!data.recs?.length){
+      $('feed-cards').innerHTML='<div class="card"><div class="empty">No recommendations yet — try refreshing once stats load.</div></div>';
       if(btn){btn.textContent='Refresh ↺';btn.disabled=false;}
       return;
     }
 
     $('feed-updated').textContent='Updated '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    const typeLabels={waiver:'Waiver wire',trade:'Trade',draft:'Draft',roster:'Roster'};
-    $('feed-cards').innerHTML=data.recs.map(function(r){
+    const typeLabels={waiver:'Waiver wire',idp:'IDP insight',trade:'Trade',draft:'Draft target'};
+    const typeColors={waiver:'var(--accent)',idp:'var(--green)',trade:'var(--amber)',draft:'#a78bfa'};
+    $('feed-cards').innerHTML=data.recs.map(r=>{
       const lbl=typeLabels[r.type]||r.type;
+      const col=typeColors[r.type]||'var(--accent)';
       const nav={
         waiver:"mobileTab('waivers',document.getElementById('mnav-waivers'))",
         trade:"mobileTab('trades',document.getElementById('mnav-trades'))",
-        draft:"mobileTab('draftroom',document.getElementById('mnav-draft'))"
-      }[r.cta_action]||("homeAsk('More on: "+( (r.headline||'').replace(/'/g,'') )+"')");
+        draft:"mobileTab('draftroom',document.getElementById('mnav-draft'))",
+        info:`homeAsk('Tell me more: ${(r.headline||'').replace(/'/g,'')}')`,
+      }[r.cta_action]||`homeAsk('More on: ${(r.headline||'').replace(/'/g,'')}')`;
       const hl=(r.headline||'').replace(/'/g,'');
       const copyBtn=r.copy?'<button class="feed-secondary" onclick="copyText('+JSON.stringify(r.copy)+',this)">Copy msg</button>':'';
       const body=(r.body||'').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-      return '<div class="feed-card type-'+r.type+'">'
-        +'<div class="feed-type '+r.type+'">'+lbl+'</div>'
+      return '<div class="feed-card" style="border-left:3px solid '+col+'">'
+        +'<div class="feed-type" style="color:'+col+'">'+lbl+'</div>'
         +'<div class="feed-headline">'+(r.headline||'')+'</div>'
         +'<div class="feed-body">'+body+'</div>'
         +'<div class="feed-actions">'
-        +'<button class="feed-cta" onclick="'+nav+'">'+(r.cta_label||'Explore')+' →</button>'
+        +'<button class="feed-cta" style="background:'+col+'" onclick="'+nav+'">'+(r.cta_label||'Explore')+' →</button>'
         +copyBtn
-        +'<button class="feed-secondary" onclick="homeAsk(this.getAttribute(\'data-q\'))" data-q="More: '+hl+'">Why? ↗</button>'
+        +'<button class="feed-secondary" onclick="homeAsk(this.getAttribute(\"data-q\"))" data-q="More: '+hl+'">Ask AI ↗</button>'
         +'</div></div>';
     }).join('');
-
   }catch(e){
     $('feed-cards').innerHTML='<div class="card"><div class="empty" style="color:var(--red)">Error: '+e.message+'</div></div>';
   }
@@ -2451,6 +2396,7 @@ Recommend ${slotsToFill} waiver add(s) in priority order.
 ${slots.openBench===0?'ROSTER IS FULL — only suggest adding if clearly worth a drop. You must specify who to drop.':'Do NOT suggest drops, roster has open slots.'}
 ${isFAAB?`For each add, give a realistic FAAB bid range based on the position historical spend data and my remaining $${faab.remaining}.`:''}
 Be specific about WHY each player fits my team and mentality. Reference their role, age, and upside.
+IDP SCORING CONTEXT: sacks=${sc.idp_sack||4}pts, INT=${sc.idp_int||5}pts, PassDef=${sc.idp_pass_def||3}pts, TKLsolo=${sc.idp_tkl_solo||0.5}pts, QBhit=${sc.idp_qb_hit||1.25}pts. DBs with INT/PD upside are most valuable. Avoid pure volume tacklers (LBs) unless elite.
 
 Respond with ONLY this JSON (no markdown, no explanation):
 {"recommendations":[{"name":"exact player name","position":"QB/RB/WR/TE/DL/LB/DB","team":"NFL team abbr","rank":1,"age":25,"dynastyValue":5000,"reason":"2 specific sentences about fit and why","drop":null,"drop_reason":null,${faabFields}"copyText":"Hi [owner], putting in a waiver claim for [player]. Happy to discuss."}]}`;
@@ -2559,38 +2505,102 @@ async function sendWaiverChat(){
     const avail=getAvailablePlayers();
     const availStr=avail.slice(0,25).map(function(d){return pName(d.id)+'('+d.p.position+',age'+(d.p.age||'?')+',v'+d.val+(S.playerStats&&S.playerStats[d.id]&&S.playerStats[d.id].seasonAvg?',avg'+S.playerStats[d.id].seasonAvg.toFixed(1):'')+')'}).join(';');
     const ctx='MY TEAM:\n'+buildCtx()+'\n'+buildMentalityCtx()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (sorted by dynasty value):\n'+availStr;
-    const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nQuestion: '+text+'\n\nBe specific — name actual players from the Available list above. 3-5 sentences max.'}]);
+    const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)||4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)||5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)||3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
     lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
   msgs.scrollTop=99999;
-}// ── Context builders ───────────────────────────────────────────
-function buildScoringStr(){
-  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  const sc=league?.scoring_settings||{};
-  return Object.entries({rec:'PPR',pass_td:'passTD',rush_td:'rushTD',bonus_rec_te:'TEprem',rec_yd:'recYd'}).filter(([k])=>sc[k]!==undefined).map(([k,l])=>`${l}:${sc[k]}`).join(',')|| 'custom';
+}// ── Context builders ───────────────────────────────────────────// IDP scoring value — uses actual league scoring settings
+function calcIDPScore(stats, sc){
+  if(!stats)return 0;
+  let pts=0;
+  const add=(stat,mult)=>{pts+=(stats[stat]||0)*(mult||0);};
+  // IDP scoring from actual league settings
+  add('idp_tkl_solo', sc.idp_tkl_solo||0.5);
+  add('idp_tkl_ast', sc.idp_tkl_ast||0.25);
+  add('idp_tkl_loss', sc.idp_tkl_loss||2);
+  add('idp_sack', sc.idp_sack||4);
+  add('idp_ff', sc.idp_ff||3);
+  add('idp_int', sc.idp_int||5);
+  add('idp_pass_def', sc.idp_pass_def||3);
+  add('idp_qb_hit', sc.idp_qb_hit||1.25);
+  add('idp_safe', sc.idp_safe||2);
+  add('idp_blk_kick', sc.idp_blk_kick||3);
+  add('idp_def_td', sc.idp_def_td||6);
+  add('idp_pass_def_3p', sc.idp_pass_def_3p||1);
+  return +pts.toFixed(1);
+}
+
+// IDP position scoring tier based on league settings
+function idpTier(pos, sc){
+  // Score hypothetical elite season at each position
+  const eliteDL={idp_sack:10,idp_tkl_solo:40,idp_tkl_ast:20,idp_tkl_loss:8,idp_qb_hit:25,idp_ff:3};
+  const eliteLB={idp_tkl_solo:80,idp_tkl_ast:30,idp_sack:5,idp_tkl_loss:10,idp_ff:3,idp_int:2,idp_pass_def:5};
+  const eliteDB={idp_int:5,idp_pass_def:15,idp_tkl_solo:60,idp_tkl_ast:20,idp_def_td:1,idp_ff:2,idp_pass_def_3p:2};
+  const scores={DL:calcIDPScore(eliteDL,sc),LB:calcIDPScore(eliteLB,sc),DB:calcIDPScore(eliteDB,sc)};
+  return scores[pos]||0;
 }
 
 function buildCtx(){
-  if(!S.user)return'No account connected.';
+  if(!S.user)return 'No account connected.';
   const my=myR();const s=my?.settings||{};
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const sc=league?.scoring_settings||{};
   const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
   const rank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
-  // Starters: name+pos+team only. Bench: name+pos, cap at 8
-  const starters=(my?.starters||[]).map(p=>`${pName(p)}(${pPos(p)},${pTeam(p)})`);
-  const benchAll=(my?.players||[]).filter(p=>!(my?.starters||[]).includes(p)&&!(my?.reserve||[]).includes(p)&&!(my?.taxi||[]).includes(p));
-  const bench=benchAll.slice(0,8).map(p=>`${pName(p)}(${pPos(p)})`);
-  const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId).slice(0,5).map(p=>`${p.season}R${p.round}`);
-  const m=loadMentality();
-  const mentStr=m.mentality||'balanced';
-  const base=`${S.user.display_name}|${league?.name}|Wk${S.currentWeek}|${s.wins||0}-${s.losses||0}|#${rank}/${S.rosters.length}|${buildScoringStr()}|Starters:[${starters.join(';')}]|Bench:[${bench.join(',')}]|Picks:[${picks.join(',')||'none'}]|Mentality:${mentStr}`;
-  try{
-    const notes=getMemory('notes','');
-    return base+(notes?'|Notes:'+notes.substring(0,80):'');
-  }catch(e){return base;}
+
+  // Starters with stats
+  const starters=(my?.starters||[]).filter(p=>p&&p!=='0').map(p=>{
+    const avg=S.playerStats?.[p]?.seasonAvg||0;
+    return pName(p)+'('+pPos(p)+(avg?','+avg.toFixed(1)+'avg':'')+')';
+  });
+
+  // Positional gaps using real startable thresholds
+  const rp=league?.roster_positions||[];
+  const slots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+  rp.forEach(slot=>{
+    if(slot in slots)slots[slot]++;
+    else if(slot==='FLEX'){slots.RB+=0.4;slots.WR+=0.4;slots.TE+=0.2;}
+    else if(slot==='SUPER_FLEX'){slots.QB+=0.5;slots.WR+=0.25;slots.RB+=0.25;}
+    else if(slot==='IDP_FLEX'){slots.DL+=0.35;slots.LB+=0.35;slots.DB+=0.3;}
+  });
+  Object.keys(slots).forEach(p=>slots[p]=Math.round(slots[p]));
+
+  // IDP elite scoring thresholds (based on actual scoring)
+  const idpThresh={
+    DL: Math.round(idpTier('DL',sc)*0.4),  // 40% of elite season = starter-quality
+    LB: Math.round(idpTier('LB',sc)*0.4),
+    DB: Math.round(idpTier('DB',sc)*0.4),
+  };
+  const offThresh={QB:18,RB:10,WR:10,TE:8};
+
+  const gaps=[];const surpluses=[];
+  const players=my?.players||[];
+  ['QB','RB','WR','TE','DL','LB','DB'].forEach(pos=>{
+    const need=slots[pos]||0;if(!need)return;
+    const thresh=idpThresh[pos]||offThresh[pos]||10;
+    const mine=players.filter(p=>pPos(p)===pos);
+    const startable=mine.filter(p=>(S.playerStats?.[p]?.seasonAvg||0)>=thresh).length;
+    if(startable<need)gaps.push(pos+':'+(need-startable)+' short');
+    else if(startable>need+1)surpluses.push(pos+':+'+(startable-need));
+  });
+
+  // IDP context with scoring weights
+  const idpCtx=`IDP(${sc.idp_sack||4}pts/sack,${sc.idp_int||5}pts/int,${sc.idp_pass_def||3}pts/PD,${sc.idp_tkl_solo||0.5}pts/tkl)`;
+
+  const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
+    .map(p=>p.season+'R'+p.round).join(',');
+
+  return [
+    S.user.display_name+' | '+rank+'/'+S.rosters.length+' | '+(s.wins||0)+'-'+(s.losses||0),
+    'Starters: '+starters.join(', '),
+    gaps.length?'NEEDS: '+gaps.join(', '):'',
+    surpluses.length?'SURPLUS: '+surpluses.join(', '):'',
+    picks?'Picks: '+picks:'',
+    idpCtx,
+    loadMentality().notes?'Notes: '+loadMentality().notes:'',
+  ].filter(Boolean).join('\n');
 }
 
-// ── Chat ───────────────────────────────────────────────────────
 function sc(el){$('chat-in').value=el.textContent;sendMessage();}
 function goAsk(text){
   // Find agent tab by data-tab attribute, not fragile index
@@ -2728,19 +2738,7 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=800){
     }
   }
   throw new Error('Rate limit — please wait and try again.');
-}
-
-function addMsg(text,role){
-  const d=document.createElement('div');d.className='msg msg-'+role;
-  d.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  $('chat-msgs').appendChild(d);$('chat-msgs').scrollTop=99999;
-}
-function addLoading(){
-  const id=Date.now();const d=document.createElement('div');d.className='msg msg-a';d.id='ld-'+id;
-  d.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
-  $('chat-msgs').appendChild(d);$('chat-msgs').scrollTop=99999;return id;
-}
-function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
+}function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
 
 // ── Settings ───────────────────────────────────────────────────
 function saveKey(){
@@ -3621,49 +3619,12 @@ function toggleMobileMore(){
 }
 
 // ── Analytics ──────────────────────────────────────────────────
-// ── Analytics ──────────────────────────────────────────────────
-function computeAnalytics(weeks){
-  // Build per-team per-week stats
-  const teams={};
-  S.rosters.forEach(r=>{
-    teams[r.roster_id]={name:getUser(r.owner_id),pts:[],wins:[],expWins:[],me:r.roster_id===S.myRosterId};
-  });
-
-  weeks.forEach(w=>{
-    const mm=S.matchups['w'+w]||[];
-    if(!mm.length)return;
-    // Points this week
-    mm.forEach(m=>{if(teams[m.roster_id])teams[m.roster_id].pts.push(m.points||0);});
-    // Expected wins: fraction of other teams you'd beat
-    const scores=mm.map(m=>m.points||0).filter(p=>p>0);
-    if(!scores.length)return;
-    scores.sort((a,b)=>a-b);
-    mm.forEach(m=>{
-      if(!teams[m.roster_id])return;
-      const myPts=m.points||0;
-      const expW=scores.filter(s=>s<myPts).length/(scores.length-1||1);
-      teams[m.roster_id].expWins.push(expW);
-      // Actual win for this matchup
-      const opp=mm.find(o=>o.matchup_id===m.matchup_id&&o.roster_id!==m.roster_id);
-      teams[m.roster_id].wins.push(opp&&myPts>opp.points?1:0);
-    });
-  });
-
-  // My points trend
-  const me=Object.values(teams).find(t=>t.me);
-  const myPts=me?.pts||[];
-  const maxPts=Math.max(...Object.values(teams).flatMap(t=>t.pts),1);
-  return{teams,myPts,maxPts};
-}
-
-// ── Stats (stubs for removed stats explorer) ───────────────────
+// ── Analytics ──────────────────────────────────────────────────// ── Stats (stubs for removed stats explorer) ───────────────────
 let statsData={};
 
 
-
-function onStatsPosChange(){} // stats panel removed
-
-function statsSort(key){} // stats panel removed// ── Memory / localStorage ──────────────────────────────────────
+ // stats panel removed
+ // stats panel removed// ── Memory / localStorage ──────────────────────────────────────
 const MEM_KEY='dynastyhq_memory';
 
 function loadMemory(){
