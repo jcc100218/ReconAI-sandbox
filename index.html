@@ -1323,19 +1323,21 @@ async function selectLeague(leagueId,userId){
     const dc2=$('digest-content');if(dc2)dc2.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
     prog(100);
-    // Show home feed immediately
-    renderHomeSnapshot();
+    // Show home feed immediately (safe — won't crash if stats aren't loaded yet)
+    try{renderHomeSnapshot();}catch(e){console.warn('Home snapshot error:',e);}
     // Fire data loads — stats + DHQ engine in parallel
     const t0=Date.now();
-    // Stats load fast (2 API calls), DHQ takes longer but has permanent cache
     Promise.all([
-      loadRosterStats().catch(e=>console.warn('Stats error:',e)),
-      loadLeagueIntel().catch(e=>console.warn('DHQ error:',e)),
+      loadRosterStats().catch(e=>{console.warn('Stats error:',e);return null;}),
+      loadLeagueIntel().catch(e=>{console.warn('DHQ error:',e);return null;}),
     ]).then(()=>{
       console.log('All data ready in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys(LI.playerScores||{}).length);
       updateDataFreshness();updateSyncStatus();
-      buildRosterTable();renderAvailable();renderDraftNeeds();
-      if(S.apiKey) runSmartFeed();
+      buildRosterTable();
+      try{renderAvailable();}catch(e){console.warn('renderAvailable error:',e);}
+      try{renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds error:',e);}
+      try{renderHomeSnapshot();}catch(e){} // re-render with data
+      if(S.apiKey) setTimeout(()=>runSmartFeed(),100);
     }).catch(e=>console.warn('Data load error:',e));
   }catch(e){
     const sb=$('setup-block');
@@ -1578,8 +1580,12 @@ function livDraftADP(pos){
 // Caches historical data permanently (past drafts/stats never change)
 // Only refreshes current season on each load
 async function loadLeagueIntel(){
-  if(loadLICache())return;
-  if(!S.currentLeagueId)return;
+  if(LI_LOADED)return; // already loaded
+  if(window._liLoading)return; // already in progress
+  window._liLoading=true;
+  try{
+  if(loadLICache()){window._liLoading=false;return;}
+  if(!S.currentLeagueId){window._liLoading=false;return;}
 
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
   const sc=league?.scoring_settings||{};
@@ -2140,6 +2146,7 @@ async function loadLeagueIntel(){
   }catch(e){
     console.warn('LeagueIntel error:',e);
   }
+  }finally{window._liLoading=false;}
 }
 
 // Get display value — DHQ (LI) score
@@ -2719,40 +2726,51 @@ function renderAvailable(){
 
   if(!avail.length){tbody.innerHTML='<div style="padding:16px;text-align:center;color:var(--text3)">No available players found.</div>';return;}
   const posFilter=$('avail-pos-sel')?.value||'';
-  let filtered=posFilter?avail.filter(a=>a.p.position===posFilter):avail;
+  const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+  let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
   filtered=[...filtered].sort((a,b)=>{
     if(availSortKey==='age')return((a.p.age||99)-(b.p.age||99))*availSortDir;
     return(b.val-a.val)*availSortDir;
   });
 
-  const el=$('available-count');if(el)el.textContent=`${avail.length} available`;
+  const el=$('available-count');if(el)el.textContent=`${filtered.length}/${avail.length}`;
   const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  const faab=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0};
+  const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
 
-  // Compact table: Name | Pos | Age | DHQ | PPG | Ask
-  const header=`<div style="display:grid;grid-template-columns:1fr 36px 32px 58px 42px 36px;gap:4px;padding:4px 8px;font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border)">
-    <span>Player</span><span>Pos</span><span>Age</span><span>DHQ</span><span>PPG</span><span></span></div>`;
+  // Tight roster-style table: Photo | Name+Team | Pos | Age | DHQ | PPG | FAAB | Ask
+  const header=`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:5px 8px;font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border2);align-items:center">
+    <span></span><span>Player</span><span>Pos</span><span>Age</span><span>DHQ</span><span>PPG</span><span>FAAB</span><span></span></div>`;
 
-  const rows=filtered.slice(0,30).map(({id,p,val})=>{
+  const rows=filtered.slice(0,10).map(({id,p,val},i)=>{
     const stats=S.playerStats?.[id]||{};
     const {col}=tradeValueTier(val);
-    const isIDP=['DL','LB','DB'].includes(p.position);
+    const mPos=posMapFilter(p.position);
+    const isIDP=['DL','LB','DB'].includes(mPos);
     const raw=stats?.prevRawStats;
     const ppg=isIDP&&raw?+(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)).toFixed(1):(stats.seasonAvg||stats.prevAvg||0);
+    // FAAB suggestion based on league market data + player value
+    const market=faabMarket[mPos];
+    let faabSug='—';
+    if(market&&market.count>=3&&faab.budget>0){
+      const baseB=Math.round(market.avg*(val/4000)); // scale bid by value relative to starter
+      const sug=Math.max(1,Math.min(Math.round(faab.remaining*0.15),baseB));
+      faabSug='$'+sug;
+    }
 
-    return`<div style="display:grid;grid-template-columns:1fr 36px 32px 58px 42px 36px;gap:4px;padding:5px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s" onclick="openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <div style="display:flex;align-items:center;gap:6px;overflow:hidden">
-        <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:22px;height:22px;border-radius:50%;flex-shrink:0" onerror="this.style.display='none'" loading="lazy"/>
-        <div style="overflow:hidden"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</div><div style="font-size:9px;color:var(--text3)">${p.team||'FA'}</div></div>
-      </div>
-      <span class="pos ${posClass(p.position)}" style="font-size:9px">${p.position||'?'}</span>
-      <span style="font-size:11px;color:var(--text2)">${p.age||'—'}</span>
-      <span style="font-size:11px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
-      <span style="font-size:11px;color:${ppg>=8?'var(--green)':ppg>=4?'var(--text2)':'var(--text3)'}">${ppg?ppg.toFixed(1):'—'}</span>
-      <button class="copy-btn" style="font-size:9px;padding:2px 5px" onclick="event.stopPropagation();goAsk('Should I add ${pName(id).replace(/'/g,'')}?')">Ask</button>
+    return`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:4px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
+      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+      <div style="overflow:hidden"><div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</div><div style="font-size:8px;color:var(--text3)">${p.team||'FA'}</div></div>
+      <span class="pos ${posClass(p.position)}" style="font-size:8px;padding:1px 4px">${p.position||'?'}</span>
+      <span style="font-size:10px;color:var(--text2)">${p.age||'—'}</span>
+      <span style="font-size:10px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
+      <span style="font-size:10px;color:${ppg>=8?'var(--green)':ppg>=4?'var(--text2)':'var(--text3)'}">${ppg?ppg.toFixed(1):'—'}</span>
+      <span style="font-size:10px;font-weight:600;color:var(--amber)">${faabSug}</span>
+      <button class="copy-btn" style="font-size:8px;padding:1px 4px" onclick="event.stopPropagation();goAsk('Should I add ${pName(id).replace(/'/g,'')}? What FAAB bid?')">Ask</button>
     </div>`;
   }).join('');
 
-  tbody.innerHTML=header+rows+(filtered.length>30?`<div style="padding:8px;text-align:center;font-size:10px;color:var(--text3)">${filtered.length-30} more — filter by position to see all</div>`:'');
+  tbody.innerHTML=header+rows+(filtered.length>10?`<div style="padding:6px 8px;font-size:9px;color:var(--text3);text-align:center">${filtered.length-10} more — filter by position</div>`:'');
 }
 
 function renderWaivers(){
