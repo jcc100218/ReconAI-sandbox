@@ -559,16 +559,11 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         </table>
       </div>
       <!-- Pick assets embedded in roster -->
-      <div class="sec" style="margin-top:16px">Pick assets <div class="sec-line"></div>
+      <div class="sec" style="margin-top:16px">My draft picks (next 3 years) <div class="sec-line"></div>
         <button class="btn btn-ghost btn-sm" onclick="runPicksAI()" id="picks-ai-btn">AI analysis ↗</button>
       </div>
-      <div class="card" id="picks-mine"><div class="empty">Connect to see picks.</div></div>
+      <div id="picks-mine"><div class="empty">Connect to see picks.</div></div>
       <div id="picks-ai-content" style="margin-top:10px"></div>
-      <div class="sec" style="margin-top:12px">Full league pick board <div class="sec-line"></div></div>
-      <div class="card" id="picks-all"><div class="empty">—</div></div>
-      <!-- Pick value reference -->
-      <div class="sec" style="margin-top:12px">Pick value chart <div class="sec-line"></div></div>
-      <div class="card" id="pick-value-table"><div class="empty">Connect to see values.</div></div>
     </div>
 
     <!-- START/SIT -->
@@ -637,10 +632,6 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           <tbody id="avail-tbody"><tr><td colspan="11" style="padding:20px;text-align:center;color:var(--text3)">Connect to see available players.</td></tr></tbody>
         </table>
       </div>
-
-      <!-- Trending adds -->
-      <div class="sec" style="margin-top:14px">Trending adds globally (Sleeper 24h) <div class="sec-line"></div></div>
-      <div class="card" id="trending-adds"><div class="empty">Loading...</div></div>
 
       <!-- League waiver claims -->
       <div class="sec" style="margin-top:14px">This week's claims in your league <div class="sec-line"></div></div>
@@ -1075,14 +1066,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     <div class="mobile-more-menu" id="mobile-more-menu">
       <div style="padding:8px 12px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">My team</div>
       <div class="mobile-more-item" onclick="mobileTab('roster',null);toggleMobileMore()">Roster + Picks</div>
-      <div class="mobile-more-item" onclick="mobileTab('scouting',null);toggleMobileMore()">Scouting</div>
-      <div class="mobile-more-item" 
-      <div class="mobile-more-item" 
-      <div style="padding:8px 12px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Analytics</div>
-      <div class="mobile-more-item" 
-      <div class="mobile-more-item" 
-      <div class="mobile-more-item" 
-      <div style="padding:8px 12px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Settings</div>
+      <div style="padding:8px 12px 4px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Tools</div>
       <div class="mobile-more-item" onclick="mobileTab('agent',null);toggleMobileMore()">AI Agent</div>
       <div class="mobile-more-item" onclick="mobileTab('memory',null);toggleMobileMore()">Memory</div>
       <div class="mobile-more-item" onclick="mobileTab('settings',null);toggleMobileMore()">Settings</div>
@@ -1159,6 +1143,7 @@ function switchTab(tab,btn){
   if(tab==='waivers')loadMentality();
   if(tab==='draftroom')renderDraftNeeds();
   if(tab==='digest')renderHomeSnapshot();
+  if(tab==='roster')buildRosterTable();
   if(tab==='trades')initScoutDropdown();
 }
 
@@ -1458,75 +1443,76 @@ function buildRosterTable(){
 async function loadRosterStats(){
   if(!S.myRosterId)return;
   const my=myR();if(!my)return;
-  const allPlayers=my.players||[];
-  if(!allPlayers.length)return;
+  if(!(my.players||[]).length)return;
 
-  // Init cache objects
   if(!S.playerStats)S.playerStats={};
   if(!S.playerProj)S.playerProj={};
 
+  const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  const isOffseason=!S.nflState?.season_has_scores||S.currentWeek<=1;
+
+  // All players across ALL rosters — needed for elite ranks, waiver comps, draft scout dots
+  const allLeaguePlayers=[...new Set(S.rosters.flatMap(r=>r.players||[]))];
+  // My players specifically for display
+  const allPlayers=allLeaguePlayers;
+
   try{
-    // Load last 3 weeks of stats for trailing avg
-    const weeks=[];
-    for(let w=Math.max(1,S.currentWeek-3);w<S.currentWeek;w++)weeks.push(w);
-    const statsData=await Promise.all(weeks.map(w=>
-      sf(`/stats/nfl/${S.season}/${w}?season_type=regular`).catch(()=>({}))
-    ));
-
-    // Load current season cumulative stats (week 1 to current)
-    // We'll derive season avg from the weekly data we already have
-    allPlayers.forEach(pid=>{
-      const weekPts=statsData.map(wk=>{
-        const pStats=wk[pid];
-        if(!pStats)return null;
-        return calcFantasyPts(pStats,S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{});
-      }).filter(v=>v!==null);
-      const trail3=weekPts.length?weekPts.reduce((a,b)=>a+b,0)/weekPts.length:null;
-      if(!S.playerStats[pid])S.playerStats[pid]={};
-      if(trail3!==null)S.playerStats[pid].trail3=trail3;
-    });
-
-    // Load all weeks for season avg
-    const allWeeks=[];
-    for(let w=1;w<S.currentWeek;w++)allWeeks.push(w);
-    if(allWeeks.length){
-      const allStatsData=await Promise.all(allWeeks.map(w=>
-        sf(`/stats/nfl/${S.season}/${w}?season_type=regular`).catch(()=>({}))
-      ));
-      allPlayers.forEach(pid=>{
-        const allPts=allStatsData.map(wk=>{
-          const pStats=wk[pid];
-          if(!pStats)return null;
-          return calcFantasyPts(pStats,S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{});
-        }).filter(v=>v!==null);
-        if(allPts.length){
+    // Current season stats — only if we have weeks to pull
+    if(!isOffseason){
+      const weeks=[];
+      for(let w=Math.max(1,S.currentWeek-3);w<S.currentWeek;w++)weeks.push(w);
+      if(weeks.length){
+        const statsData=await Promise.all(weeks.map(w=>
+          sf(`/stats/nfl/${S.season}/${w}?season_type=regular`).catch(()=>({}))
+        ));
+        allPlayers.forEach(pid=>{
+          const weekPts=statsData.map(wk=>{
+            const pStats=wk[pid];if(!pStats)return null;
+            return calcFantasyPts(pStats,sc);
+          }).filter(v=>v!==null);
+          const trail3=weekPts.length?weekPts.reduce((a,b)=>a+b,0)/weekPts.length:null;
           if(!S.playerStats[pid])S.playerStats[pid]={};
-          S.playerStats[pid].seasonAvg=allPts.reduce((a,b)=>a+b,0)/allPts.length;
-          S.playerStats[pid].weeklyPts=allPts;
-        }
+          if(trail3!==null)S.playerStats[pid].trail3=trail3;
+        });
+      }
+
+      // Full season avg
+      const allWeeks=[];
+      for(let w=1;w<S.currentWeek;w++)allWeeks.push(w);
+      if(allWeeks.length){
+        const allStatsData=await Promise.all(allWeeks.map(w=>
+          sf(`/stats/nfl/${S.season}/${w}?season_type=regular`).catch(()=>({}))
+        ));
+        allPlayers.forEach(pid=>{
+          const allPts=allStatsData.map(wk=>{
+            const pStats=wk[pid];if(!pStats)return null;
+            return calcFantasyPts(pStats,sc);
+          }).filter(v=>v!==null);
+          if(allPts.length){
+            if(!S.playerStats[pid])S.playerStats[pid]={};
+            S.playerStats[pid].seasonAvg=+(allPts.reduce((a,b)=>a+b,0)/allPts.length).toFixed(1);
+            S.playerStats[pid].weeklyPts=allPts;
+          }
+        });
+      }
+
+      // Projections
+      const projData=await sf(`/projections/nfl/${S.season}/${S.currentWeek}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF&position[]=DL&position[]=LB&position[]=DB`).catch(()=>({}));
+      allPlayers.forEach(pid=>{
+        const pProj=projData[pid];
+        if(pProj)S.playerProj[pid]=calcFantasyPts(pProj,sc);
       });
     }
 
-    // Load projections for current/next week
-    const projWeek=S.currentWeek;
-    const projData=await sf(`/projections/nfl/${S.season}/${projWeek}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF&position[]=DL&position[]=LB&position[]=DB`).catch(()=>({}));
-    const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
-    allPlayers.forEach(pid=>{
-      const pProj=projData[pid];
-      if(pProj)S.playerProj[pid]=calcFantasyPts(pProj,sc);
-    });
-
-    // Last season totals — fetch all prev season weeks and aggregate
+    // Previous season stats — always load these (primary stats source in offseason)
     const prevSeason=String(parseInt(S.season)-1);
-    const prevWeekCount=18; // full season
-    const prevWeeks=[];for(let w=1;w<=prevWeekCount;w++)prevWeeks.push(w);
+    const prevWeeks=[];for(let w=1;w<=18;w++)prevWeeks.push(w);
     const prevStatsData=await Promise.all(prevWeeks.map(w=>
       sf(`/stats/nfl/${prevSeason}/${w}?season_type=regular`).catch(()=>({}))
     ));
     allPlayers.forEach(pid=>{
       const weekPts=prevStatsData.map(wk=>{
-        const pStats=wk[pid];
-        if(!pStats)return null;
+        const pStats=wk[pid];if(!pStats)return null;
         return calcFantasyPts(pStats,sc);
       }).filter(v=>v!==null);
       if(weekPts.length){
@@ -1536,14 +1522,18 @@ async function loadRosterStats(){
         S.playerStats[pid].prevAvg=+(total/weekPts.length).toFixed(1);
         S.playerStats[pid].prevSeason=prevSeason;
         S.playerStats[pid].prevWeeklyPts=weekPts;
-        // Store raw weekly stat objects for player card
+        // In offseason, use prev season avg as the primary "seasonAvg" for startability checks
+        if(isOffseason){
+          S.playerStats[pid].seasonAvg=S.playerStats[pid].prevAvg;
+        }
         const rawAgg={};
         prevStatsData.forEach(wk=>{const ps=wk[pid];if(ps)Object.entries(ps).forEach(([k,v])=>{if(typeof v==='number')rawAgg[k]=(rawAgg[k]||0)+v;});});
         S.playerStats[pid].prevRawStats=rawAgg;
       }
     });
 
-    // Current season totals — use allStatsData already fetched above
+    // Current season totals — only if not offseason
+    if(!isOffseason){
     allPlayers.forEach(pid=>{
       const rawAgg={};
       allStatsData.forEach(wk=>{const ps=wk[pid];if(ps)Object.entries(ps).forEach(([k,v])=>{if(typeof v==='number')rawAgg[k]=(rawAgg[k]||0)+v;});});
@@ -1556,6 +1546,7 @@ async function loadRosterStats(){
           S.playerStats[pid].seasonAvg=+(total/allWeeks.length).toFixed(1);
       }
     });
+    } // end !isOffseason
 
     // Update column headers with actual prev season year
     const thPrev=$('th-prev');const thPrevTot=$('th-prevtot');
@@ -1887,22 +1878,43 @@ function buildMentalityCtx(){
 const WIZARD_STEPS=[
   {
     id:'mentality',
-    msg:`Hey! I'm your Dynasty HQ agent. Let's get you set up so I can give you the most relevant advice.\n\nFirst question: **What's your current team strategy?** Are you trying to win now, rebuild for the future, or somewhere in between?`,
+    msg:`Hey! I'm your Dynasty HQ agent. Let me ask you a few quick questions so every recommendation is tuned to your actual situation.\n\n**What's your current team strategy?**`,
     type:'choices',
     choices:['Win Now 🏆','Rebuild 🔄','Balanced ⚖️','Dynasty Prime ⭐'],
     values:['winnow','rebuild','balanced','prime']
   },
   {
+    id:'tradeStyle',
+    msg:`**How do you approach trades?**\n\nThis helps me know whether to suggest aggressive moves or patience.`,
+    type:'choices',
+    choices:['Aggressive — always looking to deal','Selective — only obvious wins','Conservative — rarely trade','Pick seller — love trading picks'],
+    values:['aggressive','selective','conservative','pick_seller']
+  },
+  {
+    id:'agePreference',
+    msg:`**What's your player age philosophy?**`,
+    type:'choices',
+    choices:['Youth first — under 25 only','Balanced — best value wins','Vets OK — proven production','Age agnostic'],
+    values:['youth','balanced_age','vets','agnostic']
+  },
+  {
+    id:'riskTolerance',
+    msg:`**How do you feel about high-risk, high-upside players?**\n\nThink injury-prone players, depth chart longshots, unproven rookies.`,
+    type:'choices',
+    choices:['Love the upside — go bold','Some risk is fine','Prefer proven commodities','Zero risk — show me safe floors'],
+    values:['high_risk','moderate_risk','low_risk','no_risk']
+  },
+  {
     id:'tradePrefs',
-    msg:`Got it. Now — **how do you approach trades?** What's your general philosophy? For example: do you prefer proven veterans or young upside? Are you willing to give picks for players?`,
+    msg:`**Describe your trade philosophy in your own words.** This is what I'll use when drafting Sleeper messages and evaluating offers.`,
     type:'text',
-    placeholder:'e.g. I prefer young players with upside, willing to give picks for a proven WR1...'
+    placeholder:'e.g. I love young WRs with route tree upside, will give picks for proven starters, never sell a QB early...'
   },
   {
     id:'neverDrop',
-    msg:`Last one: **Are there any players on your roster you'd never drop or trade away, no matter what?** These are your untouchables — I'll never suggest moving them.`,
+    msg:`Last one: **Any players you\'d never trade or drop no matter what?** I\'ll treat these as untouchable.`,
     type:'text',
-    placeholder:'e.g. CeeDee Lamb, my 2026 1st round pick... or type "none"'
+    placeholder:'e.g. Travis Kelce, my 2026 1st... or type "none"'
   }
 ];
 let wizardStep=0;
@@ -2159,27 +2171,34 @@ function renderTrades(){
 function renderPicks(){
   const all=S.tradedPicks;
   const teams=S.rosters.length||12;
-  if(!all.length){$('picks-mine').innerHTML='<div class="empty">No traded picks.</div>';$('picks-all').innerHTML='';return;}
-  const mine=all.filter(p=>p.owner_id===S.myRosterId);
-  const gone=all.filter(p=>p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
-  const row=(p,inc)=>{
-    const orig=S.rosters.find(r=>r.roster_id===p.roster_id);
-    const curr=S.rosters.find(r=>r.roster_id===p.owner_id);
-    const val=pickValue(p.season,p.round,teams);
-    const valCol=val>4000?'var(--green)':val>2000?'var(--amber)':val>800?'var(--text2)':'var(--text3)';
-    return`<div class="pr">
-      <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;${inc?'background:var(--greenL);color:var(--green)':'background:var(--redL);color:var(--red)'}">${p.season} R${p.round}</span>
-      <span class="pn">${orig?getUser(orig.owner_id):`T${p.roster_id}`}</span>
-      <span class="pm">${inc?'→ You':'→ '+(curr?getUser(curr.owner_id):`T${p.owner_id}`)}</span>
-      <span style="font-size:11px;font-weight:700;color:${valCol};min-width:44px;text-align:right">${val.toLocaleString()}</span>
-    </div>`;
-  };
-  $('picks-mine').innerHTML=`
-    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Picks you own (${mine.length}) · Total value: <strong style="color:var(--accent)">${mine.reduce((s,p)=>s+pickValue(p.season,p.round,teams),0).toLocaleString()}</strong></div>
-    ${mine.length?mine.map(p=>row(p,true)).join(''):'<div class="empty">None.</div>'}
-    <div style="font-size:11px;color:var(--text3);margin:10px 0 8px">Picks traded away (${gone.length})</div>
-    ${gone.length?gone.map(p=>row(p,false)).join(''):'<div class="empty">None.</div>'}`;
-  $('picks-all').innerHTML=all.map(p=>row(p,p.owner_id===S.myRosterId)).join('');
+  const el=$('picks-mine');if(!el)return;
+  // Only show picks I OWN for next 3 years
+  const curYear=parseInt(S.season||new Date().getFullYear());
+  const mine=all.filter(p=>p.owner_id===S.myRosterId&&parseInt(p.season)>=curYear&&parseInt(p.season)<=curYear+2)
+    .sort((a,b)=>parseInt(a.season)-parseInt(b.season)||a.round-b.round);
+  if(!mine.length){el.innerHTML='<div class="card"><div class="empty">No traded picks for next 3 years — only your own picks.</div></div>';return;}
+  // Group by year
+  const byYear={};
+  mine.forEach(p=>{const yr=String(p.season);if(!byYear[yr])byYear[yr]=[];byYear[yr].push(p);});
+  const totalVal=mine.reduce((s,p)=>s+pickValue(p.season,p.round,teams),0);
+  el.innerHTML=Object.keys(byYear).sort().map(yr=>{
+    return'<div style="margin-bottom:10px">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">'+yr+'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
+      +byYear[yr].map(p=>{
+        const val=pickValue(p.season,p.round,teams);
+        const valCol=val>4000?'var(--green)':val>2000?'var(--amber)':val>800?'var(--text2)':'var(--text3)';
+        const orig=S.rosters.find(r=>r.roster_id===p.roster_id);
+        const origName=orig?getUser(orig.owner_id):'Own';
+        return'<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;min-width:100px">'
+          +'<div style="font-size:13px;font-weight:700;color:var(--accent)">Round '+p.round+'</div>'
+          +'<div style="font-size:10px;color:var(--text3);margin-top:2px">from '+origName+'</div>'
+          +'<div style="font-size:12px;font-weight:600;color:'+valCol+';margin-top:4px">~'+val.toLocaleString()+'</div>'
+          +'</div>';
+      }).join('')
+      +'</div></div>';
+  }).join('')
+  +'<div style="font-size:11px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+mine.length+' picks · Total value: <strong style="color:var(--accent)">~'+totalVal.toLocaleString()+'</strong></div>';
 }
 
 async function runPicksAI(){
@@ -2527,7 +2546,7 @@ async function sendHomeChat(){
     }).join(';');
     const slotsToFill=Math.max(1,Math.min(6,slots.openBench>0?slots.openBench:1));
     const faabFields=isFAAB?'"faab_low":25,"faab_high":40,"faab_rationale":"bid strategy",':"";
-    const prompt=`Dynasty waiver agent. Week ${S.currentWeek}.
+    const prompt=`Dynasty waiver agent. Offseason ${S.season} — focus on DYNASTY value, age curves, and depth building (no in-season stats context). Week ${S.currentWeek}.
 ${buildMentalityCtx()}
 ROSTER: ${slots.openBench} open bench slot(s), max ${slots.rosterMax}, active ${slots.activePlayers}.
 ${isFAAB?`FAAB: I have $${faab.remaining} remaining of $${faab.budget}. League avg remaining: $${leagueFaab.avg}.`:'Waiver priority system (no FAAB).'}
@@ -2646,9 +2665,10 @@ async function sendWaiverChat(){
 
   try{
     const faab=getFAAB();const slots=getRosterSlots();
-    const avail=getAvailablePlayers().slice(0,20).map(({id,p,val})=>`${pName(id)}(${p.position},age${p.age||'?'},val${val})`).join(';');
-    const ctx=`${buildCtx()} | ${buildMentalityCtx()} | FAAB:$${faab.remaining} | OpenSlots:${slots.openBench} | Available(top20):${avail}`;
-    const reply=await callClaude([{role:'user',content:`Waiver wire advisor for dynasty fantasy football.\nContext: ${ctx}\n\nUser question: ${text}\n\nGive a concise, specific answer (3-5 sentences max). Reference actual available players if relevant.`}]);
+    const avail=getAvailablePlayers();
+    const availStr=avail.slice(0,25).map(function(d){return pName(d.id)+'('+d.p.position+',age'+(d.p.age||'?')+',v'+d.val+(S.playerStats&&S.playerStats[d.id]&&S.playerStats[d.id].seasonAvg?',avg'+S.playerStats[d.id].seasonAvg.toFixed(1):'')+')'}).join(';');
+    const ctx='MY TEAM:\n'+buildCtx()+'\n'+buildMentalityCtx()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (sorted by dynasty value):\n'+availStr;
+    const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nQuestion: '+text+'\n\nBe specific — name actual players from the Available list above. 3-5 sentences max.'}]);
     lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
   msgs.scrollTop=99999;
@@ -3145,77 +3165,290 @@ function scoutTeam(rosterId){
   if(!rosterId){$('scout-content').innerHTML='<div class="card"><div class="empty">Select a team.</div></div>';$('scout-ai-btn').style.display='none';return;}
   $('scout-ai-btn').style.display='';$('scout-ai-btn').dataset.roster=rosterId;
   const r=S.rosters.find(r=>r.roster_id===parseInt(rosterId));
-  if(!r){return;}
+  if(!r)return;
+
   const name=getUser(r.owner_id);
   const s=r.settings||{};
   const players=r.players||[];
-  const starters=r.starters||[];
-  // Group by position
-  const byPos={QB:[],RB:[],WR:[],TE:[],K:[],DEF:[]};
-  players.forEach(pid=>{const pos=pPos(pid)||'WR';if(byPos[pos])byPos[pos].push(pid);else byPos['WR'].push(pid);});
-  // Grade each position group
-  const gradePos=(pids)=>{
-    if(!pids.length)return{grade:'D',color:'grade-d',avg:0};
-    const avg=pids.reduce((s,p)=>s+dynastyValue(p),0)/pids.length;
-    const grade=avg>3500?'A':avg>2500?'B':avg>1500?'C':'D';
-    return{grade,color:'grade-'+grade.toLowerCase(),avg:Math.round(avg)};
-  };
-  const posOrder=['QB','RB','WR','TE'];
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const rp=league?.roster_positions||[];
+
+  // Starter slots (same logic as renderDraftNeeds)
+  const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+  rp.forEach(slot=>{
+    if(slot==='QB')starterSlots.QB++;
+    else if(slot==='RB')starterSlots.RB++;
+    else if(slot==='WR')starterSlots.WR++;
+    else if(slot==='TE')starterSlots.TE++;
+    else if(slot==='DL'||slot==='DE'||slot==='DT')starterSlots.DL++;
+    else if(slot==='LB')starterSlots.LB++;
+    else if(slot==='DB'||slot==='CB'||slot==='S')starterSlots.DB++;
+    else if(slot==='FLEX'){starterSlots.RB+=0.4;starterSlots.WR+=0.4;starterSlots.TE+=0.2;}
+    else if(slot==='SUPER_FLEX'){starterSlots.QB+=0.5;starterSlots.WR+=0.25;starterSlots.RB+=0.25;}
+    else if(slot==='IDP_FLEX'){starterSlots.DL+=0.35;starterSlots.LB+=0.35;starterSlots.DB+=0.3;}
+    else if(slot==='REC_FLEX'){starterSlots.WR+=0.5;starterSlots.TE+=0.5;}
+  });
+  Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.max(1,Math.round(starterSlots[p])));
+  const idealDepth={};
+  Object.keys(starterSlots).forEach(p=>idealDepth[p]=Math.ceil(starterSlots[p]*2.5));
+  const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+
+  // Elite: top 5 FC value at each position league-wide
+  const eliteByPos={};
+  if(S.players){
+    Object.keys(starterSlots).forEach(pos=>{
+      Object.keys(S.players).filter(pid=>pPos(pid)===pos&&dynastyValue(pid)>0)
+        .sort((a,b)=>dynastyValue(b)-dynastyValue(a)).slice(0,5)
+        .forEach(pid=>eliteByPos[pid]=true);
+    });
+  }
+
+  // Build per-position data
+  const byPos={};
+  players.forEach(pid=>{
+    const pos=pPos(pid);if(!(pos in starterSlots))return;
+    if(!byPos[pos])byPos[pos]={total:0,startable:0,players:[]};
+    byPos[pos].total++;
+    const avg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||0;
+    const isStartable=avg>=startThresh[pos];
+    if(isStartable)byPos[pos].startable++;
+    byPos[pos].players.push({pid,avg,isStartable,isElite:!!eliteByPos[pid]});
+  });
+  Object.values(byPos).forEach(d=>{
+    d.players.sort((a,b)=>{
+      if(a.isElite!==b.isElite)return a.isElite?-1:1;
+      if(a.isStartable!==b.isStartable)return a.isStartable?-1:1;
+      return b.avg-a.avg;
+    });
+  });
+
+  const gradeColors={surplus:'var(--green)',ok:'var(--green)',thin:'var(--text2)',need:'var(--amber)',desperate:'var(--red)'};
+  const gradeLabels={surplus:'Stacked',ok:'Solid',thin:'Thin',need:'Need',desperate:'Weak'};
+  const gradeBorder={surplus:'rgba(34,197,94,.2)',ok:'var(--border)',thin:'var(--border)',need:'rgba(245,158,11,.3)',desperate:'rgba(239,68,68,.4)'};
+
   const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
   const rank=sorted.findIndex(r2=>r2.roster_id===r.roster_id)+1;
+  const faab=r.settings?.waiver_budget_used!==undefined?((r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0)):null;
+
+  // Strengths and needs for summary
+  const surplusPos=[];const needPos=[];
+  Object.keys(starterSlots).forEach(pos=>{
+    const d=byPos[pos]||{startable:0,total:0};
+    const gap=starterSlots[pos]-d.startable;
+    if(gap>=starterSlots[pos])needPos.push(pos);
+    else if(gap<=0&&d.total>=idealDepth[pos])surplusPos.push(pos);
+  });
+
+  // Their traded picks
+  const theirPicks=S.tradedPicks.filter(p=>p.owner_id===r.roster_id)
+    .sort((a,b)=>a.season-b.season||a.round-b.round)
+    .map(p=>`<span style="background:rgba(108,99,245,.12);border:1px solid rgba(108,99,245,.25);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;color:var(--accent)">${p.season} R${p.round}</span>`).join('');
+
+  // Score and rank positions
+  const posScores2=Object.keys(starterSlots).map(pos=>{
+    const d=byPos[pos]||{total:0,startable:0,players:[]};
+    const need=starterSlots[pos];const depth=idealDepth[pos];
+    const gap=Math.max(0,need-d.startable);
+    const grade=gap>=need?'desperate':gap>0?'need':Math.max(0,depth-d.total)>2?'thin':d.total>=depth?'surplus':'ok';
+    const score=d.startable-need+(d.total-depth)*0.3;
+    return{pos,d,need,depth,gap,grade,score};
+  }).sort((a,b)=>b.score-a.score);
+
+  const strengths2=posScores2.filter(p=>p.score>=0);
+  const weaknesses2=posScores2.filter(p=>p.score<0).reverse();
+
+  const makeCard2=({pos,d,need,depth,grade})=>{
+    const dots=d.players.slice(0,8).map(({pid,isStartable,isElite,avg})=>{
+      const col=isElite?'var(--green)':isStartable?'var(--accent)':avg>0?'rgba(245,158,11,.7)':'var(--red)';
+      return`<span title="${pName(pid)} (${avg>0?avg.toFixed(1)+' avg':'no stats'})${isElite?' ⭐':''}" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;cursor:default"></span>`;
+    }).join('');
+    const empty=Math.max(0,Math.min(3,depth-d.players.slice(0,8).length));
+    const emptyDots=Array(empty).fill('<span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:1px dashed var(--border2);flex-shrink:0"></span>').join('');
+    return`<div style="background:var(--bg2);border-radius:var(--r);padding:9px 11px;border:1px solid ${gradeBorder[grade]}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:700">${pos}</span>
+        <span style="font-size:9px;font-weight:600;color:${gradeColors[grade]}">${gradeLabels[grade]}</span>
+      </div>
+      <div style="font-size:16px;font-weight:700;line-height:1;margin-bottom:3px">${d.startable}<span style="font-size:11px;font-weight:400;color:var(--text3)">/${need}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:3px">${dots}${emptyDots}</div>
+      <div style="font-size:9px;color:var(--text3)">${d.total}/${depth}</div>
+    </div>`;
+  };
+
+  const posCards=(strengths2.length?
+    '<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their strengths</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">'
+    +strengths2.map(makeCard2).join('')+'</div>':'')
+  +(weaknesses2.length?
+    '<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their needs (your leverage)</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">'
+    +weaknesses2.map(makeCard2).join('')+'</div>':'');
+
   $('scout-content').innerHTML=`
     <div class="card" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div><div style="font-size:15px;font-weight:600">${name}</div><div style="font-size:11px;color:var(--text3)">Rank #${rank}/${S.rosters.length} · ${s.wins||0}-${s.losses||0} · ${((s.fpts||0)+(s.fpts_decimal||0)/100).toFixed(1)} pts</div></div>
-        <div style="font-size:11px;color:var(--text2)">Waiver #${s.waiver_position||'?'}</div>
+      <!-- Header -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div>
+          <div style="font-size:15px;font-weight:700">${name}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">Rank #${rank}/${S.rosters.length} · ${s.wins||0}-${s.losses||0}${faab!==null?' · $'+faab+' FAAB':''}</div>
+        </div>
+        <button class="btn btn-sm" onclick="runScoutAI()" id="scout-ai-btn" style="font-size:11px">Full war room ↗</button>
       </div>
-      <div class="scout-roster-grid">
-        ${posOrder.map(pos=>{
-          const pids=byPos[pos];const g=gradePos(pids);
-          return`<div class="scout-pos-group">
-            <div class="scout-pos-title" style="color:var(--text2)">${pos} <span class="scout-grade ${g.color}">${g.grade}</span></div>
-            ${pids.slice(0,4).map(pid=>`<div class="pr" style="padding:5px 0"><span class="pos ${posClass(pos)}" style="font-size:9px">${pos}</span><span class="pn" style="font-size:12px;cursor:pointer;text-decoration:underline;text-decoration-color:var(--border2)" onclick="openPlayerModal('${pid}')">${pName(pid)}</span><span class="pm">${pAge(pid)?''+pAge(pid):'?'}</span></div>`).join('')}
-            ${pids.length>4?`<div style="font-size:11px;color:var(--text3);margin-top:3px">+${pids.length-4} more</div>`:''}
-          </div>`;
-        }).join('')}
+
+      <!-- Legend -->
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:9px;color:var(--text3);margin-bottom:10px">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:2px"></span>Elite/Starter</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:2px"></span>Depth</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(245,158,11,.7);margin-right:2px"></span>Marginal</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:2px"></span>No stats</span>
       </div>
-      <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Position grades</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${posOrder.map(pos=>{const g=gradePos(byPos[pos]);return`<span class="scout-grade ${g.color}" style="padding:3px 8px;border-radius:6px">${pos}: ${g.grade}</span>`;}).join('')}
+
+      <!-- Position grid -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:7px;margin-bottom:12px">
+        ${posCards}
+      </div>
+
+      <!-- Summary row -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their surplus → target</div>
+          <div style="font-size:12px;color:var(--green);font-weight:600">${strengths2.filter(p=>p.score>1).map(p=>p.pos).join(', ')||'None identified'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their needs → your leverage</div>
+          <div style="font-size:12px;color:var(--amber);font-weight:600">${weaknesses2.map(p=>p.pos).join(', ')||'No obvious gaps'}</div>
         </div>
       </div>
+      ${theirPicks?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Their traded picks</div><div style="display:flex;flex-wrap:wrap;gap:4px">${theirPicks}</div></div>`:''}
     </div>`;
-  /* scout-ai-content removed */
 }
 
 async function runScoutAI(){
   if(!S.apiKey){switchTab('settings');return;}
   const btn=$('scout-ai-btn');btn.textContent='Analyzing...';btn.disabled=true;
-  const out=$('scout-content');if(out)out.innerHTML='<div class="card"><div class="empty">Running full war room analysis...</div></div>';
+  const out=$('scout-content');
   try{
     const rosterId=parseInt($('trade-opp-sel').value);
     const r=S.rosters.find(r=>r.roster_id===rosterId);
-    if(!r){if(out)out.innerHTML='';btn.textContent='Full war room ↗';btn.disabled=false;return;}
+    if(!r){btn.textContent='Full war room ↗';btn.disabled=false;return;}
+
     const oppName=getUser(r.owner_id);
+    const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+    const rp=league?.roster_positions||[];
     const teams=S.rosters.length||12;
-    const oppPlayers=(r.players||[]).map(pid=>`${pName(pid)} (${pPos(pid)}, age ${pAge(pid)||'?'}, val ${dynastyValue(pid).toLocaleString()})`).join(', ');
-    const oppPicks=S.tradedPicks.filter(p=>p.owner_id===rosterId).map(p=>`${p.season} R${p.round} (val ${pickValue(p.season,p.round,teams).toLocaleString()})`).join(', ');
+    const sc=league?.scoring_settings||{};
+
+    // Starter slots
+    const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+    rp.forEach(slot=>{
+      if(slot in starterSlots)starterSlots[slot]++;
+      else if(slot==='FLEX'){starterSlots.RB+=0.4;starterSlots.WR+=0.4;starterSlots.TE+=0.2;}
+      else if(slot==='SUPER_FLEX'){starterSlots.QB+=0.5;starterSlots.WR+=0.25;starterSlots.RB+=0.25;}
+      else if(slot==='IDP_FLEX'){starterSlots.DL+=0.35;starterSlots.LB+=0.35;starterSlots.DB+=0.3;}
+    });
+    Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.max(1,Math.round(starterSlots[p])));
+    const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+
+    // Build position grades for opponent
+    const byPos={};
+    (r.players||[]).forEach(pid=>{
+      const pos=pPos(pid);if(!(pos in starterSlots))return;
+      if(!byPos[pos])byPos[pos]={startable:0,total:0,top:[]};
+      byPos[pos].total++;
+      const avg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||0;
+      if(avg>=startThresh[pos])byPos[pos].startable++;
+      byPos[pos].top.push({name:pName(pid),avg:+avg.toFixed(1),val:dynastyValue(pid),age:pAge(pid)||'?'});
+    });
+    Object.values(byPos).forEach(d=>d.top.sort((a,b)=>b.val-a.val).splice(4)); // top 4 per pos by value
+
+    // Positional grades string
+    const posGrades=Object.keys(starterSlots).map(pos=>{
+      const d=byPos[pos]||{startable:0,total:0,top:[]};
+      const need=starterSlots[pos];
+      const gap=need-d.startable;
+      const grade=gap>=need?'WEAK':gap>0?'NEED':d.total>=(need*2)?'STACKED':'SOLID';
+      const topNames=d.top.slice(0,3).map(p=>`${p.name}(${p.avg}avg,v${p.val})`).join(',');
+      return `${pos}: ${d.startable}/${need} startable [${grade}] — ${topNames||'none'}`;
+    }).join('\n');
+
+    // My positional surpluses vs their needs = leverage
+    const myR2=myR();
+    const myByPos={};
+    (myR2?.players||[]).forEach(pid=>{
+      const pos=pPos(pid);if(!(pos in starterSlots))return;
+      if(!myByPos[pos])myByPos[pos]={startable:0,total:0};
+      myByPos[pos].total++;
+      const avg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||0;
+      if(avg>=startThresh[pos])myByPos[pos].startable++;
+    });
+    const myLeverage=Object.keys(starterSlots).filter(pos=>{
+      const mine=myByPos[pos]||{startable:0};
+      const theirs=byPos[pos]||{startable:0};
+      return mine.startable>(starterSlots[pos]+1)&&theirs.startable<starterSlots[pos];
+    }).join(', ')||'none obvious';
+
+    // Their picks
+    const oppPicks=S.tradedPicks.filter(p=>p.owner_id===rosterId)
+      .sort((a,b)=>a.season-b.season||a.round-b.round)
+      .map(p=>`${p.season}R${p.round}(v${pickValue(p.season,p.round,teams)})`).join(', ');
+
+    // Trade history — what they give up vs what they get
     const allTrades=Object.values(S.transactions).flatMap(w=>(w||[]).filter(t=>t.type==='trade'));
-    const theirTrades=allTrades.filter(t=>t.roster_ids?.includes(rosterId)).slice(0,6).map(t=>{
-      const adds=Object.keys(t.adds||{}).map(pName).join(', ');
-      const picks=(t.draft_picks||[]).map(p=>`${p.season}R${p.round}`).join(', ');
-      return`Acquired: ${adds}${picks?', '+picks:''}`;
-    }).join('; ');
-    const reply=await callClaude([{role:'user',content:`Dynasty fantasy football trade war room for scouting ${oppName}.\n\nTHEIR ROSTER: ${oppPlayers}\nTHEIR PICKS: ${oppPicks||'No traded picks'}\nTHEIR TRADE HISTORY: ${theirTrades||'No recent trades'}\nTHEIR RECORD: ${r.settings?.wins||0}-${r.settings?.losses||0}\nMY CONTEXT: ${buildCtx()}\n${buildMentalityCtx()}\n\nProvide: 1) Team assessment 2) Positional needs 3) Trade tendencies 4) Players they might sell 5) How to approach them 6) Top 3 targets with offer 7) Leverage points. Be specific and strategic.`}],true);
-    if(out)out.innerHTML='<div class="card" style="border-color:rgba(108,99,245,.2)">'
-      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
-      +(avatarUrl(S.leagueUsers.find(u=>u.user_id===r.owner_id))?`<img src="${avatarUrl(S.leagueUsers.find(u=>u.user_id===r.owner_id))}" style="width:32px;height:32px;border-radius:50%;object-fit:cover">`:'')
-      +`<div style="font-size:14px;font-weight:600">${oppName} — War Room</div>`
-      +`<button class="copy-btn" style="margin-left:auto" onclick="copyText(${JSON.stringify(reply)},this)">Copy</button>`
+    const theirTrades=allTrades.filter(t=>t.roster_ids?.includes(rosterId)).slice(0,8).map(t=>{
+      const got=Object.entries(t.adds||{}).filter(([,rid])=>rid===rosterId).map(([pid])=>pName(pid)).join(',');
+      const gave=Object.entries(t.adds||{}).filter(([,rid])=>rid!==rosterId&&t.roster_ids?.includes(rid)).map(([pid])=>pName(pid)).join(',');
+      const picksGot=(t.draft_picks||[]).filter(p=>p.owner_id===rosterId).map(p=>`${p.season}R${p.round}`).join(',');
+      const picksGave=(t.draft_picks||[]).filter(p=>p.owner_id!==rosterId).map(p=>`${p.season}R${p.round}`).join(',');
+      return`GOT: ${got||'—'}${picksGot?' +picks:'+picksGot:''} | GAVE: ${gave||'—'}${picksGave?' +picks:'+picksGave:''}`;
+    }).join('\n');
+
+    // League context
+    const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
+    const oppRank=sorted.findIndex(r2=>r2.roster_id===r.roster_id)+1;
+    const faab=r.settings?.waiver_budget_used!==undefined?((r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0)):null;
+
+    const prompt=`Dynasty trade war room: scouting ${oppName} for a potential trade.
+
+THEIR TEAM: Rank #${oppRank}/${teams}, ${r.settings?.wins||0}-${r.settings?.losses||0}${faab!==null?', $'+faab+' FAAB remaining':''}
+THEIR PICKS: ${oppPicks||'own picks only'}
+
+POSITIONAL BREAKDOWN (startable/needed [grade] — top players):
+${posGrades}
+
+MY TRADE LEVERAGE: I'm surplus at ${myLeverage} — positions they need
+
+THEIR TRADE HISTORY (last 8 trades):
+${theirTrades||'No recent trades found'}
+
+MY CONTEXT:
+${buildCtx()}
+${buildMentalityCtx()}
+
+Based on this data give me:
+1. TEAM TIER — contender/rebuilding/stuck? Their window?
+2. WHAT THEY DESPERATELY NEED — specific positions, grade them on urgency
+3. TRADE TENDENCIES — do they sell picks or buy them? Stars or depth? What patterns show?
+4. PLAYERS TO TARGET — top 3 specific players I should try to get, with why each is gettable and what to offer
+5. HOW TO APPROACH — exact strategy, what to lead with, how to frame my offer given their situation
+6. DRAFT A MESSAGE — a ready-to-paste Sleeper DM opening this trade conversation
+
+Be direct and specific. Name real players and real offers.`;
+
+    const reply=await callClaude([{role:'user',content:prompt}],false,2,900);
+
+    // Rebuild the scout view with AI report appended
+    scoutTeam(rosterId);
+    const aiCard=document.createElement('div');
+    aiCard.className='card';
+    aiCard.style.cssText='border-color:rgba(108,99,245,.2);margin-top:10px';
+    aiCard.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      +(avatarUrl(S.leagueUsers.find(u=>u.user_id===r.owner_id))?`<img src="${avatarUrl(S.leagueUsers.find(u=>u.user_id===r.owner_id))}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">`:'')
+      +`<div style="font-size:13px;font-weight:600">${oppName} — War Room</div>`
+      +`<button class="copy-btn" style="margin-left:auto;font-size:10px" onclick="copyText(${JSON.stringify(reply)},this)">Copy</button>`
       +'</div>'
-      +`<div style="font-size:13px;color:var(--text2);line-height:1.7">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/\n\n/g,'</p><p style="margin-top:10px">').replace(/\n/g,'<br>')}</div>`
-      +'</div>';
+      +`<div style="font-size:12px;color:var(--text2);line-height:1.8">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/#{1,3} /g,'').replace(/\n\n/g,'</p><p style="margin-top:10px">').replace(/\n/g,'<br>')}</div>`;
+    if(out)out.appendChild(aiCard);
+
   }catch(e){if(out)out.innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;}
   btn.textContent='Full war room ↗';btn.disabled=false;
 }
@@ -3290,35 +3523,47 @@ function renderDraftNeeds(){
   const gradeLabels={surplus:'Stacked',ok:'Solid',thin:'Thin',need:'Need',desperate:'🚨 Weak'};
   const gradeBorder={surplus:'rgba(34,197,94,.25)',ok:'var(--border)',thin:'var(--border)',need:'rgba(245,158,11,.35)',desperate:'rgba(239,68,68,.45)'};
 
-  needsEl.innerHTML=Object.keys(starterSlots).map(pos=>{
+  // Score each position: positive = strength, negative = need
+  const posScores=Object.keys(starterSlots).map(pos=>{
     const d=byPos[pos]||{total:0,startable:0,players:[]};
     const slotsNeeded=starterSlots[pos];
     const depth=idealDepth[pos];
-    const startableGap=Math.max(0,slotsNeeded-d.startable);
-    const depthGap=Math.max(0,depth-d.total);
+    const startableGap=slotsNeeded-d.startable;
+    const depthGap=depth-d.total;
     const grade=startableGap>=slotsNeeded?'desperate':startableGap>0?'need':depthGap>2?'thin':d.total>=depth?'surplus':'ok';
+    const score=d.startable-slotsNeeded + (d.total-depth)*0.3;
+    return{pos,d,slotsNeeded,depth,startableGap,depthGap,grade,score};
+  }).sort((a,b)=>b.score-a.score); // best first
 
-    // Player dots — show up to 8, each colored by status
+  const strengths=posScores.filter(p=>p.score>=0);
+  const weaknesses=posScores.filter(p=>p.score<0).reverse(); // worst first
+
+  const makeCard=({pos,d,slotsNeeded,depth,grade})=>{
     const dots=d.players.slice(0,10).map(({pid,isStartable,isElite,name,avg})=>{
       const dotColor=isElite?'var(--green)':isStartable?'var(--accent)':avg>0?'rgba(245,158,11,.7)':'var(--red)';
-      const title=`${name} (${avg>0?avg.toFixed(1)+' avg':'no stats'})${isElite?' ⭐':''}`;
-      return `<span title="${title}" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;cursor:default"></span>`;
+      return`<span title="${name} (${avg>0?avg.toFixed(1)+' avg':'no stats'})${isElite?' ⭐':''}" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${dotColor};flex-shrink:0;cursor:default"></span>`;
     }).join('');
-    // Fill remaining with empty slots if below ideal
-    const emptySlots=Math.max(0,Math.min(4,depth-d.players.slice(0,10).length));
-    const emptyDots=Array(emptySlots).fill('<span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:1px dashed var(--border2);flex-shrink:0"></span>').join('');
-
+    const emptyDots=Array(Math.max(0,Math.min(4,depth-d.players.slice(0,10).length))).fill('<span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:1px dashed var(--border2);flex-shrink:0"></span>').join('');
     return`<div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;border:1px solid ${gradeBorder[grade]}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
         <span style="font-size:13px;font-weight:700;color:var(--text)">${pos}</span>
         <span style="font-size:10px;font-weight:600;color:${gradeColors[grade]}">${gradeLabels[grade]}</span>
       </div>
-      <div style="font-size:18px;font-weight:700;color:var(--text);line-height:1;margin-bottom:4px">${d.startable}<span style="font-size:12px;font-weight:400;color:var(--text3)">/${slotsNeeded}</span></div>
-      <div style="font-size:9px;color:var(--text3);margin-bottom:6px">startable / needed</div>
-      <div style="display:flex;flex-wrap:wrap;gap:3px;min-height:12px">${dots}${emptyDots}</div>
-      <div style="font-size:9px;color:var(--text3);margin-top:5px">${d.total} rostered · ${depth} ideal</div>
+      <div style="font-size:18px;font-weight:700;color:var(--text);line-height:1;margin-bottom:3px">${d.startable}<span style="font-size:12px;font-weight:400;color:var(--text3)">/${slotsNeeded}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;min-height:12px;margin-bottom:4px">${dots}${emptyDots}</div>
+      <div style="font-size:9px;color:var(--text3)">${d.total}/${depth} ideal</div>
     </div>`;
-  }).join('');
+  };
+
+  needsEl.innerHTML=(strengths.length?
+    '<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;margin-top:2px">💪 Strengths (best → good)</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:16px">'
+    +strengths.map(makeCard).join('')+'</div>':'')
+  +(weaknesses.length?
+    '<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🎯 Needs (worst → fixable)</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">'
+    +weaknesses.map(makeCard).join('')+'</div>':'');
+
 
   // Summary panel
   const summaryEl=$('draft-summary');
