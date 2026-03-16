@@ -833,40 +833,45 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     <!-- DRAFT SCOUTING -->
     <div class="panel" id="panel-draftroom">
       <!-- Header -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <div style="flex:1">
           <div style="font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px">AI-powered pick recommendations for your roster</div>
         </div>
         <select id="draft-year-sel" onchange="renderDraftNeeds()" style="font-size:12px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2)">
           <option value="2026">2026</option>
           <option value="2025">2025</option>
           <option value="2027">2027</option>
         </select>
-        <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn">Scout ↗</button>
       </div>
 
-      <!-- Roster needs — PRIMARY section, shows immediately -->
+      <!-- Best bet insight — TOP of page -->
+      <div id="draft-best-bet"></div>
+
+      <!-- Your picks — spelled out -->
+      <div id="draft-my-picks-section" style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:14px">
+        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your picks</div>
+        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px"><span style="color:var(--text3);font-size:12px">Connect to see picks</span></div>
+      </div>
+
+      <!-- Draft priority with picks called out -->
       <div id="draft-summary" style="display:none;margin-bottom:14px">
         <div id="draft-summary-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;display:flex;flex-direction:column;gap:10px"></div>
       </div>
       <div id="draft-needs" style="display:none"></div>
 
-      <!-- Your picks -->
-      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:14px">
-        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your picks</div>
-        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px"><span style="color:var(--text3);font-size:12px">Connect to see picks</span></div>
-      </div>
+      <!-- Historical success — league-wide + your picks -->
+      <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
 
-      <!-- AI draft board -->
-      <div id="draft-scout-content"><div class="card"><div class="empty">Click Scout ↗ to get personalized rookie draft recommendations.</div></div></div>
-
-      <!-- Draft chat -->
-      <div class="sec" style="margin-top:16px">Draft chat <div class="sec-line"></div></div>
+      <!-- AI Draft Advisor — single section combining scout + chat -->
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-        <div id="draft-msgs" style="height:320px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-          <div class="hc-msg-a" style="font-size:12px">I know your roster gaps, your pick slots, and your league's draft tendencies. Tell me what you're thinking and I'll tell you if it's right.</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg3)">
+          <div style="font-size:12px;font-weight:700;color:var(--text)">Draft Advisor</div>
+          <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:10px;padding:3px 10px">Scout my picks ↗</button>
         </div>
+        <div id="draft-msgs" style="height:350px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
+          <div class="hc-msg-a" style="font-size:12px">I know your roster gaps, your pick slots, and your league's draft history. Ask me anything about the draft — who to target, whether to trade up, or which positions to prioritize.</div>
+        </div>
+        <div id="draft-scout-content" style="display:none"></div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
           <input type="text" id="draft-chat-in" placeholder="Who's the best RB? Should I trade up for 1.01?" style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
           <button class="btn btn-sm" onclick="sendDraftChat()">Ask</button>
@@ -4824,8 +4829,25 @@ function renderDraftNeeds(){
   const year=$('draft-year-sel')?.value||'2026';
   const teams=S.rosters.length||12;
   const posMap=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+  const draftRounds=league?.settings?.draft_rounds||7;
 
-  // === STEP 1: Starter requirements from roster slots ===
+  // === Build owned picks list ===
+  const allTP=S.tradedPicks;
+  const ownedPicks=[];
+  const ownPickRounds=[];
+  for(let rd=1;rd<=draftRounds;rd++){
+    const myTradedAway=allTP.find(p=>String(p.season)===year&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
+    const acquired=allTP.filter(p=>String(p.season)===year&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
+    if(!myTradedAway){ownedPicks.push({round:rd,own:true});ownPickRounds.push(rd);}
+    acquired.forEach(p=>{
+      const from=getUser(S.rosters.find(r=>r.roster_id===p.roster_id)?.owner_id);
+      ownedPicks.push({round:rd,own:false,from});
+      if(!ownPickRounds.includes(rd))ownPickRounds.push(rd);
+    });
+  }
+  ownPickRounds.sort((a,b)=>a-b);
+
+  // === Roster analysis ===
   const rp=league?.roster_positions||[];
   const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
   rp.forEach(slot=>{
@@ -4839,160 +4861,39 @@ function renderDraftNeeds(){
   Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.round(starterSlots[p]));
   const activePositions=Object.keys(starterSlots).filter(p=>starterSlots[p]>0);
 
-  // === STEP 2: Evaluate roster strength using DHQ data ===
-  // Use league-derived thresholds from LI if available, else estimate
   const avgThresh=LI_LOADED&&LI.avgThresh?LI.avgThresh:{};
   const peaks=LI_LOADED&&LI.peakWindows?LI.peakWindows:{QB:[24,33],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
 
   const posAnalysis=activePositions.map(pos=>{
-    // Map DE/DT/CB/S players to parent position
     const players=allPlayers.filter(pid=>posMap(pPos(pid))===pos);
     const withData=players.map(pid=>{
       const age=pAge(pid)||26;
       const dhqVal=dynastyValue(pid);
-      // Use seasonAvg (which is prevAvg in offseason) or DHQ meta ppg
       const ppg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||(LI_LOADED&&LI.playerMeta?.[pid]?.ppg)||0;
       return{pid,age,dhqVal,ppg};
     });
-
-    // Startable = above starter threshold (from league data or fallback)
     const starterPPG=avgThresh[pos]?+(avgThresh[pos].starterLine/17).toFixed(1):{QB:12,RB:8,WR:8,TE:6,DL:4,LB:4,DB:3}[pos]||6;
     const startable=withData.filter(p=>p.ppg>=starterPPG);
     const elite=withData.filter(p=>p.dhqVal>=7000);
     const [,peakEnd]=peaks[pos]||[23,29];
     const aging=withData.filter(p=>p.age>peakEnd);
     const young=withData.filter(p=>p.age<=25);
-    const declining=withData.filter(p=>{
-      // Players past peak AND losing value (not just old)
-      if(p.age<=peakEnd)return false;
-      const meta=LI_LOADED&&LI.playerMeta?.[p.pid];
-      return meta&&meta.ageFactor<0.7;
-    });
-
     const slotsNeeded=starterSlots[pos];
     const starterGap=Math.max(0,slotsNeeded-startable.length);
-    const depthTarget=slotsNeeded+Math.ceil(slotsNeeded*0.5);
-
-    // Need score: higher = draft priority
     let needScore=starterGap*30;
-    needScore+=Math.max(0,depthTarget-players.length)*5;
-    needScore+=aging.length*8;
-    needScore+=declining.length*12; // declining players are worse than just aging
-    needScore-=young.length*4;
-    needScore-=elite.length*10;
+    needScore+=Math.max(0,(slotsNeeded+Math.ceil(slotsNeeded*0.5))-players.length)*5;
+    needScore+=aging.length*8;needScore-=young.length*4;needScore-=elite.length*10;
     if(startable.length===0&&slotsNeeded>0)needScore+=50;
-
-    // Scarcity boost from DHQ data
-    if(LI_LOADED&&LI.scarcityMult?.[pos]){
-      needScore=Math.round(needScore*(LI.scarcityMult[pos]));
-    }
-
+    if(LI_LOADED&&LI.scarcityMult?.[pos])needScore=Math.round(needScore*LI.scarcityMult[pos]);
     return{pos,slotsNeeded,startable:startable.length,total:players.length,elite:elite.length,
-      aging:aging.length,declining:declining.length,young:young.length,depthTarget,starterGap,needScore,starterPPG};
-  });
+      aging:aging.length,young:young.length,starterGap,needScore};
+  }).sort((a,b)=>b.needScore-a.needScore);
 
-  posAnalysis.sort((a,b)=>b.needScore-a.needScore);
-
-  // === STEP 3: My actual picks in this draft ===
-  const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&String(p.season)===year);
-  const draftRounds=league?.settings?.draft_rounds||7;
-  const tradedAway=S.tradedPicks.filter(p=>p.previous_owner_id===S.myRosterId&&String(p.season)===year);
-  const ownPickRounds=[];
-  for(let rd=1;rd<=draftRounds;rd++){
-    const tradedAwayThisRound=tradedAway.some(p=>p.round===rd);
-    const acquiredThisRound=myPicks.find(p=>p.round===rd);
-    if(acquiredThisRound||!tradedAwayThisRound)ownPickRounds.push(rd);
-  }
-  myPicks.forEach(p=>{if(!ownPickRounds.includes(p.round))ownPickRounds.push(p.round);});
-  ownPickRounds.sort((a,b)=>a-b);
-
-  // === STEP 4: Pick-by-pick intelligence from DHQ data ===
-  const pickSlotRecs=[];
-  if(LI_LOADED&&LI.hitRateByRound){
-    ownPickRounds.forEach(rd=>{
-      const roundData=LI.hitRateByRound[rd];
-      if(!roundData)return;
-      const bestPositions=(roundData.bestPos||[]).filter(p=>p.total>=2);
-      const scored=bestPositions.map(bp=>{
-        const myNeed=posAnalysis.find(pa=>pa.pos===bp.pos);
-        const needWeight=myNeed?myNeed.needScore:0;
-        const starterRate=bp.starters!==undefined?+(bp.starters/bp.total*100).toFixed(0):bp.rate;
-        return{...bp,needWeight,starterRate,combined:starterRate*0.4+needWeight*0.6};
-      }).sort((a,b)=>b.combined-a.combined);
-
-      // DHQ pick value for this slot
-      const pickNo=(rd-1)*teams+Math.ceil(teams/2);
-      const dhqPV=LI.dhqPickValues?.[pickNo];
-
-      pickSlotRecs.push({round:rd,starterRate:roundData.rate,eliteRate:roundData.eliteRate||0,
-        totalPicks:roundData.total,bestPositions:scored.slice(0,3),
-        pickValue:dhqPV?.value||0,pickNo});
-    });
-  }
-
-  // === STEP 5: Render ===
-  const summaryEl=$('draft-summary');
-  const summaryContent=$('draft-summary-content');
-  if(!summaryEl||!summaryContent)return;
-  summaryEl.style.display='block';
-
-  const topNeeds=posAnalysis.filter(p=>p.needScore>0).slice(0,3);
-  const gradeColor=ns=>ns>=50?'var(--red)':ns>=20?'var(--amber)':ns>0?'var(--text2)':'var(--green)';
-  const gradeLabel=ns=>ns>=50?'Critical':ns>=20?'Need':ns>0?'Thin':'Solid';
-  const valSource=LI_LOADED?'DHQ':'FC';
-
-  let html='';
-
-  // Data source badge
-  html+=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-    <span style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Draft priority</span>
-    <span style="font-size:8px;padding:2px 6px;border-radius:4px;background:${LI_LOADED?'rgba(52,211,153,.1)':'rgba(251,191,36,.1)'};color:${LI_LOADED?'var(--green)':'var(--amber)'}">${valSource}${LI_LOADED?' · '+LI.leagueYears?.length+'yr data':''}</span>
-  </div>`;
-
-  // Positional priority
-  html+=posAnalysis.map(p=>{
-    const isTop3=topNeeds.includes(p);
-    const bar=Math.min(100,Math.max(5,p.needScore*1.2));
-    const barCol=gradeColor(p.needScore);
-    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0${isTop3?';font-weight:600':''}">
-      <span style="font-size:11px;font-weight:700;min-width:24px;color:${barCol}">${p.pos}</span>
-      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:10px;color:${barCol};min-width:44px">${gradeLabel(p.needScore)}</span>
-          <div style="flex:1;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${bar}%;height:100%;background:${barCol};border-radius:2px"></div></div>
-        </div>
-        <span style="font-size:9px;color:var(--text3)">${p.startable}/${p.slotsNeeded} starters${p.aging?' · '+p.aging+' aging':''}${p.declining?' · '+p.declining+' declining':''}${p.young?' · '+p.young+' young':''}</span>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Pick-by-pick intelligence
-  if(pickSlotRecs.length){
-    html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-      <div style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your picks — historical success by position</div>`;
-    html+=pickSlotRecs.map(pr=>{
-      const hitColor=pr.starterRate>=50?'var(--green)':pr.starterRate>=25?'var(--amber)':'var(--red)';
-      const posRecs=pr.bestPositions.map(bp=>{
-        const needDot=bp.needWeight>=20?'🎯':'';
-        return`<span style="font-size:10px;color:${bp.starterRate>=40?'var(--green)':bp.starterRate>=20?'var(--text2)':'var(--text3)'}">${bp.pos} ${bp.starterRate}%${needDot}</span>`;
-      }).join(' · ');
-      const pvStr=pr.pickValue>0?` · DHQ ${pr.pickValue.toLocaleString()}`:'';
-      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:11px;font-weight:700;color:var(--text);min-width:32px">R${pr.round}</span>
-        <div style="flex:1;background:var(--bg4);border-radius:2px;height:6px;overflow:hidden"><div style="width:${Math.max(5,pr.starterRate)}%;height:100%;background:${hitColor};border-radius:2px"></div></div>
-        <span style="font-size:10px;color:${hitColor};min-width:30px;text-align:right">${pr.starterRate}%</span>
-        <span style="font-size:10px;color:var(--text3);min-width:120px;text-align:right">${posRecs||'—'}${pvStr}</span>
-      </div>`;
-    }).join('');
-    html+=`<div style="font-size:9px;color:var(--text3);margin-top:6px">% = starter rate at position (top ${teams>12?15:20}% in league). 🎯 = matches your need. Based on ${LI.totalPicks||'?'} picks across ${LI.draftMeta?.length||'?'} drafts.</div></div>`;
-  }
-
-  // Late-round strategy insight
-  const lateRounds=ownPickRounds.filter(r=>r>=4);
-  if(lateRounds.length&&LI_LOADED&&LI.hitRateByRound){
-    const lateHit=lateRounds.map(r=>LI.hitRateByRound[r]?.rate||0);
-    const avgLateHit=lateHit.reduce((a,b)=>a+b,0)/lateHit.length;
-    // Find best IDP position for late rounds
+  // === RENDER: Best Bet (top of page) ===
+  const bestBetEl=$('draft-best-bet');
+  if(bestBetEl&&LI_LOADED&&LI.hitRateByRound){
+    const topNeed=posAnalysis[0];
+    const lateRounds=ownPickRounds.filter(r=>r>=4);
     const lateIdpHits={DL:0,LB:0,DB:0};
     lateRounds.forEach(r=>{
       (LI.hitRateByRound[r]?.bestPos||[]).forEach(bp=>{
@@ -5000,40 +4901,104 @@ function renderDraftNeeds(){
       });
     });
     const bestLateIDP=Object.entries(lateIdpHits).sort((a,b)=>b[1]-a[1])[0];
+    const earlyRounds=ownPickRounds.filter(r=>r<=3);
+    const bestEarlyNeed=posAnalysis.find(p=>p.needScore>0);
 
-    if(avgLateHit<40){
-      html+=`<div style="margin-top:10px;padding:8px 10px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r);font-size:11px;color:var(--amber)">
-        ⚠️ Your late picks (R${lateRounds.join(', R')}) have a ${avgLateHit.toFixed(0)}% starter rate.${bestLateIDP&&bestLateIDP[1]>0?' Best bet: <b>'+bestLateIDP[0]+'</b> has the highest late-round hit rate in your league.':' Consider trading up for better odds.'}
+    let betHtml='';
+    if(earlyRounds.length&&bestEarlyNeed){
+      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:12px;color:var(--green);line-height:1.5">
+        🎯 <strong>Priority target:</strong> Use your R${earlyRounds[0]} pick on <strong>${bestEarlyNeed.pos}</strong> — you have ${bestEarlyNeed.startable}/${bestEarlyNeed.slotsNeeded} starters and it's your biggest gap.
       </div>`;
     }
+    if(lateRounds.length&&bestLateIDP&&bestLateIDP[1]>0){
+      const avgLateHit=lateRounds.map(r=>LI.hitRateByRound[r]?.rate||0).reduce((a,b)=>a+b,0)/lateRounds.length;
+      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r);font-size:12px;color:var(--amber);line-height:1.5">
+        ⚠️ Late picks (R${lateRounds.join(', R')}): ${avgLateHit.toFixed(0)}% starter rate. Best bet: <strong>${bestLateIDP[0]}</strong> — highest late-round hit rate in your league's history.
+      </div>`;
+    }
+    bestBetEl.innerHTML=betHtml;
   }
+
+  // === RENDER: Your Picks (spelled out) ===
+  const pickEl=$('draft-my-picks');
+  if(pickEl){
+    pickEl.innerHTML=ownedPicks.length?ownedPicks.map(p=>{
+      const val=pickValue(year,p.round,teams);
+      return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg4)':'rgba(124,107,248,.12)'};border:1px solid ${p.own?'var(--border2)':'rgba(124,107,248,.25)'};border-radius:8px;padding:6px 12px">
+        <span style="font-size:13px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">R${p.round}</span>
+        <span style="font-size:9px;color:var(--text3)">${p.own?'Own':'From '+p.from}</span>
+        <span style="font-size:10px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace">~${val.toLocaleString()}</span>
+      </div>`;
+    }).join(''):`<span style="color:var(--text3);font-size:12px">No picks for ${year}</span>`;
+  }
+
+  // === RENDER: Draft Priority (with picks called out) ===
+  const summaryEl=$('draft-summary');
+  const summaryContent=$('draft-summary-content');
+  if(!summaryEl||!summaryContent)return;
+  summaryEl.style.display='block';
+
+  const gradeColor=ns=>ns>=50?'var(--red)':ns>=20?'var(--amber)':ns>0?'var(--text2)':'var(--green)';
+  const gradeLabel=ns=>ns>=50?'Critical':ns>=20?'Need':ns>0?'Thin':'Solid';
+
+  let html=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Draft priority</span>
+    ${LI_LOADED?`<span style="font-size:8px;padding:2px 6px;border-radius:4px;background:rgba(52,211,153,.1);color:var(--green)">DHQ · ${LI.leagueYears?.length||0}yr</span>`:''}
+    <span style="font-size:9px;color:var(--text3);margin-left:auto">Picks: ${ownPickRounds.map(r=>'R'+r).join(', ')||'none'}</span>
+  </div>`;
+
+  html+=posAnalysis.map(p=>{
+    const bar=Math.min(100,Math.max(5,p.needScore*1.2));
+    const barCol=gradeColor(p.needScore);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+      <span style="font-size:11px;font-weight:700;min-width:24px;color:${barCol}">${p.pos}</span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;color:${barCol};min-width:44px">${gradeLabel(p.needScore)}</span>
+          <div style="flex:1;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${bar}%;height:100%;background:${barCol};border-radius:2px"></div></div>
+        </div>
+        <span style="font-size:9px;color:var(--text3)">${p.startable}/${p.slotsNeeded} starters${p.aging?' · '+p.aging+' aging':''}${p.young?' · '+p.young+' young':''}</span>
+      </div>
+    </div>`;
+  }).join('');
 
   summaryContent.innerHTML=html;
   needsEl.style.display='none';
 
-  // Populate draft-my-picks with ALL owned picks (own + acquired)
-  const pickEl=$('draft-my-picks');
-  if(pickEl){
-    const all=S.tradedPicks;
-    const allOwned=[];
+  // === RENDER: Historical success — league-wide + your picks ===
+  const histEl=$('draft-history-section');
+  if(histEl&&LI_LOADED&&LI.hitRateByRound){
+    histEl.style.display='block';
+    let hHtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">
+      <div style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Historical starter rate by round — ${LI.totalPicks||0} picks across ${LI.draftMeta?.length||0} drafts</div>`;
+
+    // League-wide table
+    hHtml+=`<div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:10px;margin-bottom:6px">
+      <span style="font-weight:700;color:var(--text3)">Round</span><span style="font-weight:700;color:var(--text3)">League-wide</span><span style="font-weight:700;color:var(--text3)">Rate</span><span style="font-weight:700;color:var(--text3)">Best positions</span>`;
+
     for(let rd=1;rd<=draftRounds;rd++){
-      // Check if I traded away my own pick this round
-      const myTradedAway=all.find(p=>String(p.season)===year&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
-      // Check if I acquired someone else's pick this round
-      const acquired=all.filter(p=>String(p.season)===year&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
-      // My own pick (if not traded away)
-      if(!myTradedAway)allOwned.push({round:rd,own:true});
-      // Acquired picks
-      acquired.forEach(p=>{
-        const from=getUser(S.rosters.find(r=>r.roster_id===p.roster_id)?.owner_id);
-        allOwned.push({round:rd,own:false,from});
-      });
+      const roundData=LI.hitRateByRound[rd];
+      if(!roundData)continue;
+      const rate=roundData.rate||0;
+      const isMine=ownPickRounds.includes(rd);
+      const hitColor=rate>=50?'var(--green)':rate>=25?'var(--amber)':'var(--red)';
+      const posRecs=(roundData.bestPos||[]).slice(0,3).map(bp=>{
+        const myNeed=posAnalysis.find(pa=>pa.pos===bp.pos);
+        const needDot=myNeed&&myNeed.needScore>=20?'🎯':'';
+        return`<span style="color:${bp.rate>=40?'var(--green)':bp.rate>=20?'var(--text2)':'var(--text3)'}">${bp.pos} ${bp.rate}%${needDot}</span>`;
+      }).join(' · ');
+
+      hHtml+=`
+        <span style="font-weight:700;color:${isMine?'var(--accent)':'var(--text)'}">${isMine?'► ':''}R${rd}</span>
+        <div style="background:var(--bg4);border-radius:2px;height:5px;overflow:hidden"><div style="width:${Math.max(3,rate)}%;height:100%;background:${hitColor};border-radius:2px"></div></div>
+        <span style="color:${hitColor};font-weight:600">${rate}%</span>
+        <span style="color:var(--text3)">${posRecs||'—'}</span>`;
     }
-    allOwned.sort((a,b)=>a.round-b.round);
-    pickEl.innerHTML=allOwned.length?allOwned.map(p=>{
-      const val=pickValue(year,p.round,teams);
-      return`<span style="background:${p.own?'var(--bg4)':'rgba(124,107,248,.12)'};border:1px solid ${p.own?'var(--border2)':'rgba(124,107,248,.25)'};border-radius:6px;padding:3px 10px;font-size:11px;font-weight:600;color:${p.own?'var(--text2)':'var(--accent)'}" title="${p.own?'Own pick':'From '+p.from} · DHQ ~${val}">${year} R${p.round}${p.own?'':' ⇠'}</span>`;
-    }).join(''):`<span style="color:var(--text3);font-size:12px">No picks for ${year}</span>`;
+
+    hHtml+=`</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">% = starter rate (top 15% at position). 🎯 = matches your need. ► = you have this pick.</div>
+    </div>`;
+    histEl.innerHTML=hHtml;
   }
 }
 
