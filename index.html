@@ -3288,20 +3288,99 @@ function renderTeamOverview(){
 
   let html='';
 
-  // Value rank + Draft capital row
-  html+=`<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Roster Value</div>
-      <div style="display:flex;align-items:baseline;gap:6px">
-        <span style="font-size:20px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace">${totalVal.toLocaleString()}</span>
-        <span style="font-size:11px;color:${myValRank<=3?'var(--green)':myValRank<=8?'var(--text2)':'var(--red)'};font-weight:600">#${myValRank}/${teams}${myValRank===1?' 👑':''}</span>
+  // ── Compute CONTENDER SCORE: optimal starting lineup PPG for every team ──
+  const rp=league?.roster_positions||[];
+  // Count starter slots
+  const slotCounts={QB:0,RB:0,WR:0,TE:0,FLEX:0,SUPER_FLEX:0,DL:0,LB:0,DB:0,IDP_FLEX:0};
+  rp.forEach(s=>{
+    if(s==='DE'||s==='DT')slotCounts.DL++;
+    else if(s==='CB'||s==='S')slotCounts.DB++;
+    else if(s in slotCounts)slotCounts[s]++;
+    else if(s==='REC_FLEX')slotCounts.FLEX++;
+    else if(s==='BN'||s==='IR'||s==='TAXI'){}
+    else slotCounts.FLEX++;
+  });
+
+  function calcOptimalPPG(rosterPids){
+    // Get all players with PPG, sorted by PPG desc within each position
+    const byPos={};
+    (rosterPids||[]).forEach(pid=>{
+      const rawPos=pPos(pid);const pos=pM(rawPos);
+      const ppg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||0;
+      if(ppg<=0)return;
+      if(!byPos[pos])byPos[pos]=[];
+      byPos[pos].push({pid,ppg,pos});
+    });
+    Object.values(byPos).forEach(arr=>arr.sort((a,b)=>b.ppg-a.ppg));
+
+    // Greedily fill starter slots
+    const used=new Set();
+    let total=0;
+
+    // Fill fixed positions first
+    ['QB','RB','WR','TE','DL','LB','DB'].forEach(pos=>{
+      const need=slotCounts[pos]||0;
+      const avail=byPos[pos]||[];
+      for(let i=0;i<need&&i<avail.length;i++){
+        total+=avail[i].ppg;used.add(avail[i].pid);
+      }
+    });
+
+    // Fill FLEX (RB/WR/TE)
+    const flexPool=['RB','WR','TE'].flatMap(pos=>(byPos[pos]||[]).filter(p=>!used.has(p.pid))).sort((a,b)=>b.ppg-a.ppg);
+    for(let i=0;i<(slotCounts.FLEX||0)&&i<flexPool.length;i++){
+      total+=flexPool[i].ppg;used.add(flexPool[i].pid);
+    }
+
+    // Fill SUPER_FLEX (QB/RB/WR/TE)
+    const sfPool=['QB','RB','WR','TE'].flatMap(pos=>(byPos[pos]||[]).filter(p=>!used.has(p.pid))).sort((a,b)=>b.ppg-a.ppg);
+    for(let i=0;i<(slotCounts.SUPER_FLEX||0)&&i<sfPool.length;i++){
+      total+=sfPool[i].ppg;used.add(sfPool[i].pid);
+    }
+
+    // Fill IDP_FLEX (DL/LB/DB)
+    const idpPool=['DL','LB','DB'].flatMap(pos=>(byPos[pos]||[]).filter(p=>!used.has(p.pid))).sort((a,b)=>b.ppg-a.ppg);
+    for(let i=0;i<(slotCounts.IDP_FLEX||0)&&i<idpPool.length;i++){
+      total+=idpPool[i].ppg;used.add(idpPool[i].pid);
+    }
+
+    return +total.toFixed(1);
+  }
+
+  const contenderRanks=S.rosters.map(r=>({rid:r.roster_id,ppg:calcOptimalPPG(r.players||[])})).sort((a,b)=>b.ppg-a.ppg);
+  const myContenderPPG=contenderRanks.find(r=>r.rid===S.myRosterId)?.ppg||0;
+  const myContenderRank=contenderRanks.findIndex(r=>r.rid===S.myRosterId)+1;
+  const topContender=contenderRanks[0]?.ppg||1;
+
+  // Three KPI cards: Contender + Dynasty + Draft Capital
+  const cCol=myContenderRank<=3?'var(--green)':myContenderRank<=8?'var(--accent)':'var(--amber)';
+  const dCol=myValRank<=3?'var(--green)':myValRank<=8?'var(--accent)':'var(--amber)';
+  html+=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span style="font-size:22px;font-weight:800;color:${cCol};font-family:'JetBrains Mono',monospace">#${myContenderRank}</span>
+        <span style="font-size:10px;color:var(--text3)">/${teams}</span>
       </div>
-      <div style="background:var(--bg4);border-radius:2px;height:4px;margin-top:6px;overflow:hidden"><div style="width:${Math.round(totalVal/topVal*100)}%;height:100%;background:var(--accent);border-radius:2px"></div></div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">${myContenderPPG.toFixed(1)} starter PPG</div>
+      <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(myContenderPPG/topContender*100)}%;height:100%;background:${cCol};border-radius:2px"></div></div>
     </div>
-    <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Draft Capital</div>
-      <div style="font-size:20px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalPicks} <span style="font-size:11px;font-weight:600;color:var(--text3)">picks</span></div>
-      <div style="font-size:10px;color:var(--text3);margin-top:4px">${myPickCount.map(p=>`'${String(p.yr).slice(2)}: ${p.count}`).join(' · ')}</div>
+    <div style="flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span style="font-size:22px;font-weight:800;color:${dCol};font-family:'JetBrains Mono',monospace">#${myValRank}</span>
+        <span style="font-size:10px;color:var(--text3)">/${teams}</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">${totalVal.toLocaleString()} DHQ</div>
+      <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(totalVal/topVal*100)}%;height:100%;background:var(--accent);border-radius:2px"></div></div>
+    </div>
+    <div style="flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Draft Capital</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <span style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalPicks}</span>
+        <span style="font-size:10px;color:var(--text3)">picks</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">${myPickCount.map(p=>`'${String(p.yr).slice(2)}: ${p.count}`).join(' · ')}</div>
     </div>
   </div>`;
 
