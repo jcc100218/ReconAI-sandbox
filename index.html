@@ -1222,7 +1222,7 @@ async function selectLeague(leagueId,userId){
   S.currentLeagueId=leagueId;
   const league=S.leagues.find(l=>l.league_id===leagueId);
   $('league-pill').textContent=(league?.name||'League').substring(0,20);
-  $('setup-block').innerHTML=`<div style="font-size:13px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
+  $('setup-block').innerHTML=`<div style="font-size:13px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}... (roster data)</div>`;
   try{
     await loadLeague(leagueId,userId);
     // Redirect to dashboard and show it
@@ -1234,10 +1234,13 @@ async function selectLeague(leagueId,userId){
     renderHomeSnapshot();
     // Fire all non-AI data loads in parallel
     // Load stats + FC values in parallel, fire smart feed when both ready
+    const t0=Date.now();
     Promise.all([
       loadRosterStats(),
       fetchFantasyCalcValues(),
     ]).then(()=>{
+      const elapsed=((Date.now()-t0)/1000).toFixed(1);
+      console.log('Data loaded in '+elapsed+'s | stats:'+Object.keys(S.playerStats||{}).length+' players | avail:'+getAvailablePlayers().length);
       if(S.apiKey) runSmartFeed();
     });
   }catch(e){
@@ -2014,7 +2017,7 @@ function renderTrades(){
       </div>
       <button class="copy-btn" style="margin-top:8px" onclick="goAsk('Analyze this trade: ${sidesTxt}. Who won from a dynasty perspective?')">Analyze ↗</button>
     </div>`;
-  }).join(''):'<div class="empty">No trades this week.</div>';
+  }).join(''):'<div class="empty">No trades yet this season.</div>';
 }
 
 // ── Picks ──────────────────────────────────────────────────────
@@ -2329,7 +2332,7 @@ async function runSmartFeed(){
       })
       .sort((a,b)=>(b.idpPts||b.val/1000)-(a.idpPts||a.val/1000))
       .slice(0,5)
-      .map(p=>`${p.name}(${p.pos},age${p.age},v${p.val},${p.idpPts?p.idpPts+'idpPPG':'no2025stats'})`).join(';');
+      .map(p=>`${p.name}(${p.pos},${p.age>0?'age'+p.age:'rookie'},v${p.val},${p.idpPts?p.idpPts+'idpPPG':'no2025stats'})`).join(';');
 
     // Picks
     const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
@@ -2630,8 +2633,17 @@ async function sendWaiverChat(){
   try{
     const faab=getFAAB();const slots=getRosterSlots();
     const avail=getAvailablePlayers();
-    const availStr=avail.slice(0,25).map(function(d){return pName(d.id)+'('+d.p.position+',age'+(d.p.age||'?')+',v'+d.val+(S.playerStats&&S.playerStats[d.id]&&S.playerStats[d.id].seasonAvg?',avg'+S.playerStats[d.id].seasonAvg.toFixed(1):'')+')'}).join(';');
-    const ctx='MY TEAM:\n'+buildCtx()+'\n'+buildMentalityCtx()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (sorted by dynasty value):\n'+availStr;
+    const sc8=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+    const availStr=avail.slice(0,30).map(function(d){
+      const isI=['DL','LB','DB'].includes(d.p.position||'');
+      const raw=S.playerStats?.[d.id]?.prevRawStats;
+      const ppg=isI&&raw?+(calcIDPScore(raw,sc8)/Math.max(1,raw.gp||17)).toFixed(1):null;
+      const avg=S.playerStats?.[d.id]?.seasonAvg||0;
+      const statPart=ppg?(','+ppg+'idpPPG'):avg?(',avg'+avg.toFixed(1)):'';
+      const age=d.p.age>0?',age'+d.p.age:',rookie';
+      return pName(d.id)+'('+d.p.position+age+',v'+d.val+statPart+')';
+    }).join(';');
+    const ctx='MY TEAM:\n'+buildCtx()+'\n'+buildMentalityCtx()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
     const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)||4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)||5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)||3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
     lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
@@ -2974,11 +2986,36 @@ function openPlayerModal(playerId){
   const isIDPModal=['DL','LB','DB'].includes(pos);
   const scModal=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
   const rawModal=S.playerStats?.[playerId]?.prevRawStats;
-  const idpPPGModal=isIDPModal&&rawModal?+(calcIDPScore(rawModal,scModal)/Math.max(1,rawModal.gp||17)).toFixed(1):null;
-  if(idpPPGModal){
+  if(isIDPModal&&rawModal){
+    const gp=rawModal.gp||17;
+    const idpPPGModal=+(calcIDPScore(rawModal,scModal)/Math.max(1,gp)).toFixed(1);
     const idpBadge=$('pm-idp-badge');
-    if(idpBadge)idpBadge.innerHTML=`<span style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--green)">⚡ ${idpPPGModal} IDP PPG (2024)</span>`;
+    if(idpBadge&&idpPPGModal>0){
+      // Build stat breakdown
+      const sacks=(rawModal.idp_sack||0).toFixed(1);
+      const tkl=Math.round((rawModal.idp_tkl_solo||0)+(rawModal.idp_tkl_ast||0));
+      const ints=rawModal.idp_int||0;
+      const pds=rawModal.idp_pass_def||0;
+      const ff=rawModal.idp_ff||0;
+      const qbhits=rawModal.idp_qb_hit||0;
+      const statParts=[];
+      if(sacks>0)statParts.push(sacks+' sacks');
+      if(ints>0)statParts.push(ints+' INT');
+      if(pds>0)statParts.push(pds+' PD');
+      if(qbhits>0)statParts.push(qbhits+' QBhit');
+      if(tkl>0)statParts.push(tkl+' tkl');
+      if(ff>0)statParts.push(ff+' FF');
+      idpBadge.innerHTML=
+        '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 12px;margin:6px 0">'
+        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +'<span style="font-size:14px;font-weight:800;color:var(--green)">⚡ '+idpPPGModal+' IDP PPG</span>'
+        +'<span style="font-size:10px;color:var(--text3)">2024 season ('+gp+'gp)</span>'
+        +'</div>'
+        +(statParts.length?'<div style="font-size:11px;color:var(--text2);margin-top:4px">'+statParts.join(' · ')+'</div>':'')
+        +'</div>';
+    }
   }
+  const idpPPGModal=isIDPModal&&rawModal?+(calcIDPScore(rawModal,scModal)/Math.max(1,rawModal.gp||17)).toFixed(1):null;
   // Tags
   const tags=[];
   if(p.injury_status)tags.push(`<span style="background:var(--redL);color:var(--red);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">${p.injury_status}</span>`);
@@ -3623,6 +3660,7 @@ function renderDraftNeeds(){
       </div>
       <div style="font-size:18px;font-weight:700;color:var(--text);line-height:1;margin-bottom:3px">${d.startable}<span style="font-size:12px;font-weight:400;color:var(--text3)">/${slotsNeeded}</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:3px;min-height:12px;margin-bottom:4px">${dots}${emptyDots}</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:3px">${d.players.slice(0,3).map(({name,avg})=>(name.split(' ').pop()+(avg>0?' '+avg.toFixed(0):''))).join(' · ')}</div>
       <div style="font-size:9px;color:var(--text3)">${d.total}/${depth} ideal</div>
     </div>`;
   };
