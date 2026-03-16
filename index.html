@@ -1242,6 +1242,8 @@ async function selectLeague(leagueId,userId){
       const elapsed=((Date.now()-t0)/1000).toFixed(1);
       console.log('Data loaded in '+elapsed+'s | stats:'+Object.keys(S.playerStats||{}).length+' players | avail:'+getAvailablePlayers().length);
       if(S.apiKey) runSmartFeed();
+      // LeagueIntel loads async after main feed — doesn't block UX
+      setTimeout(()=>loadLeagueIntel(),500);
     });
   }catch(e){
     const sb=$('setup-block');
@@ -1420,6 +1422,289 @@ function buildRosterTable(){
   });
 
   tbody.innerHTML=html||'<tr><td colspan="14" style="padding:20px;text-align:center;color:var(--text3)">No players found.</td></tr>';
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// LEAGUEINTEL — Your league's actual value system
+// Builds IDP value from real scoring data + draft history + FAAB market
+// ══════════════════════════════════════════════════════════════════
+
+const LI_CACHE_KEY='dhq_leagueintel_v2';
+const LI_TTL=24*60*60*1000; // 24 hours
+let LI={}; // LeagueIntel data object — populated async after connect
+let LI_LOADED=false;
+
+function loadLICache(){
+  try{
+    const raw=localStorage.getItem(LI_CACHE_KEY);
+    if(!raw)return false;
+    const d=JSON.parse(raw);
+    if(Date.now()-d.ts>LI_TTL)return false;
+    if(d.leagueId!==S.currentLeagueId)return false;
+    LI=d.data;LI_LOADED=true;
+    console.log('LeagueIntel loaded from cache');
+    return true;
+  }catch(e){return false;}
+}
+
+function saveLICache(){
+  try{localStorage.setItem(LI_CACHE_KEY,JSON.stringify({ts:Date.now(),leagueId:S.currentLeagueId,data:LI}));}catch(e){}
+}
+
+// Get LeagueIntel value for a player (replaces dynastyValue for IDP)
+function livScore(pid){
+  if(!LI_LOADED)return null;
+  return LI.playerScores?.[pid]||null;
+}
+
+// Get FAAB recommendation for a player based on league history
+function livFAABRange(pos){
+  if(!LI_LOADED||!pos)return null;
+  const market=LI.faabByPos?.[pos];
+  if(!market||market.count<3)return null;
+  return{low:Math.round(market.avg*0.7),high:Math.round(market.avg*1.3),avg:Math.round(market.avg),count:market.count};
+}
+
+// Get draft ADP for a position in this league
+function livDraftADP(pos){
+  if(!LI_LOADED||!pos)return null;
+  return LI.adpByPos?.[pos]||null;
+}
+
+// Main LeagueIntel loader — runs async after connect, doesn't block feed
+async function loadLeagueIntel(){
+  if(loadLICache())return; // use cache if fresh
+  if(!S.currentLeagueId)return;
+
+  const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  const rp=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.roster_positions||[];
+  const totalTeams=S.rosters?.length||16;
+
+  // Starter counts per position
+  const starterCounts={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+  rp.forEach(slot=>{
+    if(slot in starterCounts)starterCounts[slot]++;
+    else if(slot==='FLEX'){starterCounts.RB+=0.4;starterCounts.WR+=0.4;starterCounts.TE+=0.2;}
+    else if(slot==='SUPER_FLEX'){starterCounts.QB+=0.5;starterCounts.WR+=0.25;starterCounts.RB+=0.25;}
+    else if(slot==='IDP_FLEX'){starterCounts.DL+=0.35;starterCounts.LB+=0.35;starterCounts.DB+=0.3;}
+  });
+  Object.keys(starterCounts).forEach(p=>starterCounts[p]=Math.max(1,Math.round(starterCounts[p])));
+  const totalStartersNeeded=Object.values(starterCounts).reduce((a,b)=>a+b,0)*totalTeams;
+
+  try{
+    // ── STEP 1: Multi-year scoring data ──────────────────────────────
+    // 2024 already loaded in S.playerStats — fetch 2022 & 2023
+    const [stats2023,stats2022]=await Promise.all([
+      sf('/stats/nfl/regular/2023').catch(()=>({})),
+      sf('/stats/nfl/regular/2022').catch(()=>({})),
+    ]);
+
+    // Score every player across all 3 years using league's actual scoring
+    const allYears=[
+      {year:'2024',data:null}, // use S.playerStats prevRawStats
+      {year:'2023',data:stats2023},
+      {year:'2022',data:stats2022},
+    ];
+
+    // Build per-player scoring history
+    const playerHistory={}; // pid -> {pts:[],pos,name}
+    const positions=['QB','RB','WR','TE','DL','LB','DB'];
+
+    // 2024 from loaded stats
+    Object.entries(S.playerStats||{}).forEach(([pid,ps])=>{
+      const pos=pPos(pid);if(!positions.includes(pos))return;
+      if(!playerHistory[pid])playerHistory[pid]={pts:[],pos,name:pName(pid)};
+      const raw=ps.prevRawStats;
+      if(raw){
+        const gp=raw.gp||17;
+        const isIDP=['DL','LB','DB'].includes(pos);
+        const pts=isIDP?calcIDPScore(raw,sc):calcFantasyPts(raw,sc);
+        if(pts>0)playerHistory[pid].pts.push({year:'2024',total:+pts.toFixed(1),ppg:+(pts/gp).toFixed(2),gp});
+      }
+    });
+
+    // 2023 and 2022
+    [stats2023,stats2022].forEach((yearData,idx)=>{
+      const year=idx===0?'2023':'2022';
+      if(!yearData||!Object.keys(yearData).length)return;
+      Object.entries(yearData).forEach(([pid,raw])=>{
+        const pos=pPos(pid);if(!positions.includes(pos))return;
+        const gp=raw.gp||17;if(gp<4)return; // ignore tiny samples
+        const isIDP=['DL','LB','DB'].includes(pos);
+        const pts=isIDP?calcIDPScore(raw,sc):calcFantasyPts(raw,sc);
+        if(pts<5)return; // ignore irrelevant players
+        if(!playerHistory[pid])playerHistory[pid]={pts:[],pos,name:pName(pid)||pid};
+        playerHistory[pid].pts.push({year,total:+pts.toFixed(1),ppg:+(pts/gp).toFixed(2),gp});
+      });
+    });
+
+    // ── STEP 2: Positional value from top 500 scorers ────────────────
+    // Get ALL players sorted by best recent PPG (average across years)
+    const scoredPlayers=Object.entries(playerHistory).map(([pid,h])=>{
+      const avgPPG=h.pts.length?h.pts.reduce((a,b)=>a+b.ppg,0)/h.pts.length:0;
+      const avgTotal=h.pts.length?h.pts.reduce((a,b)=>a+b.total,0)/h.pts.length:0;
+      const recentYear=h.pts.find(p=>p.year==='2024')||h.pts[0];
+      return{pid,pos:h.pos,name:h.name,avgPPG:+avgPPG.toFixed(2),avgTotal:+avgTotal.toFixed(1),recentPPG:recentYear?.ppg||0,years:h.pts.length};
+    }).filter(p=>p.avgPPG>0).sort((a,b)=>b.avgPPG-a.avgPPG);
+
+    // Top 500 across ALL positions — this is the unified ranking
+    const top500=scoredPlayers.slice(0,500);
+
+    // ── STEP 3: Positional tier analysis ─────────────────────────────
+    const posTiers={}; // pos -> {starter_threshold,elite_threshold,avg_rank,value_per_starter}
+    positions.forEach(pos=>{
+      const posPlayers=top500.filter(p=>p.pos===pos).sort((a,b)=>b.avgPPG-a.avgPPG);
+      if(!posPlayers.length)return;
+      const need=starterCounts[pos]*totalTeams; // total starters needed league-wide
+      const starter=posPlayers[Math.min(need-1,posPlayers.length-1)]; // marginal starter
+      const elite=posPlayers[Math.min(2,posPlayers.length-1)]; // top 3
+      const avgRankInTop500=posPlayers.reduce((a,p)=>{
+        const rank=top500.findIndex(x=>x.pid===p.pid)+1;
+        return a+rank;
+      },0)/posPlayers.length;
+      posTiers[pos]={
+        count:posPlayers.length,
+        starterThreshold:+(starter?.avgPPG||0).toFixed(2),
+        eliteThreshold:+(elite?.avgPPG||0).toFixed(2),
+        avgRank:+avgRankInTop500.toFixed(0),
+        startableCount:posPlayers.filter(p=>p.avgPPG>=(starter?.avgPPG||0)*0.85).length,
+        scarcity:+(need/(posPlayers.length||1)).toFixed(3), // higher = scarcer
+      };
+    });
+
+    // Normalize to 0-10000 value scale (10000 = best player overall)
+    const maxPPG=scoredPlayers[0]?.avgPPG||1;
+    const playerScores={};
+    scoredPlayers.forEach((p,rank)=>{
+      // Value = blend of PPG rank + positional scarcity
+      const ppgNorm=p.avgPPG/maxPPG; // 0-1
+      const posScarcity=posTiers[p.pos]?.scarcity||0.5; // higher = more valuable
+      const scarcityBonus=Math.min(1.5,0.8+posScarcity*0.7); // 0.8-1.5x multiplier
+      const rawVal=ppgNorm*scarcityBonus*9000+500; // 500-9500 range
+      playerScores[p.pid]=Math.round(Math.min(9999,rawVal));
+    });
+
+    // ── STEP 4: Draft history — all 5 years ──────────────────────────
+    const draftIds={
+      '2025':'1180557728262062080',
+      '2024':'1048447185358073857',
+      '2023':'916343216021217281',
+      '2022':'784894594822307841',
+      '2021':'667414663268491264',
+    };
+
+    const allDraftPicks=[];
+    await Promise.all(Object.entries(draftIds).map(async([year,did])=>{
+      const picks=await fetch(`${SLEEPER}/draft/${did}/picks`).then(r=>r.ok?r.json():[]).catch(()=>[]);
+      picks.forEach(p=>{
+        if(!p.metadata?.position)return;
+        allDraftPicks.push({
+          year,round:p.round,pick:p.pick_no,
+          pos:p.metadata.position,pid:p.player_id,
+          name:(p.metadata.first_name||'')+' '+(p.metadata.last_name||''),
+        });
+      });
+    }));
+
+    // ADP by position — what pick does each position go at in YOUR league
+    const adpByPos={};
+    positions.forEach(pos=>{
+      const posPicksData=allDraftPicks.filter(p=>pos==='DL'?['DL','DE','DT'].includes(p.pos):p.pos===pos);
+      if(!posPicksData.length)return;
+      const avgPick=posPicksData.reduce((a,p)=>a+p.pick,0)/posPicksData.length;
+      const byRound={};
+      posPicksData.forEach(p=>{
+        if(!byRound[p.round])byRound[p.round]=0;
+        byRound[p.round]++;
+      });
+      adpByPos[pos]={
+        avgPick:+avgPick.toFixed(1),
+        count:posPicksData.length,
+        topRound:Object.keys(byRound).sort((a,b)=>byRound[b]-byRound[a])[0],
+        byRound,
+      };
+    });
+
+    // ── STEP 5: FAAB market prices by position ────────────────────────
+    // Pull weeks 1-6 from past 3 seasons (most FAAB activity)
+    const leagueHistory={
+      '2025':'1180557728257867776',
+      '2024':'1048447185358073856',
+      '2023':'916343216021217280',
+    };
+
+    const faabTxns=[];
+    await Promise.all(Object.entries(leagueHistory).map(async([year,lid])=>{
+      const weeks=[1,2,3,4,5,6,8,10,12]; // sample key weeks
+      const weekData=await Promise.all(
+        weeks.map(w=>fetch(`${SLEEPER}/league/${lid}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[]))
+      );
+      weekData.flat().forEach(t=>{
+        if(t.type!=='waiver'||(t.settings?.waiver_bid||0)===0)return;
+        if(t.status==='failed')return; // ignore losing bids
+        const bid=t.settings.waiver_bid;
+        Object.keys(t.adds||{}).forEach(pid=>{
+          const pos=pPos(pid)||S.players?.[pid]?.position;
+          if(!positions.includes(pos))return;
+          faabTxns.push({year,pid,pos,bid,playerName:pName(pid)});
+        });
+      });
+    }));
+
+    // Aggregate FAAB by position
+    const faabByPos={};
+    faabTxns.forEach(({pos,bid})=>{
+      if(!faabByPos[pos])faabByPos[pos]={total:0,count:0,bids:[]};
+      faabByPos[pos].total+=bid;
+      faabByPos[pos].count++;
+      faabByPos[pos].bids.push(bid);
+    });
+    Object.entries(faabByPos).forEach(([pos,d])=>{
+      d.avg=+(d.total/d.count).toFixed(1);
+      d.median=d.bids.sort((a,b)=>a-b)[Math.floor(d.bids.length/2)]||0;
+      d.p75=d.bids[Math.floor(d.bids.length*0.75)]||0; // 75th percentile bid to WIN
+      delete d.bids; // clean up memory
+    });
+
+    // ── STEP 6: Store everything ──────────────────────────────────────
+    LI={
+      playerScores,   // pid -> 0-9999 LIV score
+      posTiers,       // pos -> tier stats
+      adpByPos,       // pos -> draft ADP in this league
+      faabByPos,      // pos -> FAAB market prices
+      top500Summary:top500.slice(0,20).map(p=>({pid:p.pid,pos:p.pos,name:p.name,ppg:p.avgPPG})),
+      totalPicks:allDraftPicks.length,
+      totalFAABTxns:faabTxns.length,
+      builtAt:new Date().toLocaleDateString(),
+    };
+    LI_LOADED=true;
+    saveLICache();
+    console.log(`LeagueIntel built: ${Object.keys(playerScores).length} players scored, ${allDraftPicks.length} draft picks, ${faabTxns.length} FAAB txns`);
+
+    // Re-render available players with LIV scores
+    renderAvailable();
+    renderDraftNeeds();
+
+  }catch(e){
+    console.warn('LeagueIntel error:',e);
+  }
+}
+
+// Get display value — LIV score if available, FC value as fallback
+function bestValue(pid){
+  const liv=livScore(pid);
+  if(liv!=null)return liv;
+  return dynastyValue(pid);
+}
+
+// Get FAAB bid recommendation string for display
+function faabBidStr(pos,budget){
+  const range=livFAABRange(pos);
+  if(!range||range.count<3)return null;
+  const pct=budget>0?Math.min(1,(range.p75||range.avg)/200):0;
+  const myBid=Math.round(budget*pct*1.1); // bid 10% above market to win
+  return`$${range.low}-$${range.p75} (league avg $${range.avg}, ${range.count} claims)`;
 }
 
 
@@ -1873,7 +2158,7 @@ function getAvailablePlayers(){
       const raw=stats?.prevRawStats;
       // IDP value: use calcIDPScore * 17 as proxy for "dynasty value" 
       const idpVal=isIDP&&raw?Math.round(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)*100):0;
-      const val=dynastyValue(id)||idpVal;
+      const val=livScore(id)||dynastyValue(id)||idpVal;
       return{id,p,val,isIDP,rank:S.posRanks?.[id],proj:S.playerProj?.[id]};
     })
     .filter(p=>p.val>0)
@@ -2476,12 +2761,20 @@ async function sendHomeChat(){
       return`${pName(id)}(${p.position},${p.age||'?'}y,${p.team||'FA'},v${val}${proj?`,p${proj.toFixed(0)}`:''}${ownPct}${isTrending?',🔥':''})`;
     }).join(';');
     const slotsToFill=Math.max(1,Math.min(6,slots.openBench>0?slots.openBench:1));
-    const faabFields=isFAAB?'"faab_low":25,"faab_high":40,"faab_rationale":"bid strategy",':"";
+    const faabFields=isFAAB?(()=>{
+      // Use real league FAAB history if available
+      return '"faab_low":0,"faab_high":0,"faab_rationale":"based on league history",';
+    })():"";
+    // Build FAAB context from LeagueIntel
+    const faabCtxStr=LI_LOADED&&LI.faabByPos?
+      'LEAGUE FAAB HISTORY BY POSITION:\n'+Object.entries(LI.faabByPos).map(([pos,d])=>
+        `  ${pos}: avg $${d.avg}, median $${d.median}, win-bid $${d.p75} (${d.count} claims)`
+      ).join('\n'):'No FAAB history yet.';
     const prompt=`Dynasty waiver agent. Offseason ${S.season} — focus on DYNASTY value, age curves, and depth building (no in-season stats context). Week ${S.currentWeek}.
 ${buildMentalityCtx()}
 ROSTER: ${slots.openBench} open bench slot(s), max ${slots.rosterMax}, active ${slots.activePlayers}.
 ${isFAAB?`FAAB: I have $${faab.remaining} remaining of $${faab.budget}. League avg remaining: $${leagueFaab.avg}.`:'Waiver priority system (no FAAB).'}
-${spendCtx?`HISTORICAL LEAGUE SPEND BY POS: ${spendCtx}`:'No historical spend data.'}
+${faabCtxStr}
 MY ROSTER POS COUNTS: ${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')||'unknown'}
 WAIVER PRIORITY: #${myR()?.settings?.waiver_position||'?'}
 AVAILABLE PLAYERS (top 40 by dynasty value, not on any roster):
@@ -2489,7 +2782,7 @@ ${topAvailStr||'No available players found — may still be loading.'}
 
 Recommend ${slotsToFill} waiver add(s) in priority order.
 ${slots.openBench===0?'ROSTER IS FULL — only suggest adding if clearly worth a drop. You must specify who to drop.':'Do NOT suggest drops, roster has open slots.'}
-${isFAAB?`For each add, give a realistic FAAB bid range based on the position historical spend data and my remaining $${faab.remaining}.`:''}
+${isFAAB?`For each add, give a FAAB bid range. Use this real historical data from MY league:\n${faabCtxStr}\nMy remaining budget: $${faab.remaining}.`:''}
 Be specific about WHY each player fits my team and mentality. Reference their role, age, and upside.
 IDP SCORING CONTEXT: sacks=${sc.idp_sack||4}pts, INT=${sc.idp_int||5}pts, PassDef=${sc.idp_pass_def||3}pts, TKLsolo=${sc.idp_tkl_solo||0.5}pts, QBhit=${sc.idp_qb_hit||1.25}pts. DBs with INT/PD upside are most valuable. Avoid pure volume tacklers (LBs) unless elite.
 
@@ -2729,6 +3022,25 @@ function buildCtx(){
   const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
     .map(p=>p.season+'R'+p.round).join(',');
 
+  // LeagueIntel insights
+  const liCtx=LI_LOADED?(()=>{
+    const insights=[];
+    // Draft market context
+    if(LI.adpByPos){
+      const undervalued=Object.entries(LI.adpByPos)
+        .filter(([pos,d])=>d.avgPick>50&&['DL','LB','DB'].includes(pos))
+        .map(([pos,d])=>`${pos} avg pick ${d.avgPick} (undervalued in your league)`);
+      if(undervalued.length)insights.push('DRAFT VALUE: '+undervalued.join(', '));
+    }
+    // FAAB market gaps
+    if(LI.faabByPos){
+      const cheap=Object.entries(LI.faabByPos)
+        .filter(([pos,d])=>d.avg<15&&['DL','DB'].includes(pos))
+        .map(([pos,d])=>`${pos} avg $${d.avg} FAAB (market underprices them)`);
+      if(cheap.length)insights.push('FAAB OPPORTUNITY: '+cheap.join(', '));
+    }
+    return insights.join('\n');
+  })():'';
   const memCtx=buildMemoryCtx();
   return [
     S.user.display_name+' | '+rank+'/'+S.rosters.length+' | '+(s.wins||0)+'-'+(s.losses||0),
@@ -2738,6 +3050,7 @@ function buildCtx(){
     picks?'Picks: '+picks:'',
     idpCtx,
     memCtx||'',
+    liCtx||'',
   ].filter(Boolean).join('\n');
 }
 
@@ -3723,6 +4036,14 @@ async function runDraftScouting(){
   $('draft-scout-content').innerHTML='<div class="card"><div class="empty">Analyzing your roster needs and the rookie class...</div></div>';
   try{
     const year=$('draft-year-sel')?.value||'2026';
+  // Inject LeagueIntel draft market context
+  const liDraftCtx=LI_LOADED&&LI.adpByPos?(()=>{
+    const insights=Object.entries(LI.adpByPos).map(([pos,d])=>{
+      const tier=d.avgPick<25?'Round 1-2':d.avgPick<50?'Round 3-4':d.avgPick<80?'Round 5-6':'Round 7+';
+      return `${pos}: avg pick ${d.avgPick} (${tier} in your league, ${d.count} picks over 5 years)`;
+    }).join('\n');
+    return '\nYOUR LEAGUE DRAFT HISTORY (5 seasons):\n'+insights;
+  })():'';
     const my=myR();
     const allPlayers=my?.players||[];
     const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
@@ -3919,7 +4240,29 @@ function renderMemoryPanel(){
     <div style="margin-top:10px">
       <button class="btn btn-ghost btn-sm" onclick="loadConvMemory().length&&(localStorage.removeItem('dhq_sessions'),renderMemoryPanel(),showToast('Sessions cleared'))" style="color:var(--text3)">Clear session history</button>
     </div>
-    <div id="mem-ai-content" style="margin-top:12px"></div>`;
+    <div id="mem-ai-content" style="margin-top:12px"></div>
+    ${LI_LOADED?`
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">⚡ League Intel (${LI.builtAt})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        ${Object.entries(LI.faabByPos||{}).sort((a,b)=>b[1].count-a[1].count).slice(0,6).map(([pos,d])=>`
+          <div style="background:var(--bg3);border-radius:6px;padding:8px 10px">
+            <div style="font-size:9px;color:var(--text3);text-transform:uppercase;font-weight:700">${pos} FAAB</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text)">$${d.avg} avg</div>
+            <div style="font-size:9px;color:var(--text3)">win: $${d.p75} · ${d.count} claims</div>
+          </div>`).join('')}
+      </div>
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Draft ADP in your league</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${Object.entries(LI.adpByPos||{}).sort((a,b)=>a[1].avgPick-b[1].avgPick).map(([pos,d])=>`
+          <span style="background:var(--bg3);border-radius:5px;padding:4px 8px;font-size:11px">
+            <span style="font-weight:700">${pos}</span>
+            <span style="color:var(--text3);margin-left:4px">pick ${d.avgPick}</span>
+          </span>`).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--text3)">${LI.totalPicks||0} draft picks · ${LI.totalFAABTxns||0} FAAB transactions analyzed</div>
+    </div>`:'<div style="font-size:11px;color:var(--text3);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">League Intel loading after connect...</div>'}
+  `;
 }
 
 function saveNotes(){setMemory('notes',$('agent-notes-ta').value);}
