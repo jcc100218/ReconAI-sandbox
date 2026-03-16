@@ -2595,15 +2595,16 @@ const BASE_PICK_VALUES={
   '5.11':55,'5.12':50,
 };
 
-function pickValue(season,round,totalTeams){
+function pickValue(season,round,totalTeams,pickInRound){
   const curSeason=parseInt(S.season)||2025;
   const pickSeason=parseInt(season)||curSeason;
   const teams=totalTeams||S.rosters?.length||16;
 
   // DHQ pick values (league-derived) — primary
   if(LI_LOADED&&LI.dhqPickValues){
-    const mid=Math.ceil(teams/2);
-    const pick=(round-1)*teams+mid;
+    // Use specific pick position if known, otherwise mid-round
+    const pos=pickInRound||Math.ceil(teams/2);
+    const pick=(round-1)*teams+Math.min(pos,teams);
     const base=LI.dhqPickValues[pick]?.value||LI.dhqPickValues[pick-1]?.value||LI.dhqPickValues[pick+1]?.value||0;
     if(base>0){
       const yearDiscount=Math.pow(0.88,Math.max(0,pickSeason-curSeason));
@@ -5155,7 +5156,7 @@ function renderDraftNeeds(){
     if(!myTradedAway){ownedPicks.push({round:rd,own:true});ownPickRounds.push(rd);}
     acquired.forEach(p=>{
       const from=getUser(S.rosters.find(r=>r.roster_id===p.roster_id)?.owner_id);
-      ownedPicks.push({round:rd,own:false,from});
+      ownedPicks.push({round:rd,own:false,from,fromRosterId:p.roster_id});
       if(!ownPickRounds.includes(rd))ownPickRounds.push(rd);
     });
   }
@@ -5236,11 +5237,25 @@ function renderDraftNeeds(){
   // === RENDER: Your Picks (spelled out) ===
   const pickEl=$('draft-my-picks');
   if(pickEl){
+    // Estimate pick position: rank rosters by inverse DHQ value (worst team = pick 1)
+    const rosterRanks=S.rosters.map(r=>{
+      const val=(r.players||[]).reduce((s,pid)=>s+dynastyValue(pid),0);
+      return{rid:r.roster_id,val};
+    }).sort((a,b)=>a.val-b.val); // worst first = earliest pick
+    const getPickPos=(rosterId)=>{
+      const idx=rosterRanks.findIndex(r=>r.rid===rosterId);
+      return idx>=0?idx+1:Math.ceil(teams/2);
+    };
+
     pickEl.innerHTML=ownedPicks.length?ownedPicks.map(p=>{
-      const val=pickValue(year,p.round,teams);
+      const fromRoster=p.own?S.myRosterId:p.fromRosterId;
+      const estPos=getPickPos(fromRoster);
+      const val=pickValue(year,p.round,teams,estPos);
+      const pickLabel=p.round+'.'+String(estPos).padStart(2,'0');
+      const fromName=p.own?'Own':'From '+p.from;
       return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg4)':'rgba(124,107,248,.12)'};border:1px solid ${p.own?'var(--border2)':'rgba(124,107,248,.25)'};border-radius:8px;padding:6px 12px">
-        <span style="font-size:13px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">R${p.round}</span>
-        <span style="font-size:9px;color:var(--text3)">${p.own?'Own':'From '+p.from}</span>
+        <span style="font-size:13px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</span>
+        <span style="font-size:9px;color:var(--text3)">${fromName}</span>
         <span style="font-size:10px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace">~${val.toLocaleString()}</span>
       </div>`;
     }).join(''):`<span style="color:var(--text3);font-size:12px">No picks for ${year}</span>`;
