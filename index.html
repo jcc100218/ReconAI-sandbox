@@ -2108,40 +2108,26 @@ async function autoSaveMemory(history,label){
 }
 function buildMentalityCtx(){
   const m=loadMentality();
-  const stratMap={winnow:'WIN NOW — proven production, bold moves, window is open',
-    rebuild:'REBUILDING — stockpile picks/youth, willing seller of aging vets',
-    balanced:'BALANCED — compete now while protecting long-term upside',
-    prime:'DYNASTY PRIME — protect the core, 2-3yr peak window'};
-  const windowMap={now:'Competing RIGHT NOW — this season matters',
-    '1yr':'1 year from contending — need a few more pieces',
-    '2yr':'2-3 years out — building for the future',
-    far:'Full rebuild — 3+ years away, maximize draft capital and youth'};
-  const tradeMap={aggressive:'Aggressive trader — always looking to deal',
-    selective:'Selective — only moves on obvious wins',
-    conservative:'Conservative — rarely trades, prefers waivers',
-    pick_seller:'Pick seller — prefers proven players over picks',
-    pick_hoarder:'Pick hoarder — stockpiles draft capital'};
-  const ageMap={youth:'Youth first — under 25 priority',
-    balanced_age:'Age balanced — best value wins',
-    vets:'Veteran friendly — trusts proven production',
-    agnostic:'Age agnostic — role and value only'};
-  const riskMap={high_risk:'High risk — loves boom-or-bust plays',
-    moderate_risk:'Moderate risk — calculated gambles',
-    low_risk:'Low risk — safe floors over ceilings',
-    no_risk:'Zero risk — proven commodities only'};
-  return [
-    'GM STRATEGY: '+(stratMap[m.mentality]||(m.mentality||'Not set')),
-    m.window?'WINDOW: '+(windowMap[m.window]||m.window):'',
-    m.tradeStyle?'TRADE STYLE: '+(tradeMap[m.tradeStyle]||m.tradeStyle):'',
-    m.agePreference?'AGE PREF: '+(ageMap[m.agePreference]||m.agePreference):'',
-    m.riskTolerance?'RISK: '+(riskMap[m.riskTolerance]||m.riskTolerance):'',
-    m.upgradePositions?'ACTIVELY UPGRADING: '+m.upgradePositions:'',
-    m.targetPlayers?'TARGETING PLAYERS: '+m.targetPlayers:'',
-    m.shoppingPlayers?'SHOPPING / SELLING: '+m.shoppingPlayers:'',
-    m.tradePrefs?'TRADE PHILOSOPHY: '+m.tradePrefs:'',
-    m.neverDrop?'UNTOUCHABLE: '+m.neverDrop:'',
-    m.notes?'GM NOTES: '+m.notes:'',
-  ].filter(Boolean).join('\n');
+  const s={winnow:'WIN NOW',rebuild:'REBUILD',balanced:'BALANCED',prime:'2-3YR WINDOW'};
+  const w={now:'competing now','1yr':'1yr out','2yr':'2-3yr out',far:'full rebuild'};
+  const t={aggressive:'aggressive',selective:'selective',conservative:'conservative',pick_seller:'sells picks',pick_hoarder:'hoards picks'};
+  const a={youth:'youth<25',balanced_age:'age neutral',vets:'vet friendly',agnostic:'age agnostic'};
+  const r={high_risk:'high risk',moderate_risk:'moderate risk',low_risk:'low risk',no_risk:'zero risk'};
+  const parts=[
+    s[m.mentality]||m.mentality||'balanced',
+    w[m.window]||'',
+    t[m.tradeStyle]||'',
+    a[m.agePreference]||'',
+    r[m.riskTolerance]||'',
+  ].filter(Boolean);
+  const lines=['GM:'+parts.join(',')];
+  if(m.upgradePositions)lines.push('UPGRADING:'+m.upgradePositions);
+  if(m.targetPlayers)lines.push('TARGETS:'+m.targetPlayers);
+  if(m.shoppingPlayers)lines.push('SELLING:'+m.shoppingPlayers);
+  if(m.tradePrefs)lines.push('TRADE STYLE:'+m.tradePrefs.substring(0,150));
+  if(m.neverDrop)lines.push('UNTOUCHABLE:'+m.neverDrop);
+  if(m.notes)lines.push('NOTES:'+m.notes.substring(0,150));
+  return lines.join('\n');
 }
 
 // ── Setup Wizard ───────────────────────────────────────────────
@@ -2851,15 +2837,15 @@ async function runSmartFeed(){
         return{...p,idpPts};
       })
       .sort((a,b)=>(b.idpPts||b.val/1000)-(a.idpPts||a.val/1000))
-      .slice(0,5)
-      .map(p=>`${p.name}(${p.pos},${p.age>0?'age'+p.age:'rookie'},v${p.val},${p.idpPts?p.idpPts+'idpPPG':'no2025stats'})`).join(';');
+      .slice(0,3)
+      .map(p=>`${p.name}(${p.pos},${p.age>0?p.age:'?'},v${p.val}${p.idpPts?','+p.idpPts+'ppg':''})`).join(';');
 
     // Picks
     const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
       .map(p=>p.season+'R'+p.round).join(',');
 
     const m=loadMentality();
-    const idpCtx=`League IDP scoring: sack=${sc.idp_sack||4}, INT=${sc.idp_int||5}, PD=${sc.idp_pass_def||3}, TKL=${sc.idp_tkl_solo||0.5}, QBhit=${sc.idp_qb_hit||1.25}. DBs most valuable (INT+PD+potential TD). Edge rushers premium (sack+QBhit). LBs need high volume.`;
+    const idpCtx=`IDP scoring: sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3},TKL=${sc.idp_tkl_solo||0.5}. DBs(INT/PD)>Edge(sack)>LB(volume).`;
 
     const prompt=[
       'Dynasty fantasy football. You are an elite GM advisor. Generate exactly 4 targeted recommendations.',
@@ -2868,23 +2854,17 @@ async function runSmartFeed(){
       myGaps.length?'ROSTER GAPS (urgent): '+myGaps.map(g=>g.pos+' need '+g.gap+' more starter'+(g.gap>1?'s':'')).join(', '):'No critical gaps',
       gapTargets?'AVAILABLE TARGETS BY NEED:\n'+gapTargets:'',
       mySurplus.length?'MY TRADE CHIPS: '+mySurplus.join(', '):'',
-      'BEST AVAILABLE FREE AGENTS: '+avail.slice(0,8).map(p=>p.name+'('+p.pos+',age'+p.age+',v'+p.val+',avg'+p.avg+')').join(';'),
-      'BEST AVAILABLE IDP: '+idpAvail,
+      'BEST AVAILABLE: '+avail.slice(0,5).map(p=>p.name+'('+p.pos+','+p.age+',v'+p.val+')').join(';'),
+      'IDP AVAIL: '+idpAvail,
       hotStr?'LEAGUE ADDING: '+hotStr:'',
       myPicks?'MY PICKS: '+myPicks:'',
       m.neverDrop?'NEVER TOUCH: '+m.neverDrop:'',
       '',
       idpCtx,
       '',
-      'REQUIRED: Return exactly 4 cards covering these angles:',
-      '1. type:waiver — Best free agent add right now with specific FAAB range',
-      '2. type:idp — IDP-specific insight using scoring weights (INT/sack/PD value). Name a specific player to add, trade for, or target in draft.',
-      '3. type:trade — Specific trade to propose using my surplus. Name both players.',
-      '4. type:draft — Offseason rookie draft priority given my gaps.',
-      '',
-      'Each must: name real players, cite actual values/ages, be non-obvious.',
-      '',
-      'JSON only: {"recs":[{"type":"waiver|idp|trade|draft","headline":"sharp action sentence","body":"2 sentences with specific data and IDP scoring context where relevant","cta_label":"short label","cta_action":"waiver|info|trade|draft","copy":"ready Sleeper message or null"}]}',
+      'Return exactly 4 recs: 1:waiver add, 2:IDP insight, 3:trade proposal, 4:draft priority.',
+      'Each: name real players, cite FC values/ages.',
+      'JSON only: {"recs":[{"type":"waiver|idp|trade|draft","headline":"action sentence","body":"2 sentences with data","cta_label":"label","cta_action":"waiver|info|trade|draft","copy":"Sleeper msg or null"}]}',
     ].filter(v=>v!==null).join('\n');
 
     const reply=await callClaude([{role:'user',content:prompt}],false,2,700);
@@ -3217,36 +3197,22 @@ function buildCtx(){
   const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
   const rank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
 
-  // Starters with stats AND FantasyCalc values
-  const starters=(my?.starters||[]).filter(p=>p&&p!=='0').map(p=>{
-    const avg=S.playerStats?.[p]?.seasonAvg||0;
-    const val=dynastyValue(p);
-    const age=pAge(p);
-    const parts=[pPos(p)];
-    if(age)parts.push('age'+age);
-    if(avg)parts.push(avg.toFixed(1)+'ppg');
-    if(val>0)parts.push('FC:'+val);
-    return pName(p)+'('+parts.join(',')+')';
-  });
+  // Compact player string: "Name(WR,24,FC8200)" 
+  const pStr=(pid)=>{
+    const val=dynastyValue(pid);const age=pAge(pid);
+    return pName(pid)+'('+pPos(pid)+(age?','+age:'')+(val>0?',FC'+val:'')+')';
+  };
 
-  // Bench players with FC values (so AI knows trade chips)
-  const benchPlayers=(my?.players||[]).filter(p=>!(my?.starters||[]).includes(p)&&!(my?.reserve||[]).includes(p)&&!(my?.taxi||[]).includes(p));
-  const bench=benchPlayers.slice(0,15).map(p=>{
-    const val=dynastyValue(p);
-    const age=pAge(p);
-    const avg=S.playerStats?.[p]?.seasonAvg||0;
-    if(!val&&!avg)return null;
-    const parts=[pPos(p)];
-    if(age)parts.push('age'+age);
-    if(avg)parts.push(avg.toFixed(1)+'ppg');
-    if(val>0)parts.push('FC:'+val);
-    return pName(p)+'('+parts.join(',')+')';
-  }).filter(Boolean);
+  // Starters
+  const starters=(my?.starters||[]).filter(p=>p&&p!=='0').map(pStr);
 
-  // Total roster FC value
+  // Top bench by FC value only — keep it tight
+  const benchPids=(my?.players||[]).filter(p=>!(my?.starters||[]).includes(p)&&!(my?.reserve||[]).includes(p)&&!(my?.taxi||[]).includes(p));
+  const bench=benchPids.map(p=>({pid:p,val:dynastyValue(p)})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val).slice(0,8).map(x=>pStr(x.pid));
+
   const totalVal=(my?.players||[]).reduce((sum,p)=>sum+dynastyValue(p),0);
 
-  // Positional gaps using real startable thresholds
+  // Positional gaps
   const rp=league?.roster_positions||[];
   const slots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
   rp.forEach(slot=>{
@@ -3257,14 +3223,8 @@ function buildCtx(){
   });
   Object.keys(slots).forEach(p=>slots[p]=Math.round(slots[p]));
 
-  // IDP elite scoring thresholds (based on actual scoring)
-  const idpThresh={
-    DL: Math.round(idpTier('DL',sc)*0.4),
-    LB: Math.round(idpTier('LB',sc)*0.4),
-    DB: Math.round(idpTier('DB',sc)*0.4),
-  };
+  const idpThresh={DL:Math.round(idpTier('DL',sc)*0.4),LB:Math.round(idpTier('LB',sc)*0.4),DB:Math.round(idpTier('DB',sc)*0.4)};
   const offThresh={QB:18,RB:10,WR:10,TE:8};
-
   const gaps=[];const surpluses=[];
   const players=my?.players||[];
   ['QB','RB','WR','TE','DL','LB','DB'].forEach(pos=>{
@@ -3276,48 +3236,19 @@ function buildCtx(){
     else if(startable>need+1)surpluses.push(pos+':+'+(startable-need));
   });
 
-  // IDP context with scoring weights
-  const idpCtx=`IDP(${sc.idp_sack||4}pts/sack,${sc.idp_int||5}pts/int,${sc.idp_pass_def||3}pts/PD,${sc.idp_tkl_solo||0.5}pts/tkl)`;
-
-  const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
-    .map(p=>p.season+'R'+p.round).join(',');
-
-  // LeagueIntel insights
-  const liCtx=LI_LOADED?(()=>{
-    const insights=[];
-    if(LI.adpByPos){
-      const undervalued=Object.entries(LI.adpByPos)
-        .filter(([pos,d])=>d.avgPick>50&&['DL','LB','DB'].includes(pos))
-        .map(([pos,d])=>`${pos} avg pick ${d.avgPick} (undervalued in your league)`);
-      if(undervalued.length)insights.push('DRAFT VALUE: '+undervalued.join(', '));
-    }
-    if(LI.faabByPos){
-      const cheap=Object.entries(LI.faabByPos)
-        .filter(([pos,d])=>d.avg<15&&['DL','DB'].includes(pos))
-        .map(([pos,d])=>`${pos} avg $${d.avg} FAAB (market underprices them)`);
-      if(cheap.length)insights.push('FAAB OPPORTUNITY: '+cheap.join(', '));
-    }
-    return insights.join('\n');
-  })():'';
+  const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId).map(p=>p.season+'R'+p.round).join(',');
   const memCtx=buildMemoryCtx();
 
-  // FC data freshness indicator
-  const fcAge=FC_LOADED?(()=>{
-    try{const raw=localStorage.getItem(FC_CACHE_KEY);if(raw){const d=JSON.parse(raw);const hrs=Math.round((Date.now()-d.ts)/3600000);return hrs+'hr ago'}}catch(e){}return'live';
-  })():'not loaded';
-
   return [
-    S.user.display_name+' | '+rank+'/'+S.rosters.length+' | '+(s.wins||0)+'-'+(s.losses||0)+' | Total FC value: '+totalVal.toLocaleString(),
-    'STARTERS: '+starters.join(', '),
-    bench.length?'KEY BENCH: '+bench.join(', '):'',
-    gaps.length?'NEEDS: '+gaps.join(', '):'',
-    surpluses.length?'SURPLUS: '+surpluses.join(', '):'',
-    picks?'Picks: '+picks:'',
-    idpCtx,
-    'IMPORTANT: All trade values are from FantasyCalc (FC:number). Use these exact values when discussing trades.',
-    'FC data freshness: '+fcAge,
+    S.user.display_name+'|#'+rank+'/'+S.rosters.length+'|'+(s.wins||0)+'-'+(s.losses||0)+'|FC total:'+totalVal.toLocaleString(),
+    'STARTERS:'+starters.join(';'),
+    bench.length?'BENCH(top8):'+bench.join(';'):'',
+    gaps.length?'NEEDS:'+gaps.join(','):'',
+    surpluses.length?'SURPLUS:'+surpluses.join(','):'',
+    picks?'PICKS:'+picks:'',
+    'IDP:sack='+((sc.idp_sack)||4)+',INT='+((sc.idp_int)||5)+',PD='+((sc.idp_pass_def)||3)+',TKL='+((sc.idp_tkl_solo)||0.5),
+    'Trade values=FantasyCalc(FC). Use FC numbers for trade discussions.',
     memCtx||'',
-    liCtx||'',
   ].filter(Boolean).join('\n');
 }
 
