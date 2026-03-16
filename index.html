@@ -595,7 +595,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         </div>
         <!-- Data sync status -->
         <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text3);align-items:center">
-          <span id="sync-fc" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>FC values</span>
+          <span id="sync-fc" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>DHQ values</span>
           <span id="sync-stats" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Stats</span>
           <span id="sync-li" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Intel</span>
           <button onclick="resyncAllData()" style="background:none;border:1px solid var(--border2);border-radius:5px;color:var(--text3);font-size:10px;padding:2px 8px;cursor:pointer;font-family:inherit;margin-left:auto">Resync ↺</button>
@@ -1325,18 +1325,19 @@ async function selectLeague(leagueId,userId){
     prog(100);
     // Show home feed immediately
     renderHomeSnapshot();
-    // Fire all non-AI data loads in parallel
-    // Load stats + FC values in parallel, fire smart feed when both ready
+    // Fire data loads — stats first, then DHQ engine
     const t0=Date.now();
-    Promise.all([
-      loadRosterStats(),
-      fetchFantasyCalcValues(),
-    ]).then(()=>{
+    loadRosterStats().then(()=>{
       const elapsed=((Date.now()-t0)/1000).toFixed(1);
-      console.log('Data loaded in '+elapsed+'s | stats:'+Object.keys(S.playerStats||{}).length+' players | avail:'+getAvailablePlayers().length);
+      console.log('Stats loaded in '+elapsed+'s | '+Object.keys(S.playerStats||{}).length+' players');
+      updateSyncStatus();
       if(S.apiKey) runSmartFeed();
-      // LeagueIntel loads async after main feed — doesn't block UX
-      setTimeout(()=>loadLeagueIntel(),500);
+      // DHQ engine builds player + pick values from league history
+      loadLeagueIntel().then(()=>{
+        console.log('DHQ engine ready in '+((Date.now()-t0)/1000).toFixed(1)+'s');
+        updateDataFreshness();updateSyncStatus();
+        buildRosterTable();renderAvailable();renderDraftNeeds();
+      });
     });
   }catch(e){
     const sb=$('setup-block');
@@ -1511,7 +1512,7 @@ function buildRosterTable(){
       <td><div class="rt-name">${pName(pid)}${isStarter?'<span class="rt-slot">'+posLabel(slot,pid)+'</span>':''}</div><div class="rt-team">${fullTeam(pTeam(pid))}</div></td>
       <td><span class="pos ${pc}" style="font-size:9px">${pos}</span></td>
       <td class="rt-num-cell rt-val">${age||'—'}</td>
-      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+trendHtml:FC_LOADED?'<span style="font-size:9px;color:var(--text3)">—</span>':'...'}</td>
+      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+trendHtml:LI_LOADED?'<span style="font-size:9px;color:var(--text3)">—</span>':'...'}</td>
       <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}</td>
       <td class="rt-num-cell rt-val dim">${prev?prev.toFixed(1):'—'}</td>
       <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:9px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
@@ -2019,7 +2020,7 @@ async function loadLeagueIntel(){
     // STORE EVERYTHING
     // ═══════════════════════════════════════════════════════════════
     LI={
-      // Player values (THE value system — replaces FantasyCalc)
+      // Player values (DHQ engine — league-derived)
       playerScores,     // pid -> 0-10000 DHQ value
       playerMeta,       // pid -> {pos, ppg, age, ageFactor, peakYrsLeft}
       // Pick values
@@ -2068,7 +2069,7 @@ async function loadLeagueIntel(){
   }
 }
 
-// Get display value — LIV score if available, FC value as fallback
+// Get display value — DHQ (LI) score
 function bestValue(pid){
   const liv=livScore(pid);
   if(liv!=null)return liv;
@@ -2245,16 +2246,6 @@ function pickValue(season,round,totalTeams){
       const yearDiscount=Math.pow(0.88,Math.max(0,pickSeason-curSeason));
       return Math.round(base*yearDiscount);
     }
-  }
-
-  // FC pick values fallback
-  if(window.FC_PICK_VALUES&&Object.keys(window.FC_PICK_VALUES).length){
-    const pos=pickSeason===curSeason?'mid':'mid';
-    const key=pickSeason+'_'+round+'_'+pos;
-    const fcVal=window.FC_PICK_VALUES[key];
-    if(fcVal>0)return fcVal;
-    const anyKey=Object.keys(window.FC_PICK_VALUES).find(k=>k.startsWith(pickSeason+'_'+round+'_'));
-    if(anyKey&&window.FC_PICK_VALUES[anyKey]>0)return window.FC_PICK_VALUES[anyKey];
   }
 
   // Hardcoded fallback with year discount
@@ -2589,33 +2580,31 @@ function getAvailablePlayers(){
   const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
   const results=[];
 
-  // FAST PATH: scan FC_VALUES keys (typically ~1000 players) instead of full 10k+ DB
-  if(FC_LOADED){
-    Object.keys(FC_VALUES).forEach(id=>{
+  // FAST PATH: scan DHQ player scores (LI.playerScores) for valued players
+  if(LI_LOADED&&LI.playerScores){
+    Object.keys(LI.playerScores).forEach(id=>{
       if(rostered.has(id))return;
       const p=S.players[id];if(!p)return;
       if(!offPos.includes(p.position)&&!idpPos.includes(p.position))return;
       if(p.status==='Inactive'||p.status==='Retired')return;
-      const val=FC_VALUES[id]?.value||0;
+      const val=LI.playerScores[id]||0;
       if(val<=0)return;
       results.push({id,p,val,isIDP:idpPos.includes(p.position),rank:S.posRanks?.[id],proj:S.playerProj?.[id]});
     });
   }
 
-  // IDP players: scan stats (smaller set than full DB) for players with production
+  // Fallback: IDP players from stats (before DHQ loads)
   Object.keys(S.playerStats||{}).forEach(id=>{
     if(rostered.has(id))return;
-    if(results.some(r=>r.id===id))return; // already added via FC
+    if(results.some(r=>r.id===id))return;
     const p=S.players[id];if(!p)return;
-    if(!idpPos.includes(p.position))return;
+    if(!idpPos.includes(p.position)&&!offPos.includes(p.position))return;
     if(p.status==='Inactive'||p.status==='Retired')return;
     const stats=S.playerStats[id];
     if(!stats?.prevAvg&&!stats?.seasonAvg)return;
-    const raw=stats?.prevRawStats;
-    const idpVal=raw?Math.round(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)*100):0;
-    const val=livScore(id)||dynastyValue(id)||idpVal;
+    const val=dynastyValue(id)||(stats.seasonAvg||stats.prevAvg||0)*100;
     if(val<=0)return;
-    results.push({id,p,val,isIDP:true,rank:S.posRanks?.[id],proj:S.playerProj?.[id]});
+    results.push({id,p,val,isIDP:idpPos.includes(p.position),rank:S.posRanks?.[id],proj:S.playerProj?.[id]});
   });
 
   return results.sort((a,b)=>b.val-a.val).slice(0,250);
@@ -2637,7 +2626,7 @@ function availSort(key){
 function renderAvailable(){
   const tbody=$('avail-tbody');if(!tbody)return;
 
-  if(!FC_LOADED){
+  if(!LI_LOADED&&Object.keys(S.playerStats||{}).length===0){
     tbody.innerHTML=`<tr><td colspan="8" style="padding:12px">
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="skeleton" style="height:14px;width:70%"></div>
@@ -2645,13 +2634,13 @@ function renderAvailable(){
         <div class="skeleton" style="height:14px;width:65%"></div>
         <div class="skeleton" style="height:14px;width:50%"></div>
       </div>
-      <div style="font-size:10px;color:var(--text3);margin-top:8px">Loading FantasyCalc values...</div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">Building DHQ values from league history...</div>
     </td></tr>`;
     return;
   }
 
-  // Cache key = FC loaded state + roster hash
-  const cacheKey=FC_LOADED+'_'+(S.rosters?.length||0)+'_'+(Object.keys(S.playerStats||{}).length);
+  // Cache key = LI loaded state + roster hash
+  const cacheKey=LI_LOADED+'_'+(S.rosters?.length||0)+'_'+(Object.keys(S.playerStats||{}).length);
   let avail;
   if(_availCache&&_availCacheKey===cacheKey){
     avail=_availCache;
@@ -2679,9 +2668,8 @@ function renderAvailable(){
 
   tbody.innerHTML=filtered.slice(0,40).map(({id,p,val})=>{
     const stats=S.playerStats?.[id]||{};
-    const fc=FC_VALUES[String(id)];
-    const trend=fc?.trend||0;
-    const trendStr=trend>50?`<span style="color:var(--green);font-size:10px">▲</span>`:trend<-50?`<span style="color:var(--red);font-size:10px">▼</span>`:'';
+    const trend=0; // DHQ doesn't track 30-day trend yet
+    const trendStr='';
     const {col}=tradeValueTier(val);
 
     // PPG: use IDP scoring for IDP players
@@ -2896,143 +2884,66 @@ Be specific with round and year for each recommendation.`}]);
 // Dynasty value formula: base position value * recency factor * age factor
 // ── KTC Value System ───────────────────────────────────────────
 // Cache key and TTL (24 hours)
-// ── FantasyCalc Value System ───────────────────────────────────
-// Public API: https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=1&numTeams=12&ppr=1
-// Returns players with sleeperId, value (0-10000 scale), overallRank, positionRank, trend30Day
-const FC_CACHE_KEY='dynastyhq_fc_values';
-const FC_TTL=4*60*60*1000; // 4 hour cache — values change daily
-let FC_VALUES={}; // sleeperId -> {value, overallRank, positionRank, trend}
+// ── Value System — DHQ Only ────────────────────────────────────
+// All player and pick values come from LeagueIntel (DHQ engine).
+// FC has been removed — no external API dependency for values.
+let FC_VALUES={}; // kept as empty stub so old references don't crash
 let FC_LOADED=false;
+const FC_CACHE_KEY='_deprecated';
 
 function updateDataFreshness(){
   const pill=$('week-pill');if(!pill)return;
   const base='Wk '+S.currentWeek+' · '+S.season;
-  if(!FC_LOADED){pill.textContent=base;pill.title='FantasyCalc values not loaded';return;}
-  try{
-    const raw=localStorage.getItem(FC_CACHE_KEY);
-    if(raw){
-      const d=JSON.parse(raw);
-      const mins=Math.round((Date.now()-d.ts)/60000);
-      const freshLabel=mins<60?mins+'m ago':Math.round(mins/60)+'h ago';
-      pill.textContent=base;
-      pill.title='FC values: '+freshLabel+' ('+Object.keys(FC_VALUES).length+' players)';
-      pill.className=mins<240?'pill pg':'pill pd'; // green if <4h, grey if stale
-    }
-  }catch(e){}
-}
-
-function loadFCCache(){
-  try{
-    const raw=localStorage.getItem(FC_CACHE_KEY);
-    if(raw){const{ts,values}=JSON.parse(raw);if(Date.now()-ts<FC_TTL){FC_VALUES=values;FC_LOADED=true;return true;}}
-  }catch(e){}
-  return false;
-}
-
-function saveFCCache(values){
-  try{localStorage.setItem(FC_CACHE_KEY,JSON.stringify({ts:Date.now(),values}));}catch(e){}
+  pill.textContent=base;
+  if(LI_LOADED){
+    pill.title='DHQ values: '+Object.keys(LI.playerScores||{}).length+' players';
+    pill.className='pill pg';
+  }else{
+    pill.title='DHQ loading...';
+  }
 }
 
 function updateSyncStatus(){
   const fcEl=$('sync-fc');const statsEl=$('sync-stats');const liEl=$('sync-li');
+  // FC indicator repurposed to show DHQ status
   if(fcEl){
     const dot=fcEl.querySelector('span');
-    if(FC_LOADED){dot.style.background='var(--green)';fcEl.style.color='var(--text2)';fcEl.lastChild.textContent=' FC ✓ ('+Object.keys(FC_VALUES).length+')';}
-    else{dot.style.background='var(--red)';fcEl.style.color='var(--red)';fcEl.lastChild.textContent=' FC ✗';}
+    if(LI_LOADED){
+      dot.style.background='var(--green)';fcEl.style.color='var(--text2)';
+      fcEl.lastChild.textContent=' DHQ ✓ ('+Object.keys(LI.playerScores||{}).length+')';
+    } else{dot.style.background='var(--text3)';fcEl.style.color='var(--text3)';fcEl.lastChild.textContent=' DHQ...';}
   }
   if(statsEl){
     const dot=statsEl.querySelector('span');
     const count=Object.keys(S.playerStats||{}).length;
     if(count>0){dot.style.background='var(--green)';statsEl.style.color='var(--text2)';statsEl.lastChild.textContent=' Stats ✓ ('+count+')';}
-    else{dot.style.background='var(--amber)';statsEl.style.color='var(--amber)';statsEl.lastChild.textContent=' Stats (offseason)';}
+    else{dot.style.background='var(--amber)';statsEl.style.color='var(--amber)';statsEl.lastChild.textContent=' Stats...';}
   }
   if(liEl){
     const dot=liEl.querySelector('span');
     if(LI_LOADED){
-      const pCount=Object.keys(LI.playerScores||{}).length;
       const dCount=LI.totalPicks||0;
       dot.style.background='var(--green)';liEl.style.color='var(--text2)';
-      liEl.lastChild.textContent=` DHQ ✓ (${pCount}p, ${dCount} picks)`;
+      liEl.lastChild.textContent=` Intel ✓ (${dCount} picks, ${LI.leagueYears?.length||0}yr)`;
     }
-    else{dot.style.background='var(--text3)';liEl.lastChild.textContent=' DHQ...';}
+    else{dot.style.background='var(--text3)';liEl.lastChild.textContent=' Intel...';}
   }
 }
 
 async function resyncAllData(){
   if(!S.currentLeagueId){showToast('Connect first');return;}
   showToast('Resyncing...');
-  // Clear caches
-  try{localStorage.removeItem(FC_CACHE_KEY);localStorage.removeItem('dhq_leagueintel_v3');}catch(e){}
-  FC_LOADED=false;FC_VALUES={};_availCache=null;LI_LOADED=false;LI={};
+  try{localStorage.removeItem('dhq_leagueintel_v3');}catch(e){}
+  _availCache=null;LI_LOADED=false;LI={};S.playerStats={};
   updateSyncStatus();
-  // Re-fetch everything
-  await Promise.all([loadRosterStats(),fetchFantasyCalcValues()]);
+  await loadRosterStats();
   updateSyncStatus();
   buildRosterTable();renderAvailable();renderPicks();
-  setTimeout(()=>loadLeagueIntel().then(updateSyncStatus),500);
+  loadLeagueIntel().then(()=>{updateSyncStatus();updateDataFreshness();buildRosterTable();renderAvailable();});
   showToast('Data refreshed ✓');
 }
 
-async function fetchFantasyCalcValues(){
-  if(loadFCCache()){updateDataFreshness();updateSyncStatus();buildRosterTable();renderAvailable();return;}
-  try{
-    // League format detection
-    const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-    const positions=league?.roster_positions||[];
-    const isSF=positions.includes('SUPER_FLEX');
-    const numQbs=isSF?2:1;
-    const teams=S.rosters.length||16;
-    // Always use .5 PPR — standard for dynasty IDP leagues
-    const url=`https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${numQbs}&numTeams=${teams}&ppr=0.5`;
-    const data=await fetch(url).then(r=>r.ok?r.json():[]).catch(()=>[]);
-    if(!data.length){console.warn('FantasyCalc returned no data');return;}
-    const values={};
-    const pickValues={}; // "2026_1" -> value
-    data.forEach(d=>{
-      if(d.player?.sleeperId){
-        values[String(d.player.sleeperId)]={
-          value:Math.max(0,d.value||0),
-          overallRank:d.overallRank||999,
-          positionRank:d.positionRank||99,
-          trend:d.trend30Day||0,
-        };
-      }
-      // Capture pick values — FC returns these as entries without sleeperId
-      if(d.player?.position==='PICK'||(!d.player?.sleeperId&&d.player?.name)){
-        const name=d.player?.name||'';
-        // FC pick names like "2026 1st", "2026 Mid 2nd", etc
-        const m=name.match(/(\d{4})\s*(early|mid|late)?\s*(\d+)/i);
-        if(m){
-          const yr=m[1];const pos=(m[2]||'mid').toLowerCase();const rd=m[3];
-          const key=yr+'_'+rd+'_'+pos;
-          pickValues[key]=Math.max(0,d.value||0);
-        }
-      }
-    });
-    FC_VALUES=values;FC_LOADED=true;
-    // Store pick values globally
-    window.FC_PICK_VALUES=pickValues;
-    if(Object.keys(pickValues).length){
-      console.log('FC pick values:',Object.keys(pickValues).length,'picks captured');
-    }
-    _availCache=null; // invalidate available players cache
-    saveFCCache(values);
-    updateDataFreshness();
-    // Re-render now that values are available
-    buildRosterTable();
-    renderAvailable();
-    document.querySelectorAll('.rt-th').forEach(th=>{
-      if(th.textContent.trim()==='Value')
-        th.innerHTML='Value <span style="font-size:8px;color:var(--green)">FC</span>';
-    });
-    console.log(`FantasyCalc: ${Object.keys(values).length} players (.5PPR, ${teams} teams, ${numQbs}QB)`);
-    updateSyncStatus();
-  }catch(e){console.warn('FantasyCalc fetch failed:',e);updateDataFreshness();updateSyncStatus();}
-}
-
-// ── Player Value (FantasyCalc only) ───────────────────────────
-// Returns the FC dynasty value (0-10000 scale), or 0 if not in FC.
-// 0 means no dynasty value — used to flag roster dead weight.
+// ── Player Value — DHQ Primary ───────────────────────────────
 function tradeValueTier(val){
   if(val>=7000)return{tier:'Elite',col:'var(--green)'};
   if(val>=4000)return{tier:'Starter',col:'var(--accent)'};
@@ -3044,31 +2955,25 @@ function tradeValueTier(val){
 function dynastyValue(playerId){
   const p=S.players[playerId];if(!p)return 0;
   if(p.status==='Inactive'||p.status==='Retired')return 0;
-  // DHQ value (league-derived) is primary
+  // DHQ value (league-derived) is the sole value source
   if(LI_LOADED&&LI.playerScores?.[playerId]>0)return LI.playerScores[playerId];
-  // FantasyCalc fallback
-  const fc=FC_VALUES[String(playerId)];
-  if(fc!=null)return Math.max(0,fc.value||0);
   return 0;
 }
 
 function getPlayerRank(playerId){
-  // DHQ rank from LI if available
   if(LI_LOADED&&LI.playerScores?.[playerId]>0){
     const allScores=Object.entries(LI.playerScores).sort((a,b)=>b[1]-a[1]);
     const overall=allScores.findIndex(([pid])=>pid===String(playerId))+1;
     const pos=LI.playerMeta?.[playerId]?.pos;
     const posScores=allScores.filter(([pid])=>LI.playerMeta?.[pid]?.pos===pos);
     const posRank=posScores.findIndex(([pid])=>pid===String(playerId))+1;
-    return{overall:overall||999,pos:posRank||99,trend:FC_VALUES[String(playerId)]?.trend||0};
+    return{overall:overall||999,pos:posRank||99,trend:0};
   }
-  const fc=FC_VALUES[String(playerId)];
-  if(fc)return{overall:fc.overallRank,pos:fc.positionRank,trend:fc.trend};
   return null;
 }
 
 function isNoValue(playerId){
-  return (LI_LOADED||FC_LOADED) && dynastyValue(playerId)===0;
+  return LI_LOADED && dynastyValue(playerId)===0;
 }
 
 function ktcNormalize(name){return(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
@@ -3283,7 +3188,7 @@ async function runSmartFeed(){
       idpCtx,
       '',
       'Return exactly 4 recs: 1:waiver add, 2:IDP insight, 3:trade proposal, 4:draft priority.',
-      'Each: name real players, cite FC values/ages.',
+      'Each: name real players, cite DHQ values/ages.',
       'JSON only: {"recs":[{"type":"waiver|idp|trade|draft","headline":"action sentence","body":"2 sentences with data","cta_label":"label","cta_action":"waiver|info|trade|draft","copy":"Sleeper msg or null"}]}',
     ].filter(v=>v!==null).join('\n');
 
@@ -3398,14 +3303,14 @@ async function sendHomeChat(){
     const faabCtxStr=LI_LOADED&&LI.faabByPos?
       Object.entries(LI.faabByPos).slice(0,4).map(([pos,d])=>`${pos}:avg$${d.avg}(${d.count}claims)`).join(';'):'';
     const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
-    const prompt=`Waiver agent. ${S.season} offseason. FC values 0-10000 scale.
+    const prompt=`Waiver agent. ${S.season} offseason. DHQ values 0-10000 scale.
 ${buildMentalityCtx()}
 ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
 ${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
 AVAILABLE(top10):${topAvailStr||'still loading'}
 IDP:sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3}
 ${slots.openBench===0?'ROSTER FULL — must suggest who to drop.':''}
-Recommend ${slotsToFill} adds. Name players, cite FC values, explain fit. JSON only:
+Recommend ${slotsToFill} adds. Name players, cite DHQ values, explain fit. JSON only:
 {"recommendations":[{"name":"player","position":"POS","team":"TM","rank":1,"age":0,"dynastyValue":0,"reason":"why",${faabFields}"copyText":"Sleeper msg"}]}`;
     const reply=await callClaude([{role:'user',content:prompt}]);
     let data={recommendations:[]};
@@ -3478,7 +3383,7 @@ async function sendTradeChat(){
     if(tradeChatHistory.length>6)tradeChatHistory=tradeChatHistory.slice(-6);
     const ctx=buildCtx()+'\n'+buildMentalityCtx();
     const msgs=tradeChatHistory.map(function(m,i){
-      if(i===0)return{role:m.role,content:'Dynasty trade advisor. FC values are 0-10000 scale (not dollars). Draft Sleeper-ready messages when asked.\n\n'+ctx+'\n\nQuestion: '+m.content};
+      if(i===0)return{role:m.role,content:'Dynasty trade advisor. DHQ values are 0-10000 scale (not dollars). Draft Sleeper-ready messages when asked.\n\n'+ctx+'\n\nQuestion: '+m.content};
       return m;
     });
     const tradeNeedsSearch=/news|value|worth|ranking|trade for|trade away|market|recent/i.test(tradeChatHistory[tradeChatHistory.length-1]?.content||'');
@@ -3574,7 +3479,7 @@ function buildCtx(){
   // Starters
   const starters=(my?.starters||[]).filter(p=>p&&p!=='0').map(pStr);
 
-  // Top bench by FC value only — keep it tight
+  // Top bench by DHQ value — keep it tight
   const benchPids=(my?.players||[]).filter(p=>!(my?.starters||[]).includes(p)&&!(my?.reserve||[]).includes(p)&&!(my?.taxi||[]).includes(p));
   const bench=benchPids.map(p=>({pid:p,val:dynastyValue(p)})).filter(x=>x.val>0).sort((a,b)=>b.val-a.val).slice(0,8).map(x=>pStr(x.pid));
 
@@ -3615,7 +3520,7 @@ function buildCtx(){
     surpluses.length?'SURPLUS:'+surpluses.join(','):'',
     picks?'PICKS:'+picks:'',
     'IDP:sack='+((sc.idp_sack)||4)+',INT='+((sc.idp_int)||5)+',PD='+((sc.idp_pass_def)||3)+',TKL='+((sc.idp_tkl_solo)||0.5),
-    'Trade values=FantasyCalc(FC:0-10000 scale, NOT dollars). Higher=better. 7000+=elite, 4000+=starter, 2000+=depth.',
+    'Trade values=DHQ(0-10000 scale, league-derived, NOT dollars). Higher=better. 7000+=elite, 4000+=starter, 2000+=depth.',
     memCtx||'',
   ].filter(Boolean).join('\n');
 }
@@ -3718,7 +3623,7 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
   const provider = S.aiProvider || 'anthropic';
   const apiKey = S.apiKey;
   const model = S.aiModel || PROVIDERS[provider]?.defaultModel || 'claude-sonnet-4-20250514';
-  const sys = 'Dynasty FF advisor. Values from FantasyCalc (0-10000 scale, NOT dollars). Be specific with player names and FC values. Sleeper-ready messages when asked.';
+  const sys = 'Dynasty FF advisor. Values from DHQ (0-10000 scale, league-derived). Be specific with player names and DHQ values. Sleeper-ready messages when asked.';
   // Web search only works with Anthropic — silently disable for other providers
   if(provider !== 'anthropic') useWebSearch = false;
 
@@ -3954,8 +3859,8 @@ function openPlayerModal(playerId){
   }else{$('pm-spark-wrap').style.display='none';}
 
   // Trade value + peak
-  $('pm-trade-val').textContent=val>0?val.toLocaleString():FC_LOADED?'No FC value':'Loading...';
-  $('pm-trade-tier').innerHTML=val>0?`<span style="color:${col}">${tier}</span>${fcRankData?' · Overall #'+fcRankData.overall:''}`:FC_LOADED?'<span style="color:var(--text3)">Not tracked by FantasyCalc</span>':'<span style="color:var(--text3)">FantasyCalc loading...</span>';
+  $('pm-trade-val').textContent=val>0?val.toLocaleString():LI_LOADED?'Not valued':'Loading...';
+  $('pm-trade-tier').innerHTML=val>0?`<span style="color:${col}">${tier}</span>${fcRankData?' · Overall #'+fcRankData.overall:''}`:LI_LOADED?'<span style="color:var(--text3)">No DHQ production data</span>':'<span style="color:var(--text3)">DHQ engine loading...</span>';
   $('pm-peak-years').textContent=pk.label;
   $('pm-peak-desc').textContent=pk.desc;
 
@@ -4156,7 +4061,7 @@ function scoutTeam(rosterId){
     DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
   };
 
-  // Elite: top 5 FC value at each position league-wide
+  // Elite: top 5 DHQ value at each position league-wide
   const eliteByPos={};
   if(S.players){
     Object.keys(starterSlots).forEach(pos=>{
