@@ -1325,20 +1325,18 @@ async function selectLeague(leagueId,userId){
     prog(100);
     // Show home feed immediately
     renderHomeSnapshot();
-    // Fire data loads — stats first, then DHQ engine
+    // Fire data loads — stats + DHQ engine in parallel
     const t0=Date.now();
-    loadRosterStats().then(()=>{
-      const elapsed=((Date.now()-t0)/1000).toFixed(1);
-      console.log('Stats loaded in '+elapsed+'s | '+Object.keys(S.playerStats||{}).length+' players');
-      updateSyncStatus();
+    // Stats load fast (2 API calls), DHQ takes longer but has permanent cache
+    Promise.all([
+      loadRosterStats().catch(e=>console.warn('Stats error:',e)),
+      loadLeagueIntel().catch(e=>console.warn('DHQ error:',e)),
+    ]).then(()=>{
+      console.log('All data ready in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys(LI.playerScores||{}).length);
+      updateDataFreshness();updateSyncStatus();
+      buildRosterTable();renderAvailable();renderDraftNeeds();
       if(S.apiKey) runSmartFeed();
-      // DHQ engine builds player + pick values from league history
-      loadLeagueIntel().then(()=>{
-        console.log('DHQ engine ready in '+((Date.now()-t0)/1000).toFixed(1)+'s');
-        updateDataFreshness();updateSyncStatus();
-        buildRosterTable();renderAvailable();renderDraftNeeds();
-      });
-    });
+    }).catch(e=>console.warn('Data load error:',e));
   }catch(e){
     const sb=$('setup-block');
     if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:13px">Error loading league: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
@@ -1577,7 +1575,8 @@ function livDraftADP(pos){
 }
 
 // Main LeagueIntel loader — THE valuation engine
-// Auto-discovers league history, builds player + pick values from YOUR league data
+// Caches historical data permanently (past drafts/stats never change)
+// Only refreshes current season on each load
 async function loadLeagueIntel(){
   if(loadLICache())return;
   if(!S.currentLeagueId)return;
@@ -1602,102 +1601,148 @@ async function loadLeagueIntel(){
   });
   Object.keys(starterCounts).forEach(p=>starterCounts[p]=Math.max(1,Math.round(starterCounts[p])));
 
-  // Unified scoring function using league's exact settings (offense + IDP + kicking + ST)
+  // Unified scoring function
   function scorePts(s){
     if(!s)return 0;
     let pts=0;
     const add=(stat,mult)=>{pts+=(s[stat]||0)*(mult||0);};
-    // Passing
     add('pass_yd',sc.pass_yd||0);add('pass_td',sc.pass_td||4);add('pass_int',sc.pass_int||-1);
     add('pass_2pt',sc.pass_2pt||0);add('pass_sack',sc.pass_sack||0);
-    // Rushing
     add('rush_yd',sc.rush_yd||0.1);add('rush_td',sc.rush_td||6);add('rush_2pt',sc.rush_2pt||0);add('rush_fd',sc.rush_fd||0);
-    // Receiving
     add('rec',sc.rec||0.5);add('rec_yd',sc.rec_yd||0.1);add('rec_td',sc.rec_td||6);add('rec_2pt',sc.rec_2pt||0);add('rec_fd',sc.rec_fd||0);
-    // Fumbles
     add('fum_lost',sc.fum_lost||-0.5);add('fum_rec_td',sc.fum_rec_td||0);
-    // Kicking
     add('xpm',sc.xpm||0);add('xpmiss',sc.xpmiss||0);add('fgm_yds',sc.fgm_yds||0);
     add('fgmiss',sc.fgmiss||0);add('fgmiss_0_19',sc.fgmiss_0_19||0);add('fgmiss_20_29',sc.fgmiss_20_29||0);
-    // IDP — try both prefixed and non-prefixed field names
-    add('idp_tkl_solo',sc.idp_tkl_solo||0);add('tkl_solo',sc.idp_tkl_solo||0);
-    add('idp_tkl_ast',sc.idp_tkl_ast||0);add('tkl_ast',sc.idp_tkl_ast||0);
-    add('idp_tkl_loss',sc.idp_tkl_loss||0);add('tkl_loss',sc.idp_tkl_loss||0);
-    add('idp_sack',sc.idp_sack||0);add('sack',sc.idp_sack||0);
-    add('idp_sack_yd',sc.idp_sack_yd||0);
-    add('idp_qb_hit',sc.idp_qb_hit||0);add('qb_hit',sc.idp_qb_hit||0);
-    add('idp_int',sc.idp_int||0);add('int',sc.idp_int||0);
-    add('idp_int_ret_yd',sc.idp_int_ret_yd||0);
-    add('idp_ff',sc.idp_ff||0);add('ff',sc.idp_ff||0);
-    add('idp_fum_rec',sc.idp_fum_rec||0);add('idp_fum_ret_yd',sc.idp_fum_ret_yd||0);
-    add('idp_pass_def',sc.idp_pass_def||0);add('pass_def',sc.idp_pass_def||0);
-    add('idp_pass_def_3p',sc.idp_pass_def_3p||0);
-    add('idp_def_td',sc.idp_def_td||0);add('def_td',sc.idp_def_td||0);
-    add('idp_blk_kick',sc.idp_blk_kick||0);add('idp_safe',sc.idp_safe||0);
-    // Special teams
+    const idpF=[['idp_tkl_solo','tkl_solo'],['idp_tkl_ast','tkl_ast'],['idp_tkl_loss','tkl_loss'],
+      ['idp_sack','sack'],['idp_qb_hit','qb_hit'],['idp_int','int'],['idp_ff','ff'],
+      ['idp_fum_rec'],['idp_pass_def','pass_def'],['idp_pass_def_3p'],
+      ['idp_def_td','def_td'],['idp_blk_kick'],['idp_safe'],['idp_sack_yd'],['idp_int_ret_yd'],['idp_fum_ret_yd']];
+    idpF.forEach(names=>{const mult=sc[names[0]]||0;if(!mult)return;let v=0;for(const n of names){if(s[n]){v=s[n];break;}}pts+=v*mult;});
     add('st_td',sc.st_td||0);add('st_ff',sc.st_ff||0);add('st_fum_rec',sc.st_fum_rec||0);
     add('st_tkl_solo',sc.st_tkl_solo||0);add('kr_yd',sc.kr_yd||0);add('pr_yd',sc.pr_yd||0);
     return +pts.toFixed(1);
   }
 
   try{
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Auto-discover league chain (no hardcoded IDs)
-    // ═══════════════════════════════════════════════════════════════
-    const chain=[];
-    let lid=S.currentLeagueId;
-    while(lid){
-      const l=await fetch(`${SLEEPER}/league/${lid}`).then(r=>r.json()).catch(()=>null);
-      if(!l)break;
-      chain.push({id:l.league_id,season:l.season,draft_id:l.draft_id,prev:l.previous_league_id});
-      lid=l.previous_league_id;
-    }
-    console.log('League chain:',chain.map(c=>c.season).join('→'));
+    const t0=performance.now();
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 2: Pull ALL rookie drafts (exclude startup 50+ rounds)
+    // STEP 1: Discover league chain (sequential — each season links to previous)
+    // But check permanent cache first — chain never changes for completed seasons
     // ═══════════════════════════════════════════════════════════════
-    const allDraftPicks=[];
-    const draftMeta=[];
-    await Promise.all(chain.map(async c=>{
-      if(!c.draft_id)return;
-      const drafts=await fetch(`${SLEEPER}/league/${c.id}/drafts`).then(r=>r.json()).catch(()=>[]);
-      for(const d of drafts){
-        if(!d.draft_id||d.status!=='complete')continue;
-        const picks=await fetch(`${SLEEPER}/draft/${d.draft_id}/picks`).then(r=>r.ok?r.json():[]).catch(()=>[]);
-        const rounds=d.settings?.rounds||picks.reduce((m,p)=>Math.max(m,p.round),0);
-        // Skip startup drafts (50+ rounds) — they distort analysis
-        if(rounds>=20){console.log(`Skipping startup draft ${c.season} (${rounds} rounds, ${picks.length} picks)`);continue;}
-        draftMeta.push({season:c.season,rounds,picks:picks.length,draft_id:d.draft_id});
-        picks.forEach(p=>{
-          if(!p.metadata?.position)return;
-          const mp=posMap(p.metadata.position);
-          allDraftPicks.push({
-            season:c.season,round:p.round,pick_no:p.pick_no,roster_id:p.roster_id,
-            pid:p.player_id,name:(p.metadata.first_name||'')+' '+(p.metadata.last_name||''),
-            pos:mp,rawPos:p.metadata.position,team:p.metadata.team
+    const HIST_KEY='dhq_hist_'+S.currentLeagueId;
+    let histCache=null;
+    try{const raw=localStorage.getItem(HIST_KEY);if(raw)histCache=JSON.parse(raw);}catch(e){}
+
+    let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns;
+    const uniqueYears=[2021,2022,2023,2024,2025];
+
+    if(histCache&&histCache.chain?.length>=5&&histCache.draftPicks?.length>0){
+      // ── FAST PATH: Use permanent cache for historical data ──
+      chain=histCache.chain;
+      allDraftPicks=histCache.draftPicks;
+      draftMeta=histCache.draftMeta;
+      faabTxns=histCache.faabTxns||[];
+      // Only fetch stats fresh (they're large but fast from Sleeper CDN)
+      seasonStatsRaw={};
+      await Promise.all(uniqueYears.map(async yr=>{
+        seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
+      }));
+      console.log(`DHQ FAST PATH: cached chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}) | fresh stats in ${((performance.now()-t0)/1000).toFixed(1)}s`);
+
+    }else{
+      // ── COLD PATH: Discover everything from scratch, then cache ──
+      console.log('DHQ COLD PATH: building from scratch...');
+
+      // Step 1a: League chain
+      chain=[];
+      let lid=S.currentLeagueId;
+      while(lid){
+        const l=await fetch(`${SLEEPER}/league/${lid}`).then(r=>r.json()).catch(()=>null);
+        if(!l)break;
+        chain.push({id:l.league_id,season:l.season,draft_id:l.draft_id,prev:l.previous_league_id});
+        lid=l.previous_league_id;
+      }
+
+      // Step 1b: ALL parallel — drafts + stats + FAAB at once
+      allDraftPicks=[];
+      draftMeta=[];
+      seasonStatsRaw={};
+      faabTxns=[];
+
+      // Build all fetch promises
+      const fetchPromises=[];
+
+      // Draft picks (one call per league to get draft list, then one per draft for picks)
+      const draftPromise=(async()=>{
+        const draftLists=await Promise.all(chain.map(c=>
+          c.draft_id?fetch(`${SLEEPER}/league/${c.id}/drafts`).then(r=>r.json()).catch(()=>[]):Promise.resolve([])
+        ));
+        const pickFetches=[];
+        draftLists.forEach((drafts,i)=>{
+          drafts.forEach(d=>{
+            if(!d.draft_id||d.status!=='complete')return;
+            pickFetches.push(
+              fetch(`${SLEEPER}/draft/${d.draft_id}/picks`).then(r=>r.ok?r.json():[]).catch(()=>[])
+                .then(picks=>{
+                  const rounds=d.settings?.rounds||picks.reduce((m,p)=>Math.max(m,p.round),0);
+                  if(rounds>=20)return; // skip startup
+                  draftMeta.push({season:chain[i].season,rounds,picks:picks.length,draft_id:d.draft_id});
+                  picks.forEach(p=>{
+                    if(!p.metadata?.position)return;
+                    allDraftPicks.push({
+                      season:chain[i].season,round:p.round,pick_no:p.pick_no,roster_id:p.roster_id,
+                      pid:p.player_id,name:(p.metadata.first_name||'')+' '+(p.metadata.last_name||''),
+                      pos:posMap(p.metadata.position),rawPos:p.metadata.position,team:p.metadata.team
+                    });
+                  });
+                })
+            );
           });
         });
-      }
-    }));
-    console.log(`Drafts loaded: ${draftMeta.length} rookie drafts, ${allDraftPicks.length} total picks`);
-    const draftSeasons=draftMeta.map(d=>d.season);
+        await Promise.all(pickFetches);
+      })();
+      fetchPromises.push(draftPromise);
+
+      // Stats (all 5 years in parallel)
+      fetchPromises.push(Promise.all(uniqueYears.map(async yr=>{
+        seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
+      })));
+
+      // FAAB (3 seasons × 9 weeks — all parallel)
+      const faabPromise=(async()=>{
+        const faabLeagues=chain.filter(c=>parseInt(c.season)>=2023&&parseInt(c.season)<=2025);
+        const allWeekFetches=[];
+        faabLeagues.forEach(c=>{
+          [1,2,3,4,5,6,8,10,12].forEach(w=>{
+            allWeekFetches.push(
+              fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[])
+                .then(txns=>txns.forEach(t=>{
+                  if(t.type!=='waiver'||(t.settings?.waiver_bid||0)===0||t.status==='failed')return;
+                  Object.keys(t.adds||{}).forEach(pid=>{
+                    const pos=posMap(pPos(pid)||S.players?.[pid]?.position||'');
+                    if(positions.includes(pos))faabTxns.push({season:c.season,pid,pos,bid:t.settings.waiver_bid});
+                  });
+                }))
+            );
+          });
+        });
+        await Promise.all(allWeekFetches);
+      })();
+      fetchPromises.push(faabPromise);
+
+      // Fire everything at once
+      await Promise.all(fetchPromises);
+
+      // Cache historical data permanently (drafts/chain/faab never change)
+      try{localStorage.setItem(HIST_KEY,JSON.stringify({chain,draftPicks:allDraftPicks,draftMeta,faabTxns,ts:Date.now()}));}catch(e){}
+      console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length})`);
+    }
+
+    console.log('Stats:',Object.entries(seasonStatsRaw).map(([y,s])=>y+':'+Object.keys(s).length+'p').join(' '));
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 3: Pull full-season stats for every league year
-    // ═══════════════════════════════════════════════════════════════
-    const statYears=[];
-    chain.forEach(c=>{const yr=parseInt(c.season);if(yr>=2021&&yr<=2025)statYears.push(yr);});
-    // Dedupe and sort
-    const uniqueYears=[...new Set(statYears)].sort();
-    const seasonStatsRaw={};
-    await Promise.all(uniqueYears.map(async yr=>{
-      seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
-    }));
-    console.log('Stats loaded:',uniqueYears.join(','),Object.entries(seasonStatsRaw).map(([y,s])=>y+':'+Object.keys(s).length+'p').join(' '));
-
-    // ═══════════════════════════════════════════════════════════════
-    // STEP 4: Score every player × every season using league scoring
+    // From here on: pure computation, no API calls
     // ═══════════════════════════════════════════════════════════════
     const playerSeasons={}; // pid -> {seasons:{2021:{total,avg,gp},...}, pos, name}
     uniqueYears.forEach(yr=>{
@@ -1950,28 +1995,10 @@ async function loadLeagueIntel(){
     console.log('DHQ player values: '+Object.keys(playerScores).length+' players scored');
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 9: FAAB market prices (same as before, auto-discovered)
+    // STEP 9: Aggregate FAAB data (already fetched/cached above)
     // ═══════════════════════════════════════════════════════════════
-    const faabTxns=[];
-    // Use chain to get league IDs for past seasons
-    const faabLeagues=chain.filter(c=>parseInt(c.season)>=2023&&parseInt(c.season)<=2025);
-    await Promise.all(faabLeagues.map(async c=>{
-      const weeks=[1,2,3,4,5,6,8,10,12];
-      const weekData=await Promise.all(
-        weeks.map(w=>fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[]))
-      );
-      weekData.flat().forEach(t=>{
-        if(t.type!=='waiver'||(t.settings?.waiver_bid||0)===0||t.status==='failed')return;
-        Object.keys(t.adds||{}).forEach(pid=>{
-          const pos=posMap(pPos(pid)||S.players?.[pid]?.position||'');
-          if(!positions.includes(pos))return;
-          faabTxns.push({season:c.season,pid,pos,bid:t.settings.waiver_bid});
-        });
-      });
-    }));
-
     const faabByPos={};
-    faabTxns.forEach(({pos,bid})=>{
+    (faabTxns||[]).forEach(({pos,bid})=>{
       if(!faabByPos[pos])faabByPos[pos]={total:0,count:0,bids:[]};
       faabByPos[pos].total+=bid;faabByPos[pos].count++;faabByPos[pos].bids.push(bid);
     });
