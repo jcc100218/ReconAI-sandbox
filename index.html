@@ -590,7 +590,6 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn btn-ghost btn-sm" onclick="switchTab('roster')" style="font-size:11px">Roster</button>
-            <button class="btn btn-ghost btn-sm" onclick="runSmartFeed()" id="feed-refresh-btn" style="font-size:11px">Refresh ↺</button>
           </div>
         </div>
         <!-- Data sync status -->
@@ -618,12 +617,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             <button class="chip" onclick="homeAsk('Where is my roster weakest heading into the rookie draft?')">Roster gaps?</button>
           </div>
         </div>
-        <!-- Feed -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Recommendations</div>
-          <div style="font-size:10px;color:var(--text3)" id="feed-updated"></div>
-        </div>
-        <div id="feed-cards"><div class="card"><div class="empty">Loading recommendations...</div></div></div>
+        <!-- Team overview — replaces AI recommendations (saves API call) -->
+        <div id="home-team-overview"></div>
       </div>
     </div>    <!-- ROSTER -->
     <div class="panel" id="panel-roster">
@@ -869,7 +864,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <!-- Draft chat -->
       <div class="sec" style="margin-top:16px">Draft chat <div class="sec-line"></div></div>
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-        <div id="draft-msgs" style="height:180px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
+        <div id="draft-msgs" style="height:320px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
           <div class="hc-msg-a" style="font-size:12px">I know your roster gaps, your pick slots, and your league's draft tendencies. Tell me what you're thinking and I'll tell you if it's right.</div>
         </div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
@@ -1113,7 +1108,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div class="card">
         <p style="font-size:12px;color:var(--text2);margin-bottom:10px">The Daily Digest runs automatically each time you open the app.</p>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost" onclick="runSmartFeed();switchTab('digest')">Refresh home feed</button>
+          <button class="btn btn-ghost" onclick="switchTab('digest')">Go to home</button>
           <button class="btn btn-ghost" onclick="clearHistory()">Clear agent history</button>
         </div>
       </div>
@@ -1337,7 +1332,7 @@ async function selectLeague(leagueId,userId){
       try{renderAvailable();}catch(e){console.warn('renderAvailable error:',e);}
       try{renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds error:',e);}
       try{renderHomeSnapshot();}catch(e){} // re-render with data
-      if(S.apiKey) setTimeout(()=>runSmartFeed(),100);
+      try{renderTeamOverview();}catch(e){console.warn('Overview error:',e);}
     }).catch(e=>console.warn('Data load error:',e));
   }catch(e){
     const sb=$('setup-block');
@@ -1985,6 +1980,13 @@ async function loadLeagueIntel(){
     const playerScores={};
     const playerMeta={};
 
+    // Build set of all rostered players across the league
+    const rosteredSet=new Set(S.rosters.flatMap(r=>r.players||[]));
+    // Detect offseason: if most players have null/missing team, Sleeper hasn't updated
+    const samplePids=Object.keys(S.players).slice(0,500);
+    const nullTeamPct=samplePids.filter(id=>{const t=S.players[id]?.team;return!t||t==='null'||t===null;}).length/samplePids.length;
+    const isOffseasonTeams=nullTeamPct>0.3;
+
     // Score all players with recent production
     const recentPlayers=Object.entries(playerSeasons)
       .filter(([pid,ps])=>ps.seasons[2025]||ps.seasons[2024]||ps.seasons[2023])
@@ -1993,7 +1995,6 @@ async function loadLeagueIntel(){
         const p=S.players[pid];
 
         // ─── COMPONENT 1: Production Base (40%) ───
-        // Weighted PPG: recent production matters most
         let weightedTotal=0,weightSum=0;
         const weights={2025:4,2024:3,2023:2,2022:1,2021:0.5};
         Object.entries(ps.seasons).forEach(([yr,s])=>{
@@ -2011,31 +2012,37 @@ async function loadLeagueIntel(){
         let ageFactor=1.0;
 
         if(age<peakStart){
-          // Pre-peak: rising trajectory
-          // Younger = more upside but less proven
           const yearsToStart=peakStart-age;
           ageFactor=0.80+0.20*(1-yearsToStart/Math.max(1,peakStart-18));
         }else if(age<=peakEnd){
-          // In peak window: full value
           ageFactor=1.0;
         }else{
-          // Past peak: position-specific decay
           const yearsPost=age-peakEnd;
           const rate=decayRates[pos]||0.13;
           ageFactor=Math.max(0.03,1.0-yearsPost*rate);
-
-          // Stacking penalties for extreme age
-          if(yearsPost>=5)ageFactor*=0.70; // 5+ years past: extra 30% haircut
-          if(yearsPost>=8)ageFactor*=0.50; // 8+ years past: extra 50% on top
-          ageFactor=Math.max(0.02,ageFactor); // floor at 2%
+          if(yearsPost>=5)ageFactor*=0.70;
+          if(yearsPost>=8)ageFactor*=0.50;
+          ageFactor=Math.max(0.02,ageFactor);
         }
 
         // ─── COMPONENT 3: Situation Multiplier (20%) ───
         let sitMult=1.0;
+        const isRostered=rosteredSet.has(pid);
+        const hasRealTeam=p?.team&&p.team!=='null'&&p.team!==null&&p.team!=='FA'&&p.team!=='';
 
-        // A) Team status
-        if(!p?.team||p.team==='FA'){
-          sitMult*=0.55; // Free agent: no path to production
+        // A) Team / roster status — smart offseason handling
+        if(!isRostered&&!hasRealTeam){
+          // Not rostered by anyone AND no NFL team = effectively retired/worthless
+          sitMult*=0.30;
+        }else if(!isRostered&&hasRealTeam){
+          // Has an NFL team but no one in the league rosters them = available FA
+          sitMult*=0.55;
+        }else if(isRostered&&!hasRealTeam&&isOffseasonTeams){
+          // Rostered but team shows null — Sleeper offseason lag, don't penalize
+          sitMult*=1.0;
+        }else if(isRostered&&!hasRealTeam&&!isOffseasonTeams){
+          // Rostered but no team mid-season = cut/released
+          sitMult*=0.65;
         }
 
         // B) Role detection: starter vs backup
@@ -2114,13 +2121,17 @@ async function loadLeagueIntel(){
       // Peak years remaining bonus (5%): ~120 per year, capped at 1000
       const peakBonus=Math.min(1000,p.peakYrsLeft*120);
 
-      // Consistency bonus (part of remaining 10%)
-      const consistencyBonus=p.starterSeasons>=4?400:p.starterSeasons>=3?300:p.starterSeasons>=2?150:0;
+      // Consistency bonus — but NOT for unrostered players (nobody wants them)
+      const isUnrostered=!rosteredSet.has(p.pid);
+      const consistencyBonus=isUnrostered?0:(p.starterSeasons>=4?400:p.starterSeasons>=3?300:p.starterSeasons>=2?150:0);
 
-      // Durability micro-bonus
-      const durabilityBonus=p.recentGP>=16?100:p.recentGP>=13?50:0;
+      // Durability micro-bonus (not for unrostered)
+      const durabilityBonus=isUnrostered?0:(p.recentGP>=16?100:p.recentGP>=13?50:0);
 
-      const raw=coreScore+scarcityScore+peakBonus+consistencyBonus+durabilityBonus;
+      // Scarcity doesn't apply to unrostered players either
+      const scarcityFinal=isUnrostered?0:scarcityScore;
+
+      const raw=coreScore+scarcityFinal+peakBonus+consistencyBonus+durabilityBonus;
       const val=Math.round(Math.min(10000,Math.max(0,raw)));
       playerScores[p.pid]=val;
       playerMeta[p.pid]={
@@ -3125,6 +3136,8 @@ function dynastyValue(playerId){
   if(p.status==='Inactive'||p.status==='Retired')return 0;
   // DHQ value (league-derived) is the sole value source
   if(LI_LOADED&&LI.playerScores?.[playerId]>0)return LI.playerScores[playerId];
+  // If DHQ is loaded but player has no score, they're worthless
+  if(LI_LOADED)return 0;
   return 0;
 }
 
@@ -3220,6 +3233,118 @@ function renderHomeSnapshot(){
     ${lastSession?`<div style="background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);padding:10px 14px;font-size:11px;color:var(--text3);line-height:1.5">
       <span style="color:var(--accent);font-weight:700">Last session (${lastSession.date}):</span> ${lastSession.text}
     </div>`:''}`;
+}
+
+function renderTeamOverview(){
+  const el=$('home-team-overview');if(!el)return;
+  const my=myR();if(!my){el.innerHTML='';return;}
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const teams=S.rosters.length||16;
+  const players=my?.players||[];
+  const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+
+  // Roster value by position
+  const posGroups={};
+  let totalVal=0;
+  players.forEach(pid=>{
+    const pos=pM(pPos(pid));if(!pos)return;
+    const val=dynastyValue(pid);
+    if(!posGroups[pos])posGroups[pos]={total:0,count:0,top:[]};
+    posGroups[pos].total+=val;posGroups[pos].count++;
+    if(val>0)posGroups[pos].top.push({name:pName(pid),val,age:pAge(pid)||'?'});
+    totalVal+=val;
+  });
+  Object.values(posGroups).forEach(g=>g.top.sort((a,b)=>b.val-a.val));
+
+  // League rank by total value
+  const rosterVals=S.rosters.map(r=>{
+    const val=(r.players||[]).reduce((s,pid)=>s+dynastyValue(pid),0);
+    return{rid:r.roster_id,val};
+  }).sort((a,b)=>b.val-a.val);
+  const myValRank=rosterVals.findIndex(r=>r.rid===S.myRosterId)+1;
+  const topVal=rosterVals[0]?.val||1;
+
+  // Draft capital
+  const year=parseInt(S.season)||2026;
+  const draftRounds=league?.settings?.draft_rounds||7;
+  const allTP=S.tradedPicks;
+  const myPickCount=[];
+  for(let yr=year;yr<=year+2;yr++){
+    let count=0;
+    for(let rd=1;rd<=draftRounds;rd++){
+      const tradedAway=allTP.find(p=>parseInt(p.season)===yr&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
+      const acquired=allTP.filter(p=>parseInt(p.season)===yr&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
+      if(!tradedAway)count++;
+      count+=acquired.length;
+    }
+    myPickCount.push({yr,count});
+  }
+  const totalPicks=myPickCount.reduce((s,p)=>s+p.count,0);
+
+  // Position grades
+  const positions=['QB','RB','WR','TE','DL','LB','DB'];
+  const gradeColor=v=>v>=6000?'var(--green)':v>=3500?'var(--accent)':v>=1500?'var(--amber)':'var(--red)';
+  const gradeLetter=v=>v>=6000?'A':v>=4000?'B':v>=2500?'C':v>=1000?'D':'F';
+
+  let html='';
+
+  // Value rank + Draft capital row
+  html+=`<div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Roster Value</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <span style="font-size:20px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace">${totalVal.toLocaleString()}</span>
+        <span style="font-size:11px;color:${myValRank<=3?'var(--green)':myValRank<=8?'var(--text2)':'var(--red)'};font-weight:600">#${myValRank}/${teams}${myValRank===1?' 👑':''}</span>
+      </div>
+      <div style="background:var(--bg4);border-radius:2px;height:4px;margin-top:6px;overflow:hidden"><div style="width:${Math.round(totalVal/topVal*100)}%;height:100%;background:var(--accent);border-radius:2px"></div></div>
+    </div>
+    <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Draft Capital</div>
+      <div style="font-size:20px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalPicks} <span style="font-size:11px;font-weight:600;color:var(--text3)">picks</span></div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">${myPickCount.map(p=>`'${String(p.yr).slice(2)}: ${p.count}`).join(' · ')}</div>
+    </div>
+  </div>`;
+
+  // Position grades grid
+  html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+    <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px">`;
+  positions.forEach(pos=>{
+    const g=posGroups[pos];if(!g||!g.count)return;
+    const avgVal=Math.round(g.total/g.count);
+    const topP=g.top[0];
+    html+=`<div style="background:var(--bg3);border-radius:var(--r);padding:8px 10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <span style="font-size:11px;font-weight:700">${pos}</span>
+        <span style="font-size:13px;font-weight:800;color:${gradeColor(avgVal)}">${gradeLetter(avgVal)}</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3)">${g.count}p · avg ${avgVal.toLocaleString()}</div>
+      ${topP?`<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} ${topP.val.toLocaleString()}</div>`:''}
+    </div>`;
+  });
+  html+=`</div></div>`;
+
+  // Crown jewels — top 5
+  const topPlayers=players.map(pid=>({pid,val:dynastyValue(pid),name:pName(pid),pos:pM(pPos(pid)),age:pAge(pid)}))
+    .filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
+  if(topPlayers.length){
+    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Crown Jewels</div>`;
+    html+=topPlayers.map((p,i)=>{
+      const {col}=tradeValueTier(p.val);
+      const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
+      const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':'past peak';
+      return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0${i<4?';border-bottom:1px solid var(--border)':''}">
+        <span style="font-size:10px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
+        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+        <div style="flex:1;overflow:hidden"><div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:9px;color:var(--text3)">${p.pos} · ${p.age} · ${peakStr}</div></div>
+        <span style="font-size:11px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+      </div>`;
+    }).join('');
+    html+=`</div>`;
+  }
+
+  el.innerHTML=html;
 }
 
 async function runSmartFeed(){
@@ -3869,7 +3994,6 @@ function saveKey(){
   const label = p?.name || provider;
   ss('key-status', label + ' key saved ✓');
   checkApiWarn();
-  if(S.user && S.myRosterId) runSmartFeed();
 }
 function clearKey(){
   S.apiKey=''; S.aiProvider='anthropic'; S.aiModel='';
