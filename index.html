@@ -1310,33 +1310,45 @@ async function selectLeague(leagueId,userId){
   try{localStorage.setItem('dynastyhq_league',leagueId);}catch(e){}
   const league=S.leagues.find(l=>l.league_id===leagueId);
   $('league-pill').textContent=(league?.name||'League').substring(0,20);
-  $('setup-block').innerHTML=`<div style="font-size:13px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}... (roster data)</div>`;
+  $('setup-block').innerHTML=`<div style="font-size:13px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
   try{
     await loadLeague(leagueId,userId);
-    // Redirect to dashboard and show it
     const sb2=$('setup-block');if(sb2)sb2.style.display='none';
     const dc2=$('digest-content');if(dc2)dc2.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
     prog(100);
-    // Show home feed immediately (safe — won't crash if stats aren't loaded yet)
-    try{renderHomeSnapshot();}catch(e){console.warn('Home snapshot error:',e);}
-    // Fire data loads — stats + DHQ engine in parallel
-    const t0=Date.now();
-    Promise.all([
-      loadRosterStats().catch(e=>{console.warn('Stats error:',e);return null;}),
-      loadLeagueIntel().catch(e=>{console.warn('DHQ error:',e);return null;}),
-    ]).then(()=>{
-      console.log('All data ready in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys(LI.playerScores||{}).length);
-      updateDataFreshness();updateSyncStatus();
-      buildRosterTable();
-      try{renderAvailable();}catch(e){console.warn('renderAvailable error:',e);}
-      try{renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds error:',e);}
-      try{renderHomeSnapshot();}catch(e){} // re-render with data
-      try{renderTeamOverview();}catch(e){console.warn('Overview error:',e);}
-    }).catch(e=>console.warn('Data load error:',e));
+    try{renderHomeSnapshot();}catch(e){}
+    // Fire data loads via setTimeout to guarantee execution
+    console.log('selectLeague: firing data loads...');
+    setTimeout(()=>loadAllData(),100);
   }catch(e){
     const sb=$('setup-block');
-    if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:13px">Error loading league: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
+    if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
+  }
+}
+
+// Separate function for data loading — called after selectLeague completes
+async function loadAllData(){
+  if(!S.currentLeagueId||!S.myRosterId)return;
+  console.log('loadAllData: starting...');
+  const t0=Date.now();
+  try{
+    // Show loading state in sync bar
+    updateSyncStatus();
+    // Load stats + DHQ in parallel
+    await Promise.all([
+      loadRosterStats().catch(e=>{console.warn('Stats error:',e);return null;}),
+      loadLeagueIntel().catch(e=>{console.warn('DHQ error:',e);return null;}),
+    ]);
+    console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys(LI.playerScores||{}).length+' | rookies:'+(LI.rookieCount||0));
+    updateDataFreshness();updateSyncStatus();
+    buildRosterTable();
+    try{renderAvailable();}catch(e){console.warn('renderAvailable:',e);}
+    try{renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
+    try{renderHomeSnapshot();}catch(e){}
+    try{renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
+  }catch(e){
+    console.warn('loadAllData error:',e);
   }
 }
 
@@ -1524,7 +1536,7 @@ function buildRosterTable(){
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v3';
+const LI_CACHE_KEY='dhq_leagueintel_v4';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -3179,14 +3191,14 @@ function updateSyncStatus(){
 
 async function resyncAllData(){
   if(!S.currentLeagueId){showToast('Connect first');return;}
-  showToast('Resyncing...');
-  try{localStorage.removeItem('dhq_leagueintel_v3');}catch(e){}
-  _availCache=null;LI_LOADED=false;LI={};S.playerStats={};
+  showToast('Resyncing all data...');
+  try{
+    localStorage.removeItem('dhq_leagueintel_v4');
+    Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
+  _availCache=null;LI_LOADED=false;LI={};S.playerStats={};window._liLoading=false;
   updateSyncStatus();
-  await loadRosterStats();
-  updateSyncStatus();
-  buildRosterTable();renderAvailable();renderPicks();
-  loadLeagueIntel().then(()=>{updateSyncStatus();updateDataFreshness();buildRosterTable();renderAvailable();});
+  await loadAllData();
   showToast('Data refreshed ✓');
 }
 
@@ -4185,7 +4197,7 @@ function reconnect(){
   S.playerStats={};S.posRanks={};LI_LOADED=false;LI={};window._liLoading=false;
   _availCache=null;
   // Clear caches for clean reconnect
-  try{localStorage.removeItem('dhq_leagueintel_v3');
+  try{localStorage.removeItem('dhq_leagueintel_v4');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   // Restore the setup block with the connect form
