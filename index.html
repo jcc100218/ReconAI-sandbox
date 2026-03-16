@@ -994,11 +994,13 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <div id="key-status" class="status-txt"></div>
       </div>
       <div class="sec">Team strategy <div class="sec-line"></div></div>
-      <div class="card" style="border-color:rgba(108,99,245,.18)">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">This informs every AI decision — waivers, trades, start/sit, daily digest. Saved permanently.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div class="card" style="border-color:rgba(124,107,248,.15)">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6">This is your GM profile — it shapes every AI recommendation. The more specific you are, the sharper the advice.</p>
+
+        <!-- Row 1: Core identity -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
           <div>
-            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Mentality</div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Team mentality</div>
             <select id="mentality-sel" style="width:100%;font-size:12px">
               <option value="balanced">Balanced — compete + build</option>
               <option value="winnow">Win Now — maximize this season</option>
@@ -1007,7 +1009,52 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             </select>
           </div>
           <div>
-            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Waiver priority</div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Championship window</div>
+            <select id="window-sel" style="width:100%;font-size:12px">
+              <option value="now">Competing right now</option>
+              <option value="1yr">1 year out</option>
+              <option value="2yr">2-3 years out</option>
+              <option value="far">3+ years — full rebuild</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 2: Trade & Risk -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Trade style</div>
+            <select id="trade-style-sel" style="width:100%;font-size:12px">
+              <option value="aggressive">Aggressive — always dealing</option>
+              <option value="selective">Selective — only clear wins</option>
+              <option value="conservative">Conservative — rarely trade</option>
+              <option value="pick_seller">Pick seller — players > picks</option>
+              <option value="pick_hoarder">Pick hoarder — stockpile draft capital</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Risk tolerance</div>
+            <select id="risk-sel" style="width:100%;font-size:12px">
+              <option value="moderate_risk">Moderate — calculated gambles</option>
+              <option value="high_risk">High risk — love boom/bust</option>
+              <option value="low_risk">Low risk — safe floors</option>
+              <option value="no_risk">Zero risk — proven only</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Row 3: Age & Waivers -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Age preference</div>
+            <select id="age-pref-sel" style="width:100%;font-size:12px">
+              <option value="balanced_age">Balanced — best value wins</option>
+              <option value="youth">Youth first — under 25</option>
+              <option value="vets">Vet friendly — proven production</option>
+              <option value="agnostic">Age agnostic</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Waiver priority</div>
             <select id="priority-sel" style="width:100%;font-size:12px">
               <option value="auto">Auto (AI decides)</option>
               <option value="age">Age — prefer younger</option>
@@ -1017,19 +1064,53 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             </select>
           </div>
         </div>
+
+        <!-- Positions to upgrade -->
         <div style="margin-bottom:10px">
-          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Trade preferences</div>
-          <input type="text" id="trade-prefs" placeholder="e.g. willing to give up picks for proven players, prefer youth over vets..." style="font-size:12px"/>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Positions actively trying to upgrade</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="upgrade-pos-btns">
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'QB')">QB</button>
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'RB')">RB</button>
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'WR')">WR</button>
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'TE')">TE</button>
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'DL')">DL</button>
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'LB')">LB</button>
+            <button class="rfbtn" onclick="toggleUpgradePos(this,'DB')">DB</button>
+          </div>
+          <input type="hidden" id="upgrade-positions" value=""/>
         </div>
+
+        <!-- Trade preferences -->
         <div style="margin-bottom:10px">
-          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Never drop (comma-separated)</div>
-          <input type="text" id="never-drop" placeholder="e.g. CeeDee Lamb, Bijan Robinson..." style="font-size:12px"/>
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Trade philosophy (in your words)</div>
+          <textarea id="trade-prefs" placeholder="e.g. I love young WRs with route tree upside, will give picks for proven starters, never sell a QB early, targeting Team X's aging RB..." style="font-size:12px;min-height:60px"></textarea>
         </div>
-        <div>
-          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Additional notes for AI</div>
-          <input type="text" id="mentality-notes" placeholder="e.g. thin at LB, rebuilding IDP, targeting 2026 draft..." style="font-size:12px"/>
+
+        <!-- Targets & Shopping -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Players I'm targeting</div>
+            <input type="text" id="target-players" placeholder="e.g. Nico Collins, any young TE..." style="font-size:12px"/>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Players I'm shopping</div>
+            <input type="text" id="shopping-players" placeholder="e.g. Derrick Henry, my 2027 1st..." style="font-size:12px"/>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+
+        <!-- Untouchables -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Untouchable — never trade or drop</div>
+          <input type="text" id="never-drop" placeholder="e.g. CeeDee Lamb, Bijan Robinson, my 2026 1st..." style="font-size:12px"/>
+        </div>
+
+        <!-- Additional notes -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Anything else the AI should know</div>
+          <textarea id="mentality-notes" placeholder="e.g. my dad runs Team X so we can't trade with each other, league has taxi squads, IDP is deep..." style="font-size:12px;min-height:50px"></textarea>
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
           <button class="btn" onclick="saveMentality()">Save strategy</button>
           <button class="btn btn-ghost btn-sm" onclick="startSetupWizard()">Re-run setup wizard</button>
           <div id="mentality-saved" style="font-size:11px;color:var(--green);display:none">Saved ✓</div>
@@ -1942,7 +2023,7 @@ function getRosterSlots(){
   const openBench=Math.max(0,benchSlots-(activePlayers-(positions.filter(p=>p!=='BN'&&p!=='IR'&&p!=='Taxi').length)));
   return{totalSlots,benchSlots,openBench,taxiSlots,irSlots,taxiUsed,irUsed,rosterMax,activePlayers};
 }function loadMentality(){
-  const m=getMemory('mentality',{mentality:'balanced',priority:'auto',notes:'',tradePrefs:'',neverDrop:''});
+  const m=getMemory('mentality',{mentality:'balanced',priority:'auto',notes:'',tradePrefs:'',neverDrop:'',window:'now',tradeStyle:'selective',riskTolerance:'moderate_risk',agePreference:'balanced_age',upgradePositions:'',targetPlayers:'',shoppingPlayers:''});
   const sel=$('mentality-sel');const pri=$('priority-sel');
   const notes=$('mentality-notes');const tp=$('trade-prefs');const nd=$('never-drop');
   if(sel)sel.value=m.mentality||'balanced';
@@ -1950,6 +2031,21 @@ function getRosterSlots(){
   if(notes)notes.value=m.notes||'';
   if(tp)tp.value=m.tradePrefs||'';
   if(nd)nd.value=m.neverDrop||'';
+  // New fields
+  const ws=$('window-sel');if(ws)ws.value=m.window||'now';
+  const ts=$('trade-style-sel');if(ts)ts.value=m.tradeStyle||'selective';
+  const rs=$('risk-sel');if(rs)rs.value=m.riskTolerance||'moderate_risk';
+  const ap=$('age-pref-sel');if(ap)ap.value=m.agePreference||'balanced_age';
+  const tgt=$('target-players');if(tgt)tgt.value=m.targetPlayers||'';
+  const shop=$('shopping-players');if(shop)shop.value=m.shoppingPlayers||'';
+  // Restore upgrade positions
+  const up=$('upgrade-positions');if(up)up.value=m.upgradePositions||'';
+  if(m.upgradePositions){
+    m.upgradePositions.split(',').filter(Boolean).forEach(pos=>{
+      const btns=document.querySelectorAll('#upgrade-pos-btns .rfbtn');
+      btns.forEach(b=>{if(b.textContent.trim()===pos)b.classList.add('active');});
+    });
+  }
   return m;
 }
 function saveMentality(){
@@ -1958,11 +2054,26 @@ function saveMentality(){
     priority:$('priority-sel')?.value||'auto',
     notes:$('mentality-notes')?.value||'',
     tradePrefs:$('trade-prefs')?.value||'',
-    neverDrop:$('never-drop')?.value||''
+    neverDrop:$('never-drop')?.value||'',
+    window:$('window-sel')?.value||'now',
+    tradeStyle:$('trade-style-sel')?.value||'selective',
+    riskTolerance:$('risk-sel')?.value||'moderate_risk',
+    agePreference:$('age-pref-sel')?.value||'balanced_age',
+    upgradePositions:$('upgrade-positions')?.value||'',
+    targetPlayers:$('target-players')?.value||'',
+    shoppingPlayers:$('shopping-players')?.value||''
   };
   setMemory('mentality',m);
   const saved=$('mentality-saved');
   if(saved){saved.style.display='block';setTimeout(()=>saved.style.display='none',2000);}
+}
+
+function toggleUpgradePos(btn,pos){
+  btn.classList.toggle('active');
+  const active=[];
+  document.querySelectorAll('#upgrade-pos-btns .rfbtn.active').forEach(b=>active.push(b.textContent.trim()));
+  const hidden=$('upgrade-positions');
+  if(hidden)hidden.value=active.join(',');
 }
 
 
@@ -2000,10 +2111,15 @@ function buildMentalityCtx(){
     rebuild:'REBUILDING — stockpile picks/youth, willing seller of aging vets',
     balanced:'BALANCED — compete now while protecting long-term upside',
     prime:'DYNASTY PRIME — protect the core, 2-3yr peak window'};
+  const windowMap={now:'Competing RIGHT NOW — this season matters',
+    '1yr':'1 year from contending — need a few more pieces',
+    '2yr':'2-3 years out — building for the future',
+    far:'Full rebuild — 3+ years away, maximize draft capital and youth'};
   const tradeMap={aggressive:'Aggressive trader — always looking to deal',
     selective:'Selective — only moves on obvious wins',
     conservative:'Conservative — rarely trades, prefers waivers',
-    pick_seller:'Pick seller — prefers proven players over picks'};
+    pick_seller:'Pick seller — prefers proven players over picks',
+    pick_hoarder:'Pick hoarder — stockpiles draft capital'};
   const ageMap={youth:'Youth first — under 25 priority',
     balanced_age:'Age balanced — best value wins',
     vets:'Veteran friendly — trusts proven production',
@@ -2013,13 +2129,17 @@ function buildMentalityCtx(){
     low_risk:'Low risk — safe floors over ceilings',
     no_risk:'Zero risk — proven commodities only'};
   return [
-    stratMap[m.mentality]||(m.mentality||'Strategy not set'),
-    m.tradeStyle?tradeMap[m.tradeStyle]||m.tradeStyle:'',
-    m.agePreference?ageMap[m.agePreference]||m.agePreference:'',
-    m.riskTolerance?riskMap[m.riskTolerance]||m.riskTolerance:'',
-    m.tradePrefs?'Trade philosophy: '+m.tradePrefs:'',
+    'GM STRATEGY: '+(stratMap[m.mentality]||(m.mentality||'Not set')),
+    m.window?'WINDOW: '+(windowMap[m.window]||m.window):'',
+    m.tradeStyle?'TRADE STYLE: '+(tradeMap[m.tradeStyle]||m.tradeStyle):'',
+    m.agePreference?'AGE PREF: '+(ageMap[m.agePreference]||m.agePreference):'',
+    m.riskTolerance?'RISK: '+(riskMap[m.riskTolerance]||m.riskTolerance):'',
+    m.upgradePositions?'ACTIVELY UPGRADING: '+m.upgradePositions:'',
+    m.targetPlayers?'TARGETING PLAYERS: '+m.targetPlayers:'',
+    m.shoppingPlayers?'SHOPPING / SELLING: '+m.shoppingPlayers:'',
+    m.tradePrefs?'TRADE PHILOSOPHY: '+m.tradePrefs:'',
     m.neverDrop?'UNTOUCHABLE: '+m.neverDrop:'',
-    m.notes?'Notes: '+m.notes:'',
+    m.notes?'GM NOTES: '+m.notes:'',
   ].filter(Boolean).join('\n');
 }
 
