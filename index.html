@@ -1230,8 +1230,7 @@ async function selectLeague(leagueId,userId){
     // Show home feed immediately
     renderHomeSnapshot();
     // Fire all non-AI data loads in parallel
-    // Stats + FC values load in parallel, smart feed fires when both done
-    // Load stats and FC values in parallel, fire smart feed when both ready
+    // Load stats + FC values in parallel, fire smart feed when both ready
     Promise.all([
       loadRosterStats(),
       fetchFantasyCalcValues(),
@@ -1245,22 +1244,23 @@ async function selectLeague(leagueId,userId){
 }
 
 async function loadLeague(leagueId,userId){
-  const[rosters,users,tradedPicks,drafts,bracketW,bracketL]=await Promise.all([
+  const week=S.currentWeek||1;
+  const[rosters,users,tradedPicks,drafts,bracketW,bracketL,matchups,txns]=await Promise.all([
     sf(`/league/${leagueId}/rosters`),
     sf(`/league/${leagueId}/users`),
     sf(`/league/${leagueId}/traded_picks`),
     sf(`/league/${leagueId}/drafts`),
     sf(`/league/${leagueId}/winners_bracket`),
     sf(`/league/${leagueId}/losers_bracket`).catch(()=>[]),
+    sf(`/league/${leagueId}/matchups/${week}`).catch(()=>[]),
+    sf(`/league/${leagueId}/transactions/${week}`).catch(()=>[]),
   ]);
   S.rosters=rosters||[];S.leagueUsers=users||[];S.tradedPicks=tradedPicks||[];
   S.drafts=drafts||[];S.bracket={w:bracketW||[],l:bracketL||[]};
+  S.matchups['w'+week]=matchups||[];
+  S.transactions['w'+week]=txns||[];
   const uid=userId||S.user?.user_id;
   S.myRosterId=S.rosters.find(r=>r.owner_id===uid)?.roster_id;
-  await Promise.all([
-    loadMatchups(leagueId,S.currentWeek),
-    loadTxns(leagueId,S.currentWeek),
-  ]);
   renderRoster();renderWaivers();renderTrades();renderPicks();initScoutDropdown();
 }async function loadOwnership(){
   // /players/nfl/research/regular/{season}/{week} returns ownership% and rostering%
@@ -1562,19 +1562,8 @@ document.addEventListener('change',e=>{
     check.classList.add('on');check.textContent='✓';
     row.classList.add('selected');
   }
-  updateTradeBuilderSummary();
-}function updateTradeBuilderSummary(){
-  const teams=S.rosters.length||12;
-  const myVal=tradeBuilderAssets.mine.reduce((s,a)=>s+(a.type==='pick'?pickValue(a.pickData?.season,a.pickData?.round,teams):dynastyValue(a.id)),0);
-  const theirVal=tradeBuilderAssets.theirs.reduce((s,a)=>s+(a.type==='pick'?pickValue(a.pickData?.season,a.pickData?.round,teams):dynastyValue(a.id)),0);
-  const summary=$('tf-selection-summary');
-  const mine=tradeBuilderAssets.mine.map(a=>a.type==='pick'?pickLabel(a.pickData||{}):pName(a.id));
-  const theirs=tradeBuilderAssets.theirs.map(a=>a.type==='pick'?pickLabel(a.pickData||{}):pName(a.id));
-  if(mine.length||theirs.length){
-    summary.style.display='block';
-    summary.innerHTML=`<strong>You give:</strong> ${mine.join(', ')||'—'} <span style="color:var(--accent)">(${myVal.toLocaleString()})</span><br><strong>You get:</strong> ${theirs.join(', ')||'—'} <span style="color:var(--green)">(${theirVal.toLocaleString()})</span>`;
-  }else summary.style.display='none';
 }
+
 
 // ── Power Rankings ─────────────────────────────────────────────
 function avatarUrl(user){
@@ -1886,7 +1875,11 @@ function renderWaivers(){
   if(S.myRosterId){
     const faab=getFAAB();const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const slots=getRosterSlots();
-    const leagueFaab=getLeagueFAABStats();
+    const leagueFaab=(()=>{
+      const budgets=S.rosters.map(r=>(r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0));
+      const avg=budgets.length?Math.round(budgets.reduce((a,b)=>a+b,0)/budgets.length):100;
+      return{avg};
+    })();
     const bar=$('faab-bar');if(bar)bar.style.display='flex';
     const mineEl=$('faab-mine');if(mineEl)mineEl.textContent='$'+faab.remaining;
     const avgEl=$('faab-avg');if(avgEl)avgEl.textContent='$'+leagueFaab.avg;
@@ -1899,25 +1892,6 @@ function renderWaivers(){
 
   renderAvailable();
 
-  // Trending adds (global signal — mark if available in league)
-  const rostered=new Set(S.rosters.flatMap(r=>(r.players||[]).map(String)));
-  if([].length){
-    $('trending-adds').innerHTML=[].slice(0,15).map(t=>{
-      const name=pName(t.player_id);const pos=pPos(t.player_id);
-      const onMyTeam=(myR()?.players||[]).includes(String(t.player_id));
-      const isAvail=!rostered.has(String(t.player_id));
-      const sc=t.count>200?'score-a':t.count>60?'score-b':'score-c';
-      return`<div class="wq-item">
-        <span class="pos ${posClass(pos)||'pFLEX'}">${pos||'?'}</span>
-        <div class="wq-info">
-          <div class="wq-name">${name}${onMyTeam?' ✓ yours':isAvail?' <span style="color:var(--green);font-size:10px">available</span>':' <span style="color:var(--text3);font-size:10px">rostered</span>'}</div>
-          <div class="wq-reason">${fullTeam(pTeam(t.player_id))} · ${t.count.toLocaleString()} adds globally</div>
-        </div>
-        <span class="wq-score ${sc}">${t.count}</span>
-        ${isAvail&&!onMyTeam?`<button class="copy-btn" onclick="goAsk('Should I add ${name} to my dynasty roster? ${buildMentalityCtx()}')">Ask AI</button>`:''}
-      </div>`;
-    }).join('');
-  }
 
   // League waiver claims
   const claims=(S.transactions['w'+S.currentWeek]||[]).filter(t=>t.type==='free_agent'||t.type==='waiver').slice(0,12);
@@ -2367,10 +2341,14 @@ async function sendHomeChat(){
     const top20=filtered.slice(0,20);
     const faab=getFAAB();
     const slots=getRosterSlots();
-    const leagueFaab=getLeagueFAABStats();
-    const histSpend=getLeagueWaiverHistory();
+    const leagueFaab=(()=>{
+      const budgets=S.rosters.map(r=>(r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0));
+      const avg=budgets.length?Math.round(budgets.reduce((a,b)=>a+b,0)/budgets.length):100;
+      return{avg};
+    })();
+    const histSpend={}; // simplified - historical spend removed
     const isFAAB=faab.budget>0;
-    const spendCtx=Object.entries(histSpend).map(([pos,d])=>`${pos}:avg$${d.avg},max$${d.max}(${d.count}claims)`).join(';');
+    const spendCtx='';
     const myPlayers=myR()?.players||[];
     const myPosCounts={};
     myPlayers.forEach(pid=>{const pos=pPos(pid);if(pos)myPosCounts[pos]=(myPosCounts[pos]||0)+1;});
@@ -2448,6 +2426,7 @@ Respond with ONLY this JSON (no markdown, no explanation):
 
 // ── Trade Chat ─────────────────────────────────────────────────
 let tradeChatHistory=[];
+let tradeBuilderAssets={mine:[],theirs:[]};
 
 function sendTradeChatMsg(text){
   const inp=$('trade-chat-in');if(inp)inp.value=text;
@@ -2608,6 +2587,18 @@ function goAsk(text){
   switchTab('agent',agentTab);
   setTimeout(()=>{const ci=$('chat-in');if(ci){ci.value=text;sendMessage();}},100);
 }
+
+function addMsg(text,role){
+  const d=document.createElement('div');d.className='msg msg-'+role;
+  d.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+  const el=$('chat-msgs');if(el){el.appendChild(d);el.scrollTop=99999;}
+}
+function addLoading(){
+  const id=Date.now();const d=document.createElement('div');d.className='msg msg-a';d.id='ld-'+id;
+  d.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
+  const el=$('chat-msgs');if(el){el.appendChild(d);el.scrollTop=99999;}return id;
+}
+function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
 
 async function sendMessage(){
   if(!S.apiKey){switchTab('settings',document.querySelector(".tab[onclick*='settings']"));return;}
@@ -2806,7 +2797,7 @@ function openPlayerModal(playerId){
   const pos=p.position||'?';const age=p.age||26;const val=dynastyValue(playerId);
   const exp=p.years_exp??0;
   const peakMap={QB:[27,31],RB:[23,26],WR:[25,29],TE:[25,29],DL:[24,29],LB:[24,28],DB:[24,28]};
-  const [pLo,pHi]=getPeakRange(playerId);
+  const [pLo,pHi]=(()=>{ const pos=pPos(playerId); const peaks={QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]}; return peaks[pos]||[24,29]; })();
   const peak=Math.round((pLo+pHi)/2);
   const onMyTeam=(myR()?.players||[]).includes(String(playerId));
   const stats=S.playerStats?.[playerId]||{};
@@ -2831,7 +2822,7 @@ function openPlayerModal(playerId){
   if(p.injury_status)tags.push(`<span style="background:var(--redL);color:var(--red);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">${p.injury_status}</span>`);
   if(dcLbl)tags.push(`<span style="background:var(--bg4);color:var(--text2);font-size:10px;padding:2px 7px;border-radius:20px">${dcLbl}</span>`);
   if(posRank)tags.push(`<span style="background:var(--accentL);color:var(--accent);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">${pos}${posRank} in league</span>`);
-  if(p.height||p.weight)tags.push(`<span style="background:var(--bg4);color:var(--text3);font-size:10px;padding:2px 7px;border-radius:20px">${[fmtHeight(p.height),p.weight?p.weight+'lbs':''].filter(Boolean).join(' · ')}</span>`);
+  if(p.height||p.weight)tags.push(`<span style="background:var(--bg4);color:var(--text3);font-size:10px;padding:2px 7px;border-radius:20px">${[(p.height?Math.floor((p.height||0)/12)+"'"+(( p.height||0)%12)+'"':''),p.weight?p.weight+'lbs':''].filter(Boolean).join(' · ')}</span>`);
   $('pm-tags').innerHTML=tags.join('');
 
   // Stats bar (5 columns)
@@ -2878,7 +2869,7 @@ function openPlayerModal(playerId){
     {lbl:'Experience',val:`${exp} yr${exp!==1?'s':''}`},
     {lbl:'College',val:p.college||'—'},
     {lbl:'Status',val:p.status||'Active'},
-    {lbl:'Height',val:fmtHeight(p.height)||'—'},
+    {lbl:'Height',val:(p.height?Math.floor((p.height||0)/12)+"'"+(( p.height||0)%12)+'"':'')||'—'},
     {lbl:'Weight',val:p.weight?p.weight+' lbs':'—'},
     {lbl:'Depth',val:dcLbl||'—'},
   ];
@@ -3321,7 +3312,7 @@ Based on this data give me:
 5. HOW TO APPROACH — exact strategy, what to lead with, how to frame my offer given their situation
 6. DRAFT A MESSAGE — a ready-to-paste Sleeper DM opening this trade conversation
 
-Be direct and specific. Name real players and real offers.`;
+Be direct and specific. Name real players and real offers. IDP in this league: sack=4pts, INT=5pts, PD=3pts — DBs/edge rushers most valuable. Note any IDP gaps.`;
 
     const reply=await callClaude([{role:'user',content:prompt}],false,2,900);
 
@@ -3582,7 +3573,7 @@ async function sendDraftChat(){
     draftChatHistory.push({role:'user',content:text});
     if(draftChatHistory.length>10)draftChatHistory=draftChatHistory.slice(-10);
     const msgs=draftChatHistory.map((m,i)=>
-      i===0?{role:m.role,content:`${year} rookie draft context. My team: ${buildCtx()}. Scoring: ${buildScoringStr()}.\n\n${m.content}`}:m
+      i===0?{role:m.role,content:`${year} rookie draft context. My team: ${buildCtx()}. Scoring: ${'PPR:'+(sc.rec||0)+',passTD:'+(sc.pass_td||4)+',sack:'+(sc.idp_sack||4)+',INT:'+(sc.idp_int||5)}.\n\n${m.content}`}:m
     );
     const reply=await callClaude(msgs,false,2,600);
     draftChatHistory.push({role:'assistant',content:reply});
