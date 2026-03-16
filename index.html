@@ -1347,7 +1347,10 @@ async function selectLeague(leagueId,userId){
     // Fire data loads via setTimeout to guarantee execution
     console.log('selectLeague: firing data loads...');
     checkApiKeyCallout();
-    setTimeout(()=>loadAllData(),100);
+    setTimeout(()=>{
+      console.log('setTimeout fired, calling loadAllData');
+      loadAllData();
+    },100);
   }catch(e){
     const sb=$('setup-block');
     if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
@@ -4437,9 +4440,15 @@ function checkApiWarn(){$('api-warn').style.display=S.apiKey?'none':'block';}
     if(savedUser){
       const uInput = $('u-input');
       if(uInput) uInput.value = savedUser;
-      // Auto-connect after a short delay to let the page render
       setTimeout(()=>{if(!S.user)connect();},500);
     }
+    // FAILSAFE: if data hasn't loaded 8 seconds after page load, force it
+    setTimeout(()=>{
+      if(S.myRosterId&&!LI_LOADED&&!window._liLoading){
+        console.log('FAILSAFE: data not loaded after 8s, forcing loadAllData');
+        loadAllData();
+      }
+    },8000);
   }catch(e){}
 })();
 function reconnect(){
