@@ -1079,7 +1079,7 @@ const SLEEPER='https://api.sleeper.app/v1';
 let S={
   user:null,leagues:[],leagueUsers:[],rosters:[],matchups:{},
   transactions:{},tradedPicks:[],players:{},
-  trending:{adds:[],drops:[]},ownership:{},nflState:null,bracket:{w:[],l:[]},
+  ownership:{},nflState:null,bracket:{w:[],l:[]},
   currentLeagueId:null,myRosterId:null,apiKey:'',aiProvider:'anthropic',aiModel:'',chatHistory:[],
   currentWeek:1,season:'2025',
   tradeCalc:{a:[],b:[]},agentLog:[],lastDigest:null,
@@ -1239,8 +1239,6 @@ async function selectLeague(leagueId,userId){
     // Show home feed immediately
     renderHomeSnapshot();
     // Fire all non-AI data loads in parallel
-    loadTrending();
-    loadOwnership();
     fetchFantasyCalcValues();
     // Stats first — then AI after data is ready
     loadRosterStats().then(()=>{
@@ -1279,17 +1277,7 @@ async function loadMatchups(lid,week){
 async function loadTxns(lid,week){
   const key='w'+week;if(S.transactions[key])return;
   S.transactions[key]=await sf(`/league/${lid}/transactions/${week}`).catch(()=>[]);
-}
-async function loadTrending(){
-  const[adds,drops]=await Promise.all([
-    sf('/players/nfl/trending/add?lookback_hours=24&limit=25').catch(()=>[]),
-    sf('/players/nfl/trending/drop?lookback_hours=24&limit=15').catch(()=>[]),
-  ]);
-  S.trending={adds:adds||[],drops:drops||[]};
-  renderWaivers();
-}
-
-async function loadOwnership(){
+}async function loadOwnership(){
   // /players/nfl/research/regular/{season}/{week} returns ownership% and rostering%
   // keyed by player_id: {owned_by: N, rostered_by: N, started_by: N, ...}
   try{
@@ -1453,188 +1441,80 @@ function buildRosterTable(){
 
 async function loadRosterStats(){
   if(!S.myRosterId)return;
-  const my=myR();if(!my)return;
-  if(!(my.players||[]).length)return;
-
+  const my=myR();if(!my||!(my.players||[]).length)return;
   if(!S.playerStats)S.playerStats={};
   if(!S.playerProj)S.playerProj={};
 
   const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  const curSeason=S.season||'2025';
+  const prevSeason=String(parseInt(curSeason)-1);
   const isOffseason=!S.nflState?.season_has_scores||S.currentWeek<=1;
 
-  // All players across ALL rosters — needed for elite ranks, waiver comps, draft scout dots
+  // All players across all rosters — needed for league-wide elite ranks
   const allLeaguePlayers=[...new Set(S.rosters.flatMap(r=>r.players||[]))];
-  // My players specifically for display
-  const allPlayers=allLeaguePlayers;
 
   try{
-    // Current season stats — only if we have weeks to pull
-    if(!isOffseason){
-      const weeks=[];
-      for(let w=Math.max(1,S.currentWeek-3);w<S.currentWeek;w++)weeks.push(w);
-      if(weeks.length){
-        const statsData=await Promise.all(weeks.map(w=>
-          sf(`/stats/nfl/${S.season}/${w}?season_type=regular`).catch(()=>({}))
-        ));
-        allPlayers.forEach(pid=>{
-          const weekPts=statsData.map(wk=>{
-            const pStats=wk[pid];if(!pStats)return null;
-            return calcFantasyPts(pStats,sc);
-          }).filter(v=>v!==null);
-          const trail3=weekPts.length?weekPts.reduce((a,b)=>a+b,0)/weekPts.length:null;
-          if(!S.playerStats[pid])S.playerStats[pid]={};
-          if(trail3!==null)S.playerStats[pid].trail3=trail3;
-        });
-      }
+    // ── TWO API CALLS replace 36 ────────────────────────────────────────────
+    // Sleeper aggregate endpoint: full season totals per player, one call each
+    const [curAgg, prevAgg] = await Promise.all([
+      isOffseason ? Promise.resolve({}) :
+        sf(`/stats/nfl/regular/${curSeason}`).catch(()=>({})),
+      sf(`/stats/nfl/regular/${prevSeason}`).catch(()=>({})),
+    ]);
 
-      // Full season avg
-      const allWeeks=[];
-      for(let w=1;w<S.currentWeek;w++)allWeeks.push(w);
-      if(allWeeks.length){
-        const allStatsData=await Promise.all(allWeeks.map(w=>
-          sf(`/stats/nfl/${S.season}/${w}?season_type=regular`).catch(()=>({}))
-        ));
-        allPlayers.forEach(pid=>{
-          const allPts=allStatsData.map(wk=>{
-            const pStats=wk[pid];if(!pStats)return null;
-            return calcFantasyPts(pStats,sc);
-          }).filter(v=>v!==null);
-          if(allPts.length){
-            if(!S.playerStats[pid])S.playerStats[pid]={};
-            S.playerStats[pid].seasonAvg=+(allPts.reduce((a,b)=>a+b,0)/allPts.length).toFixed(1);
-            S.playerStats[pid].weeklyPts=allPts;
-          }
-        });
-      }
+    // Process every league player from the aggregate response
+    allLeaguePlayers.forEach(pid=>{
+      if(!S.playerStats[pid])S.playerStats[pid]={};
 
-      // Projections
-      const projData=await sf(`/projections/nfl/${S.season}/${S.currentWeek}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE&position[]=K&position[]=DEF&position[]=DL&position[]=LB&position[]=DB`).catch(()=>({}));
-      allPlayers.forEach(pid=>{
-        const pProj=projData[pid];
-        if(pProj)S.playerProj[pid]=calcFantasyPts(pProj,sc);
-      });
-    }
-
-    // Previous season stats — always load these (primary stats source in offseason)
-    const prevSeason=String(parseInt(S.season)-1);
-    const prevWeeks=[];for(let w=1;w<=18;w++)prevWeeks.push(w);
-    const prevStatsData=await Promise.all(prevWeeks.map(w=>
-      sf(`/stats/nfl/${prevSeason}/${w}?season_type=regular`).catch(()=>({}))
-    ));
-    allPlayers.forEach(pid=>{
-      const weekPts=prevStatsData.map(wk=>{
-        const pStats=wk[pid];if(!pStats)return null;
-        return calcFantasyPts(pStats,sc);
-      }).filter(v=>v!==null);
-      if(weekPts.length){
-        if(!S.playerStats[pid])S.playerStats[pid]={};
-        const total=weekPts.reduce((a,b)=>a+b,0);
-        S.playerStats[pid].prevTotal=+total.toFixed(1);
-        S.playerStats[pid].prevAvg=+(total/weekPts.length).toFixed(1);
+      // Previous season (2024) — always available
+      const prev=prevAgg[pid];
+      if(prev){
+        const pts=calcFantasyPts(prev,sc);
+        const gp=prev.gp||prev.games_played||17;
+        S.playerStats[pid].prevTotal=+pts.toFixed(1);
+        S.playerStats[pid].prevAvg=gp>0?+(pts/gp).toFixed(1):+(pts/17).toFixed(1);
         S.playerStats[pid].prevSeason=prevSeason;
-        S.playerStats[pid].prevWeeklyPts=weekPts;
-        // In offseason, use prev season avg as the primary "seasonAvg" for startability checks
-        if(isOffseason){
-          S.playerStats[pid].seasonAvg=S.playerStats[pid].prevAvg;
-        }
-        const rawAgg={};
-        prevStatsData.forEach(wk=>{const ps=wk[pid];if(ps)Object.entries(ps).forEach(([k,v])=>{if(typeof v==='number')rawAgg[k]=(rawAgg[k]||0)+v;});});
-        S.playerStats[pid].prevRawStats=rawAgg;
+        S.playerStats[pid].prevRawStats=prev;
+      }
+
+      // Current season (if in-season)
+      const cur=curAgg[pid];
+      if(cur){
+        const pts=calcFantasyPts(cur,sc);
+        const gp=cur.gp||cur.games_played||17;
+        S.playerStats[pid].seasonTotal=+pts.toFixed(1);
+        S.playerStats[pid].seasonAvg=+(pts/gp).toFixed(1);
+        S.playerStats[pid].curRawStats=cur;
+      }
+
+      // In offseason: promote prev season avg as primary
+      if(isOffseason&&S.playerStats[pid].prevAvg){
+        S.playerStats[pid].seasonAvg=S.playerStats[pid].prevAvg;
       }
     });
 
-    // Current season totals — only if not offseason
-    if(!isOffseason){
-    allPlayers.forEach(pid=>{
-      const rawAgg={};
-      allStatsData.forEach(wk=>{const ps=wk[pid];if(ps)Object.entries(ps).forEach(([k,v])=>{if(typeof v==='number')rawAgg[k]=(rawAgg[k]||0)+v;});});
-      if(Object.keys(rawAgg).length){
-        if(!S.playerStats[pid])S.playerStats[pid]={};
-        S.playerStats[pid].curRawStats=rawAgg;
-        const total=calcFantasyPts(rawAgg,sc);
-        S.playerStats[pid].seasonTotal=+total.toFixed(1);
-        if(!S.playerStats[pid].seasonAvg&&allWeeks.length>0)
-          S.playerStats[pid].seasonAvg=+(total/allWeeks.length).toFixed(1);
-      }
-    });
-    } // end !isOffseason
-
-    // Update column headers with actual prev season year
+    // Update column header with prev season year
     const thPrev=$('th-prev');const thPrevTot=$('th-prevtot');
     if(thPrev)thPrev.textContent=`'${prevSeason.slice(2)}avg`;
     if(thPrevTot)thPrevTot.textContent=`'${prevSeason.slice(2)}tot`;
-    const teams=[...new Set(allPlayers.map(pid=>pTeam(pid)).filter(Boolean))];
-    const dcResults=await Promise.all(teams.map(t=>
-      fetch(`https://api.sleeper.app/players/nfl/${t}/depth_chart`).then(r=>r.ok?r.json():null).catch(()=>null)
-    ));
-    teams.forEach((t,i)=>{ if(dcResults[i])S.depthCharts[t]=dcResults[i]; });
 
-    // Positional ranks from current season stats — rank all rostered players by position
-    const allRosteredPlayers=[...new Set(S.rosters.flatMap(r=>r.players||[]))];
+    // Positional ranks — all rostered players sorted by pts
     const posPts={};
-    allRosteredPlayers.forEach(pid=>{
+    allLeaguePlayers.forEach(pid=>{
       const pos=pPos(pid);if(!pos)return;
-      const pts=S.playerStats[pid]?.seasonTotal||S.playerStats[pid]?.seasonAvg||0;
+      const pts=S.playerStats[pid]?.seasonTotal||0;
       if(!posPts[pos])posPts[pos]=[];
       posPts[pos].push({pid,pts});
     });
     Object.entries(posPts).forEach(([pos,arr])=>{
-      arr.sort((a,b)=>b.pts-a.pts).forEach(({pid},i)=>{ S.posRanks[pid]=i+1; });
+      arr.sort((a,b)=>b.pts-a.pts).forEach(({pid},i)=>{S.posRanks[pid]=i+1;});
     });
 
-    // Re-render with all data populated
-    const my2=myR();if(!my2)return;
-    const league2=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-    const positions2=league2?.roster_positions||[];
-    const starters2=my2.starters||[];
-    const reserve2=my2.reserve||[];
-    const bench2=(my2.players||[]).filter(p=>!starters2.includes(p)&&!reserve2.includes(p));
-
-    const buildRow=(pid,slot)=>{
-      const p=S.players[pid];
-      const pos=posLabel(slot,pid);const pc=posClass(pos);
-      const inj=p?.injury_status;
-      const stats=S.playerStats?.[pid]||{};
-      const proj=S.playerProj?.[pid];
-      const trail3=stats.trail3?.toFixed(1)||'—';
-      const seasonAvg=stats.seasonAvg?.toFixed(1)||'—';
-      const prevAvg=stats.prevAvg?.toFixed(1)||'—';
-      // Depth chart lookup
-      const team=pTeam(pid);
-      const dc=S.depthCharts[team]||{};
-      let dcPos='',dcOrder='';
-      for(const [dpos,dplayers] of Object.entries(dc)){
-        for(const [order,plObj] of Object.entries(dplayers||{})){
-          const pid2=plObj?.player_id||plObj;
-          if(String(pid2)===String(pid)){dcPos=dpos;dcOrder=order;break;}
-        }
-        if(dcPos)break;
-      }
-      const dcLabel=(dcPos&&dcOrder)?`#${dcOrder} ${dcPos}`:dcPos||(p?.depth_chart_order?`#${p.depth_chart_order} ${p.depth_chart_position||''}`.trim():'');
-      const posRank=S.posRanks?.[pid];
-      const rankLabel=posRank?`${pPos(pid)||''}${posRank}`:'';
-      return`<div class="pr" onclick="openPlayerModal('${pid}')">
-        <span class="pos ${pc}">${pos}</span>
-        <img class="pr-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" loading="lazy"/>
-        <div class="pr-photo-placeholder" style="display:none">${((p?.first_name||'?')[0]+(p?.last_name||'?')[0]).toUpperCase()}</div>
-        <div class="pr-info">
-          <div class="pr-name">${pName(pid)}</div>
-          <div class="pr-meta">${fullTeam(pTeam(pid))}${pAge(pid)?' · '+pAge(pid)+'y':''}${dcLabel?' · '+dcLabel:''}${rankLabel?` · <span style="color:var(--accent);font-weight:600">${rankLabel}</span>`:''}</div>
-        </div>
-        ${inj?`<span class="pr-inj">${inj}</span>`:''}
-        <div class="pr-stats">
-          <div class="pr-stat"><div class="pr-stat-val">${seasonAvg}</div><div class="pr-stat-lbl">Avg</div></div>
-          <div class="pr-stat"><div class="pr-stat-val">${trail3}</div><div class="pr-stat-lbl">L3</div></div>
-          <div class="pr-stat"><div class="pr-stat-val" style="color:var(--text2)">${prevAvg}</div><div class="pr-stat-lbl">'${String(parseInt(S.season)-1).slice(2)}avg</div></div>
-          ${proj!==undefined?`<div class="pr-proj">${proj.toFixed(1)}</div>`:''}
-        </div>
-      </div>`;
-    };
-
-    // Re-render spreadsheet with all data populated
     buildRosterTable();
+    renderDraftNeeds();
   }catch(e){console.warn('Stats load error:',e);}
 }
+
 
 function calcFantasyPts(stats,sc){
   if(!stats)return 0;
@@ -2064,7 +1944,7 @@ function renderAvailable(){
   });
 
   $('available-count').textContent=`${avail.length} available`;
-  const trendingIds=new Set(S.trending.adds.slice(0,50).map(t=>String(t.player_id)));
+  const trendingIds=new Set([].slice(0,50).map(t=>String(t.player_id)));
 
   tbody.innerHTML=filtered.slice(0,30).map(({id,p,val,proj})=>{
     const isTrending=trendingIds.has(String(id));
@@ -2117,8 +1997,8 @@ function renderWaivers(){
 
   // Trending adds (global signal — mark if available in league)
   const rostered=new Set(S.rosters.flatMap(r=>(r.players||[]).map(String)));
-  if(S.trending.adds.length){
-    $('trending-adds').innerHTML=S.trending.adds.slice(0,15).map(t=>{
+  if([].length){
+    $('trending-adds').innerHTML=[].slice(0,15).map(t=>{
       const name=pName(t.player_id);const pos=pPos(t.player_id);
       const onMyTeam=(myR()?.players||[]).includes(String(t.player_id));
       const isAvail=!rostered.has(String(t.player_id));
@@ -2550,7 +2430,7 @@ async function sendHomeChat(){
     const myPosCounts={};
     myPlayers.forEach(pid=>{const pos=pPos(pid);if(pos)myPosCounts[pos]=(myPosCounts[pos]||0)+1;});
     const topAvailStr=top20.map(({id,p,val,proj})=>{
-      const isTrending=S.trending.adds.slice(0,50).some(t=>String(t.player_id)===String(id));
+      const isTrending=[].slice(0,50).some(t=>String(t.player_id)===String(id));
       const own=S.ownership?.[String(id)];
       const ownPct=own?.owned_by!=null?`,own${(own.owned_by*100).toFixed(0)}%`:'';
       return`${pName(id)}(${p.position},${p.age||'?'}y,${p.team||'FA'},v${val}${proj?`,p${proj.toFixed(0)}`:''}${ownPct}${isTrending?',🔥':''})`;
