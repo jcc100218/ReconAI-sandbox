@@ -1949,100 +1949,186 @@ async function loadLeagueIntel(){
 
     // ═══════════════════════════════════════════════════════════════
     // STEP 8: DHQ_PLAYER_VALUE — every player, 0-10000 scale
-    //   production (40%) + age/peak curve (30%) + situation (20%) + scarcity (10%)
+    //
+    // WEIGHT ALLOCATION:
+    //   Production Base:      40% (weighted PPG from league scoring)
+    //   Age / Peak Curve:     25% (remaining productive years)
+    //   Situation Multiplier: 20% (team, role, trajectory)
+    //   Positional Scarcity:  10% (supply vs demand at position)
+    //   Peak Years Bonus:      5% (additive per remaining peak year)
     // ═══════════════════════════════════════════════════════════════
 
-    // Age curves — aggressive decay past peak
+    // ── Age curves: position-specific peak windows ──
     const peakWindows={QB:[24,33],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
 
-    // Positional scarcity
+    // ── Position-specific decay rates (per year past peak end) ──
+    const decayRates={QB:0.08,RB:0.25,WR:0.14,TE:0.12,DL:0.15,LB:0.15,DB:0.14};
+
+    // ── Positional scarcity multipliers ──
+    // In 16-team SF IDP: QB premium, IDP discount, TE unicorn
     const scarcityMult={};
+    const isSF=rp.includes('SUPER_FLEX');
     positions.forEach(pos=>{
       const needed=(starterCounts[pos]||1)*totalTeams;
       const available=Object.values(playerSeasons).filter(p=>p.pos===pos&&Object.keys(p.seasons).length>=1).length;
       const ratio=needed/Math.max(1,available);
-      scarcityMult[pos]=Math.min(1.3,0.8+ratio*0.6);
+      // Base from supply/demand
+      let mult=Math.min(1.3,0.8+ratio*0.5);
+      // Manual overrides based on dynasty market reality
+      if(pos==='QB'&&isSF)mult=Math.max(mult,1.25); // SF QB premium
+      else if(pos==='TE')mult=Math.max(mult,1.15); // TE scarcity
+      else if(pos==='WR')mult=Math.min(mult,1.0); // deepest position
+      else if(['DL','LB','DB'].includes(pos))mult=Math.min(mult,0.92); // IDP replaceable
+      scarcityMult[pos]=+mult.toFixed(3);
     });
 
     const playerScores={};
     const playerMeta={};
 
-    // Score all players with recent production (played in last 2 years)
+    // Score all players with recent production
     const recentPlayers=Object.entries(playerSeasons)
       .filter(([pid,ps])=>ps.seasons[2025]||ps.seasons[2024]||ps.seasons[2023])
       .map(([pid,ps])=>{
         const pos=ps.pos;
-        // Weighted PPG: most recent year counts most
+        const p=S.players[pid];
+
+        // ─── COMPONENT 1: Production Base (40%) ───
+        // Weighted PPG: recent production matters most
         let weightedTotal=0,weightSum=0;
         const weights={2025:4,2024:3,2023:2,2022:1,2021:0.5};
         Object.entries(ps.seasons).forEach(([yr,s])=>{
-          const w=weights[yr]||1;
+          const w=weights[yr]||0.5;
           weightedTotal+=s.avg*w;
           weightSum+=w;
         });
         const wPPG=weightSum>0?+(weightedTotal/weightSum).toFixed(2):0;
         const bestSeason=Object.values(ps.seasons).reduce((m,s)=>s.total>m.total?s:m,{total:0,avg:0});
 
-        // Age curve — AGGRESSIVE decay past peak
+        // ─── COMPONENT 2: Age / Peak Curve (25%) ───
         const age=pAge(pid)||26;
         const [peakStart,peakEnd]=peakWindows[pos]||[23,29];
         const peakYrsLeft=Math.max(0,peakEnd-age);
         let ageFactor=1.0;
+
         if(age<peakStart){
-          // Rising: younger players get a premium (dynasty upside)
-          ageFactor=0.85+0.15*Math.max(0,(age-18))/(peakStart-18);
+          // Pre-peak: rising trajectory
+          // Younger = more upside but less proven
+          const yearsToStart=peakStart-age;
+          ageFactor=0.80+0.20*(1-yearsToStart/Math.max(1,peakStart-18));
         }else if(age<=peakEnd){
+          // In peak window: full value
           ageFactor=1.0;
         }else{
-          // Past peak: STEEP decay
+          // Past peak: position-specific decay
           const yearsPost=age-peakEnd;
-          const decayRate=pos==='QB'?0.10:pos==='RB'?0.25:pos==='WR'?0.14:pos==='TE'?0.12:0.13;
-          ageFactor=Math.max(0.05,1.0-yearsPost*decayRate);
-          // Extra penalty for extreme age
-          if(yearsPost>=5)ageFactor*=0.7;
-          if(yearsPost>=8)ageFactor*=0.5;
+          const rate=decayRates[pos]||0.13;
+          ageFactor=Math.max(0.03,1.0-yearsPost*rate);
+
+          // Stacking penalties for extreme age
+          if(yearsPost>=5)ageFactor*=0.70; // 5+ years past: extra 30% haircut
+          if(yearsPost>=8)ageFactor*=0.50; // 8+ years past: extra 50% on top
+          ageFactor=Math.max(0.02,ageFactor); // floor at 2%
         }
 
-        // Situation multiplier — team context affects dynasty value
-        // Based on: player status (starter vs backup), team quality indicators
-        const p=S.players[pid];
+        // ─── COMPONENT 3: Situation Multiplier (20%) ───
         let sitMult=1.0;
-        // Free agents lose value (no team = no production path)
-        if(!p?.team||p.team==='FA')sitMult*=0.6;
-        // Depth chart: if player has very low recent PPG relative to position, likely backup
+
+        // A) Team status
+        if(!p?.team||p.team==='FA'){
+          sitMult*=0.55; // Free agent: no path to production
+        }
+
+        // B) Role detection: starter vs backup
         const recentPPG=ps.seasons[2025]?.avg||ps.seasons[2024]?.avg||0;
-        const posAvg=avgThresh[pos]?.avgStarter||100;
-        const posAvgPPG=posAvg/17;
-        if(recentPPG>0&&recentPPG<posAvgPPG*0.3)sitMult*=0.7; // well below starter level
-        // Consistency bonus: produced at starter level in multiple seasons
+        const posStarterPPG=(avgThresh[pos]?.avgStarter||100)/17;
+
+        if(recentPPG>0){
+          if(recentPPG<posStarterPPG*0.3){
+            sitMult*=0.70; // Deep backup: well below starter level
+          }else if(recentPPG<posStarterPPG*0.6){
+            sitMult*=0.85; // Fringe/backup territory
+          }else if(recentPPG>=posStarterPPG*1.3){
+            sitMult*=1.10; // Premium starter: top-tier at position
+          }
+          // else: starter level, no adjustment (1.0x)
+        }
+
+        // C) Career trajectory
         const starterSeasons=Object.values(ps.seasons).filter(s=>s.total>=(avgThresh[pos]?.starterLine||100)).length;
-        if(starterSeasons>=3)sitMult*=1.15; // proven multi-year starter
-        else if(starterSeasons>=2)sitMult*=1.05;
-        // Youth premium: young players with production get extra value
-        if(age<=23&&wPPG>posAvgPPG*0.5)sitMult*=1.2;
-        else if(age<=25&&wPPG>posAvgPPG*0.7)sitMult*=1.1;
+        const totalSeasons=Object.keys(ps.seasons).length;
+
+        if(starterSeasons>=3){
+          sitMult*=1.15; // Proven multi-year starter: reduced risk
+        }else if(starterSeasons>=2){
+          sitMult*=1.05; // Two-year starter: building track record
+        }
+        // One-year wonder: no bonus (1.0x)
+
+        // D) Youth premium: dynasty's crown jewels
+        if(age<=22&&wPPG>=posStarterPPG*0.5){
+          sitMult*=1.25; // 22 or younger producing at half-starter level
+        }else if(age<=23&&wPPG>=posStarterPPG*0.5){
+          sitMult*=1.20; // 23 with production
+        }else if(age<=25&&wPPG>=posStarterPPG*0.7){
+          sitMult*=1.10; // 25 or under, starter-level
+        }
+
+        // E) Durability: games played penalty
+        const recentGP=ps.seasons[2025]?.gp||ps.seasons[2024]?.gp||17;
+        const prevGP=ps.seasons[2024]?.gp||ps.seasons[2023]?.gp||17;
+        if(recentGP<=10&&prevGP<=10&&totalSeasons>=2){
+          sitMult*=0.85; // Missed significant time in multiple seasons
+        }else if(recentGP<=10&&totalSeasons>=1){
+          sitMult*=0.92; // Missed time in most recent season
+        }
+
+        // F) Top-of-position ranking bonus
+        // If player ranks in top 5 at their position by PPG in the league
+        const posPlayers=Object.entries(playerSeasons)
+          .filter(([,pps])=>pps.pos===pos&&(pps.seasons[2025]||pps.seasons[2024]))
+          .map(([,pps])=>pps.seasons[2025]?.avg||pps.seasons[2024]?.avg||0)
+          .sort((a,b)=>b-a);
+        const posRank=posPlayers.indexOf(recentPPG)+1;
+        if(posRank>0&&posRank<=3)sitMult*=1.12; // Top 3 at position
+        else if(posRank>0&&posRank<=8)sitMult*=1.05; // Top 8
 
         return{pid,pos,name:ps.name,wPPG,bestTotal:bestSeason.total,bestAvg:bestSeason.avg,
-          age,ageFactor:+ageFactor.toFixed(3),sitMult:+sitMult.toFixed(3),
-          peakYrsLeft,seasons:Object.keys(ps.seasons).length,starterSeasons};
+          age,ageFactor:+ageFactor.toFixed(4),sitMult:+Math.min(2.0,sitMult).toFixed(4),
+          peakYrsLeft,seasons:totalSeasons,starterSeasons,recentGP};
       })
       .filter(p=>p.wPPG>0)
       .sort((a,b)=>(b.wPPG*b.ageFactor*b.sitMult)-(a.wPPG*a.ageFactor*a.sitMult));
 
-    // Assign values on 0-10000 scale
-    const topScore=recentPlayers[0]?(recentPlayers[0].wPPG*recentPlayers[0].ageFactor*recentPlayers[0].sitMult):1;
-    recentPlayers.forEach((p,idx)=>{
+    // ─── FINAL VALUE ASSEMBLY ───
+    // Combine all components into 0-10000 scale
+    const topComposite=recentPlayers[0]?(recentPlayers[0].wPPG*recentPlayers[0].ageFactor*recentPlayers[0].sitMult):1;
+    recentPlayers.forEach((p)=>{
       const composite=p.wPPG*p.ageFactor*p.sitMult;
-      const productionScore=(composite/topScore)*6000; // 0-6000 (production + age + situation)
-      const scarcity=(scarcityMult[p.pos]||1.0)*1000-300; // 0-1000
-      const peakBonus=p.peakYrsLeft*150; // 0-1200 for peak years remaining
-      const consistencyBonus=p.starterSeasons>=3?300:p.starterSeasons>=2?150:0;
-      const raw=productionScore+scarcity+Math.min(1200,peakBonus)+consistencyBonus;
+
+      // Production + Age + Situation (75% of value)
+      const coreScore=(composite/topComposite)*7500;
+
+      // Positional scarcity (10%)
+      const scarcityScore=(scarcityMult[p.pos]||1.0)*1000-500; // range ~300-800
+
+      // Peak years remaining bonus (5%): ~120 per year, capped at 1000
+      const peakBonus=Math.min(1000,p.peakYrsLeft*120);
+
+      // Consistency bonus (part of remaining 10%)
+      const consistencyBonus=p.starterSeasons>=4?400:p.starterSeasons>=3?300:p.starterSeasons>=2?150:0;
+
+      // Durability micro-bonus
+      const durabilityBonus=p.recentGP>=16?100:p.recentGP>=13?50:0;
+
+      const raw=coreScore+scarcityScore+peakBonus+consistencyBonus+durabilityBonus;
       const val=Math.round(Math.min(10000,Math.max(0,raw)));
       playerScores[p.pid]=val;
-      playerMeta[p.pid]={pos:p.pos,ppg:p.wPPG,age:p.age,
+      playerMeta[p.pid]={
+        pos:p.pos,ppg:p.wPPG,age:p.age,
         ageFactor:p.ageFactor,sitMult:p.sitMult,
-        peakYrsLeft:p.peakYrsLeft,starterSeasons:p.starterSeasons};
+        peakYrsLeft:p.peakYrsLeft,starterSeasons:p.starterSeasons,
+        recentGP:p.recentGP
+      };
     });
     console.log('DHQ player values: '+Object.keys(playerScores).length+' players scored');
 
