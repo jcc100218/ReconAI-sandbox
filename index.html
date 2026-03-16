@@ -638,6 +638,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         </div>
         <!-- Team overview — replaces AI recommendations (saves API call) -->
         <div id="home-team-overview"></div>
+        <!-- League Pulse — trending adds/drops from Sleeper -->
+        <div id="league-pulse"></div>
       </div>
     </div>    <!-- ROSTER -->
     <div class="panel" id="panel-roster">
@@ -1357,7 +1359,6 @@ async function loadAllData(){
   if(!S.currentLeagueId||!S.myRosterId)return;
   console.log('loadAllData: starting...');
   const t0=Date.now();
-  // Show loading banner
   const loadBanner=$('dhq-loading-banner');
   if(loadBanner)loadBanner.style.display='block';
   try{
@@ -1365,6 +1366,7 @@ async function loadAllData(){
     await Promise.all([
       loadRosterStats().catch(e=>{console.warn('Stats error:',e);return null;}),
       loadLeagueIntel().catch(e=>{console.warn('DHQ error:',e);return null;}),
+      fetchTrending().catch(e=>{console.warn('Trending error:',e);return null;}),
     ]);
     console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys(LI.playerScores||{}).length+' | rookies:'+(LI.rookieCount||0));
     if(loadBanner)loadBanner.style.display='none';
@@ -1374,7 +1376,8 @@ async function loadAllData(){
     try{renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
     try{renderHomeSnapshot();}catch(e){}
     try{renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
-    checkApiKeyCallout();    // First-time strategy walkthrough
+    try{renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
+    checkApiKeyCallout();
     if(!localStorage.getItem('dhq_strategy_done')&&S.apiKey){
       setTimeout(()=>startStrategyWalkthrough(),500);
     }
@@ -1382,6 +1385,61 @@ async function loadAllData(){
     console.warn('loadAllData error:',e);
     if(loadBanner)loadBanner.style.display='none';
   }
+}
+
+// Fetch Sleeper trending adds/drops — real-time signal about what's happening
+async function fetchTrending(){
+  try{
+    const [adds,drops]=await Promise.all([
+      fetch('https://api.sleeper.app/v1/players/trending/nfl/add?lookback_hours=24&limit=20').then(r=>r.ok?r.json():[]).catch(()=>[]),
+      fetch('https://api.sleeper.app/v1/players/trending/nfl/drop?lookback_hours=24&limit=20').then(r=>r.ok?r.json():[]).catch(()=>[]),
+    ]);
+    S.trending={adds:adds||[],drops:drops||[],fetchedAt:Date.now()};
+    console.log('Trending loaded: '+adds.length+' adds, '+drops.length+' drops');
+  }catch(e){S.trending={adds:[],drops:[],fetchedAt:0};}
+}
+
+// Render League Pulse — trending adds/drops with roster context
+function renderLeaguePulse(){
+  const el=$('league-pulse');if(!el)return;
+  const t=S.trending;
+  if(!t||!t.adds?.length){el.innerHTML='';return;}
+  const myPlayers=new Set(myR()?.players||[]);
+  const posMap=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+
+  const renderList=(list,label,isAdds)=>{
+    return list.slice(0,8).map(item=>{
+      const p=S.players[item.player_id];
+      if(!p)return'';
+      const onMyTeam=myPlayers.has(item.player_id);
+      const val=dynastyValue(item.player_id);
+      const {col}=tradeValueTier(val);
+      return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
+        <span style="color:${isAdds?'var(--green)':'var(--red)'};font-weight:700;font-size:9px;min-width:14px">${isAdds?'▲':'▼'}</span>
+        <span style="font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer" onclick="openPlayerModal('${item.player_id}')">${p.first_name} ${p.last_name}</span>
+        <span class="pos ${posMap(p.position)==='QB'?'qb':posMap(p.position)==='RB'?'rb':posMap(p.position)==='WR'?'wr':posMap(p.position)==='TE'?'te':'idp'}" style="font-size:8px;padding:1px 4px">${posMap(p.position)}</span>
+        ${val>0?`<span style="font-size:10px;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>`:''}
+        ${onMyTeam?'<span style="font-size:8px;color:var(--accent)" title="On your roster">✦</span>':''}
+      </div>`;
+    }).filter(Boolean).join('');
+  };
+
+  el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">League Pulse</span>
+      <span style="font-size:8px;color:var(--text3)">Trending across Sleeper · Last 24h</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div style="font-size:9px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Most Added</div>
+        ${renderList(t.adds,'adds',true)}
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Most Dropped</div>
+        ${renderList(t.drops,'drops',false)}
+      </div>
+    </div>
+  </div>`;
 }
 
 async function loadLeague(leagueId,userId){
@@ -3904,7 +3962,7 @@ async function sendHomeChat(){
         if(i===0)return{role:m.role,content:'Team:\n'+ctxStr+'\n\n'+m.content};
         return m;
       });
-      const needsSearch=/news|breaking|injury|injur|trade rumor|sign|cut|release|depth chart|waiver wire|free agent|latest|update|today|recent/i.test(text);
+      const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor today/i.test(text);
       const reply=await callClaude(msgs,needsSearch,2,700);
       homeChatHistory.push({role:'assistant',content:reply});
       lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
@@ -4151,6 +4209,14 @@ function buildCtx(){
   const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId).map(p=>p.season+'R'+p.round).join(',');
   const memCtx=buildMemoryCtx();
 
+  // Trending data from Sleeper (real-time signal)
+  let trendingCtx='';
+  if(S.trending?.adds?.length){
+    const topAdds=S.trending.adds.slice(0,5).map(t=>{const p=S.players[t.player_id];return p?(p.first_name+' '+p.last_name+' '+p.position):t.player_id;}).join(', ');
+    const topDrops=(S.trending.drops||[]).slice(0,5).map(t=>{const p=S.players[t.player_id];return p?(p.first_name+' '+p.last_name+' '+p.position):t.player_id;}).join(', ');
+    trendingCtx='TRENDING(24h): Most added: '+topAdds+'. Most dropped: '+topDrops+'.';
+  }
+
   return [
     S.user.display_name+'|#'+rank+'/'+S.rosters.length+'|'+(s.wins||0)+'-'+(s.losses||0)+'|DHQ total:'+totalVal.toLocaleString(),
     'STARTERS:'+starters.join(';'),
@@ -4160,6 +4226,7 @@ function buildCtx(){
     picks?'PICKS:'+picks:'',
     'IDP:sack='+((sc.idp_sack)||4)+',INT='+((sc.idp_int)||5)+',PD='+((sc.idp_pass_def)||3)+',TKL='+((sc.idp_tkl_solo)||0.5),
     'Trade values=DHQ(0-10000 scale, league-derived, NOT dollars). Higher=better. 7000+=elite, 4000+=starter, 2000+=depth.',
+    trendingCtx,
     memCtx||'',
   ].filter(Boolean).join('\n');
 }
@@ -4195,7 +4262,7 @@ async function sendMessage(){
     const msgs=S.chatHistory.map((m,i)=>
       (i===0&&m.role==='user')?{role:'user',content:`My team context: ${buildCtx()}\n\n${m.content}`}:m
     );
-    const agentNeedsSearch=/news|breaking|injury|injur|trade rumor|sign|cut|release|depth chart|latest|update|today|recent|ranking|value/i.test(text);
+    const agentNeedsSearch=/search for|look up|find news|injury report|breaking news|trade rumor today/i.test(text);
     const reply=await callClaude(msgs,agentNeedsSearch);
     S.chatHistory.push({role:'assistant',content:reply});
     removeLoading(lid);addMsg(reply,'a');
