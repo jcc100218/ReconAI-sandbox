@@ -1443,8 +1443,13 @@ async function loadRosterStats(){
       sf(`/stats/nfl/regular/${prevSeason}`).catch(()=>({})),
     ]);
 
-    // Process every league player from the aggregate response
-    allLeaguePlayers.forEach(pid=>{
+    // Process ALL players from the aggregate response (not just rostered)
+    // This ensures free agent IDP players also get stats for waiver recommendations
+    const allStatPids=new Set([...allLeaguePlayers,...Object.keys(prevAgg),...Object.keys(curAgg||{})]);
+    allStatPids.forEach(pid=>{
+      if(!S.players[pid])return; // skip unknown player IDs
+      const pos=S.players[pid]?.position;
+      if(!pos||['K','DEF','P'].includes(pos))return; // skip kickers/defense/punters
       if(!S.playerStats[pid])S.playerStats[pid]={};
 
       // Previous season (2024) — always available
@@ -1839,19 +1844,38 @@ function skipWizard(){setMemory('wizardDone',true);closeWizard();}
 
 // ── Available players ──────────────────────────────────────────
 function getAvailablePlayers(){
-  if(!FC_LOADED)return[]; // wait for FC values — 0 = not dynasty relevant
   const rostered=new Set(S.rosters.flatMap(r=>(r.players||[]).concat(r.taxi||[]).concat(r.reserve||[])).map(String));
-  const relevant=['QB','RB','WR','TE','DL','LB','DB'];
+  const offPos=['QB','RB','WR','TE'];
+  const idpPos=['DL','LB','DB'];
+  const relevant=[...offPos,...idpPos];
+  const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+
   return Object.entries(S.players)
     .filter(([id,p])=>{
       if(!relevant.includes(p.position))return false;
       if(rostered.has(String(id)))return false;
       if(p.status==='Inactive'||p.status==='Retired')return false;
-      return dynastyValue(id)>0; // FC value required — not tracked = not dynasty relevant
+      // Offense: require FC value (dynasty tracked)
+      if(offPos.includes(p.position)) return FC_LOADED?dynastyValue(id)>0:true;
+      // IDP: require stats last season (played = relevant)
+      if(idpPos.includes(p.position)){
+        const stats=S.playerStats?.[id];
+        return stats?.prevAvg>0||stats?.seasonAvg>0;
+      }
+      return false;
     })
-    .map(([id,p])=>({id,p,val:dynastyValue(id),rank:S.posRanks?.[id],proj:S.playerProj?.[id]}))
+    .map(([id,p])=>{
+      const isIDP=idpPos.includes(p.position);
+      const stats=S.playerStats?.[id];
+      const raw=stats?.prevRawStats;
+      // IDP value: use calcIDPScore * 17 as proxy for "dynasty value" 
+      const idpVal=isIDP&&raw?Math.round(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)*100):0;
+      const val=dynastyValue(id)||idpVal;
+      return{id,p,val,isIDP,rank:S.posRanks?.[id],proj:S.playerProj?.[id]};
+    })
+    .filter(p=>p.val>0)
     .sort((a,b)=>b.val-a.val)
-    .slice(0,200);
+    .slice(0,250);
 }
 
 let availSortKey='value'; let availSortDir=-1;
@@ -2542,7 +2566,17 @@ async function sendTradeChat(){
     const oppName=oppRoster?getUser(oppRoster.owner_id):'unknown';
     const sc6=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const oppCtx=oppRoster?(()=>{
-      const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+      // IDP thresholds based on actual league scoring (not traditional pts)
+  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  // A "startable" IDP player = someone who scored in top 60% of their position
+  // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
+  // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
+  // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
+  const startThresh={QB:18,RB:10,WR:10,TE:8,
+    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
+    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
+    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
+  };
       const rp=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.roster_positions||[];
       const slots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
       rp.forEach(s=>{if(s in slots)slots[s]++;else if(s==='FLEX'){slots.RB+=0.4;slots.WR+=0.4;slots.TE+=0.2;}else if(s==='IDP_FLEX'){slots.DL+=0.35;slots.LB+=0.35;slots.DB+=0.3;}});
@@ -3199,7 +3233,17 @@ function scoutTeam(rosterId){
   Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.max(1,Math.round(starterSlots[p])));
   const idealDepth={};
   Object.keys(starterSlots).forEach(p=>idealDepth[p]=Math.ceil(starterSlots[p]*2.5));
-  const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+  // IDP thresholds based on actual league scoring (not traditional pts)
+  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  // A "startable" IDP player = someone who scored in top 60% of their position
+  // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
+  // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
+  // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
+  const startThresh={QB:18,RB:10,WR:10,TE:8,
+    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
+    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
+    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
+  };
 
   // Elite: top 5 FC value at each position league-wide
   const eliteByPos={};
@@ -3355,7 +3399,17 @@ async function runScoutAI(){
       else if(slot==='IDP_FLEX'){starterSlots.DL+=0.35;starterSlots.LB+=0.35;starterSlots.DB+=0.3;}
     });
     Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.max(1,Math.round(starterSlots[p])));
-    const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+    // IDP thresholds based on actual league scoring (not traditional pts)
+  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  // A "startable" IDP player = someone who scored in top 60% of their position
+  // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
+  // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
+  // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
+  const startThresh={QB:18,RB:10,WR:10,TE:8,
+    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
+    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
+    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
+  };
 
     // Build position grades for opponent
     const byPos={};
@@ -3492,7 +3546,17 @@ function renderDraftNeeds(){
   Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.max(1,Math.round(starterSlots[p])));
   const idealDepth={};
   Object.keys(starterSlots).forEach(p=>idealDepth[p]=Math.ceil(starterSlots[p]*2.5));
-  const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+  // IDP thresholds based on actual league scoring (not traditional pts)
+  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  // A "startable" IDP player = someone who scored in top 60% of their position
+  // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
+  // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
+  // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
+  const startThresh={QB:18,RB:10,WR:10,TE:8,
+    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
+    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
+    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
+  };
 
   // Elite: top 5 FC value at each position league-wide
   const eliteByPos={};
@@ -3633,7 +3697,17 @@ async function runDraftScouting(){
       else if(s==='SUPER_FLEX'){starterSlots.QB+=0.5;starterSlots.WR+=0.25;starterSlots.RB+=0.25;}
       else if(s==='IDP_FLEX'){starterSlots.DL+=0.35;starterSlots.LB+=0.35;starterSlots.DB+=0.3;}
     });
-    const startThresh={QB:18,RB:10,WR:10,TE:8,DL:7,LB:7,DB:6};
+    // IDP thresholds based on actual league scoring (not traditional pts)
+  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+  // A "startable" IDP player = someone who scored in top 60% of their position
+  // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
+  // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
+  // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
+  const startThresh={QB:18,RB:10,WR:10,TE:8,
+    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
+    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
+    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
+  };
     const needsStr=Object.keys(starterSlots).map(pos=>{
       const slots=Math.max(1,Math.round(starterSlots[pos]));
       const ideal=Math.ceil(slots*2.5);
