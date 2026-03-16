@@ -1089,7 +1089,7 @@ let S={
 // ── Utilities ──────────────────────────────────────────────────
 const sf=path=>fetch(SLEEPER+path).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()});
 const $=id=>document.getElementById(id);
-const ss=(id,msg,err)=>{const e=$(id);e.textContent=msg;e.className='status-txt'+(err?' err':'')};
+const ss=(id,msg,err)=>{const e=$(id);if(e){e.textContent=msg;e.className='status-txt'+(err?' err':'')}};
 const posMap={QB:'QB',RB:'RB',WR:'WR',TE:'TE',FLEX:'FLEX',SUPER_FLEX:'SF',K:'K',DEF:'DEF',BN:'BN',IDP_FLEX:'IDP',DL:'DL',LB:'LB',DB:'DB',REC_FLEX:'FLEX',WR_RB_FLEX:'FLEX',WR_TE:'FLEX'};
 const posClass=s=>{const p=posMap[s]||s||'FLEX';return{QB:'pQB',RB:'pRB',WR:'pWR',TE:'pTE',K:'pK',DEF:'pDEF',FLEX:'pFLEX',SF:'pSF',BN:'pBN',DL:'pDL',LB:'pLB',DB:'pDB',IDP:'pIDP'}[p]||'pFLEX'};
 // For display label — show actual position, never 'FL' or 'BN'
@@ -1320,6 +1320,17 @@ function getDcLabel(pid){
 async function renderRoster(){
   const my=myR();if(!my)return;
   buildRosterTable();
+}
+
+// Peak age range helper (loadPeakCurves removed — use static defaults)
+function peakYears(pid){
+  const pos=pPos(pid);const age=pAge(pid)||0;
+  const peaks={QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+  const [lo,hi]=peaks[pos]||[24,29];
+  if(!age)return'—';
+  if(age<lo)return'Pre-peak';
+  if(age<=hi)return'Peak';
+  return'Post-peak';
 }
 
 // Roster sort/filter stubs
