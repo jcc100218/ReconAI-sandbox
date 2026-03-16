@@ -537,6 +537,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
       <button class="btn btn-ghost btn-sm" id="switch-league-btn" style="display:none;font-size:10px;padding:2px 8px" onclick="switchLeagueMode()">Switch</button>
+      <button onclick="openPlayerSearch()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="Search Players"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       <button onclick="switchTab('roster')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="My Roster"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></button>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
@@ -593,11 +594,29 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           </div>
         </div>
         <!-- Data sync status -->
-        <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text3);align-items:center">
+        <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:10px;color:var(--text3);align-items:center">
           <span id="sync-fc" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>DHQ values</span>
           <span id="sync-stats" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Stats</span>
           <span id="sync-li" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Intel</span>
           <button onclick="resyncAllData()" style="background:none;border:1px solid var(--border2);border-radius:5px;color:var(--text3);font-size:10px;padding:2px 8px;cursor:pointer;font-family:inherit;margin-left:auto">Resync ↺</button>
+        </div>
+        <!-- Loading banner -->
+        <div id="dhq-loading-banner" style="display:none;margin-bottom:12px;padding:12px 16px;background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);text-align:center">
+          <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+            <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>
+            <span style="font-size:13px;font-weight:600;color:var(--accent)">Building your league intelligence...</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px">Analyzing 5 years of stats, drafts, and transactions. First time takes ~15 seconds, then it's cached.</div>
+        </div>
+        <!-- API key callout -->
+        <div id="api-key-callout" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r)">
+          <div style="font-size:12px;color:var(--amber);line-height:1.5">🔑 <strong>Add an AI key to unlock chat features.</strong> Go to <a onclick="switchTab('settings')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a> and paste a free <strong>Groq</strong> or <strong>Gemini</strong> API key. It takes 30 seconds.</div>
+        </div>
+        <!-- Player search -->
+        <div style="margin-bottom:12px;position:relative" id="player-search-wrap">
+          <input type="text" id="player-search-in" placeholder="Search any player..." oninput="handlePlayerSearch(this.value)" onfocus="this.parentElement.querySelector('#player-search-results').style.display='block'" style="width:100%;font-size:13px;padding:8px 14px 8px 32px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);outline:none;box-sizing:border-box"/>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2" style="position:absolute;left:10px;top:10px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <div id="player-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:0 0 var(--r) var(--r);max-height:280px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
         </div>
         <!-- Snapshot pills -->
         <div id="home-snapshot" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
@@ -1325,6 +1344,7 @@ async function selectLeague(leagueId,userId){
     try{renderHomeSnapshot();}catch(e){}
     // Fire data loads via setTimeout to guarantee execution
     console.log('selectLeague: firing data loads...');
+    checkApiKeyCallout();
     setTimeout(()=>loadAllData(),100);
   }catch(e){
     const sb=$('setup-block');
@@ -1337,23 +1357,30 @@ async function loadAllData(){
   if(!S.currentLeagueId||!S.myRosterId)return;
   console.log('loadAllData: starting...');
   const t0=Date.now();
+  // Show loading banner
+  const loadBanner=$('dhq-loading-banner');
+  if(loadBanner)loadBanner.style.display='block';
   try{
-    // Show loading state in sync bar
     updateSyncStatus();
-    // Load stats + DHQ in parallel
     await Promise.all([
       loadRosterStats().catch(e=>{console.warn('Stats error:',e);return null;}),
       loadLeagueIntel().catch(e=>{console.warn('DHQ error:',e);return null;}),
     ]);
     console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys(LI.playerScores||{}).length+' | rookies:'+(LI.rookieCount||0));
+    if(loadBanner)loadBanner.style.display='none';
     updateDataFreshness();updateSyncStatus();
     buildRosterTable();
     try{renderAvailable();}catch(e){console.warn('renderAvailable:',e);}
     try{renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
     try{renderHomeSnapshot();}catch(e){}
     try{renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
+    checkApiKeyCallout();    // First-time strategy walkthrough
+    if(!localStorage.getItem('dhq_strategy_done')&&S.apiKey){
+      setTimeout(()=>startStrategyWalkthrough(),500);
+    }
   }catch(e){
     console.warn('loadAllData error:',e);
+    if(loadBanner)loadBanner.style.display='none';
   }
 }
 
@@ -1514,10 +1541,9 @@ function buildRosterTable(){
     const {tier,col}=tradeValueTier(val);
     const initials=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
 
-    // FC trend arrow
-    const fcRank=getPlayerRank(pid);
-    const trend=fcRank?.trend||0;
-    const trendHtml=trend>50?'<span style="color:var(--green);font-size:9px;margin-left:3px">▲</span>':trend<-50?'<span style="color:var(--red);font-size:9px;margin-left:3px">▼</span>':'';
+    // DHQ trend arrow (year-over-year PPG change)
+    const dhqTrend=LI_LOADED&&LI.playerMeta?.[pid]?.trend||0;
+    const trendHtml=dhqTrend>=15?'<span style="color:var(--green);font-size:9px;margin-left:2px" title="PPG up '+dhqTrend+'% YoY">▲</span>':dhqTrend<=-15?'<span style="color:var(--red);font-size:9px;margin-left:2px" title="PPG down '+Math.abs(dhqTrend)+'% YoY">▼</span>':'';
 
     html+=`<tr class="${rowCls}" onclick="openPlayerModal('${pid}')">
       <td><img class="rt-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rt-initials>${initials}</span>')" loading="lazy"/></td>
@@ -2134,9 +2160,14 @@ async function loadLeagueIntel(){
         // ── CLAMP situation multiplier to reasonable range ──
         sitMult=Math.min(1.60,Math.max(0.40,sitMult));
 
+        // Trend: compare most recent season to prior
+        const ppg25=ps.seasons[2025]?.avg||0;
+        const ppg24=ps.seasons[2024]?.avg||0;
+        const trend=ppg25&&ppg24?+(((ppg25-ppg24)/ppg24)*100).toFixed(0):0; // % change
+
         return{pid,pos,name:ps.name,wPPG,bestTotal:bestSeason.total,bestAvg:bestSeason.avg,
           age,ageFactor:+ageFactor.toFixed(4),sitMult:+sitMult.toFixed(4),
-          peakYrsLeft,seasons:totalSeasons,starterSeasons,recentGP,posRank,posTotal};
+          peakYrsLeft,seasons:totalSeasons,starterSeasons,recentGP,posRank,posTotal,trend};
       })
       .filter(p=>p.wPPG>0)
       .sort((a,b)=>(b.wPPG*b.ageFactor*b.sitMult)-(a.wPPG*a.ageFactor*a.sitMult));
@@ -2179,7 +2210,16 @@ async function loadLeagueIntel(){
         pos:p.pos,ppg:p.wPPG,age:p.age,
         ageFactor:p.ageFactor,sitMult:p.sitMult,
         peakYrsLeft:p.peakYrsLeft,starterSeasons:p.starterSeasons,
-        recentGP:p.recentGP
+        recentGP:p.recentGP,
+        // Trend: compare most recent season PPG to prior
+        trend:(()=>{
+          const ps=playerSeasons[p.pid];if(!ps)return 0;
+          const cur=ps.seasons[2025]?.avg||0;
+          const prev=ps.seasons[2024]?.avg||ps.seasons[2023]?.avg||0;
+          if(!cur||!prev)return 0;
+          const pctChange=((cur-prev)/prev)*100;
+          return +pctChange.toFixed(0); // e.g., +15 means 15% improvement, -20 means 20% decline
+        })()
       };
     });
     console.log('DHQ player values: '+Object.keys(playerScores).length+' players scored');
@@ -2703,6 +2743,11 @@ function buildMentalityCtx(){
   if(m.tradePrefs)lines.push('TRADE STYLE:'+m.tradePrefs.substring(0,150));
   if(m.neverDrop)lines.push('UNTOUCHABLE:'+m.neverDrop);
   if(m.notes)lines.push('NOTES:'+m.notes.substring(0,150));
+  // Inject strategy walkthrough answers if available
+  const strat=loadStrategy();
+  if(strat){
+    lines.push('STRATEGY:'+strat.mode+',trades:'+strat.tradeStyle+',IDP:'+strat.idpApproach+',draft:'+strat.draftApproach+',vets:'+strat.veteranApproach);
+  }
   return lines.join('\n');
 }
 
@@ -3264,7 +3309,143 @@ function assetName(id){
     return`${season} Round ${round} Pick`;
   }
   return pName(id);
-}// ── AI-powered features ────────────────────────────────────────
+}
+
+// ── Player Search ──────────────────────────────────────────────
+function handlePlayerSearch(query){
+  const results=$('player-search-results');if(!results)return;
+  if(!query||query.length<2){results.innerHTML='';results.style.display='none';return;}
+  results.style.display='block';
+  const q=query.toLowerCase();
+  const matches=Object.entries(S.players)
+    .filter(([id,p])=>{
+      const name=(p.first_name+' '+p.last_name).toLowerCase();
+      return name.includes(q)&&(p.status==='Active'||dynastyValue(id)>0);
+    })
+    .map(([id,p])=>({id,p,name:p.first_name+' '+p.last_name,val:dynastyValue(id)}))
+    .sort((a,b)=>b.val-a.val)
+    .slice(0,8);
+
+  if(!matches.length){results.innerHTML='<div style="padding:12px;font-size:11px;color:var(--text3)">No players found</div>';return;}
+  const posMap=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+  results.innerHTML=matches.map(({id,p,name,val})=>{
+    const meta=LI_LOADED?LI.playerMeta?.[id]:null;
+    const isRookie=meta?.source==='FC_ROOKIE';
+    const {col}=tradeValueTier(val);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s" onclick="openPlayerModal('${id}');$('player-search-results').style.display='none';$('player-search-in').value=''" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
+      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+      <div style="flex:1;overflow:hidden">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:8px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
+        <div style="font-size:9px;color:var(--text3)">${posMap(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
+    </div>`;
+  }).join('');
+}
+// Close search on outside click
+document.addEventListener('click',e=>{
+  const wrap=$('player-search-wrap');
+  if(wrap&&!wrap.contains(e.target)){
+    const r=$('player-search-results');if(r)r.style.display='none';
+  }
+});
+
+// ── API Key Callout ────────────────────────────────────────────
+function checkApiKeyCallout(){
+  const el=$('api-key-callout');if(!el)return;
+  el.style.display=S.apiKey?'none':'block';
+}
+
+// ── Strategy Walkthrough (first-time login) ────────────────────
+const STRATEGY_QUESTIONS=[
+  {q:"First, are you trying to **win the championship this year**, or are you **rebuilding for the future**?",opts:['Win now','Rebuild','Competing but flexible']},
+  {q:"How aggressive are you with trades? Do you prefer to **hold and develop**, or are you always looking for a deal?",opts:['Hold and develop','Active trader','Only if the value is right']},
+  {q:"How do you feel about **IDP players** on your roster? Are they important to your strategy, or do you mostly focus on offense?",opts:['IDP is a priority','Offense first, IDP secondary','I draft IDP late']},
+  {q:"When it comes to the **rookie draft**, do you prefer to draft the best player available (BPA), or do you target specific positions of need?",opts:['Best player available','Draft for need','Mix of both']},
+  {q:"Last one — how do you feel about **aging veteran players** on your roster? Are you comfortable riding them while they produce, or do you want to sell high before they decline?",opts:['Ride them until the wheels fall off','Sell high when I can','Depends on the player']},
+];
+
+async function startStrategyWalkthrough(){
+  if(!S.apiKey||localStorage.getItem('dhq_strategy_done'))return;
+  const msgs=$('home-chat-msgs');if(!msgs)return;
+
+  // Add intro message
+  msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6">
+    <div style="font-weight:700;color:var(--accent);margin-bottom:4px">Welcome to Dynasty HQ! Let's set up your strategy.</div>
+    I'll ask you 5 quick questions so I can tailor my advice to how you like to play. This takes about 30 seconds.
+  </div>`;
+
+  const answers=[];
+  for(let i=0;i<STRATEGY_QUESTIONS.length;i++){
+    const sq=STRATEGY_QUESTIONS[i];
+    msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6;margin-top:6px">${sq.q}</div>`;
+    msgs.innerHTML+=`<div id="strat-opts-${i}" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0">${sq.opts.map((o,j)=>`<button class="chip" style="font-size:11px" onclick="selectStrategyAnswer(${i},${j})">${o}</button>`).join('')}</div>`;
+    msgs.scrollTop=msgs.scrollHeight;
+
+    // Wait for answer
+    await new Promise(resolve=>{
+      window['_stratResolve'+i]=resolve;
+    });
+    answers.push(window['_stratAnswer'+i]);
+  }
+
+  // Save strategy and generate AI summary
+  const strategy={
+    mode:answers[0],
+    tradeStyle:answers[1],
+    idpApproach:answers[2],
+    draftApproach:answers[3],
+    veteranApproach:answers[4],
+    setAt:new Date().toISOString()
+  };
+  try{localStorage.setItem('dhq_strategy',JSON.stringify(strategy));localStorage.setItem('dhq_strategy_done','1');}catch(e){}
+
+  msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6;margin-top:6px">
+    <div style="font-weight:700;color:var(--green);margin-bottom:4px">Strategy saved! ✓</div>
+    <strong>${strategy.mode}</strong> mode · <strong>${strategy.tradeStyle}</strong> · <strong>${strategy.idpApproach}</strong> · Draft: <strong>${strategy.draftApproach}</strong> · Veterans: <strong>${strategy.veteranApproach}</strong>
+    <div style="margin-top:6px;color:var(--text3)">I'll use this to personalize all my advice. You can change it anytime in Settings.</div>
+  </div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+
+  // Generate AI analysis with the strategy context
+  if(S.apiKey&&LI_LOADED){
+    msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;color:var(--text3)">Analyzing your roster with your strategy...</div>`;
+    msgs.scrollTop=msgs.scrollHeight;
+    try{
+      const reply=await callClaude([{role:'user',content:`You are a dynasty fantasy football advisor. The user just set their strategy:
+Mode: ${strategy.mode}
+Trade style: ${strategy.tradeStyle}
+IDP approach: ${strategy.idpApproach}
+Draft approach: ${strategy.draftApproach}
+Veteran approach: ${strategy.veteranApproach}
+
+${buildCtx()}
+
+Give a brief (3-4 sentences) personalized assessment of their roster given their strategy. Be specific about players. End with one actionable recommendation.`}]);
+      msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;
+    }catch(e){
+      msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:12px;color:var(--text3)">Strategy saved! Ask me anything about your team.</div>`;
+    }
+    msgs.scrollTop=msgs.scrollHeight;
+  }
+}
+
+function selectStrategyAnswer(qIdx,optIdx){
+  const opt=STRATEGY_QUESTIONS[qIdx].opts[optIdx];
+  window['_stratAnswer'+qIdx]=opt;
+  // Replace buttons with selected answer
+  const el=$('strat-opts-'+qIdx);
+  if(el)el.outerHTML=`<div class="hc-msg-u" style="font-size:12px">${opt}</div>`;
+  // Resolve the promise
+  if(window['_stratResolve'+qIdx])window['_stratResolve'+qIdx]();
+}
+
+// Load saved strategy into mentality context
+function loadStrategy(){
+  try{return JSON.parse(localStorage.getItem('dhq_strategy')||'null');}catch(e){return null;}
+}
+
+// ── AI-powered features ────────────────────────────────────────
 // ── Smart Feed ─────────────────────────────────────────────────
 let homeChatHistory=[];
 
@@ -4240,6 +4421,63 @@ function reloadSeason(){
 }
 function clearHistory(){S.chatHistory=[];addMsg('Chat history cleared.','sys');}
 // ── Player Profile Modal ───────────────────────────────────────
+// ── Player Search ─────────────────────────────────────────────
+function openPlayerSearch(){
+  // Create modal overlay
+  let modal=$('player-search-modal');
+  if(!modal){
+    modal=document.createElement('div');modal.id='player-search-modal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;backdrop-filter:blur(4px)';
+    modal.innerHTML=`
+      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:100%;max-width:440px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.4)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="player-search-input" placeholder="Search any player..." style="flex:1;font-size:15px;background:transparent;border:none;outline:none;color:var(--text)" oninput="filterPlayerSearch(this.value)" autofocus/>
+          <button onclick="closePlayerSearch()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px">✕</button>
+        </div>
+        <div id="player-search-results" style="max-height:400px;overflow-y:auto"></div>
+      </div>`;
+    modal.addEventListener('click',e=>{if(e.target===modal)closePlayerSearch();});
+    document.body.appendChild(modal);
+  }
+  modal.style.display='flex';
+  const inp=$('player-search-input');if(inp){inp.value='';inp.focus();}
+  $('player-search-results').innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px">Type a name to search across all NFL players...</div>';
+}
+function closePlayerSearch(){const m=$('player-search-modal');if(m)m.style.display='none';}
+function filterPlayerSearch(q){
+  const el=$('player-search-results');if(!el)return;
+  if(!q||q.length<2){el.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px">Type at least 2 characters...</div>';return;}
+  const lq=q.toLowerCase();
+  const matches=Object.entries(S.players)
+    .filter(([,p])=>(p.first_name+' '+p.last_name).toLowerCase().includes(lq)&&(p.status==='Active'||dynastyValue(p)>0))
+    .map(([id,p])=>({id,p,val:dynastyValue(id),name:p.first_name+' '+p.last_name}))
+    .sort((a,b)=>b.val-a.val)
+    .slice(0,12);
+  if(!matches.length){el.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px">No players found.</div>';return;}
+  el.innerHTML=matches.map(({id,p,val,name})=>{
+    const {col}=tradeValueTier(val);
+    const meta=LI_LOADED?LI.playerMeta?.[id]:null;
+    const rostered=S.rosters.some(r=>(r.players||[]).includes(id));
+    const owner=rostered?S.rosters.find(r=>(r.players||[]).includes(id)):null;
+    const ownerName=owner?getUser(owner.owner_id):'Free Agent';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;border-radius:6px" onclick="closePlayerSearch();openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
+      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+      <div style="flex:1;overflow:hidden">
+        <div style="font-size:12px;font-weight:600">${name}</div>
+        <div style="font-size:9px;color:var(--text3)">${p.position||'?'} · ${p.team||'FA'} · Age ${p.age||'?'} · ${ownerName}</div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
+    </div>`;
+  }).join('');
+}
+// Keyboard shortcut: Cmd/Ctrl + K opens search
+document.addEventListener('keydown',e=>{
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();openPlayerSearch();}
+  if(e.key==='Escape')closePlayerSearch();
+});
+
+// ── API Key Callout ──────────────────────────────────────────
 function openPlayerModal(playerId){
   const p=S.players[playerId];if(!p)return;
   window._pmPid=playerId;
