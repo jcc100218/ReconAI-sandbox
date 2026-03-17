@@ -706,7 +706,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <!-- Waiver chat -->
       <div class="sec" style="margin-top:16px">Waiver advisor chat <div class="sec-line"></div></div>
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-        <div id="wq-chat-msgs" style="max-height:50px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+        <div id="wq-chat-msgs" style="max-height:56px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
           <div class="hc-msg-a" style="font-size:12px">Ask me who to grab, what to bid, or who to drop.</div>
         </div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
@@ -750,7 +750,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Trade advisor</div>
         <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-          <div id="trade-chat-msgs" style="max-height:50px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+          <div id="trade-chat-msgs" style="max-height:56px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
             <div class="hc-msg-a" style="font-size:12px">Tell me what you need and I'll find the right trade partner.</div>
           </div>
           <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;align-items:center;background:var(--bg3)">
@@ -766,6 +766,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           </div>
         </div>
       </div>
+      <!-- Trade Intel — depth, needs, top assets -->
+      <div id="trade-intel" style="margin-top:14px"></div>
       <!-- Recent league trades -->
       <div style="margin-top:14px">
         <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Recent league trades</div>
@@ -874,7 +876,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           <div style="font-size:12px;font-weight:700;color:var(--text)">Draft Advisor</div>
           <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:10px;padding:3px 10px">Scout my picks ↗</button>
         </div>
-        <div id="draft-msgs" style="max-height:50px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+        <div id="draft-msgs" style="max-height:56px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
           <div class="hc-msg-a" style="font-size:12px">Ask me about the draft — who to target, whether to trade up, or which positions to prioritize.</div>
         </div>
         <div id="draft-scout-content" style="display:none"></div>
@@ -3039,7 +3041,7 @@ function renderAvailable(){
     return(b.val-a.val)*availSortDir;
   });
 
-  const el=$('available-count');if(el)el.textContent=`${filtered.length}/${avail.length}`;
+  const el=$('available-count');if(el)el.textContent=filtered.length===avail.length?`${avail.length} players available`:`${filtered.length} of ${avail.length} shown`;
   const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
   const faab=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0};
   const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
@@ -3154,6 +3156,62 @@ function renderTrades(){
       <button class="copy-btn" style="margin-top:8px" onclick="goAsk('Analyze this trade: ${sidesTxt}. Who won from a dynasty perspective?')">Analyze ↗</button>
     </div>`;
   }).join(''):'<div class="empty">No trades yet this season.</div>';
+  renderTradeIntel();
+}
+
+function renderTradeIntel(){
+  const el=$('trade-intel');if(!el||!LI_LOADED)return;
+  const my=myR();if(!my)return;
+  const players=my.players||[];
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const rp=league?.roster_positions||[];
+
+  // Count starters needed per position
+  const needs={};const counts={};
+  ['QB','RB','WR','TE','K','DL','LB','DB'].forEach(pos=>{
+    const slotsNeeded=rp.filter(s=>s===pos||
+      (s==='FLEX'&&['RB','WR','TE'].includes(pos))||
+      (s==='SUPER_FLEX'&&pos==='QB')||
+      (s==='IDP_FLEX'&&['DL','LB','DB'].includes(pos))
+    ).length;
+    const mine=players.filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>0);
+    counts[pos]=mine.length;
+    needs[pos]={have:mine.length,need:Math.max(1,Math.round(slotsNeeded)),surplus:mine.length-Math.max(1,Math.round(slotsNeeded))};
+  });
+
+  const depth=Object.entries(needs).filter(([,v])=>v.surplus>=2).sort((a,b)=>b[1].surplus-a[1].surplus).slice(0,3);
+  const weak=Object.entries(needs).filter(([,v])=>v.surplus<0).sort((a,b)=>a[1].surplus-b[1].surplus).slice(0,3);
+
+  // Top tradeable assets — players with high value that aren't your top starter at their position
+  const tradeableAssets=players.map(pid=>({pid,val:dynastyValue(pid),pos:pM(pPos(pid)),name:pNameShort(pid)}))
+    .filter(p=>p.val>1500)
+    .sort((a,b)=>b.val-a.val);
+  // Remove the top player at each position (you want to keep those)
+  const topByPos={};
+  tradeableAssets.forEach(p=>{if(!topByPos[p.pos])topByPos[p.pos]=p.pid;});
+  const sellable=tradeableAssets.filter(p=>p.pid!==topByPos[p.pos]).slice(0,3);
+
+  // Top pick assets
+  const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&parseInt(p.season)>=parseInt(S.season));
+  const topPicks=myPicks.filter(p=>p.round<=2).slice(0,3).map(p=>p.season+' R'+p.round);
+
+  el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Depth (trade from)</div>
+      ${depth.length?depth.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:3px"><strong>${pos}</strong> ${v.have} players (+${v.surplus})</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">No surplus positions</div>'}
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Needs (trade for)</div>
+      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:3px"><strong>${pos}</strong> ${v.have} players (${v.surplus})</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">All positions covered</div>'}
+    </div>
+  </div>
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px;margin-top:8px">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Top trade chips</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${sellable.map(p=>`<span style="font-size:11px;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--text2);cursor:pointer" onclick="openPlayerModal('${p.pid}')">${p.name} <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:10px">${p.val.toLocaleString()}</span></span>`).join('')}
+      ${topPicks.map(p=>`<span style="font-size:11px;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--amber)">${p}</span>`).join('')}
+    </div>
+  </div>`;
 }
 
 // ── Picks ──────────────────────────────────────────────────────
@@ -3340,7 +3398,12 @@ function dynastyValue(playerId){
 
 function getPlayerRank(playerId){
   if(LI_LOADED&&LI.playerScores?.[playerId]>0){
-    const allScores=Object.entries(LI.playerScores).sort((a,b)=>b[1]-a[1]);
+    // Rank among ALL rostered players in the league (not all 2240 DHQ players)
+    const rosteredPids=new Set();
+    S.rosters.forEach(r=>(r.players||[]).forEach(pid=>rosteredPids.add(pid)));
+    const allScores=Object.entries(LI.playerScores)
+      .filter(([pid])=>rosteredPids.has(pid))
+      .sort((a,b)=>b[1]-a[1]);
     const overall=allScores.findIndex(([pid])=>pid===String(playerId))+1;
     const pos=LI.playerMeta?.[playerId]?.pos;
     const posScores=allScores.filter(([pid])=>LI.playerMeta?.[pid]?.pos===pos);
@@ -5495,7 +5558,11 @@ function renderDraftNeeds(){
     });
     const bestLateIDP=Object.entries(lateIdpHits).sort((a,b)=>b[1]-a[1])[0];
     const earlyRounds=ownPickRounds.filter(r=>r<=3);
-    const bestEarlyNeed=posAnalysis.find(p=>p.needScore>0);
+    // For early picks (R1-R3), prioritize offensive positions — IDP almost never goes R1-R2
+    const offenseFirst=['QB','RB','WR','TE','K','DL','LB','DB'];
+    const bestEarlyNeed=earlyRounds[0]<=2
+      ?posAnalysis.find(p=>p.needScore>0&&!['DL','LB','DB'].includes(p.pos))||posAnalysis.find(p=>p.needScore>0)
+      :posAnalysis.find(p=>p.needScore>0);
 
     let betHtml='';
     if(earlyRounds.length&&bestEarlyNeed){
