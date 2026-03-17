@@ -1397,6 +1397,7 @@ async function loadAllData(){
     try{renderHomeSnapshot();}catch(e){}
     try{renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
     try{renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
+    try{renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
     checkApiKeyCallout();
     if(!localStorage.getItem('dhq_strategy_done')&&S.apiKey){
       setTimeout(()=>startStrategyWalkthrough(),500);
@@ -3164,6 +3165,7 @@ function renderTradeIntel(){
   const players=my.players||[];
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
   const rp=league?.roster_positions||[];
+  const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 
   // Count starters needed per position
   const needs={};const counts={};
