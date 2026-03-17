@@ -590,7 +590,6 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
             <div style="font-size:11px;color:var(--text3);margin-top:2px" id="home-league-meta"></div>
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost btn-sm" onclick="switchTab('roster')" style="font-size:11px">Roster</button>
           </div>
         </div>
         <!-- Data sync status -->
@@ -1174,6 +1173,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     Home
   </button>
+  <button class="mobile-nav-item" id="mnav-roster" onclick="mobileTab('roster',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Roster
+  </button>
   <button class="mobile-nav-item" id="mnav-waivers" onclick="mobileTab('waivers',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     Waivers
@@ -1582,9 +1585,9 @@ function buildRosterTable(){
   // Sort
   const posOrder2=['QB','RB','WR','TE','DL','LB','DB','K','DEF','IDP','FLEX','SF'];
   rows.sort((a,b)=>{
-    // Always: starters first, then bench, then taxi, then reserve (unless filtering taxi)
+    // Taxi and IR always at bottom
     if(rosterFilter!=='taxi'){
-      const sec=r=>r.isReserve?3:r.isTaxi?2:r.isStarter?0:1;
+      const sec=r=>r.isReserve?2:r.isTaxi?2:0;
       const sd=sec(a)-sec(b);if(sd!==0)return sd;
     }
     let av=a[rosterSortKey]??'',bv=b[rosterSortKey]??'';
@@ -1601,8 +1604,9 @@ function buildRosterTable(){
 
   rows.forEach(r=>{
     const {pid,p,stats,val,pk,slot,isStarter,isReserve,isTaxi,pos,age,rank}=r;
-    const section=r.isReserve?'IR / Reserve':r.isTaxi?'Taxi Squad':r.isStarter?'Starters':'Bench';
-    if(section!==lastSection){
+    // Only show section headers for Taxi and IR — main roster is one continuous list
+    const section=(r.isReserve||r.isTaxi)?(r.isReserve?'IR / Reserve':'Taxi Squad'):'';
+    if(section&&section!==lastSection){
       html+=`<tr class="rt-section-row"><td colspan="9">${section}</td></tr>`;
       lastSection=section;
     }
@@ -3704,12 +3708,44 @@ function renderTeamOverview(){
   const myContenderRank=contenderRanks.findIndex(r=>r.rid===S.myRosterId)+1;
   const topContender=contenderRanks[0]?.ppg||1;
 
-  // Three KPI cards: Contender + Dynasty + Draft Capital
+  // ── Health Score (War Room style): 60% scoring potential + 40% depth ──
+  // Scoring component: optimal lineup PPG vs league-wide weekly target
+  const allPPGs=contenderRanks.map(r=>r.ppg).filter(p=>p>0);
+  const weeklyTarget=allPPGs.length?Math.round(allPPGs.reduce((a,b)=>a+b,0)/allPPGs.length*1.1):243; // 110% of avg = target
+  const scoringPct=Math.min(100,Math.round((myContenderPPG/weeklyTarget)*100));
+
+  // Depth component: for each starting position, do we have starter-quality depth?
+  const depthPositions=['QB','RB','WR','TE','DL','LB','DB'];
+  let depthMet=0,depthTotal=0;
+  const rosterSlots=league?.roster_positions||[];
+  depthPositions.forEach(pos=>{
+    const need=rosterSlots.filter(s=>s===pos||(s==='FLEX'&&['RB','WR','TE'].includes(pos))||(s==='SUPER_FLEX'&&pos==='QB')||(s==='IDP_FLEX'&&['DL','LB','DB'].includes(pos))).length;
+    if(!need)return;
+    depthTotal++;
+    const myAtPos=(my.players||[]).filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>0);
+    // Need at least (required starters + 1) to have depth
+    if(myAtPos.length>need)depthMet++;
+  });
+  const depthPct=depthTotal>0?Math.round((depthMet/depthTotal)*100):50;
+  const healthScore=Math.round(scoringPct*0.6+depthPct*0.4);
+  const hCol=healthScore>=80?'var(--green)':healthScore>=60?'var(--accent)':healthScore>=40?'var(--amber)':'var(--red)';
+  const hTier=healthScore>=80?'Elite':healthScore>=60?'Contender':healthScore>=40?'Crossroads':'Rebuilding';
+
+  // Four KPI cards: Health + Contender + Dynasty + Draft Capital
   const cCol=myContenderRank<=3?'var(--green)':myContenderRank<=8?'var(--accent)':'var(--amber)';
   const dCol=myValRank<=3?'var(--green)':myValRank<=8?'var(--accent)':'var(--amber)';
-  html+=`<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-    <div style="flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender</div>
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Health Score</div>
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <span style="font-size:26px;font-weight:800;color:${hCol};font-family:'JetBrains Mono',monospace">${healthScore}</span>
+        <span style="font-size:11px;font-weight:600;color:${hCol}">${hTier}</span>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">Scoring ${scoringPct}% · Depth ${depthPct}%</div>
+      <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${healthScore}%;height:100%;background:${hCol};border-radius:2px"></div></div>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:${cCol};font-family:'JetBrains Mono',monospace">#${myContenderRank}</span>
         <span style="font-size:10px;color:var(--text3)">/${teams}</span>
@@ -3717,8 +3753,8 @@ function renderTeamOverview(){
       <div style="font-size:9px;color:var(--text3);margin-top:2px">${myContenderPPG.toFixed(1)} starter PPG</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(myContenderPPG/topContender*100)}%;height:100%;background:${cCol};border-radius:2px"></div></div>
     </div>
-    <div style="flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty</div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:${dCol};font-family:'JetBrains Mono',monospace">#${myValRank}</span>
         <span style="font-size:10px;color:var(--text3)">/${teams}</span>
@@ -3726,8 +3762,8 @@ function renderTeamOverview(){
       <div style="font-size:9px;color:var(--text3);margin-top:2px">${totalVal.toLocaleString()} DHQ</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(totalVal/topVal*100)}%;height:100%;background:var(--accent);border-radius:2px"></div></div>
     </div>
-    <div style="flex:1;min-width:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Draft Capital</div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Draft Capital</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalPicks}</span>
         <span style="font-size:10px;color:var(--text3)">picks</span>
