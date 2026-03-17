@@ -4092,7 +4092,9 @@ function buildCtxCompact(){
     const myPlayers=myR()?.players||[];
     const myPosCounts={};
     myPlayers.forEach(pid=>{const pos=pPos(pid);if(pos)myPosCounts[pos]=(myPosCounts[pos]||0)+1;});
-    const topAvailStr=top20.slice(0,10).map(({id,p,val})=>{
+    const topAvailStr=top20.slice(0,10)
+      .filter(({id})=>!(LI.playerMeta?.[id]?.source==='FC_ROOKIE')&&(S.players[id]?.years_exp||0)>0)
+      .map(({id,p,val})=>{
       return`${pName(id)}(${p.position},${p.age||'?'},${p.team||'FA'},FC${val})`;
     }).join(';');
     const slotsToFill=Math.max(1,Math.min(4,slots.openBench>0?slots.openBench:1));
@@ -4101,27 +4103,49 @@ function buildCtxCompact(){
       Object.entries(LI.faabByPos).slice(0,4).map(([pos,d])=>`${pos}:avg$${d.avg}(${d.count}claims)`).join(';'):'';
     const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const prompt=`Waiver agent. ${S.season} offseason. DHQ values 0-10000 scale.
-IMPORTANT: This is a dynasty league. Rookies can ONLY be added through the rookie draft, NOT waivers. Only recommend VETERAN free agents (players who have been in the NFL at least 1 season).
+CRITICAL RULES:
+1. Rookies (0 years experience, never played an NFL game) can ONLY be added through the rookie draft, NOT waivers. Do NOT recommend any rookies or first-year players.
+2. Only recommend VETERAN free agents who have played at least 1 NFL season.
+3. Respond with ONLY a JSON object — no markdown, no backticks, no explanation before or after.
 ${buildMentalityCtx()}
 ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
 ${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
 AVAILABLE(top10):${topAvailStr||'still loading'}
 IDP:sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3}
 ${slots.openBench===0?'ROSTER FULL — must suggest who to drop.':''}
-Recommend ${slotsToFill} adds. Name players, cite DHQ values, explain fit. JSON only:
+Recommend ${slotsToFill} veteran adds. JSON only:
 {"recommendations":[{"name":"player","position":"POS","team":"TM","rank":1,"age":0,"dynastyValue":0,"reason":"why",${faabFields}"copyText":"Sleeper msg"}]}`;
     const reply=await callClaude([{role:'user',content:prompt}]);
     let data={recommendations:[]};
     try{
-      const clean=reply.replace(/```json|```/g,'').trim();
-      const s=clean.indexOf('{');const e=clean.lastIndexOf('}');
-      if(s>=0&&e>s)data=JSON.parse(clean.substring(s,e+1));
+      // Aggressively clean the response to extract JSON
+      let clean=reply;
+      // Remove markdown code fences (all variations)
+      clean=clean.replace(/```(?:json|JSON|js|javascript)?\s*/g,'').replace(/```\s*/g,'');
+      // Remove any text before the first { and after the last }
+      const firstBrace=clean.indexOf('{');
+      const lastBrace=clean.lastIndexOf('}');
+      if(firstBrace>=0&&lastBrace>firstBrace){
+        clean=clean.substring(firstBrace,lastBrace+1);
+      }
+      data=JSON.parse(clean);
     }catch(err){
       // Show raw reply for debugging
       $('wq-list').innerHTML=`<div class="card"><div style="font-size:12px;color:var(--text2);line-height:1.6;padding:4px">${reply.replace(/\n/g,'<br>')}</div></div>`;
       btn.textContent='Generate';btn.disabled=false;return;
     }
     const mentLabel={balanced:'⚖️ Balanced',winnow:'🏆 Win Now',rebuild:'🔄 Rebuild',prime:'⭐ Dynasty Prime'}[loadMentality().mentality]||'';
+    // Client-side filter: remove any rookies that slipped through
+    if(data.recommendations){
+      data.recommendations=data.recommendations.filter(r=>{
+        // Check if this player is a FC_ROOKIE in our data
+        const pid=Object.entries(S.players).find(([,p])=>(p.first_name+' '+p.last_name).toLowerCase()===r.name?.toLowerCase())?.[0];
+        if(pid&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE')return false;
+        // Check years_exp from player DB
+        if(pid&&S.players[pid]?.years_exp===0)return false;
+        return true;
+      });
+    }
     $('wq-list').innerHTML=`
       <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap">
         <span>${mentLabel}</span><span>${avail.length} available</span>
