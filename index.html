@@ -3609,10 +3609,34 @@ function renderTeamOverview(){
   }
   const totalPicks=myPickCount.reduce((s,p)=>s+p.count,0);
 
-  // Position grades
+  // Position grades — RELATIVE to league average at each position
   const positions=['QB','RB','WR','TE','DL','LB','DB'];
-  const gradeColor=v=>v>=6000?'var(--green)':v>=3500?'var(--accent)':v>=1500?'var(--amber)':'var(--red)';
-  const gradeLetter=v=>v>=6000?'A':v>=4000?'B':v>=2500?'C':v>=1000?'D':'F';
+  // Compute league average DHQ per position across all rosters
+  const leagueAvgByPos={};
+  positions.forEach(pos=>{
+    let totalVal=0,totalCount=0;
+    S.rosters.forEach(r=>{
+      (r.players||[]).forEach(pid=>{
+        if(pM(pPos(pid))===pos){
+          const v=dynastyValue(pid);
+          if(v>0){totalVal+=v;totalCount++;}
+        }
+      });
+    });
+    leagueAvgByPos[pos]=totalCount>0?Math.round(totalVal/totalCount):1500;
+  });
+
+  // Grade based on how your avg compares to league avg at that position
+  const gradeColor=(avgVal,pos)=>{
+    const la=leagueAvgByPos[pos]||1500;
+    const pct=avgVal/la;
+    return pct>=1.4?'var(--green)':pct>=1.0?'var(--accent)':pct>=0.7?'var(--amber)':'var(--red)';
+  };
+  const gradeLetter=(avgVal,pos)=>{
+    const la=leagueAvgByPos[pos]||1500;
+    const pct=avgVal/la;
+    return pct>=1.4?'A':pct>=1.1?'B':pct>=0.85?'C':pct>=0.6?'D':'F';
+  };
 
   let html='';
 
@@ -3723,7 +3747,7 @@ function renderTeamOverview(){
     html+=`<div style="background:var(--bg3);border-radius:var(--r);padding:8px 10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
         <span style="font-size:11px;font-weight:700">${pos}</span>
-        <span style="font-size:13px;font-weight:800;color:${gradeColor(avgVal)}">${gradeLetter(avgVal)}</span>
+        <span style="font-size:13px;font-weight:800;color:${gradeColor(avgVal,pos)}">${gradeLetter(avgVal,pos)}</span>
       </div>
       <div style="font-size:9px;color:var(--text3)">${g.count}p · avg ${avgVal.toLocaleString()}</div>
       ${topP?`<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} ${topP.val.toLocaleString()}</div>`:''}
@@ -3960,19 +3984,56 @@ async function sendHomeChat(){
 
     try{
       homeChatHistory.push({role:'user',content:text});
-      if(homeChatHistory.length>6)homeChatHistory=homeChatHistory.slice(-6);
-      const ctxStr=buildCtx()+'\n'+buildMentalityCtx();
+      // Keep history short to stay under token limits
+      if(homeChatHistory.length>4)homeChatHistory=homeChatHistory.slice(-4);
+      // Build compact context — attach to latest message only
+      const ctxStr=buildCtxCompact();
       const msgs=homeChatHistory.map((m,i)=>{
-        if(i===0)return{role:m.role,content:'Team:\n'+ctxStr+'\n\n'+m.content};
+        // Attach context to the LAST user message only
+        if(m.role==='user'&&i===homeChatHistory.length-1){
+          return{role:'user',content:'[Team context]\n'+ctxStr+'\n\n'+m.content};
+        }
+        // Trim old assistant messages to save tokens
+        if(m.role==='assistant'&&m.content.length>400){
+          return{role:'assistant',content:m.content.substring(0,400)+'...'};
+        }
         return m;
       });
       const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor today/i.test(text);
-      const reply=await callClaude(msgs,needsSearch,2,700);
+      const reply=await callClaude(msgs,needsSearch,2,500);
       homeChatHistory.push({role:'assistant',content:reply});
       lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
     msgsEl.scrollTop=99999;
   }
+}
+
+// Compact context for chat — keeps under ~1500 chars to avoid token limits
+function buildCtxCompact(){
+  if(!S.user)return'';
+  const my=myR();if(!my)return'';
+  const s=my.settings||{};
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
+  const rank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
+  // Top 5 starters only
+  const starterPids=(my.starters||[]).filter(p=>p&&p!=='0');
+  const topStarters=starterPids.map(pid=>({pid,val:dynastyValue(pid)})).sort((a,b)=>b.val-a.val).slice(0,5)
+    .map(x=>pName(x.pid)+'('+pPos(x.pid)+','+dynastyValue(x.pid)+')').join('; ');
+  const totalVal=(my.players||[]).reduce((sum,p)=>sum+dynastyValue(p),0);
+  // Gaps only
+  const gaps=[];
+  const rp=league?.roster_positions||[];
+  const sc=league?.scoring_settings||{};
+  const mentalityStr=buildMentalityCtx();
+  const picks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&parseInt(p.season)===parseInt(S.season)).map(p=>'R'+p.round).join(',');
+  return[
+    S.user.display_name+'|#'+rank+'/'+S.rosters.length+'|'+(s.wins||0)+'-'+(s.losses||0)+'|DHQ:'+totalVal.toLocaleString(),
+    'TOP5:'+topStarters,
+    picks?'PICKS:'+picks:'',
+    mentalityStr||'',
+    'DHQ scale 0-10000. 7000+=elite 4000+=starter.'
+  ].filter(Boolean).join('\n');
 }async function runWaiverAgent(){
   if(!S.apiKey){switchTab('settings');return;}
   const btn=$('wq-btn');btn.textContent='Scanning...';btn.disabled=true;
@@ -4393,13 +4454,13 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
 
 // ── Grok News — real-time X/Twitter intelligence ──────────────
 // Uses xAI's Grok model which has live access to X posts
-// Can be used alongside any primary AI provider
-async function callGrokNews(query, maxTok=400){
-  // Check for dedicated xAI key first, then fall back to primary key if provider is grok
+// Session cache prevents duplicate calls and token waste
+const _newsCache={};
+async function callGrokNews(query, maxTok=300){
   const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
-  if(!xaiKey)return null; // No xAI key available
+  if(!xaiKey)return null;
   try{
-    const sys=`You are a dynasty fantasy football news analyst with real-time access to X/Twitter. Give BRIEF, actionable insights from the latest posts and news. Focus on: trades, injuries, depth chart changes, contract news, and fantasy community sentiment. Be specific — name sources when possible. Keep it to 2-3 sentences max.`;
+    const sys=`You are a dynasty fantasy football news reporter. IMPORTANT: ONLY report news about the SPECIFIC player asked about. Do NOT mention any other players. Give 2-3 sentences of the latest news from X/Twitter about this one player. Focus on: trades, injuries, depth chart changes, contract news. If you have no recent news about this specific player, say "No recent news found."`;
     const res=await fetch('https://api.x.ai/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+xaiKey},
@@ -4411,13 +4472,30 @@ async function callGrokNews(query, maxTok=400){
   }catch(e){console.warn('Grok news error:',e);return null;}
 }
 
-// Fetch news for a specific player (used in player modal)
 async function fetchPlayerNews(playerId){
+  if(_newsCache[playerId])return _newsCache[playerId];
   const p=S.players[playerId];if(!p)return null;
   const name=p.first_name+' '+p.last_name;
   const pos=p.position||'';
   const team=p.team||'FA';
-  return callGrokNews(`Latest dynasty fantasy football news about ${name} (${pos}, ${team}). What are people on X/Twitter saying? Any trade rumors, injury updates, role changes, or contract news?`);
+  const result=await callGrokNews(`What is the latest news about ${name} (${pos}, ${team}) specifically? ONLY discuss ${name}, no other players. Include any recent trades, signings, injuries, or dynasty fantasy football community reaction from X/Twitter.`);
+  if(result)_newsCache[playerId]=result;
+  return result;
+}
+
+async function loadPlayerNewsNow(playerId){
+  const newsEl=$('pm-news');if(!newsEl)return;
+  newsEl.innerHTML='<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>Loading from X...</div>';
+  try{
+    const news=await fetchPlayerNews(playerId);
+    if(news){
+      newsEl.innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.5">${news.replace(/\n/g,'<br>')}</div><div style="font-size:9px;color:var(--text3);margin-top:4px">via Grok · X/Twitter</div>`;
+    }else{
+      newsEl.innerHTML='<div style="color:var(--text3);font-size:11px">No recent news found for this player.</div>';
+    }
+  }catch(e){
+    newsEl.innerHTML='<div style="color:var(--red);font-size:11px">Error loading news. Check your xAI key in Settings.</div>';
+  }
 }
 
 // ── Settings ───────────────────────────────────────────────────
@@ -4783,21 +4861,18 @@ function openPlayerModal(playerId){
   modal.style.display='flex';
   modal.onclick=e=>{if(e.target===modal)closePlayerModal();};
 
-  // Auto-fetch news via Grok if xAI key available, otherwise show manual button
+  // News: show cached instantly, otherwise on-demand to save tokens
   const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
-  if(xaiKey){
-    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>Loading from X...</div>';
-    fetchPlayerNews(playerId).then(news=>{
-      if(news){
-        $('pm-news').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.5">${news.replace(/\n/g,'<br>')}</div><div style="font-size:9px;color:var(--text3);margin-top:4px">via Grok · X/Twitter</div>`;
-      }else{
-        $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px">No recent news found. Tap <strong>Refresh news</strong> for a deeper search.</div>';
-      }
-    }).catch(()=>{
-      $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px">News unavailable. Tap <strong>Refresh news</strong> to try again.</div>';
-    });
+  if(_newsCache[playerId]){
+    // Cached from earlier in this session — show instantly, no API call
+    $('pm-news').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.5">${_newsCache[playerId].replace(/\n/g,'<br>')}</div><div style="font-size:9px;color:var(--text3);margin-top:4px">via Grok · X/Twitter (cached)</div>`;
+  }else if(xaiKey){
+    $('pm-news').innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:2px 0">
+      <button class="btn btn-sm" onclick="loadPlayerNewsNow('${playerId}')" style="font-size:11px">Load news from X ↗</button>
+      <span style="font-size:10px;color:var(--text3)">Powered by Grok</span>
+    </div>`;
   }else{
-    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px;padding:4px 0">Tap <strong>Refresh news</strong> to load updates, or add an xAI key in Settings for live X/Twitter news.</div>';
+    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px;padding:4px 0">Add an xAI key in Settings for live X/Twitter news.</div>';
   }
   // Load career stats
   const cardWrap=$('pm-card-stats');if(cardWrap)cardWrap.style.display='none';
@@ -4896,11 +4971,10 @@ async function getPlayerFullCard(playerId){
   if(!S.apiKey)return;
   const p=S.players[playerId];if(!p)return;
   const name=pName(playerId);const pos=p.position;const age=p.age||'?';const team=p.team||'FA';
-  $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px">🔍 Searching live web for latest news...</div>';
+  $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px">🔍 Searching for news...</div>';
   try{
-    const isIDP=['DL','LB','DB'].includes(pos);
-    const reply=await callClaude([{role:'user',content:`Latest news on ${name} (${pos}, ${fullTeam(team)}, age ${age}). Search web. Return max 3 news items + one X post.
-JSON only: {"news":[{"source":"source","text":"news item","date":"date"}],"tweet":"@DynastyHQ_AI X post with dynasty take, max 280 chars"}`}],true,1,500);
+    const reply=await callClaude([{role:'user',content:`IMPORTANT: Search for news ONLY about ${name} (${pos}, ${fullTeam(team)}, age ${age}). Do NOT include news about any other player. If you cannot find recent news specifically about ${name}, say "No recent news found for ${name}."
+Return JSON only: {"news":[{"source":"source","text":"one sentence about ${name} only","date":"date"}],"tweet":"@DynastyHQ_AI dynasty take on ${name} specifically, max 280 chars"}`}],true,1,500);
 
     let data={news:[],tweet:''};
     try{
@@ -4909,28 +4983,29 @@ JSON only: {"news":[{"source":"source","text":"news item","date":"date"}],"tweet
       if(start>=0)data=JSON.parse(clean.substring(start,end+1));
     }catch(e){$('pm-news').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;return;}
 
+    // Filter out any news items that don't mention this player's name
+    const playerLast=p.last_name||'';
+    if(data.news)data.news=data.news.filter(n=>n.text&&(n.text.includes(playerLast)||n.text.includes(name)));
+
     $('pm-news').innerHTML=data.news?.length?data.news.slice(0,3).map(n=>`
       <div style="padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-          <span style="font-size:10px;color:var(--accent);font-weight:600">${n.source||'NFL'}${n.reporter?' '+n.reporter:''}</span>
+          <span style="font-size:10px;color:var(--accent);font-weight:600">${n.source||'NFL'}</span>
           ${n.date?`<span style="font-size:10px;color:var(--text3)">${n.date}</span>`:''}
-          ${n.url?`<a href="${n.url}" target="_blank" style="font-size:10px;color:var(--text3);margin-left:auto">↗</a>`:''}
         </div>
         <div style="font-size:12px;color:var(--text2);line-height:1.5">${n.text}</div>
       </div>`).join('')
-    :'<div style="color:var(--text3);font-size:12px">No recent news found via live search.</div>';
+    :'<div style="color:var(--text3);font-size:12px">No recent news found for '+name+'.</div>';
 
-    if(data.tweet){
+    if(data.tweet&&data.tweet.includes(playerLast)){
       $('pm-tweet').style.display='block';
       $('pm-tweet').innerHTML=`
-        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 7px">AI-generated X post <span style="color:var(--green)">🔍 live search</span></div>
-        <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);padding:12px 14px">
+        <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);padding:12px 14px;margin-top:8px">
           <div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:5px">@DynastyHQ_AI</div>
           <div style="font-size:13px;color:var(--text);line-height:1.6">${data.tweet}</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:6px">${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})} · live web search</div>
         </div>
         <button class="copy-btn" style="margin-top:8px" onclick="copyText(${JSON.stringify(data.tweet)},this)">Copy tweet</button>`;
-    }
+    }else{$('pm-tweet').style.display='none';}
   }catch(e){$('pm-news').innerHTML=`<div style="color:var(--red);font-size:11px">Error: ${e.message}</div>`;}
 }
 
