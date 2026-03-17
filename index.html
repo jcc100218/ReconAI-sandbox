@@ -621,7 +621,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <div id="home-snapshot" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
         <!-- Persistent chat -->
         <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);margin-bottom:18px;box-shadow:0 2px 12px rgba(0,0,0,.2)">
-          <div id="home-chat-msgs" style="max-height:260px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px"></div>
+          <div id="home-chat-msgs" style="max-height:0;overflow:hidden;padding:0 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
           <div style="display:flex;gap:8px;padding:10px 14px;align-items:center;border-top:1px solid var(--border);background:var(--bg3)">
             <input type="text" id="home-chat-in" placeholder="Ask anything about your team..." style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendHomeChat()"/>
             <button onclick="sendHomeChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
@@ -706,8 +706,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <!-- Waiver chat -->
       <div class="sec" style="margin-top:16px">Waiver advisor chat <div class="sec-line"></div></div>
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-        <div id="wq-chat-msgs" style="height:220px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-          <div class="hc-msg-a" style="font-size:12px">I've scanned every free agent in your league and scored them in your scoring system. Ask me who to grab, what to bid, or who to drop.</div>
+        <div id="wq-chat-msgs" style="max-height:50px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+          <div class="hc-msg-a" style="font-size:12px">Ask me who to grab, what to bid, or who to drop.</div>
         </div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
           <input type="text" id="wq-chat-in" placeholder="Should I add [player]? What's a fair FAAB bid? Who should I drop?" style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendWaiverChat()"/>
@@ -750,8 +750,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Trade advisor</div>
         <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-          <div id="trade-chat-msgs" style="max-height:300px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-            <div class="hc-msg-a" style="font-size:12px">I've scouted every roster in your league. Tell me what you need and I'll find the right trade partner and draft the message.</div>
+          <div id="trade-chat-msgs" style="max-height:50px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+            <div class="hc-msg-a" style="font-size:12px">Tell me what you need and I'll find the right trade partner.</div>
           </div>
           <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;align-items:center;background:var(--bg3)">
             <input type="text" id="trade-chat-in" placeholder="Should I trade Kelce? What can I get for my 1st?" style="flex:1;font-size:13px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendTradeChat()"/>
@@ -874,8 +874,8 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           <div style="font-size:12px;font-weight:700;color:var(--text)">Draft Advisor</div>
           <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:10px;padding:3px 10px">Scout my picks ↗</button>
         </div>
-        <div id="draft-msgs" style="height:280px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px">
-          <div class="hc-msg-a" style="font-size:12px">I know your roster gaps, your pick slots, and your league's draft history. Ask me anything about the draft — who to target, whether to trade up, or which positions to prioritize.</div>
+        <div id="draft-msgs" style="max-height:50px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+          <div class="hc-msg-a" style="font-size:12px">Ask me about the draft — who to target, whether to trade up, or which positions to prioritize.</div>
         </div>
         <div id="draft-scout-content" style="display:none"></div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
@@ -4004,12 +4004,21 @@ function homeAsk(text){
   sendHomeChat();
 }
 
+// Expand a chat container from collapsed to full size
+function expandChat(el){
+  if(!el)return;
+  el.style.maxHeight='300px';
+  el.style.overflow='auto';
+  el.style.padding='14px';
+}
+
 async function sendHomeChat(){
   if(!S.apiKey){return;}
   const input=$('home-chat-in');const text=(input?.value||'').trim();if(!text)return;
   if(input)input.value='';
 
   const msgsEl=$('home-chat-msgs');
+  expandChat(msgsEl);
   if(msgsEl){
     msgsEl.style.display='flex';
     const um=document.createElement('div');um.className='hc-msg-u';um.textContent=text;
@@ -4195,8 +4204,8 @@ async function sendTradeChat(){
   const input=$('trade-chat-in');const text=(input&&input.value||'').trim();if(!text)return;
   if(input)input.value='';
   const msgsEl=$('trade-chat-msgs');
-  const um=document.createElement('div');um.className='hc-msg-a';um.style.fontSize='12px';um.textContent=text;
-  um.className='hc-msg-u';
+  expandChat(msgsEl);
+  const um=document.createElement('div');um.className='hc-msg-u';um.style.fontSize='12px';um.textContent=text;
   msgsEl.appendChild(um);
   const lm=document.createElement('div');lm.className='hc-msg-a';lm.style.fontSize='12px';
   lm.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
@@ -4225,7 +4234,7 @@ async function sendWaiverChat(){
   input.value='';
 
   const msgs=$('wq-chat-msgs');
-  // Add user message
+  expandChat(msgs);
   const um=document.createElement('div');
   um.className='msg msg-u';um.style.fontSize='12px';um.textContent=text;
   msgs.appendChild(um);msgs.scrollTop=99999;
@@ -5705,7 +5714,9 @@ function sendDraftChatMsg(text){const inp=$('draft-chat-in');if(inp)inp.value=te
 async function sendDraftChat(){
   if(!S.apiKey){switchTab('settings');return;}
   const input=$('draft-chat-in');const text=input.value.trim();if(!text)return;
-  input.value='';addDraftMsg(text,'u');
+  input.value='';
+  expandChat($('draft-msgs'));
+  addDraftMsg(text,'u');
   const year=$('draft-year-sel')?.value||'2026';
   const loading=document.createElement('div');loading.className='msg msg-a';loading.style.fontSize='12px';
   loading.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
