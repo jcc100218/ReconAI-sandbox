@@ -720,7 +720,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <select id="avail-pos-sel" style="font-size:11px;padding:2px 6px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--text2)" onchange="renderAvailable()">
           <option value="">All</option>
           <option value="QB">QB</option><option value="RB">RB</option><option value="WR">WR</option>
-          <option value="TE">TE</option><option value="DL">DL</option><option value="LB">LB</option>
+          <option value="TE">TE</option><option value="K">K</option><option value="DL">DL</option><option value="LB">LB</option>
           <option value="DB">DB</option>
         </select>
         <span id="available-count" style="font-size:10px;color:var(--text3);margin-left:4px"></span>
@@ -3614,7 +3614,7 @@ function renderTeamOverview(){
   const totalPicks=myPickCount.reduce((s,p)=>s+p.count,0);
 
   // Position grades — RELATIVE to league average at each position
-  const positions=['QB','RB','WR','TE','DL','LB','DB'];
+  const positions=['QB','RB','WR','TE','K','DL','LB','DB'];
   // Compute league average DHQ per position across all rosters
   const leagueAvgByPos={};
   positions.forEach(pos=>{
@@ -3728,8 +3728,8 @@ function renderTeamOverview(){
   });
   const depthPct=depthTotal>0?Math.round((depthMet/depthTotal)*100):50;
   const healthScore=Math.round(scoringPct*0.6+depthPct*0.4);
-  const hCol=healthScore>=80?'var(--green)':healthScore>=60?'var(--accent)':healthScore>=40?'var(--amber)':'var(--red)';
-  const hTier=healthScore>=80?'Elite':healthScore>=60?'Contender':healthScore>=40?'Crossroads':'Rebuilding';
+  const hCol=healthScore>=90?'var(--green)':healthScore>=80?'var(--accent)':'var(--red)';
+  const hTier=healthScore>=90?'Contending':healthScore>=80?'Building':'Rebuilding';
 
   // Four KPI cards: Health + Contender + Dynasty + Draft Capital
   const cCol=myContenderRank<=3?'var(--green)':myContenderRank<=8?'var(--accent)':'var(--amber)';
@@ -4967,15 +4967,17 @@ async function loadPlayerCardStats(playerId){
 
   wrap.style.display='block';
 
-  const isIDP=['DL','LB','DB'].includes(pos);
+  const isIDP=['DL','LB','DB','DE','DT','CB','S'].includes(pos);
   const isQB=pos==='QB';
   const isRB=pos==='RB';
+  const isK=pos==='K';
 
   let cols=[];
   if(isQB)cols=[{k:'gp',l:'GP'},{k:'pass_cmp',l:'CMP'},{k:'pass_att',l:'ATT'},{k:'pass_yd',l:'YDS'},{k:'pass_td',l:'TD'},{k:'pass_int',l:'INT'},{k:'rush_yd',l:'RUSH'},{k:'fpts',l:'FPTS'}];
   else if(isRB)cols=[{k:'gp',l:'GP'},{k:'rush_att',l:'ATT'},{k:'rush_yd',l:'YDS'},{k:'rush_td',l:'TD'},{k:'rec',l:'REC'},{k:'rec_yd',l:'REC YD'},{k:'rec_tgt',l:'TGT'},{k:'fpts',l:'FPTS'}];
   else if(['WR','TE'].includes(pos))cols=[{k:'gp',l:'GP'},{k:'rec_tgt',l:'TGT'},{k:'rec',l:'REC'},{k:'rec_yd',l:'YDS'},{k:'rec_td',l:'TD'},{k:'rush_yd',l:'RUSH'},{k:'fpts',l:'FPTS'}];
-  else if(isIDP)cols=[{k:'gp',l:'GP'},{k:'tkl_solo',l:'TKL'},{k:'tkl_ast',l:'AST'},{k:'sack',l:'SACK'},{k:'def_int',l:'INT'},{k:'def_pass_def',l:'PD'},{k:'ff',l:'FF'},{k:'fpts',l:'FPTS'}];
+  else if(isK)cols=[{k:'gp',l:'GP'},{k:'fgm',l:'FGM'},{k:'fga',l:'FGA'},{k:'fgm_50p',l:'50+'},{k:'xpm',l:'XPM'},{k:'xpa',l:'XPA'},{k:'fpts',l:'FPTS'}];
+  else if(isIDP)cols=[{k:'gp',l:'GP'},{k:'idp_tkl',l:'TKL'},{k:'idp_sack',l:'SACK'},{k:'idp_int',l:'INT'},{k:'idp_pass_def',l:'PD'},{k:'idp_qb_hit',l:'QBH'},{k:'idp_ff',l:'FF'},{k:'fpts',l:'FPTS'}];
   else cols=[{k:'gp',l:'GP'},{k:'fpts',l:'FPTS'}];
 
   const gridCols=`36px 28px ${cols.map(()=>'1fr').join(' ')}`;
@@ -4987,12 +4989,22 @@ async function loadPlayerCardStats(playerId){
     const fpts=yr===curYear?(pStats.seasonTotal||calcFantasyPts(raw,sc)):(pStats.prevTotal||calcFantasyPts(raw,sc));
     return{
       yr,gp,fpts:+fpts.toFixed(1),
+      // Offense
       pass_cmp:g('pass_cmp'),pass_att:g('pass_att'),pass_yd:g('pass_yd'),pass_td:g('pass_td'),pass_int:g('pass_int'),
       rush_att:g('rush_att'),rush_yd:g('rush_yd'),rush_td:g('rush_td'),
       rec:g('rec'),rec_yd:g('rec_yd'),rec_td:g('rec_td'),
       rec_tgt:g('rec_tgt','targets','tgt'),
-      tkl_solo:g('tkl_solo','tackle_solo'),tkl_ast:g('tkl_ast','tackle_ast'),
-      sack:g('sack'),def_int:g('def_int','int'),def_pass_def:g('def_pass_def','pass_defended'),ff:g('ff','fumble_forced'),
+      // IDP — Sleeper uses idp_ prefix
+      idp_tkl:g('idp_tkl_solo','tkl_solo')+g('idp_tkl_ast','tkl_ast'),
+      idp_sack:g('idp_sack','sack'),
+      idp_int:g('idp_int','def_int','int'),
+      idp_pass_def:g('idp_pass_def','def_pass_def','pass_defended'),
+      idp_qb_hit:g('idp_qb_hit','qb_hit'),
+      idp_ff:g('idp_ff','ff','fumble_forced'),
+      // Kicker
+      fgm:g('fgm','fg_made'),fga:g('fga','fg_att'),
+      fgm_50p:g('fgm_50p','fgm_50_plus','fg_made_50_plus'),
+      xpm:g('xpm','xp_made'),xpa:g('xpa','xp_att'),
     };
   };
 
@@ -5004,9 +5016,13 @@ async function loadPlayerCardStats(playerId){
   }
 
   const fmt=(v,k)=>{
-    if(!v)return'<span style="color:var(--text3)">—</span>';
+    if(!v&&v!==0)return'<span style="color:var(--text3)">—</span>';
+    if(v===0)return'<span style="color:var(--text3)">0</span>';
     if(k==='fpts')return`<span style="color:var(--accent);font-weight:700">${v}</span>`;
     if(['pass_yd','rush_yd','rec_yd'].includes(k))return`<strong>${Math.round(v).toLocaleString()}</strong>`;
+    if(['idp_sack','idp_int','idp_ff','idp_qb_hit'].includes(k)&&v>=5)return`<span style="color:var(--green);font-weight:600">${Number.isInteger(v)?v:v.toFixed(1)}</span>`;
+    if(k==='idp_tkl'&&v>=80)return`<span style="color:var(--green);font-weight:600">${Math.round(v)}</span>`;
+    if(k==='fgm_50p'&&v>=3)return`<span style="color:var(--green);font-weight:600">${v}</span>`;
     return Number.isInteger(v)?v:v.toFixed(1);
   };
 
@@ -5091,12 +5107,13 @@ function scoutTeam(rosterId){
   const rp=league?.roster_positions||[];
 
   // Starter slots (same logic as renderDraftNeeds)
-  const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+  const starterSlots={QB:0,RB:0,WR:0,TE:0,K:0,DL:0,LB:0,DB:0};
   rp.forEach(slot=>{
     if(slot==='QB')starterSlots.QB++;
     else if(slot==='RB')starterSlots.RB++;
     else if(slot==='WR')starterSlots.WR++;
     else if(slot==='TE')starterSlots.TE++;
+    else if(slot==='K')starterSlots.K++;
     else if(slot==='DL'||slot==='DE'||slot==='DT')starterSlots.DL++;
     else if(slot==='LB')starterSlots.LB++;
     else if(slot==='DB'||slot==='CB'||slot==='S')starterSlots.DB++;
@@ -5112,7 +5129,7 @@ function scoutTeam(rosterId){
   // Based on this league: sack=4, INT=5, PD=3, TKL=0.5
   // Elite DL: ~10 sacks = 40pts + tkl ~20pts = 60pts/season = 3.5 PPG
   // Startable DL: 5 sacks + misc = ~25pts/season = 1.5 PPG
-  const startThresh={QB:18,RB:10,WR:10,TE:8,
+  const startThresh={QB:18,RB:10,WR:10,TE:8,K:6,
     DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
     LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
     DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
@@ -5267,7 +5284,7 @@ async function runScoutAI(){
     const sc=league?.scoring_settings||{};
 
     // Starter slots
-    const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+    const starterSlots={QB:0,RB:0,WR:0,TE:0,K:0,DL:0,LB:0,DB:0};
     rp.forEach(slot=>{
       if(slot in starterSlots)starterSlots[slot]++;
       else if(slot==='FLEX'){starterSlots.RB+=0.4;starterSlots.WR+=0.4;starterSlots.TE+=0.2;}
@@ -5415,7 +5432,7 @@ function renderDraftNeeds(){
 
   // === Roster analysis ===
   const rp=league?.roster_positions||[];
-  const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+  const starterSlots={QB:0,RB:0,WR:0,TE:0,K:0,DL:0,LB:0,DB:0};
   rp.forEach(slot=>{
     const s=posMap(slot);
     if(s in starterSlots)starterSlots[s]++;
@@ -5597,7 +5614,7 @@ async function runDraftScouting(){
     const sc7=league?.scoring_settings||{};
 
     // Build concise roster need context
-    const starterSlots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+    const starterSlots={QB:0,RB:0,WR:0,TE:0,K:0,DL:0,LB:0,DB:0};
     rp.forEach(s=>{
       if(s in starterSlots)starterSlots[s]++;
       else if(s==='FLEX'){starterSlots.RB+=0.4;starterSlots.WR+=0.4;starterSlots.TE+=0.2;}
