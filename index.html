@@ -437,7 +437,6 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .mobile-nav-item svg{width:22px;height:22px;stroke-width:1.5;transition:all .2s}
 .mobile-nav-more{position:relative}
 .nav-badge{position:absolute;top:6px;right:18%;width:7px;height:7px;background:var(--accent);border-radius:50%;border:1.5px solid var(--bg2);box-shadow:0 0 6px rgba(124,107,248,0.5)}
-.mobile-more-menu{display:none}
 .mobile-more-item{display:none}
 
 @media(max-width:768px){
@@ -864,6 +863,12 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         </select>
       </div>
 
+      <!-- Rookie data quality note -->
+      <div style="font-size:11px;color:var(--text3);padding:6px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:10px;line-height:1.5;display:flex;align-items:center;gap:6px">
+        <span style="font-size:14px">📋</span>
+        <span>Rookie rankings improve as the NFL draft approaches. Sleeper adds players throughout the offseason — pre-draft data is speculative.</span>
+      </div>
+
       <!-- Best bet insight — TOP of page -->
       <div id="draft-best-bet"></div>
 
@@ -1163,6 +1168,7 @@ const posMap={QB:'QB',RB:'RB',WR:'WR',TE:'TE',FLEX:'FLEX',SUPER_FLEX:'SF',K:'K',
 const posClass=s=>{const p=posMap[s]||s||'FLEX';return{QB:'pQB',RB:'pRB',WR:'pWR',TE:'pTE',K:'pK',DEF:'pDEF',FLEX:'pFLEX',SF:'pSF',BN:'pBN',DL:'pDL',LB:'pLB',DB:'pDB',IDP:'pIDP'}[p]||'pFLEX'};
 // For display label — show actual position, never 'FL' or 'BN'
 const posLabel=(slot,pid)=>{const mapped=posMap[slot];if(mapped&&mapped!=='BN'&&mapped!=='FLEX')return mapped;return pPos(pid)||slot||'?';};
+function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
 const pName=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;if(p.position==='DEF')return(p.full_name||id)+' D/ST';return p.full_name||`${p.first_name||''} ${p.last_name||''}`.trim()||id};
 const pNameShort=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;const f=p.first_name||'';const l=p.last_name||'';if(!f||!l)return pName(id);return f[0]+'. '+l;};
 const pTeam=id=>S.players[id]?.team||'';const NFL_TEAMS={
@@ -1199,13 +1205,13 @@ function switchTab(tab,btn){
   if(btn)btn.classList.add('active');
   const panel=$('panel-'+tab);
   if(panel)panel.classList.add('active');
-  if(tab==='agent')checkApiWarn();
-  if(tab==='memory')renderMemoryPanel();
+  
+  
   if(tab==='waivers')loadMentality();
   if(tab==='draftroom')renderDraftNeeds();
   if(tab==='digest')renderHomeSnapshot();
   if(tab==='roster')buildRosterTable();
-  if(tab==='trades')initScoutDropdown();
+  if(tab==='trades')renderTradeIntel();
 }
 
 function showToast(msg='Copied!'){
@@ -1312,13 +1318,13 @@ async function selectLeague(leagueId,userId){
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
     prog(100);
     try{renderHomeSnapshot();}catch(e){}
-    // Fire data loads via setTimeout to guarantee execution
-    console.log('selectLeague: firing data loads...');
     checkApiKeyCallout();
-    setTimeout(()=>{
-      console.log('setTimeout fired, calling loadAllData');
+    // Fire data loads reliably — Promise.resolve().then() fires after current microtask queue
+    // More reliable than setTimeout which can be delayed by heavy main thread work
+    Promise.resolve().then(()=>{
+      console.log('loadAllData: triggered via microtask');
       loadAllData();
-    },100);
+    });
   }catch(e){
     const sb=$('setup-block');
     if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
@@ -1432,7 +1438,7 @@ async function loadLeague(leagueId,userId){
   S.transactions['w'+week]=txns||[];
   const uid=userId||S.user?.user_id;
   S.myRosterId=S.rosters.find(r=>r.owner_id===uid)?.roster_id;
-  renderRoster();renderWaivers();renderTrades();renderPicks();initScoutDropdown();
+  renderRoster();renderWaivers();renderTrades();renderPicks();
 }async function loadOwnership(){
   // /players/nfl/research/regular/{season}/{week} returns ownership% and rostering%
   // keyed by player_id: {owned_by: N, rostered_by: N, started_by: N, ...}
@@ -3817,11 +3823,24 @@ function renderTeamOverview(){
       const {col}=tradeValueTier(p.val);
       const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
       const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':'past peak';
-      return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0${i<4?';border-bottom:1px solid var(--border)':''}">
-        <span style="font-size:10px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
-        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
-        <div style="flex:1;overflow:hidden"><div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.pos} · ${p.age} · ${peakStr}</div></div>
-        <span style="font-size:11px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+      // Build a short reason WHY this player is a crown jewel
+      const reasons=[];
+      if(meta?.peakYrsLeft>=4)reasons.push('long peak window');
+      else if(meta?.peakYrsLeft>=2)reasons.push('in prime');
+      if(meta?.starterSeasons>=3)reasons.push(meta.starterSeasons+'yr starter');
+      if(meta?.sitMult>=1.20&&p.age<=25)reasons.push('elite young producer');
+      const trend=meta?.trend||0;
+      if(trend>=20)reasons.push('trending up');
+      else if(trend<=-20)reasons.push('declining');
+      const reasonStr=reasons.length?reasons.slice(0,2).join(', '):'';
+      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0${i<4?';border-bottom:1px solid var(--border)':''};cursor:pointer" onclick="openPlayerModal('${p.pid}')">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
+        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+        <div style="flex:1;overflow:hidden">
+          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+          <div style="font-size:11px;color:var(--text3)">${p.pos} · ${p.age} · ${peakStr}${reasonStr?' · '+reasonStr:''}</div>
+        </div>
+        <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
       </div>`;
     }).join('');
     html+=`</div>`;
@@ -3835,6 +3854,11 @@ function homeAsk(text){
   const input=$('home-chat-in');
   if(input)input.value=text;
   sendHomeChat();
+}
+function goAsk(text){
+  // Redirect to home chat (agent panel was removed)
+  switchTab('digest',null);
+  setTimeout(()=>homeAsk(text),150);
 }
 
 // Expand a chat container from collapsed to full size
@@ -4045,14 +4069,15 @@ async function sendTradeChat(){
   msgsEl.appendChild(lm);msgsEl.scrollTop=99999;
   try{
     tradeChatHistory.push({role:'user',content:text});
-    if(tradeChatHistory.length>6)tradeChatHistory=tradeChatHistory.slice(-6);
-    const ctx=buildCtx()+'\n'+buildMentalityCtx();
+    if(tradeChatHistory.length>4)tradeChatHistory=tradeChatHistory.slice(-4);
+    const ctx=buildCtxCompact();
     const msgs=tradeChatHistory.map(function(m,i){
-      if(i===0)return{role:m.role,content:'Dynasty trade advisor. DHQ values are 0-10000 scale (not dollars). Draft Sleeper-ready messages when asked.\n\n'+ctx+'\n\nQuestion: '+m.content};
+      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:'Dynasty trade advisor. DHQ values 0-10000 scale.\n'+ctx+'\n\n'+m.content};
+      if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};
       return m;
     });
-    const tradeNeedsSearch=/news|value|worth|ranking|trade for|trade away|market|recent/i.test(tradeChatHistory[tradeChatHistory.length-1]?.content||'');
-    const reply=await callClaude(msgs,tradeNeedsSearch,2,600);
+    const tradeNeedsSearch=/search for|look up|find news|breaking/i.test(text);
+    const reply=await callClaude(msgs,tradeNeedsSearch,2,500);
     tradeChatHistory.push({role:'assistant',content:reply});
     lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
     // Auto-save every 3rd message
@@ -4199,44 +4224,6 @@ function buildCtx(){
   ].filter(Boolean).join('\n');
 }
 
-function sc(el){$('chat-in').value=el.textContent;sendMessage();}
-function goAsk(text){
-  // Find agent tab by data-tab attribute, not fragile index
-  const agentTab=document.querySelector('.tab[onclick*="agent"]');
-  switchTab('agent',agentTab);
-  setTimeout(()=>{const ci=$('chat-in');if(ci){ci.value=text;sendMessage();}},100);
-}
-
-function addMsg(text,role){
-  const d=document.createElement('div');d.className='msg msg-'+role;
-  d.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  const el=$('chat-msgs');if(el){el.appendChild(d);el.scrollTop=99999;}
-}
-function addLoading(){
-  const id=Date.now();const d=document.createElement('div');d.className='msg msg-a';d.id='ld-'+id;
-  d.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
-  const el=$('chat-msgs');if(el){el.appendChild(d);el.scrollTop=99999;}return id;
-}
-function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
-
-async function sendMessage(){
-  if(!S.apiKey){switchTab('settings',document.querySelector(".tab[onclick*='settings']"));return;}
-  const input=$('chat-in');const text=input.value.trim();if(!text)return;
-  input.value='';addMsg(text,'u');const lid=addLoading();
-  try{
-    S.chatHistory.push({role:'user',content:text});
-    if(S.chatHistory.length>6)S.chatHistory=S.chatHistory.slice(-6);
-    // Inject context as a system-like prefix on the first user message only
-    const msgs=S.chatHistory.map((m,i)=>
-      (i===0&&m.role==='user')?{role:'user',content:`My team context: ${buildCtx()}\n\n${m.content}`}:m
-    );
-    const agentNeedsSearch=/search for|look up|find news|injury report|breaking news|trade rumor today/i.test(text);
-    const reply=await callClaude(msgs,agentNeedsSearch);
-    S.chatHistory.push({role:'assistant',content:reply});
-    removeLoading(lid);addMsg(reply,'a');
-    if(chatHistory.length%8===0)autoSaveMemory(chatHistory,'Home');
-  }catch(e){removeLoading(lid);addMsg('Error: '+e.message+'. Check your API key.','a');}
-}
 
 // ── AI Provider layer ─────────────────────────────────────────
 // Providers: anthropic | openai | gemini | grok
@@ -4419,13 +4406,13 @@ function saveKey(){
   }catch(e){}
   const label = p?.name || provider;
   ss('key-status', label + ' key saved ✓');
-  checkApiWarn();
+  
 }
 function clearKey(){
   S.apiKey=''; S.aiProvider='anthropic'; S.aiModel='';
   try{localStorage.removeItem('dynastyhq_apikey');localStorage.removeItem('dynastyhq_provider');localStorage.removeItem('dynastyhq_model');}catch(e){}
   const inp=$('api-key-in');if(inp)inp.value='';
-  ss('key-status','Key cleared');checkApiWarn();
+  ss('key-status','Key cleared');
 }
 function saveXaiKey(){
   const k=($('xai-key-in')?.value||'').trim();
@@ -4434,7 +4421,6 @@ function saveXaiKey(){
   try{localStorage.setItem('dynastyhq_xai_key',k);}catch(e){}
   ss('xai-key-status','xAI news key saved ✓');
 }
-function checkApiWarn(){$('api-warn').style.display=S.apiKey?'none':'block';}
 // Restore API key + provider on load
 (function restoreApiKey(){
   try{
@@ -4516,62 +4502,13 @@ function reloadSeason(){
     connect();
   }
 }
-function clearHistory(){S.chatHistory=[];addMsg('Chat history cleared.','sys');}
+function clearHistory(){S.chatHistory=[];tradeChatHistory=[];draftChatHistory=[];}
 // ── Player Profile Modal ───────────────────────────────────────
 // ── Player Search ─────────────────────────────────────────────
-function openPlayerSearch(){
-  // Create modal overlay
-  let modal=$('player-search-modal');
-  if(!modal){
-    modal=document.createElement('div');modal.id='player-search-modal';
-    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:60px 16px;backdrop-filter:blur(4px)';
-    modal.innerHTML=`
-      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:100%;max-width:440px;padding:16px;box-shadow:0 20px 40px rgba(0,0,0,.4)">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="player-search-input" placeholder="Search any player..." style="flex:1;font-size:15px;background:transparent;border:none;outline:none;color:var(--text)" oninput="filterPlayerSearch(this.value)" autofocus/>
-          <button onclick="closePlayerSearch()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:0 4px">✕</button>
-        </div>
-        <div id="player-search-results" style="max-height:400px;overflow-y:auto"></div>
-      </div>`;
-    modal.addEventListener('click',e=>{if(e.target===modal)closePlayerSearch();});
-    document.body.appendChild(modal);
-  }
-  modal.style.display='flex';
-  const inp=$('player-search-input');if(inp){inp.value='';inp.focus();}
-  $('player-search-results').innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px">Type a name to search across all NFL players...</div>';
-}
-function closePlayerSearch(){const m=$('player-search-modal');if(m)m.style.display='none';}
-function filterPlayerSearch(q){
-  const el=$('player-search-results');if(!el)return;
-  if(!q||q.length<2){el.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px">Type at least 2 characters...</div>';return;}
-  const lq=q.toLowerCase();
-  const matches=Object.entries(S.players)
-    .filter(([,p])=>(p.first_name+' '+p.last_name).toLowerCase().includes(lq)&&(p.status==='Active'||dynastyValue(p)>0))
-    .map(([id,p])=>({id,p,val:dynastyValue(id),name:p.first_name+' '+p.last_name}))
-    .sort((a,b)=>b.val-a.val)
-    .slice(0,12);
-  if(!matches.length){el.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px">No players found.</div>';return;}
-  el.innerHTML=matches.map(({id,p,val,name})=>{
-    const {col}=tradeValueTier(val);
-    const meta=LI_LOADED?LI.playerMeta?.[id]:null;
-    const rostered=S.rosters.some(r=>(r.players||[]).includes(id));
-    const owner=rostered?S.rosters.find(r=>(r.players||[]).includes(id)):null;
-    const ownerName=owner?getUser(owner.owner_id):'Free Agent';
-    return`<div style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;border-radius:6px" onclick="closePlayerSearch();openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
-      <div style="flex:1;overflow:hidden">
-        <div style="font-size:12px;font-weight:600">${name}</div>
-        <div style="font-size:11px;color:var(--text3)">${p.position||'?'} · ${p.team||'FA'} · Age ${p.age||'?'} · ${ownerName}</div>
-      </div>
-      <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
-    </div>`;
-  }).join('');
-}
 // Keyboard shortcut: Cmd/Ctrl + K opens search
 document.addEventListener('keydown',e=>{
-  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();openPlayerSearch();}
-  if(e.key==='Escape')closePlayerSearch();
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();;}
+  if(e.key==='Escape');
 });
 
 // ── API Key Callout ──────────────────────────────────────────
@@ -4930,12 +4867,6 @@ Return JSON only: {"news":[{"source":"source","text":"one sentence about ${name}
 
 // Make player names clickable everywhere
 // ── Opponent Scouting ──────────────────────────────────────────
-function initScoutDropdown(){
-  const sel=$('trade-opp-sel');
-  if(!sel)return;
-  sel.innerHTML='<option value="">Select a team to scout...</option>'+
-    S.rosters.filter(r=>r.roster_id!==S.myRosterId).map(r=>`<option value="${r.roster_id}">${getUser(r.owner_id)}</option>`).join('');
-}
 
 function scoutTeam(rosterId){
   if(!rosterId){const sc=$('scout-content');if(sc)sc.innerHTML='<div class="card"><div class="empty">Select a team.</div></div>';const sb=$('scout-ai-btn');if(sb)sb.style.display='none';return;}
@@ -5615,13 +5546,6 @@ function mobileTab(tab, btn) {
   }
   switchTab(tab, null);
 }
-function toggleMobileMore(){
-  const m=$('mobile-more-menu');
-  m.classList.toggle('open');
-  document.addEventListener('click',function handler(e){
-    if(!e.target.closest('.mobile-nav-more')){m.classList.remove('open');document.removeEventListener('click',handler);}
-  },{once:false});
-}
 
 // ── Analytics ──────────────────────────────────────────────────
 // ── Analytics ──────────────────────────────────────────────────// ── Stats (stubs for removed stats explorer) ───────────────────
@@ -5638,156 +5562,10 @@ function loadMemory(){
 function saveMemory(data){
   try{localStorage.setItem(MEM_KEY,JSON.stringify(data));}catch(e){}
 }
-function getMemory(key,def=[]){return loadMemory()[key]??def;}
-function setMemory(key,val){const d=loadMemory();d[key]=val;saveMemory(d);}
 
 function renderStatsTable(){} // stats panel removed
 
-function renderMemoryPanel(){
-  const el=$('memory-panel');if(!el)return;
-  const m=loadMentality();
-  const sessions=loadConvMemory();
-  const stratLabels={winnow:'Win Now 🏆',rebuild:'Rebuilding 🔄',balanced:'Balanced ⚖️',prime:'Dynasty Prime ⭐'};
-  const tradeLabels={aggressive:'Aggressive',selective:'Selective',conservative:'Conservative',pick_seller:'Pick Seller'};
-  const ageLabels={youth:'Youth First',balanced_age:'Age Balanced',vets:'Veteran OK',agnostic:'Age Agnostic'};
-  const riskLabels={high_risk:'High Risk',moderate_risk:'Moderate',low_risk:'Low Risk',no_risk:'No Risk'};
 
-  el.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Strategy</div>
-        <div style="font-size:13px;font-weight:600;color:var(--accent)">${stratLabels[m.mentality]||m.mentality||'—'}</div>
-      </div>
-      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Trade Style</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text)">${tradeLabels[m.tradeStyle]||m.tradeStyle||'—'}</div>
-      </div>
-      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Age Preference</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text)">${ageLabels[m.agePreference]||m.agePreference||'—'}</div>
-      </div>
-      <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Risk Tolerance</div>
-        <div style="font-size:13px;font-weight:600;color:var(--text)">${riskLabels[m.riskTolerance]||m.riskTolerance||'—'}</div>
-      </div>
-    </div>
-    ${m.neverDrop?`<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:10px 12px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Untouchables</div>
-      <div style="font-size:12px;color:var(--text2)">${m.neverDrop}</div>
-    </div>`:''}
-    ${m.tradePrefs?`<div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Trade Philosophy</div>
-      <div style="font-size:12px;color:var(--text2)">${m.tradePrefs}</div>
-    </div>`:''}
-    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-      <button class="btn btn-ghost btn-sm" onclick="startSetupWizard()">Edit strategy ✏️</button>
-      <button class="btn btn-ghost btn-sm" onclick="generateMemorySummary()">AI summary ↗</button>
-      <button class="btn btn-ghost btn-sm" onclick="clearMemory()" style="color:var(--red)">Clear all</button>
-    </div>
-    <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Past sessions (${sessions.length})</div>
-    ${sessions.length?[...sessions].reverse().map(s=>`
-      <div style="background:var(--bg3);border-radius:var(--r);padding:8px 12px;margin-bottom:6px;border-left:2px solid var(--accent)">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${s.date}</div>
-        <div style="font-size:12px;color:var(--text2)">${s.text}</div>
-      </div>`).join(''):'<div class="empty">No past sessions yet — chat with the AI to build memory.</div>'}
-    <div style="margin-top:10px">
-      <button class="btn btn-ghost btn-sm" onclick="loadConvMemory().length&&(localStorage.removeItem('dhq_sessions'),renderMemoryPanel(),showToast('Sessions cleared'))" style="color:var(--text3)">Clear session history</button>
-    </div>
-    <div id="mem-ai-content" style="margin-top:12px"></div>
-    ${LI_LOADED?`
-    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">⚡ League Intel (${LI.builtAt})</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        ${Object.entries(LI.faabByPos||{}).sort((a,b)=>b[1].count-a[1].count).slice(0,6).map(([pos,d])=>`
-          <div style="background:var(--bg3);border-radius:6px;padding:8px 10px">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:700">${pos} FAAB</div>
-            <div style="font-size:14px;font-weight:700;color:var(--text)">$${d.avg} avg</div>
-            <div style="font-size:11px;color:var(--text3)">win: $${d.p75} · ${d.count} claims</div>
-          </div>`).join('')}
-      </div>
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Draft ADP in your league</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
-        ${Object.entries(LI.adpByPos||{}).sort((a,b)=>a[1].avgPick-b[1].avgPick).map(([pos,d])=>`
-          <span style="background:var(--bg3);border-radius:5px;padding:4px 8px;font-size:11px">
-            <span style="font-weight:700">${pos}</span>
-            <span style="color:var(--text3);margin-left:4px">pick ${d.avgPick}</span>
-          </span>`).join('')}
-      </div>
-      <div style="font-size:10px;color:var(--text3)">${LI.totalPicks||0} draft picks · ${LI.totalFAABTxns||0} FAAB transactions analyzed</div>
-    </div>`:'<div style="font-size:11px;color:var(--text3);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">League Intel loading after connect...</div>'}
-  `;
-}
-
-function saveNotes(){setMemory('notes',$('agent-notes-ta').value);}
-
-function openAddTrade(){
-  $('tl-date').value=new Date().toISOString().split('T')[0];
-  $('tl-gave').value='';$('tl-got').value='';$('tl-opp').value='';
-  $('tl-notes').value='';$('tl-verdict').value='pending';
-  $('trade-log-modal').style.display='flex';
-}
-function closeTradeModal(){$('trade-log-modal').style.display='none';}
-function saveTrade(){
-  const trades=getMemory('trades',[]);
-  trades.unshift({date:$('tl-date').value,gave:$('tl-gave').value,got:$('tl-got').value,opp:$('tl-opp').value,verdict:$('tl-verdict').value,notes:$('tl-notes').value,ts:Date.now()});
-  setMemory('trades',trades);
-  closeTradeModal();renderMemoryPanel();
-}
-function deleteTrade(i){const t=getMemory('trades',[]);t.splice(i,1);setMemory('trades',t);renderMemoryPanel();}
-
-function openAddWaiver(){
-  $('wl-date').value=new Date().toISOString().split('T')[0];
-  $('wl-added').value='';$('wl-dropped').value='';$('wl-reason').value='';
-  $('waiver-log-modal').style.display='flex';
-}
-function closeWaiverModal(){$('waiver-log-modal').style.display='none';}
-function saveWaiver(){
-  const waivers=getMemory('waivers',[]);
-  waivers.unshift({date:$('wl-date').value,added:$('wl-added').value,dropped:$('wl-dropped').value,reason:$('wl-reason').value,ts:Date.now()});
-  setMemory('waivers',waivers);
-  closeWaiverModal();renderMemoryPanel();
-}
-function deleteWaiver(i){const w=getMemory('waivers',[]);w.splice(i,1);setMemory('waivers',w);renderMemoryPanel();}
-
-async function generateMemorySummary(){
-  if(!S.apiKey){switchTab('settings');return;}
-  const trades=getMemory('trades',[]);
-  const notes=getMemory('notes','');
-  const waivers=getMemory('waivers',[]);
-  if(!trades.length&&!notes&&!waivers.length){$('memory-summary').innerHTML='<div class="empty">Nothing in memory yet — log some trades and notes first.</div>';return;}
-  $('memory-summary').innerHTML='<div class="empty">Generating summary...</div>';
-  const tradeSummary=trades.map(t=>`${t.date}: Gave ${t.gave}, got ${t.got} (${t.verdict}). ${t.notes||''}`).join('\n');
-  const waiverSummary=waivers.map(w=>`${w.date}: Added ${w.added}, dropped ${w.dropped||'nobody'}. ${w.reason||''}`).join('\n');
-  try{
-    const reply=await callClaude([{role:'user',content:`You are a dynasty fantasy football analyst reviewing a manager's season decisions.
-
-Trade history:\n${tradeSummary||'None'}
-Waiver history:\n${waiverSummary||'None'}
-Personal notes:\n${notes||'None'}
-Team context: ${buildCtx()}
-
-Give a 3-4 sentence honest assessment of this manager's decision-making patterns: what they're doing well, what tendencies to watch, and one concrete recommendation going forward.`}]);
-    $('memory-summary').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.7">${reply.replace(/\n/g,'<br>')}</div>`;
-    setMemory('last_summary',{text:reply,ts:Date.now()});
-  }catch(e){$('memory-summary').innerHTML='<div class="empty" style="color:var(--red)">Error: '+e.message+'</div>';}
-}
-
-function exportMemory(){
-  const data=loadMemory();
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='dynastyhq-memory-'+new Date().toISOString().split('T')[0]+'.json';
-  a.click();
-}
-
-function clearMemory(){
-  if(confirm('Clear all saved notes, trades, and waiver logs?')){
-    localStorage.removeItem(MEM_KEY);renderMemoryPanel();
-  }
-}
-
-// Memory context is merged into buildCtx above
-// switchTab memory render is merged into switchTab above
 
 // ── Page unload memory save ──────────────────────────────
 window.addEventListener('beforeunload',function(){
