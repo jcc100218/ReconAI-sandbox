@@ -3887,9 +3887,18 @@ function homeAsk(text){
   sendHomeChat();
 }
 function goAsk(text){
-  // Redirect to home chat (agent panel was removed)
+  // Close player modal if open
+  const modal=$('player-modal');
+  if(modal&&modal.style.display!=='none')closePlayerModal();
+  // Switch to home tab
   switchTab('digest',null);
-  setTimeout(()=>homeAsk(text),150);
+  // Send the message and scroll to chat
+  setTimeout(()=>{
+    homeAsk(text);
+    // Scroll to the chat area so user sees the response
+    const chatEl=$('home-chat-msgs');
+    if(chatEl)chatEl.scrollIntoView({behavior:'smooth',block:'start'});
+  },200);
 }
 
 // Expand a chat container from collapsed to full size
