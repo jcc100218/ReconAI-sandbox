@@ -4238,25 +4238,31 @@ async function sendTradeChat(){
       const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
       const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
       const rp=league?.roster_positions||[];
+      // Calculate league average DHQ to set contending threshold dynamically
+      const allTotals=S.rosters.map(r=>(r.players||[]).reduce((sum,pid)=>sum+dynastyValue(pid),0));
+      const avgTotal=allTotals.length?allTotals.reduce((a,b)=>a+b,0)/allTotals.length:80000;
       const profiles=S.rosters.filter(r=>r.roster_id!==S.myRosterId).map(r=>{
         const name=S.leagueUsers.find(u=>u.user_id===r.owner_id)?.display_name||'Team';
         const s=r.settings||{};
         const record=(s.wins||0)+'-'+(s.losses||0);
         const totalVal=(r.players||[]).reduce((sum,pid)=>sum+dynastyValue(pid),0);
-        // Find their weakest position
+        // Find their weakest positions
         const posCounts={};
         (r.players||[]).forEach(pid=>{const pos=pM(pPos(pid));if(pos)posCounts[pos]=(posCounts[pos]||0)+1;});
         const weakPositions=['QB','RB','WR','TE'].filter(pos=>{
           const need=rp.filter(s2=>s2===pos||(s2==='FLEX'&&['RB','WR','TE'].includes(pos))||(s2==='SUPER_FLEX'&&pos==='QB')).length;
           return(posCounts[pos]||0)<=need;
         });
-        // Trade DNA
+        // Top 2 players on this roster (so AI knows what they have to offer)
+        const topPlayers=(r.players||[]).map(pid=>({pid,val:dynastyValue(pid)})).sort((a,b)=>b.val-a.val).slice(0,2)
+          .map(x=>pNameShort(x.pid)+'('+pPos(x.pid)+',DHQ'+x.val+')').join(', ');
+        // Trade DNA — only include if data exists
         const dna=LI.ownerProfiles?.[r.roster_id];
-        const dnaStr=dna?.trades>0?dna.dna:'no trades';
-        const contending=totalVal>80000?'contending':'building';
-        return`${name}(${record},${contending},DHQ${Math.round(totalVal/1000)}k,needs:${weakPositions.join('/')||'none'},${dnaStr})`;
-      }).slice(0,10);
-      if(profiles.length)ownerCtx='\nLEAGUE OWNERS:\n'+profiles.join('\n');
+        const dnaStr=dna?.trades>0?' · '+dna.dna:'';
+        const contending=totalVal>avgTotal*1.1?'contender':totalVal<avgTotal*0.85?'rebuilder':'mid-tier';
+        return`${name}: ${record}, ${contending}, DHQ${Math.round(totalVal/1000)}k, needs ${weakPositions.join('/')||'nothing'}, stars: ${topPlayers}${dnaStr}`;
+      }).slice(0,12);
+      if(profiles.length)ownerCtx='\nLEAGUE OWNERS (use these specific names and needs in your answer):\n'+profiles.join('\n');
     }
     let tradeStats='';
     if(LI_LOADED&&LI.leagueTradeTendencies?.totalTrades>0){
@@ -4264,7 +4270,14 @@ async function sendTradeChat(){
       tradeStats=`\nLEAGUE: ${lt.totalTrades} trades in history, ${lt.pickHeavy} involved picks`;
     }
     const msgs=tradeChatHistory.map(function(m,i){
-      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:`Dynasty trade advisor for a real league. USE THE SPECIFIC OWNER NAMES AND DATA BELOW — do not give generic advice. Name specific trade partners from this league and explain why based on their roster needs and trade history. DHQ values 0-10000 scale. ALWAYS say "DHQ" not "FC".\n${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
+      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:`You are a dynasty trade advisor with access to REAL league data. You MUST:
+1. Name SPECIFIC owners from the list below as trade partners
+2. Explain WHY they'd accept based on their positional needs and roster
+3. Propose a SPECIFIC trade (Player A for Player B + pick) with DHQ values
+4. Draft a Sleeper-ready message the user can copy-paste
+Never say "no viable partners" — every league has trade opportunities. Match sellers to buyers by position need.
+DHQ scale: 0-10000 (7000+=elite, 4000+=starter). Always say "DHQ" not "FC".
+${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
       if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};
       return m;
     });
