@@ -1618,7 +1618,7 @@ function buildRosterTable(){
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v5';
+const LI_CACHE_KEY='dhq_leagueintel_v6';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -1729,7 +1729,7 @@ async function loadLeagueIntel(){
     let histCache=null;
     try{const raw=localStorage.getItem(HIST_KEY);if(raw)histCache=JSON.parse(raw);}catch(e){}
 
-    let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns;
+    let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns, tradeTxns;
     const uniqueYears=[2021,2022,2023,2024,2025];
 
     if(histCache&&histCache.chain?.length>=5&&histCache.draftPicks?.length>0){
@@ -1738,12 +1738,13 @@ async function loadLeagueIntel(){
       allDraftPicks=histCache.draftPicks;
       draftMeta=histCache.draftMeta;
       faabTxns=histCache.faabTxns||[];
+      tradeTxns=histCache.tradeTxns||[];
       // Only fetch stats fresh (they're large but fast from Sleeper CDN)
       seasonStatsRaw={};
       await Promise.all(uniqueYears.map(async yr=>{
         seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
       }));
-      console.log(`DHQ FAST PATH: cached chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}) | fresh stats in ${((performance.now()-t0)/1000).toFixed(1)}s`);
+      console.log(`DHQ FAST PATH: cached chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}) | fresh stats in ${((performance.now()-t0)/1000).toFixed(1)}s`);
 
     }else{
       // ── COLD PATH: Discover everything from scratch, then cache ──
@@ -1826,12 +1827,46 @@ async function loadLeagueIntel(){
       })();
       fetchPromises.push(faabPromise);
 
+      // TRADE HISTORY (all seasons × 18 weeks — all parallel)
+      const tradeTxns=[];
+      const tradePromise=(async()=>{
+        const tradeLeagues=chain.filter(c=>parseInt(c.season)>=2021);
+        const allTradeFetches=[];
+        tradeLeagues.forEach(c=>{
+          [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18].forEach(w=>{
+            allTradeFetches.push(
+              fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[])
+                .then(txns=>txns.forEach(t=>{
+                  if(t.type!=='trade'||t.status==='failed')return;
+                  const rids=t.roster_ids||[];
+                  const sides={};
+                  rids.forEach(rid=>sides[rid]={players:[],picks:[]});
+                  Object.entries(t.adds||{}).forEach(([pid,rid])=>{
+                    if(sides[rid])sides[rid].players.push(pid);
+                  });
+                  (t.draft_picks||[]).forEach(pk=>{
+                    if(sides[pk.owner_id])sides[pk.owner_id].picks.push({season:pk.season,round:pk.round});
+                  });
+                  tradeTxns.push({
+                    season:c.season,week:w,
+                    roster_ids:rids,
+                    sides,
+                    ts:t.created||t.status_updated||0
+                  });
+                }))
+            );
+          });
+        });
+        await Promise.all(allTradeFetches);
+      })();
+      fetchPromises.push(tradePromise);
+
       // Fire everything at once
       await Promise.all(fetchPromises);
 
-      // Cache historical data permanently (drafts/chain/faab never change)
-      try{localStorage.setItem(HIST_KEY,JSON.stringify({chain,draftPicks:allDraftPicks,draftMeta,faabTxns,ts:Date.now()}));}catch(e){}
-      console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length})`);
+      // Cache historical data permanently (drafts/chain/faab/trades never change)
+      try{localStorage.setItem(HIST_KEY,JSON.stringify({chain,draftPicks:allDraftPicks,draftMeta,faabTxns,tradeTxns,ts:Date.now()}));}catch(e){}
+      console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length})`);
     }
 
     console.log('Stats:',Object.entries(seasonStatsRaw).map(([y,s])=>y+':'+Object.keys(s).length+'p').join(' '));
@@ -2297,6 +2332,83 @@ async function loadLeagueIntel(){
     });
 
     // ═══════════════════════════════════════════════════════════════
+    // STEP 9b: Trade history analysis — owner profiles + league tendencies
+    // ═══════════════════════════════════════════════════════════════
+    const ownerProfiles={};
+    const playerTradeHistory={};
+    const leagueTradeTendencies={totalTrades:0,byPos:{},avgAssetsPerSide:0,pickHeavy:0,playerHeavy:0};
+
+    (tradeTxns||[]).forEach(t=>{
+      leagueTradeTendencies.totalTrades++;
+      const rids=t.roster_ids||[];
+
+      rids.forEach(rid=>{
+        if(!ownerProfiles[rid])ownerProfiles[rid]={trades:0,playersAcquired:[],playersSold:[],picksAcquired:0,picksSold:0,posAcquired:{},posSold:{}};
+        const profile=ownerProfiles[rid];
+        profile.trades++;
+
+        const got=t.sides[rid]||{players:[],picks:[]};
+        const otherRid=rids.find(r=>r!==rid);
+        const gave=otherRid&&t.sides[otherRid]?t.sides[otherRid]:{players:[],picks:[]};
+
+        // Players acquired
+        got.players.forEach(pid=>{
+          profile.playersAcquired.push(pid);
+          const pos=posMap(pPos(pid)||S.players?.[pid]?.position||'');
+          if(pos)profile.posAcquired[pos]=(profile.posAcquired[pos]||0)+1;
+        });
+
+        // Players sold (what the OTHER side got = what this owner gave)
+        gave.players.forEach(pid=>{
+          profile.playersSold.push(pid);
+          const pos=posMap(pPos(pid)||S.players?.[pid]?.position||'');
+          if(pos)profile.posSold[pos]=(profile.posSold[pos]||0)+1;
+        });
+
+        // Picks
+        got.picks.forEach(()=>profile.picksAcquired++);
+        gave.picks.forEach(()=>profile.picksSold++);
+      });
+
+      // Track which players have been traded and how often
+      rids.forEach(rid=>{
+        const side=t.sides[rid]||{players:[]};
+        side.players.forEach(pid=>{
+          if(!playerTradeHistory[pid])playerTradeHistory[pid]=[];
+          playerTradeHistory[pid].push({season:t.season,week:t.week});
+        });
+      });
+
+      // League tendencies
+      const totalAssets=rids.reduce((s,rid)=>{
+        const side=t.sides[rid]||{players:[],picks:[]};
+        return s+side.players.length+side.picks.length;
+      },0);
+      leagueTradeTendencies.avgAssetsPerSide+=totalAssets/(rids.length||1);
+      const hasPicks=rids.some(rid=>(t.sides[rid]?.picks||[]).length>0);
+      if(hasPicks)leagueTradeTendencies.pickHeavy++;
+      else leagueTradeTendencies.playerHeavy++;
+    });
+
+    // Compute owner DNA labels
+    if(leagueTradeTendencies.totalTrades>0){
+      leagueTradeTendencies.avgAssetsPerSide=+(leagueTradeTendencies.avgAssetsPerSide/leagueTradeTendencies.totalTrades).toFixed(1);
+    }
+    Object.entries(ownerProfiles).forEach(([rid,p])=>{
+      // Classify owner trade style
+      const pickBuyer=p.picksAcquired>p.picksSold*1.5;
+      const pickSeller=p.picksSold>p.picksAcquired*1.5;
+      const highVolume=p.trades>=leagueTradeTendencies.totalTrades/totalTeams*1.5;
+      const lowVolume=p.trades<=1;
+      p.dna=pickBuyer?'Rebuilder (pick collector)':pickSeller?'Win-now (pick seller)':highVolume?'Active trader':lowVolume?'Holds firm':'Balanced';
+      // Most targeted position
+      const topPos=Object.entries(p.posAcquired).sort((a,b)=>b[1]-a[1])[0];
+      p.targetPos=topPos?topPos[0]:null;
+    });
+
+    console.log(`Trade analysis: ${leagueTradeTendencies.totalTrades} trades across ${Object.keys(ownerProfiles).length} owners`);
+
+    // ═══════════════════════════════════════════════════════════════
     // STEP 10: ADP by position in this league's drafts
     // ═══════════════════════════════════════════════════════════════
     const adpByPos={};
@@ -2402,6 +2514,10 @@ async function loadLeagueIntel(){
       // Meta
       totalPicks:allDraftPicks.length,
       totalFAABTxns:faabTxns.length,
+      // Trade intelligence
+      ownerProfiles,        // roster_id -> {trades,dna,targetPos,picksAcquired,...}
+      playerTradeHistory,   // pid -> [{season,week}]
+      leagueTradeTendencies, // {totalTrades,avgAssetsPerSide,pickHeavy,playerHeavy}
       rookieCount,
       leagueYears:uniqueYears,
       builtAt:new Date().toISOString(),
@@ -2414,6 +2530,7 @@ async function loadLeagueIntel(){
   ${Object.keys(playerScores).length} players valued (${rookieCount} rookies from FC)
   ${allDraftPicks.length} draft picks analyzed (${draftMeta.length} drafts)
   ${faabTxns.length} FAAB transactions
+  ${(tradeTxns||[]).length} trade transactions across ${Object.keys(ownerProfiles).length} owners
   ${uniqueYears.length} seasons scored (${uniqueYears.join(',')})
   Top player: ${topPlayer?.name} (${topPlayer?.pos}) wPPG=${topPlayer?.wPPG} DHQ=${playerScores[topPlayer?.pid]}
   Pick 1.01 value: ${dhqPickValues[1]?.value}, R7 last pick: ${dhqPickValues[maxPicks]?.value}`);
@@ -3355,7 +3472,7 @@ async function resyncAllData(){
   if(!S.currentLeagueId){showToast('Connect first');return;}
   showToast('Resyncing all data...');
   try{
-    localStorage.removeItem('dhq_leagueintel_v5');
+    localStorage.removeItem('dhq_leagueintel_v6');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   _availCache=null;LI_LOADED=false;LI={};S.playerStats={};window._liLoading=false;
@@ -4111,8 +4228,24 @@ async function sendTradeChat(){
     tradeChatHistory.push({role:'user',content:text});
     if(tradeChatHistory.length>4)tradeChatHistory=tradeChatHistory.slice(-4);
     const ctx=buildCtxCompact();
+    // Build owner profiles context for the AI
+    let ownerCtx='';
+    if(LI_LOADED&&LI.ownerProfiles){
+      const profiles=S.rosters.filter(r=>r.roster_id!==S.myRosterId).map(r=>{
+        const p=LI.ownerProfiles[r.roster_id];
+        if(!p||p.trades===0)return null;
+        const name=S.leagueUsers.find(u=>u.user_id===r.owner_id)?.display_name||'Team '+r.roster_id;
+        return`${name}:${p.dna}(${p.trades}trades${p.targetPos?',targets '+p.targetPos:''})`;
+      }).filter(Boolean).slice(0,8);
+      if(profiles.length)ownerCtx='\nOWNER DNA: '+profiles.join('; ');
+    }
+    let tradeStats='';
+    if(LI_LOADED&&LI.leagueTradeTendencies?.totalTrades>0){
+      const lt=LI.leagueTradeTendencies;
+      tradeStats=`\nLEAGUE TRADES: ${lt.totalTrades} total, ${lt.pickHeavy} involved picks, avg ${lt.avgAssetsPerSide} assets/side`;
+    }
     const msgs=tradeChatHistory.map(function(m,i){
-      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:'Dynasty trade advisor. DHQ values 0-10000 scale.\n'+ctx+'\n\n'+m.content};
+      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:'Dynasty trade advisor. DHQ values 0-10000 scale.\n'+ctx+ownerCtx+tradeStats+'\n\n'+m.content};
       if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};
       return m;
     });
@@ -4506,7 +4639,7 @@ function reconnect(){
   S.playerStats={};S.posRanks={};LI_LOADED=false;LI={};window._liLoading=false;
   _availCache=null;
   // Clear caches for clean reconnect
-  try{localStorage.removeItem('dhq_leagueintel_v5');
+  try{localStorage.removeItem('dhq_leagueintel_v6');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   // Restore the setup block with the connect form
