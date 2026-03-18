@@ -1619,7 +1619,7 @@ function buildRosterTable(){
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v6';
+const LI_CACHE_KEY='dhq_leagueintel_v7';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -2135,10 +2135,13 @@ async function loadLeagueIntel(){
         const wPPG=weightSum>0?+(weightedTotal/weightSum).toFixed(2):0;
         const bestSeason=Object.values(ps.seasons).reduce((m,s)=>s.total>m.total?s:m,{total:0,avg:0});
 
-        // Elite pedigree floor: if a player has 3+ starter seasons and an elite best season,
-        // their weighted PPG can't drop below 60% of their best season average.
-        // This prevents one bad year from tanking a proven elite dynasty asset.
-        const pedigreeFloor=(ps.starterSeasons>=3&&bestSeason.avg>15)?bestSeason.avg*0.60:0;
+        // Elite pedigree floor: protects PROVEN ELITE dynasty assets from one bad year.
+        // Requirements: 4+ starter seasons AND an elite best season avg (QB>22, RB/WR>16, TE>13)
+        // This is intentionally strict — it should only protect JJeff/Chase/Allen caliber players,
+        // NOT bounceback guys like Daniel Jones who had 1 good year.
+        const eliteThresh={QB:22,RB:16,WR:16,TE:13,DL:8,LB:8,DB:8};
+        const isElitePedigree=ps.starterSeasons>=4&&bestSeason.avg>=(eliteThresh[pos]||15);
+        const pedigreeFloor=isElitePedigree?bestSeason.avg*0.50:0;
         const adjustedWPPG=Math.max(wPPG, pedigreeFloor);
 
         // ─── COMPONENT 2: Age / Peak Curve (25%) ───
@@ -3473,7 +3476,7 @@ async function resyncAllData(){
   if(!S.currentLeagueId){showToast('Connect first');return;}
   showToast('Resyncing all data...');
   try{
-    localStorage.removeItem('dhq_leagueintel_v6');
+    localStorage.removeItem('dhq_leagueintel_v7');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   _availCache=null;LI_LOADED=false;LI={};S.playerStats={};window._liLoading=false;
@@ -4655,7 +4658,7 @@ function reconnect(){
   S.playerStats={};S.posRanks={};LI_LOADED=false;LI={};window._liLoading=false;
   _availCache=null;
   // Clear caches for clean reconnect
-  try{localStorage.removeItem('dhq_leagueintel_v6');
+  try{localStorage.removeItem('dhq_leagueintel_v7');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   // Restore the setup block with the connect form
