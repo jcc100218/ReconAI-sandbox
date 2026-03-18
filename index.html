@@ -5562,6 +5562,8 @@ function loadMemory(){
 function saveMemory(data){
   try{localStorage.setItem(MEM_KEY,JSON.stringify(data));}catch(e){}
 }
+function getMemory(key,def=[]){return loadMemory()[key]??def;}
+function setMemory(key,val){const d=loadMemory();d[key]=val;saveMemory(d);}
 
 function renderStatsTable(){} // stats panel removed
 
