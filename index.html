@@ -1604,7 +1604,7 @@ function buildRosterTable(){
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v4';
+const LI_CACHE_KEY='dhq_leagueintel_v5';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -2034,10 +2034,10 @@ async function loadLeagueIntel(){
     // ═══════════════════════════════════════════════════════════════
 
     // ── Age curves: position-specific peak windows ──
-    const peakWindows={QB:[24,33],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
+    const peakWindows={QB:[24,34],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
 
     // ── Position-specific decay rates (per year past peak end) ──
-    const decayRates={QB:0.08,RB:0.25,WR:0.14,TE:0.12,DL:0.15,LB:0.15,DB:0.14};
+    const decayRates={QB:0.06,RB:0.25,WR:0.14,TE:0.12,DL:0.15,LB:0.15,DB:0.14};
 
     // ── Positional scarcity multipliers ──
     // In 16-team SF IDP: QB premium, IDP discount, TE unicorn
@@ -2084,6 +2084,12 @@ async function loadLeagueIntel(){
         });
         const wPPG=weightSum>0?+(weightedTotal/weightSum).toFixed(2):0;
         const bestSeason=Object.values(ps.seasons).reduce((m,s)=>s.total>m.total?s:m,{total:0,avg:0});
+
+        // Elite pedigree floor: if a player has 3+ starter seasons and an elite best season,
+        // their weighted PPG can't drop below 60% of their best season average.
+        // This prevents one bad year from tanking a proven elite dynasty asset.
+        const pedigreeFloor=(ps.starterSeasons>=3&&bestSeason.avg>15)?bestSeason.avg*0.60:0;
+        const adjustedWPPG=Math.max(wPPG, pedigreeFloor);
 
         // ─── COMPONENT 2: Age / Peak Curve (25%) ───
         const age=pAge(pid)||26;
@@ -2202,7 +2208,7 @@ async function loadLeagueIntel(){
         const ppg24=ps.seasons[2024]?.avg||0;
         const trend=ppg25&&ppg24?+(((ppg25-ppg24)/ppg24)*100).toFixed(0):0; // % change
 
-        return{pid,pos,name:ps.name,wPPG,bestTotal:bestSeason.total,bestAvg:bestSeason.avg,
+        return{pid,pos,name:ps.name,wPPG:adjustedWPPG,rawPPG:wPPG,bestTotal:bestSeason.total,bestAvg:bestSeason.avg,
           age,ageFactor:+ageFactor.toFixed(4),sitMult:+sitMult.toFixed(4),
           peakYrsLeft,seasons:totalSeasons,starterSeasons,recentGP,posRank,posTotal,trend};
       })
@@ -3335,7 +3341,7 @@ async function resyncAllData(){
   if(!S.currentLeagueId){showToast('Connect first');return;}
   showToast('Resyncing all data...');
   try{
-    localStorage.removeItem('dhq_leagueintel_v4');
+    localStorage.removeItem('dhq_leagueintel_v5');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   _availCache=null;LI_LOADED=false;LI={};S.playerStats={};window._liLoading=false;
@@ -4477,7 +4483,7 @@ function reconnect(){
   S.playerStats={};S.posRanks={};LI_LOADED=false;LI={};window._liLoading=false;
   _availCache=null;
   // Clear caches for clean reconnect
-  try{localStorage.removeItem('dhq_leagueintel_v4');
+  try{localStorage.removeItem('dhq_leagueintel_v5');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   // Restore the setup block with the connect form
