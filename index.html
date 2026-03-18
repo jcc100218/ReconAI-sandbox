@@ -530,14 +530,12 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" target="_blank" style="font-size:10px;color:#fff;text-decoration:none;padding:4px 10px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:6px;white-space:nowrap;font-weight:700;letter-spacing:.02em;box-shadow:0 2px 6px rgba(245,158,11,.25)">⚔️ War Room</a>
     <div class="spacer"></div>
     <div style="display:flex;align-items:center;gap:5px;flex-shrink:1;min-width:0;overflow:hidden">
-      <span class="pill pd" id="league-pill" style="font-size:10px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:120px" onclick="switchLeagueMode()">Not connected</span>
+      <span class="pill pd" id="league-pill" style="font-size:10px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:140px" onclick="switchLeagueMode()" title="Click to switch league">Not connected</span>
       <span class="pill pd header-hide-sm" id="week-pill" style="font-size:10px">—</span>
-      <div class="agent-status" id="agent-status" style="font-size:10px">
+      <div class="agent-status" id="agent-status" style="font-size:10px;display:none">
         <div class="status-dot" id="agent-dot"></div>
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
-      <button class="btn btn-ghost btn-sm" id="switch-league-btn" style="display:none;font-size:10px;padding:2px 8px" onclick="switchLeagueMode()">Switch</button>
-      <button onclick="openPlayerSearch()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="Search Players"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
   </div>
@@ -907,57 +905,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
     </div>
 
     <!-- AI AGENT -->
-    <div class="panel" id="panel-agent">
-      <div class="api-warn" id="api-warn" style="display:none">
-        <p style="font-size:13px;color:#c9a227;margin-bottom:10px;line-height:1.6">Add an AI API key in Settings to enable the agent. <strong>Groq and Gemini are free.</strong></p>
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('settings',document.querySelector('.tab[onclick*=\'settings\']'))">Go to Settings →</button>
-      </div>
-      <div class="chat-wrap">
-        <div class="chips">
-          <div class="chip" onclick="sc(this)">What should I do right now?</div>
-          <div class="chip" onclick="sc(this)">Who should I trade for?</div>
-          <div class="chip" onclick="sc(this)">Am I a contender or rebuilding?</div>
-          <div class="chip" onclick="sc(this)">Analyze my biggest weakness</div>
-          <div class="chip" onclick="sc(this)">Draft a trade message for Sleeper</div>
-          <div class="chip" onclick="sc(this)">Search latest player news</div>
-        </div>
-        <div class="chat-msgs" id="chat-msgs">
-          <div class="msg msg-a" style="line-height:1.7">I'm your AI general manager. I've analyzed every roster in your league, know your scoring settings inside out, and I'm watching the wire. Ask me anything — I'll tell you what I'd actually do, not just give you options.</div>
-        </div>
-        <div class="chat-in-row">
-          <input type="text" class="chat-in" id="chat-in" placeholder="Ask anything about your dynasty team..." onkeydown="if(event.key==='Enter')sendMessage()"/>
-          <button class="send-btn" onclick="sendMessage()">Send</button>
-        </div>
-      </div>
-    </div>
 
     <!-- ANALYTICS -->
     <!-- STATS EXPLORER -->
     <!-- MEMORY — merged: notes + AI summary + past sessions -->
-    <div class="panel" id="panel-memory">
-      <div style="font-size:16px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px">GM Memory</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Notes and AI-generated insights that persist between sessions.</div>
-
-      <div class="sec">Notes <div class="sec-line"></div></div>
-      <div class="card" id="agent-notes-card">
-        <textarea id="agent-notes-ta" placeholder="Free-form notes about your team, strategy, player valuations, league tendencies..." style="width:100%;min-height:120px;background:transparent;border:none;color:var(--text);font-size:12px;line-height:1.6;outline:none;resize:vertical" oninput="saveNotes()"></textarea>
-      </div>
-
-      <div class="sec">AI session summary <div class="sec-line"></div> <button class="btn btn-ghost btn-sm" onclick="generateMemorySummary()">Summarize ↗</button></div>
-      <div class="card" id="memory-summary"><div class="empty">Click Summarize to generate insights from your notes and conversations.</div></div>
-
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-ghost btn-sm" onclick="switchTab('settings')">Edit strategy →</button>
-        <button class="btn btn-ghost btn-sm" onclick="exportMemory()">Export</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="clearMemory()">Clear all</button>
-      </div>
-
-      <!-- Hidden elements for JS compatibility -->
-      <div id="trade-journal" style="display:none"></div>
-      <div id="waiver-log" style="display:none"></div>
-      <div id="trade-log-modal" style="display:none"></div>
-      <div id="waiver-log-modal" style="display:none"></div>
-    </div>
 
     <!-- SETTINGS -->
     <div class="panel" id="panel-settings">
@@ -3879,188 +3830,6 @@ function renderTeamOverview(){
   el.innerHTML=html;
 }
 
-async function runSmartFeed(){
-  if(!S.apiKey)return;
-  const btn=$('feed-refresh-btn');
-  if(btn){btn.textContent='Analyzing...';btn.disabled=true;}
-  $('feed-cards').innerHTML=`
-    <div style="animation:cardIn .3s ease both">
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rxl);padding:18px;margin-bottom:10px">
-        <div class="skeleton" style="width:80px;height:10px;border-radius:4px;margin-bottom:10px"></div>
-        <div class="skeleton" style="width:70%;height:14px;border-radius:4px;margin-bottom:8px"></div>
-        <div class="skeleton" style="width:90%;height:12px;border-radius:4px;margin-bottom:6px"></div>
-        <div class="skeleton" style="width:60%;height:12px;border-radius:4px;margin-bottom:12px"></div>
-        <div style="display:flex;gap:8px"><div class="skeleton" style="width:100px;height:32px;border-radius:8px"></div><div class="skeleton" style="width:80px;height:32px;border-radius:8px"></div></div>
-      </div>
-    </div>
-    <div style="animation:cardIn .3s ease both;animation-delay:.1s;opacity:0">
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rxl);padding:18px;margin-bottom:10px">
-        <div class="skeleton" style="width:90px;height:10px;border-radius:4px;margin-bottom:10px"></div>
-        <div class="skeleton" style="width:65%;height:14px;border-radius:4px;margin-bottom:8px"></div>
-        <div class="skeleton" style="width:85%;height:12px;border-radius:4px;margin-bottom:6px"></div>
-        <div class="skeleton" style="width:50%;height:12px;border-radius:4px;margin-bottom:12px"></div>
-        <div style="display:flex;gap:8px"><div class="skeleton" style="width:110px;height:32px;border-radius:8px"></div></div>
-      </div>
-    </div>`;
-
-  try{
-    const my=myR();const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-    const sc=league?.scoring_settings||{};
-    const rp=league?.roster_positions||[];
-    const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
-    const myRank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
-    const teams=S.rosters.length||12;
-
-    // Starter slots
-    const slots={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
-    rp.forEach(slot=>{
-      if(slot in slots)slots[slot]++;
-      else if(slot==='FLEX'){slots.RB+=0.4;slots.WR+=0.4;slots.TE+=0.2;}
-      else if(slot==='SUPER_FLEX'){slots.QB+=0.5;slots.WR+=0.25;slots.RB+=0.25;}
-      else if(slot==='IDP_FLEX'){slots.DL+=0.35;slots.LB+=0.35;slots.DB+=0.3;}
-    });
-    Object.keys(slots).forEach(p=>slots[p]=Math.round(slots[p]));
-
-    // IDP thresholds based on actual scoring
-    const idpEliteSeason={
-      DL:{idp_sack:10,idp_tkl_solo:40,idp_tkl_ast:20,idp_tkl_loss:8,idp_qb_hit:25,idp_ff:3},
-      LB:{idp_tkl_solo:80,idp_tkl_ast:30,idp_sack:5,idp_tkl_loss:10,idp_ff:3,idp_int:2,idp_pass_def:5},
-      DB:{idp_int:5,idp_pass_def:15,idp_tkl_solo:60,idp_tkl_ast:20,idp_def_td:1,idp_ff:2,idp_pass_def_3p:2},
-    };
-    const idpThresh={};
-    ['DL','LB','DB'].forEach(pos=>{
-      idpThresh[pos]=Math.round(calcIDPScore(idpEliteSeason[pos],sc)*0.4);
-    });
-    const offThresh={QB:18,RB:10,WR:10,TE:8};
-
-    // My roster gaps
-    const players=my?.players||[];
-    const myGaps=[];
-    ['QB','RB','WR','TE','DL','LB','DB'].forEach(pos=>{
-      const need=slots[pos]||0;if(!need)return;
-      const thresh=idpThresh[pos]||offThresh[pos]||10;
-      const mine=players.filter(p=>pPos(p)===pos);
-      const startable=mine.filter(p=>(S.playerStats?.[p]?.seasonAvg||0)>=thresh);
-      if(startable.length<need)myGaps.push({pos,need,have:startable.length,gap:need-startable.length});
-    });
-
-    // Available players with IDP scoring applied
-    const avail=getAvailablePlayers().slice(0,15).map(({id,p,val})=>{
-      const stats=S.playerStats?.[id];
-      const isIDP=['DL','LB','DB'].includes(p.position);
-      const avg=isIDP&&stats?.prevRawStats
-        ?calcIDPScore(stats.prevRawStats,sc)/(stats.prevRawStats?.gp||17)
-        :(stats?.seasonAvg||0);
-      return{id,pos:p.position,age:p.age||0,val,avg:+avg.toFixed(1),name:pName(id)};
-    });
-
-    // League recent adds — what are smart managers picking up
-    const recentAdds={};
-    Object.values(S.transactions).flat()
-      .filter(t=>t.type==='waiver'||t.type==='free_agent')
-      .slice(-30)
-      .forEach(t=>Object.keys(t.adds||{}).forEach(id=>{recentAdds[id]=(recentAdds[id]||0)+1;}));
-    const hotStr=Object.entries(recentAdds).sort((a,b)=>b[1]-a[1]).slice(0,5)
-      .map(([id,n])=>pName(id)+'('+pPos(id)+','+n+'x)').join(',');
-
-    // Top available by specific position gaps — AI gets real targets
-    const gapTargets=myGaps.slice(0,3).map(g=>{
-      const posAvail=avail.filter(p=>p.pos===g.pos).slice(0,3);
-      if(!posAvail.length)return'';
-      return g.pos+' needs ('+g.gap+' short): '+posAvail.map(p=>`${p.name}(v${p.val},age${p.age})`).join(', ');
-    }).filter(Boolean).join('\n');
-
-    // My surplus positions — potential trade chips
-    const mySurplus=[];
-    ['WR','TE','DL','DB'].forEach(pos=>{
-      const need=slots[pos]||0;if(!need)return;
-      const thresh=idpThresh[pos]||offThresh[pos]||10;
-      const startable=players.filter(p=>pPos(p)===pos&&(S.playerStats?.[p]?.seasonAvg||0)>=thresh).length;
-      if(startable>need+1)mySurplus.push(pos+'(+'+(startable-need)+' starters)');
-    });
-
-    // Best IDP available — key differentiator, with real IDP scoring
-    const idpAvail=avail.filter(p=>['DL','LB','DB'].includes(p.pos))
-      .map(p=>{
-        const raw=S.playerStats?.[p.id]?.prevRawStats;
-        const idpPts=raw?+(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)).toFixed(1):0;
-        return{...p,idpPts};
-      })
-      .sort((a,b)=>(b.idpPts||b.val/1000)-(a.idpPts||a.val/1000))
-      .slice(0,3)
-      .map(p=>`${p.name}(${p.pos},${p.age>0?p.age:'?'},v${p.val}${p.idpPts?','+p.idpPts+'ppg':''})`).join(';');
-
-    // Picks
-    const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId)
-      .map(p=>p.season+'R'+p.round).join(',');
-
-    const m=loadMentality();
-    const idpCtx=`IDP scoring: sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3},TKL=${sc.idp_tkl_solo||0.5}. DBs(INT/PD)>Edge(sack)>LB(volume).`;
-
-    const prompt=[
-      'Dynasty fantasy football. You are an elite GM advisor. Generate exactly 4 targeted recommendations.',
-      '',
-      'MY SITUATION: '+S.user.display_name+', rank #'+myRank+'/'+teams+', '+m.mentality+' mentality',
-      myGaps.length?'ROSTER GAPS (urgent): '+myGaps.map(g=>g.pos+' need '+g.gap+' more starter'+(g.gap>1?'s':'')).join(', '):'No critical gaps',
-      gapTargets?'AVAILABLE TARGETS BY NEED:\n'+gapTargets:'',
-      mySurplus.length?'MY TRADE CHIPS: '+mySurplus.join(', '):'',
-      'BEST AVAILABLE: '+avail.slice(0,5).map(p=>p.name+'('+p.pos+','+p.age+',v'+p.val+')').join(';'),
-      'IDP AVAIL: '+idpAvail,
-      hotStr?'LEAGUE ADDING: '+hotStr:'',
-      myPicks?'MY PICKS: '+myPicks:'',
-      m.neverDrop?'NEVER TOUCH: '+m.neverDrop:'',
-      '',
-      idpCtx,
-      '',
-      'Return exactly 4 recs: 1:waiver add, 2:IDP insight, 3:trade proposal, 4:draft priority.',
-      'Each: name real players, cite DHQ values/ages.',
-      'JSON only: {"recs":[{"type":"waiver|idp|trade|draft","headline":"action sentence","body":"2 sentences with data","cta_label":"label","cta_action":"waiver|info|trade|draft","copy":"Sleeper msg or null"}]}',
-    ].filter(v=>v!==null).join('\n');
-
-    const reply=await callClaude([{role:'user',content:prompt}],false,2,700);
-    let data={recs:[]};
-    try{
-      const clean=reply.replace(/```json|```/g,'').trim();
-      const si=clean.indexOf('{');const ei=clean.lastIndexOf('}');
-      if(si>=0)data=JSON.parse(clean.substring(si,ei+1));
-    }catch(pe){}
-
-    if(!data.recs?.length){
-      $('feed-cards').innerHTML='<div class="card"><div class="empty">No recommendations yet — try refreshing once stats load.</div></div>';
-      if(btn){btn.textContent='Refresh ↺';btn.disabled=false;}
-      return;
-    }
-
-    $('feed-updated').textContent='Updated '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    const typeLabels={waiver:'Waiver wire',idp:'IDP insight',trade:'Trade',draft:'Draft target'};
-    const typeColors={waiver:'var(--accent)',idp:'var(--green)',trade:'var(--amber)',draft:'#a78bfa'};
-    $('feed-cards').innerHTML=data.recs.map(r=>{
-      const lbl=typeLabels[r.type]||r.type;
-      const col=typeColors[r.type]||'var(--accent)';
-      const nav={
-        waiver:"mobileTab('waivers',document.getElementById('mnav-waivers'))",
-        trade:"mobileTab('trades',document.getElementById('mnav-trades'))",
-        draft:"mobileTab('draftroom',document.getElementById('mnav-draft'))",
-        info:`homeAsk('Tell me more: ${(r.headline||'').replace(/'/g,'')}')`,
-      }[r.cta_action]||`homeAsk('More on: ${(r.headline||'').replace(/'/g,'')}')`;
-      const hl=(r.headline||'').replace(/'/g,'');
-      const copyBtn=r.copy?'<button class="feed-secondary" onclick="copyText('+JSON.stringify(r.copy)+',this)">Copy msg</button>':'';
-      const body=(r.body||'').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-      return '<div class="feed-card" style="border-left:3px solid '+col+'">'
-        +'<div class="feed-type" style="color:'+col+'">'+lbl+'</div>'
-        +'<div class="feed-headline">'+(r.headline||'')+'</div>'
-        +'<div class="feed-body">'+body+'</div>'
-        +'<div class="feed-actions">'
-        +'<button class="feed-cta" style="background:'+col+'" onclick="'+nav+'">'+(r.cta_label||'Explore')+' →</button>'
-        +copyBtn
-        +'<button class="feed-secondary" onclick="homeAsk(this.getAttribute(\"data-q\"))" data-q="More: '+hl+'">Ask AI ↗</button>'
-        +'</div></div>';
-    }).join('');
-  }catch(e){
-    $('feed-cards').innerHTML='<div class="card"><div class="empty" style="color:var(--red)">Error: '+e.message+'</div></div>';
-  }
-  if(btn){btn.textContent='Refresh ↺';btn.disabled=false;}
-}
 
 function homeAsk(text){
   const input=$('home-chat-in');
@@ -4584,7 +4353,7 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
     }
   }
   throw new Error('Rate limit — please wait and try again.');
-}function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
+}
 
 // ── Grok News — real-time X/Twitter intelligence ──────────────
 // Uses xAI's Grok model which has live access to X posts
