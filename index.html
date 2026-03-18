@@ -702,7 +702,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <!-- Waiver chat -->
       <div class="sec" style="margin-top:16px">Waiver advisor chat <div class="sec-line"></div></div>
       <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-        <div id="wq-chat-msgs" style="max-height:56px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+        <div id="wq-chat-msgs" style="max-height:64px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
           <div class="hc-msg-a" style="font-size:12px">Ask me who to grab, what to bid, or who to drop.</div>
         </div>
         <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
@@ -746,7 +746,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Trade advisor</div>
         <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-          <div id="trade-chat-msgs" style="max-height:56px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+          <div id="trade-chat-msgs" style="max-height:64px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
             <div class="hc-msg-a" style="font-size:12px">Tell me what you need and I'll find the right trade partner.</div>
           </div>
           <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;align-items:center;background:var(--bg3)">
@@ -878,7 +878,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
           <div style="font-size:12px;font-weight:700;color:var(--text)">Draft Advisor</div>
           <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:10px;padding:3px 10px">Scout my picks ↗</button>
         </div>
-        <div id="draft-msgs" style="max-height:56px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+        <div id="draft-msgs" style="max-height:64px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
           <div class="hc-msg-a" style="font-size:12px">Ask me about the draft — who to target, whether to trade up, or which positions to prioritize.</div>
         </div>
         <div id="draft-scout-content" style="display:none"></div>
@@ -3153,14 +3153,23 @@ function renderTradeIntel(){
   const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&parseInt(p.season)>=parseInt(S.season));
   const topPicks=myPicks.filter(p=>p.round<=2).slice(0,3).map(p=>p.season+' R'+p.round);
 
+  // Find top sellable player per surplus position
+  const sellByPos={};
+  tradeableAssets.filter(p=>p.pid!==topByPos[p.pos]).forEach(p=>{
+    if(!sellByPos[p.pos])sellByPos[p.pos]=p;
+  });
+
   el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
       <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Depth (trade from)</div>
-      ${depth.length?depth.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:3px"><strong>${pos}</strong> ${v.have} players (+${v.surplus})</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">No surplus positions</div>'}
+      ${depth.length?depth.map(([pos,v])=>{
+        const sell=sellByPos[pos];
+        return`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> +${v.surplus}${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
+      }).join(''):'<div style="font-size:11px;color:var(--text3)">No surplus positions</div>'}
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
       <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Needs (trade for)</div>
-      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:3px"><strong>${pos}</strong> ${v.have} players (${v.surplus})</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">All positions covered</div>'}
+      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} of ${v.need} starters</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">All positions covered</div>'}
     </div>
   </div>
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px;margin-top:8px">
@@ -3549,12 +3558,13 @@ function renderHomeSnapshot(){
   // Calculate avg PPG for my team and league
   const myPts=((s.fpts||0)+(s.fpts_decimal||0)/100);
   const weeks=Math.max(1,(s.wins||0)+(s.losses||0)+(s.ties||0));
-  const myAvg=weeks>0?(myPts/weeks).toFixed(1):'—';
+  const hasGames=(s.wins||0)+(s.losses||0)+(s.ties||0)>0;
+  const myAvg=hasGames?(myPts/weeks).toFixed(1):'—';
   const leagueAvgs=S.rosters.map(r=>{
     const rs=r.settings||{};
     const pts=(rs.fpts||0)+(rs.fpts_decimal||0)/100;
     const w=Math.max(1,(rs.wins||0)+(rs.losses||0)+(rs.ties||0));
-    return pts/w;
+    return w>0?pts/w:0;
   }).filter(v=>v>0);
   const leagueAvg=leagueAvgs.length?(leagueAvgs.reduce((a,b)=>a+b,0)/leagueAvgs.length).toFixed(1):'—';
 
@@ -3797,18 +3807,19 @@ function renderTeamOverview(){
   // Position grades grid — fixed 4x2
   html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px">`;
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">`;
   positions.forEach(pos=>{
     const g=posGroups[pos];if(!g||!g.count)return;
     const avgVal=Math.round(g.total/g.count);
     const topP=g.top[0];
+    const topCol=topP?tradeValueTier(topP.val).col:'var(--text2)';
     html+=`<div style="background:var(--bg3);border-radius:var(--r);padding:8px 10px;min-height:62px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:12px;font-weight:700">${pos}</span>
         <span style="font-size:14px;font-weight:800;color:${gradeColor(avgVal,pos)}">${gradeLetter(avgVal,pos)}</span>
       </div>
       <div style="font-size:11px;color:var(--text2)">${g.count}p · ${avgVal.toLocaleString()}</div>
-      ${topP?`<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:10px">${topP.val.toLocaleString()}</span></div>`:''}
+      ${topP?`<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} <span style="color:${topCol};font-family:'JetBrains Mono',monospace;font-size:10px">${topP.val.toLocaleString()}</span></div>`:''}
     </div>`;
   });
   html+=`</div></div>`;
@@ -5277,6 +5288,18 @@ function renderDraftNeeds(){
       betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:12px;color:var(--green);line-height:1.5">
         🎯 <strong>Priority target:</strong> Use your R${earlyRounds[0]} pick on <strong>${bestEarlyNeed.pos}</strong> — ${reasonStr}.
       </div>`;
+    } else if(!earlyRounds.length&&ownPickRounds.length){
+      // Only mid/late picks — still show a target but frame differently
+      const bestMidNeed=posAnalysis.find(p=>p.needScore>0&&p.pos!=='K');
+      if(bestMidNeed){
+        const reasons=[];
+        if(bestMidNeed.starterGap>0)reasons.push(`${bestMidNeed.startable}/${bestMidNeed.slotsNeeded} starters`);
+        if(bestMidNeed.aging>0)reasons.push(`${bestMidNeed.aging} aging past peak`);
+        const reasonStr=reasons.length?reasons.join(', '):'biggest need';
+        betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:12px;color:var(--green);line-height:1.5">
+          🎯 <strong>Priority target:</strong> Look for <strong>${bestMidNeed.pos}</strong> value in mid rounds — ${reasonStr}.
+        </div>`;
+      }
     }
     if(lateRounds.length&&bestLateIDP&&bestLateIDP[1]>0){
       const avgLateHit=lateRounds.map(r=>LI.hitRateByRound[r]?.rate||0).reduce((a,b)=>a+b,0)/lateRounds.length;
