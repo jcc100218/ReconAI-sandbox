@@ -535,6 +535,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
         <div class="status-dot" id="agent-dot"></div>
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
+      <a href="https://forms.gle/REPLACE_WITH_YOUR_FORM_ID" target="_blank" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0;text-decoration:none;display:flex;align-items:center;gap:3px;font-size:10px;font-weight:600" title="Send feedback or report a bug"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></a>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
   </div>
@@ -4092,7 +4093,7 @@ function buildCtxCompact(){
     'TOP5:'+topStarters,
     picks?'PICKS:'+picks:'',
     mentalityStr||'',
-    'DHQ scale 0-10000. 7000+=elite 4000+=starter.'
+    'DHQ scale 0-10000. 7000+=elite 4000+=starter. ALWAYS refer to values as "DHQ" not "FC" or "FantasyCalc".'
   ].filter(Boolean).join('\n');
 }async function runWaiverAgent(){
   if(!S.apiKey){switchTab('settings');return;}
@@ -4119,7 +4120,7 @@ function buildCtxCompact(){
     const topAvailStr=top20.slice(0,10)
       .filter(({id})=>!(LI.playerMeta?.[id]?.source==='FC_ROOKIE')&&(S.players[id]?.years_exp||0)>0)
       .map(({id,p,val})=>{
-      return`${pName(id)}(${p.position},${p.age||'?'},${p.team||'FA'},FC${val})`;
+      return`${pName(id)}(${p.position},${p.age||'?'},${p.team||'FA'},DHQ${val})`;
     }).join(';');
     const slotsToFill=Math.max(1,Math.min(4,slots.openBench>0?slots.openBench:1));
     const faabFields=isFAAB?'"faab_low":0,"faab_high":0,':'';
@@ -4228,24 +4229,39 @@ async function sendTradeChat(){
     tradeChatHistory.push({role:'user',content:text});
     if(tradeChatHistory.length>4)tradeChatHistory=tradeChatHistory.slice(-4);
     const ctx=buildCtxCompact();
-    // Build owner profiles context for the AI
+    // Build rich owner context — who they are, what they need, how they trade
     let ownerCtx='';
-    if(LI_LOADED&&LI.ownerProfiles){
+    if(LI_LOADED){
+      const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+      const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+      const rp=league?.roster_positions||[];
       const profiles=S.rosters.filter(r=>r.roster_id!==S.myRosterId).map(r=>{
-        const p=LI.ownerProfiles[r.roster_id];
-        if(!p||p.trades===0)return null;
-        const name=S.leagueUsers.find(u=>u.user_id===r.owner_id)?.display_name||'Team '+r.roster_id;
-        return`${name}:${p.dna}(${p.trades}trades${p.targetPos?',targets '+p.targetPos:''})`;
-      }).filter(Boolean).slice(0,8);
-      if(profiles.length)ownerCtx='\nOWNER DNA: '+profiles.join('; ');
+        const name=S.leagueUsers.find(u=>u.user_id===r.owner_id)?.display_name||'Team';
+        const s=r.settings||{};
+        const record=(s.wins||0)+'-'+(s.losses||0);
+        const totalVal=(r.players||[]).reduce((sum,pid)=>sum+dynastyValue(pid),0);
+        // Find their weakest position
+        const posCounts={};
+        (r.players||[]).forEach(pid=>{const pos=pM(pPos(pid));if(pos)posCounts[pos]=(posCounts[pos]||0)+1;});
+        const weakPositions=['QB','RB','WR','TE'].filter(pos=>{
+          const need=rp.filter(s2=>s2===pos||(s2==='FLEX'&&['RB','WR','TE'].includes(pos))||(s2==='SUPER_FLEX'&&pos==='QB')).length;
+          return(posCounts[pos]||0)<=need;
+        });
+        // Trade DNA
+        const dna=LI.ownerProfiles?.[r.roster_id];
+        const dnaStr=dna?.trades>0?dna.dna:'no trades';
+        const contending=totalVal>80000?'contending':'building';
+        return`${name}(${record},${contending},DHQ${Math.round(totalVal/1000)}k,needs:${weakPositions.join('/')||'none'},${dnaStr})`;
+      }).slice(0,10);
+      if(profiles.length)ownerCtx='\nLEAGUE OWNERS:\n'+profiles.join('\n');
     }
     let tradeStats='';
     if(LI_LOADED&&LI.leagueTradeTendencies?.totalTrades>0){
       const lt=LI.leagueTradeTendencies;
-      tradeStats=`\nLEAGUE TRADES: ${lt.totalTrades} total, ${lt.pickHeavy} involved picks, avg ${lt.avgAssetsPerSide} assets/side`;
+      tradeStats=`\nLEAGUE: ${lt.totalTrades} trades in history, ${lt.pickHeavy} involved picks`;
     }
     const msgs=tradeChatHistory.map(function(m,i){
-      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:'Dynasty trade advisor. DHQ values 0-10000 scale.\n'+ctx+ownerCtx+tradeStats+'\n\n'+m.content};
+      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:`Dynasty trade advisor for a real league. USE THE SPECIFIC OWNER NAMES AND DATA BELOW — do not give generic advice. Name specific trade partners from this league and explain why based on their roster needs and trade history. DHQ values 0-10000 scale. ALWAYS say "DHQ" not "FC".\n${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
       if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};
       return m;
     });
@@ -4333,10 +4349,10 @@ function buildCtx(){
   const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
   const rank=sorted.findIndex(r=>r.roster_id===S.myRosterId)+1;
 
-  // Compact player string: "Name(WR,24,FC8200)" 
+  // Compact player string: "Name(WR,24,DHQ8200)" 
   const pStr=(pid)=>{
     const val=dynastyValue(pid);const age=pAge(pid);
-    return pName(pid)+'('+pPos(pid)+(age?','+age:'')+(val>0?',FC'+val:'')+')';
+    return pName(pid)+'('+pPos(pid)+(age?','+age:'')+(val>0?',DHQ'+val:'')+')';
   };
 
   // Starters
