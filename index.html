@@ -3298,15 +3298,15 @@ function renderTradeIntel(){
 
   el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Depth (trade from)</div>
+      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Surplus — sell high</div>
       ${depth.length?depth.map(([pos,v])=>{
         const sell=sellByPos[pos];
-        return`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> +${v.surplus}${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
+        return`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, +${v.surplus} over need${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
       }).join(''):'<div style="font-size:11px;color:var(--text3)">No surplus positions</div>'}
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Needs (trade for)</div>
-      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} of ${v.need} starters</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">All positions covered</div>'}
+      <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Thin — buy low</div>
+      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, need ${Math.abs(v.surplus)} more</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">All positions covered</div>'}
     </div>
   </div>
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px;margin-top:8px">
@@ -4059,7 +4059,7 @@ async function sendHomeChat(){
         }
         return m;
       });
-      const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor today/i.test(text);
+      const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor|SEARCH FOR CURRENT|Scout Report|current situation|dynasty outlook|2026/i.test(text);
       const reply=await callClaude(msgs,needsSearch,2,500);
       homeChatHistory.push({role:'assistant',content:reply});
       lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
@@ -4865,9 +4865,22 @@ function openPlayerModal(playerId){
   $('pm-peak-desc').textContent=pk.desc;
 
   // Action buttons
-  $('pm-ask-btn').onclick=()=>goAsk(`Dynasty buy/sell/hold for ${pName(playerId)} (${pos}, age ${age}, ${fullTeam(p.team)}). Give trade value, DLF ranking context for IDP, and specific recommendation.`);
-  $('pm-trade-btn').textContent=onMyTeam?'Trade away ↗':'Trade for ↗';
-  $('pm-trade-btn').onclick=()=>goAsk(onMyTeam?`What can I realistically get for ${pName(playerId)} in a dynasty trade? Draft a persuasive offer message.`:`Draft a trade offer to acquire ${pName(playerId)} for my dynasty roster.`);
+  $('pm-ask-btn').textContent='Scout Report ↗';
+  $('pm-ask-btn').onclick=()=>goAsk(`SEARCH FOR CURRENT INFO FIRST: Look up ${pName(playerId)} ${pos} ${fullTeam(p.team)} current situation, depth chart, and dynasty outlook for 2026. Then give a dynasty buy/sell/hold recommendation with current team context, role, and trade value. DHQ value: ${dynastyValue(playerId).toLocaleString()}.`);
+  $('pm-trade-btn').textContent=onMyTeam?'Trade Finder ↗':'Trade for ↗';
+  $('pm-trade-btn').onclick=()=>{
+    const ownerCtx=LI_LOADED&&LI.ownerProfiles?Object.entries(LI.ownerProfiles).filter(([rid])=>parseInt(rid)!==S.myRosterId).map(([rid,p])=>{
+      if(!p.trades)return null;
+      const name=S.leagueUsers.find(u=>{const r=S.rosters.find(r2=>r2.roster_id===parseInt(rid));return r&&u.user_id===r.owner_id;})?.display_name||'Team';
+      return`${name}(${p.dna}${p.targetPos?',wants '+p.targetPos:''})`;
+    }).filter(Boolean).slice(0,6).join('; '):'';
+    const histCtx=LI.playerTradeHistory?.[playerId]?.length?`This player has been traded ${LI.playerTradeHistory[playerId].length} time(s) in this league.`:'';
+    if(onMyTeam){
+      goAsk(`Find the best trade partner for ${pName(playerId)} (${pos}, DHQ ${dynastyValue(playerId).toLocaleString()}). ${histCtx} Consider which owner needs a ${pos} and what I should ask for in return. Owner profiles: ${ownerCtx}. Draft a Sleeper-ready trade message.`);
+    }else{
+      goAsk(`I want to acquire ${pName(playerId)} (${pos}, DHQ ${dynastyValue(playerId).toLocaleString()}). ${histCtx} Who owns them and what would be a fair offer? Owner profiles: ${ownerCtx}. Draft a Sleeper-ready trade message.`);
+    }
+  };
 
   // Show modal
   const modal=$('player-modal');
