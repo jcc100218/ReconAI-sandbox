@@ -1186,6 +1186,7 @@ const posLabel=(slot,pid)=>{const mapped=posMap[slot];if(mapped&&mapped!=='BN'&&
 function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
 const pName=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;if(p.position==='DEF')return(p.full_name||id)+' D/ST';return p.full_name||`${p.first_name||''} ${p.last_name||''}`.trim()||id};
 const pNameShort=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;const f=p.first_name||'';const l=p.last_name||'';if(!f||!l)return pName(id);return f[0]+'. '+l;};
+const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 const pTeam=id=>S.players[id]?.team||'';const NFL_TEAMS={
   ARI:'Arizona Cardinals',ATL:'Atlanta Falcons',BAL:'Baltimore Ravens',BUF:'Buffalo Bills',
   CAR:'Carolina Panthers',CHI:'Chicago Bears',CIN:'Cincinnati Bengals',CLE:'Cleveland Browns',
@@ -4132,16 +4133,17 @@ function buildCtxCompact(){
     const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const prompt=`Waiver agent. ${S.season} offseason. DHQ values 0-10000 scale.
 CRITICAL RULES:
-1. Rookies (0 years experience, never played an NFL game) can ONLY be added through the rookie draft, NOT waivers. Do NOT recommend any rookies or first-year players.
-2. Only recommend VETERAN free agents who have played at least 1 NFL season.
-3. Respond with ONLY a JSON object — no markdown, no backticks, no explanation before or after.
+1. ONLY recommend players from the AVAILABLE list below. Do NOT recommend any player not on this list — they are rostered by other teams.
+2. Rookies (0 years experience) can ONLY be added through the rookie draft, NOT waivers.
+3. Only recommend VETERAN free agents who have played at least 1 NFL season.
+4. Respond with ONLY a JSON object — no markdown, no backticks, no explanation.
 ${buildMentalityCtx()}
 ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
 ${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
-AVAILABLE(top10):${topAvailStr||'still loading'}
+AVAILABLE FREE AGENTS (ONLY pick from this list):${topAvailStr||'still loading'}
 IDP:sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3}
 ${slots.openBench===0?'ROSTER FULL — must suggest who to drop.':''}
-Recommend ${slotsToFill} veteran adds. JSON only:
+Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
 {"recommendations":[{"name":"player","position":"POS","team":"TM","rank":1,"age":0,"dynastyValue":0,"reason":"why",${faabFields}"copyText":"Sleeper msg"}]}`;
     const reply=await callClaude([{role:'user',content:prompt}]);
     let data={recommendations:[]};
