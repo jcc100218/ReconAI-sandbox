@@ -4750,6 +4750,8 @@ function openPlayerModal(playerId){
   const isIDPModal=['DL','LB','DB'].includes(pos);
   const scModal=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
   const rawModal=S.playerStats?.[playerId]?.prevRawStats;
+  const idpBadge=$('pm-idp-badge');
+  if(idpBadge)idpBadge.innerHTML=''; // Clear previous IDP stats
   if(isIDPModal&&rawModal){
     const gp=rawModal.gp||17;
     const idpPPGModal=+(calcIDPScore(rawModal,scModal)/Math.max(1,gp)).toFixed(1);
