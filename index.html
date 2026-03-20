@@ -3074,6 +3074,10 @@ function getAvailablePlayers(){
       const p=S.players[id];if(!p)return;
       if(!offPos.includes(p.position)&&!idpPos.includes(p.position))return;
       if(p.status==='Inactive'||p.status==='Retired')return;
+      // Skip rookies (FC imports) — they can only be added via rookie draft
+      const meta=LI.playerMeta?.[id];
+      if(meta?.source==='FC_ROOKIE')return;
+      if((p.years_exp||0)===0&&!meta?.starterSeasons)return;
       const val=LI.playerScores[id]||0;
       if(val<=0)return;
       results.push({id,p,val,isIDP:idpPos.includes(p.position),rank:S.posRanks?.[id],proj:S.playerProj?.[id]});
