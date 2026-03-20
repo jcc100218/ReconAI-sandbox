@@ -3136,7 +3136,22 @@ function renderAvailable(){
   const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
   filtered=[...filtered].sort((a,b)=>{
+    const sc2=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+    const getPPG=(x)=>{
+      const st=S.playerStats?.[x.id]||{};
+      const mP=posMapFilter(x.p.position);
+      const isI=['DL','LB','DB'].includes(mP);
+      const raw2=st?.prevRawStats;
+      return isI&&raw2?+(calcIDPScore(raw2,sc2)/Math.max(1,raw2.gp||17)).toFixed(1):(st.seasonAvg||st.prevAvg||0);
+    };
     if(availSortKey==='age')return((a.p.age||99)-(b.p.age||99))*availSortDir;
+    if(availSortKey==='ppg')return(getPPG(b)-getPPG(a))*availSortDir;
+    if(availSortKey==='faab'){
+      const fm=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
+      const fb=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0};
+      const getFaab=(x)=>{const mP2=posMapFilter(x.p.position);const mk=fm[mP2];if(!mk||mk.count<3||!fb.budget)return 0;return Math.max(1,Math.min(Math.round(fb.remaining*0.15),Math.round(mk.avg*(x.val/4000))));};
+      return(getFaab(b)-getFaab(a))*availSortDir;
+    }
     return(b.val-a.val)*availSortDir;
   });
 
@@ -3146,10 +3161,12 @@ function renderAvailable(){
   const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
 
   // Tight roster-style table: Photo | Name+Team | Pos | Age | DHQ | PPG | FAAB | Ask
+  const sortIcon=(key)=>availSortKey===key?(availSortDir===-1?'▼':'▲'):'';
+  const hdrStyle='cursor:pointer;user-select:none';
   const header=`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border2);align-items:center">
-    <span></span><span>Player</span><span>Pos</span><span>Age</span><span>DHQ</span><span>PPG</span><span>FAAB</span><span></span></div>`;
+    <span></span><span>Player</span><span>Pos</span><span style="${hdrStyle}" onclick="availSortKey='age';availSortDir=availSortKey==='age'?-availSortDir:-1;renderAvailable()">Age ${sortIcon('age')}</span><span style="${hdrStyle}" onclick="availSortKey='value';availSortDir=availSortKey==='value'?-availSortDir:-1;renderAvailable()">DHQ ${sortIcon('value')}</span><span style="${hdrStyle}" onclick="availSortKey='ppg';availSortDir=availSortKey==='ppg'?-availSortDir:-1;renderAvailable()">PPG ${sortIcon('ppg')}</span><span style="${hdrStyle}" onclick="availSortKey='faab';availSortDir=availSortKey==='faab'?-availSortDir:-1;renderAvailable()">FAAB ${sortIcon('faab')}</span><span></span></div>`;
 
-  const rows=filtered.slice(0,10).map(({id,p,val},i)=>{
+  const rows=filtered.slice(0,25).map(({id,p,val},i)=>{
     const stats=S.playerStats?.[id]||{};
     const {col}=tradeValueTier(val);
     const mPos=posMapFilter(p.position);
