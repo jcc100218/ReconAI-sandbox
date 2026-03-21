@@ -204,61 +204,53 @@ async function loadLeagueIntel(){
         seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
       })));
 
-      // FAAB (3 seasons × 9 weeks — all parallel)
-      const faabPromise=(async()=>{
-        const faabLeagues=chain.filter(c=>parseInt(c.season)>=curSeason-2&&parseInt(c.season)<=curSeason);
-        const allWeekFetches=[];
-        faabLeagues.forEach(c=>{
-          [1,2,3,4,5,6,8,10,12].forEach(w=>{
-            allWeekFetches.push(
-              fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[])
-                .then(txns=>txns.forEach(t=>{
-                  if(t.type!=='waiver'||(t.settings?.waiver_bid||0)===0||t.status==='failed')return;
-                  Object.keys(t.adds||{}).forEach(pid=>{
-                    const pos=posMapLocal(pPos(pid)||S.players?.[pid]?.position||'');
-                    if(positions.includes(pos))faabTxns.push({season:c.season,pid,pos,bid:t.settings.waiver_bid});
-                  });
-                }))
-            );
-          });
-        });
-        await Promise.all(allWeekFetches);
-      })();
-      fetchPromises.push(faabPromise);
-
-      // TRADE HISTORY (all seasons × 18 weeks — all parallel)
+      // COMBINED: FAAB + TRADE HISTORY in single pass
+      // Fetches transactions ONCE per league per week, extracts both FAAB and trades
+      // Reduced from 117 fetches to ~55 (5 seasons × 11 key weeks)
       const tradeTxns=[];
-      const tradePromise=(async()=>{
-        const tradeLeagues=chain.filter(c=>parseInt(c.season)>=curSeason-4);
-        const allTradeFetches=[];
-        tradeLeagues.forEach(c=>{
-          [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18].forEach(w=>{
-            allTradeFetches.push(
+      const txnPromise=(async()=>{
+        const txnWeeks=[1,2,3,4,5,6,7,8,9,10,11]; // weeks 12-18 rarely have trades, skip
+        const allTxnFetches=[];
+        chain.forEach(c=>{
+          const seasonNum=parseInt(c.season);
+          const isFaabSeason=seasonNum>=curSeason-2&&seasonNum<=curSeason;
+          txnWeeks.forEach(w=>{
+            allTxnFetches.push(
               fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[])
                 .then(txns=>txns.forEach(t=>{
-                  if(t.type!=='trade'||t.status==='failed')return;
-                  const rids=t.roster_ids||[];
-                  const sides={};
-                  rids.forEach(rid=>sides[rid]={players:[],picks:[]});
-                  Object.entries(t.adds||{}).forEach(([pid,rid])=>{
-                    if(sides[rid])sides[rid].players.push(pid);
-                  });
-                  (t.draft_picks||[]).forEach(pk=>{
-                    if(sides[pk.owner_id])sides[pk.owner_id].picks.push({season:pk.season,round:pk.round});
-                  });
-                  tradeTxns.push({
-                    season:c.season,week:w,
-                    roster_ids:rids,
-                    sides,
-                    ts:t.created||t.status_updated||0
-                  });
+                  if(t.status==='failed')return;
+                  // Extract FAAB waivers (last 3 seasons only)
+                  if(isFaabSeason&&t.type==='waiver'&&(t.settings?.waiver_bid||0)>0){
+                    Object.keys(t.adds||{}).forEach(pid=>{
+                      const pos=posMapLocal(pPos(pid)||S.players?.[pid]?.position||'');
+                      if(positions.includes(pos))faabTxns.push({season:c.season,pid,pos,bid:t.settings.waiver_bid});
+                    });
+                  }
+                  // Extract trades (all seasons)
+                  if(t.type==='trade'){
+                    const rids=t.roster_ids||[];
+                    const sides={};
+                    rids.forEach(rid=>sides[rid]={players:[],picks:[]});
+                    Object.entries(t.adds||{}).forEach(([pid,rid])=>{
+                      if(sides[rid])sides[rid].players.push(pid);
+                    });
+                    (t.draft_picks||[]).forEach(pk=>{
+                      if(sides[pk.owner_id])sides[pk.owner_id].picks.push({season:pk.season,round:pk.round});
+                    });
+                    tradeTxns.push({
+                      season:c.season,week:w,
+                      roster_ids:rids,
+                      sides,
+                      ts:t.created||t.status_updated||0
+                    });
+                  }
                 }))
             );
           });
         });
-        await Promise.all(allTradeFetches);
+        await Promise.all(allTxnFetches);
       })();
-      fetchPromises.push(tradePromise);
+      fetchPromises.push(txnPromise);
 
       // Fire everything at once
       await Promise.all(fetchPromises);
