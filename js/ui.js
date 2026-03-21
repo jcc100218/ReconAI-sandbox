@@ -1494,40 +1494,12 @@ function openPlayerModal(playerId){
   $('pm-pos-badge').style.cssText=`position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;${getPosBadgeStyle(pos)}`;
   $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:13px;color:var(--green);font-weight:400">✓ on roster</span>':''}`;
   $('pm-bio').innerHTML=`${pos} · ${fullTeam(p.team)} · Age ${age} · ${exp}yr exp${p.college?' · '+p.college:''}`;
-  // IDP scoring badge
+  // IDP data
   const isIDPModal=['DL','LB','DB'].includes(pos);
   const scModal=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
   const rawModal=S.playerStats?.[playerId]?.prevRawStats;
   const idpBadge=$('pm-idp-badge');
-  if(idpBadge)idpBadge.innerHTML='';
-  if(isIDPModal&&rawModal){
-    const gp=rawModal.gp||17;
-    const idpPPGModal=+(calcIDPScore(rawModal,scModal)/Math.max(1,gp)).toFixed(1);
-    const idpBadge2=$('pm-idp-badge');
-    if(idpBadge2&&idpPPGModal>0){
-      const sacks=(rawModal.idp_sack||0).toFixed(1);
-      const tkl=Math.round((rawModal.idp_tkl_solo||0)+(rawModal.idp_tkl_ast||0));
-      const ints=rawModal.idp_int||0;
-      const pds=rawModal.idp_pass_def||0;
-      const ff=rawModal.idp_ff||0;
-      const qbhits=rawModal.idp_qb_hit||0;
-      const statParts=[];
-      if(sacks>0)statParts.push(sacks+' sacks');
-      if(ints>0)statParts.push(ints+' INT');
-      if(pds>0)statParts.push(pds+' PD');
-      if(qbhits>0)statParts.push(qbhits+' QBhit');
-      if(tkl>0)statParts.push(tkl+' tkl');
-      if(ff>0)statParts.push(ff+' FF');
-      idpBadge2.innerHTML=
-        '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 12px;margin:6px 0">'
-        +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-        +'<span style="font-size:15px;font-weight:800;color:var(--green)">⚡ '+idpPPGModal+' IDP PPG</span>'
-        +'<span style="font-size:11px;color:var(--text3)">2024 season ('+gp+'gp)</span>'
-        +'</div>'
-        +(statParts.length?'<div style="font-size:12px;color:var(--text2);margin-top:4px">'+statParts.join(' · ')+'</div>':'')
-        +'</div>';
-    }
-  }
+  if(idpBadge)idpBadge.innerHTML=''; // no longer rendered as banner badge
   const idpPPGModal=isIDPModal&&rawModal?+(calcIDPScore(rawModal,scModal)/Math.max(1,rawModal.gp||17)).toFixed(1):null;
 
   // Value insight blurb
@@ -1606,13 +1578,28 @@ function openPlayerModal(playerId){
   const fcTrend=fcRankData?.trend||0;
   const trendLabel=fcTrend>100?'▲ Rising':fcTrend<-100?'▼ Falling':'Stable';
   const trendCol=fcTrend>100?'var(--green)':fcTrend<-100?'var(--red)':'var(--text3)';
-  const statBoxes=[
-    {val:val>0?val.toLocaleString():'—',lbl:'DHQ Value',col:col},
-    {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
-    {val:stats.prevAvg?.toFixed(1)||stats.seasonAvg?.toFixed(1)||'—',lbl:`'${prevYr} PPG`,col:stats.prevAvg>15?'var(--green)':stats.prevAvg&&stats.prevAvg<8?'var(--red)':'var(--text)'},
-    {val:stats.prevTotal?Math.round(stats.prevTotal):'—',lbl:`'${prevYr} Total`,col:'var(--text2)'},
-    {val:trendLabel,lbl:'30d Trend',col:trendCol},
-  ];
+  let statBoxes;
+  if(isIDPModal&&idpPPGModal){
+    // IDP stats bar: DHQ, Rank, IDP PPG, Tackles, Sacks/INTs
+    const tklTotal=rawModal?Math.round((rawModal.idp_tkl_solo||0)+(rawModal.idp_tkl_ast||0)):0;
+    const sacksTotal=rawModal?(rawModal.idp_sack||0).toFixed(1):'—';
+    const intsTotal=rawModal?(rawModal.idp_int||0):'—';
+    statBoxes=[
+      {val:val>0?val.toLocaleString():'—',lbl:'DHQ Value',col:col},
+      {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
+      {val:idpPPGModal||'—',lbl:'IDP PPG',col:idpPPGModal>=6?'var(--green)':idpPPGModal>=3?'var(--text)':'var(--text3)'},
+      {val:tklTotal||'—',lbl:'Tackles',col:tklTotal>=80?'var(--green)':tklTotal>=40?'var(--text)':'var(--text3)'},
+      {val:pos==='DB'?(intsTotal+'/'+(rawModal?.idp_pass_def||0)):sacksTotal,lbl:pos==='DB'?'INT/PD':'Sacks',col:'var(--text)'},
+    ];
+  }else{
+    statBoxes=[
+      {val:val>0?val.toLocaleString():'—',lbl:'DHQ Value',col:col},
+      {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
+      {val:stats.prevAvg?.toFixed(1)||stats.seasonAvg?.toFixed(1)||'—',lbl:`'${prevYr} PPG`,col:stats.prevAvg>15?'var(--green)':stats.prevAvg&&stats.prevAvg<8?'var(--red)':'var(--text)'},
+      {val:stats.prevTotal?Math.round(stats.prevTotal):'—',lbl:`'${prevYr} Total`,col:'var(--text2)'},
+      {val:trendLabel,lbl:'30d Trend',col:trendCol},
+    ];
+  }
   $('pm-stats-bar').innerHTML=statBoxes.map(s=>`<div class="pm-stat-box"><div class="pm-stat-box-val" style="color:${s.col}">${s.val}</div><div class="pm-stat-box-lbl">${s.lbl}</div></div>`).join('');
 
   // Age curve
@@ -1641,11 +1628,42 @@ function openPlayerModal(playerId){
     $('pm-spark-lbl').innerHTML=weeklyPts.map((_,i)=>`<span style="flex:1;text-align:center">W${i+1}</span>`).join('');
   }else{$('pm-spark-wrap').style.display='none';}
 
-  // Trade value + peak
+  // Trade value + right panel (peak years OR IDP stats)
   $('pm-trade-val').textContent=val>0?val.toLocaleString():LI_LOADED?'Not valued':'Loading...';
   $('pm-trade-tier').innerHTML=val>0?`<span style="color:${col}">${tier}</span>${fcRankData?' · Overall #'+fcRankData.overall:''}`:LI_LOADED?'<span style="color:var(--text3)">No DHQ production data</span>':'<span style="color:var(--text3)">DHQ engine loading...</span>';
-  $('pm-peak-years').textContent=pk.label;
-  $('pm-peak-desc').textContent=pk.desc;
+
+  const rightPanel=$('pm-right-panel');
+  if(rightPanel){
+    if(isIDPModal&&rawModal){
+      // IDP: show key defensive stats instead of peak projection
+      const gp=rawModal.gp||17;
+      const sacks=+(rawModal.idp_sack||0).toFixed(1);
+      const tkl=Math.round((rawModal.idp_tkl_solo||0)+(rawModal.idp_tkl_ast||0));
+      const ints=rawModal.idp_int||0;
+      const pds=rawModal.idp_pass_def||0;
+      const ff=rawModal.idp_ff||0;
+      const qbhits=rawModal.idp_qb_hit||0;
+      const tklLoss=rawModal.idp_tkl_loss||0;
+      rightPanel.innerHTML=`
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">IDP Stats <span style="font-weight:400;text-transform:none">· ${gp}gp</span></div>
+        <div style="font-size:18px;font-weight:800;color:var(--green);margin-bottom:6px">${idpPPGModal||'—'} <span style="font-size:12px;font-weight:600;color:var(--text2)">PPG</span></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
+          ${tkl?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${tkl}</strong> tackles</div>`:''}
+          ${sacks?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${sacks}</strong> sacks</div>`:''}
+          ${ints?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${ints}</strong> INT</div>`:''}
+          ${pds?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${pds}</strong> PD</div>`:''}
+          ${ff?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${ff}</strong> FF</div>`:''}
+          ${qbhits?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${qbhits}</strong> QB hits</div>`:''}
+          ${tklLoss?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${tklLoss}</strong> TFL</div>`:''}
+        </div>`;
+    }else{
+      // Offensive: show peak years projection (original behavior)
+      rightPanel.innerHTML=`
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Peak years projection</div>
+        <div id="pm-peak-years" style="font-size:16px;font-weight:700;color:var(--green)">${pk.label}</div>
+        <div id="pm-peak-desc" style="font-size:12px;color:var(--text2);margin-top:2px;line-height:1.4">${pk.desc}</div>`;
+    }
+  }
 
   // Action buttons
   $('pm-ask-btn').textContent='Scout Report ↗';
