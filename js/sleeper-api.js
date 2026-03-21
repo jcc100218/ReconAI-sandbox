@@ -37,7 +37,7 @@ async function loadLeague(leagueId,userId){
   S.matchups['w'+week]=matchups||[];
   S.transactions['w'+week]=txns||[];
   const uid=userId||S.user?.user_id;
-  S.myRosterId=S.rosters.find(r=>r.owner_id===uid)?.roster_id;
+  S.myRosterId=S.rosters.find(r=>r.owner_id===uid||(r.co_owners||[]).includes(uid))?.roster_id;
   renderRoster();renderWaivers();renderTrades();renderPicks();
 }
 
@@ -58,7 +58,7 @@ async function loadRosterStats(){
   if(!S.playerProj)S.playerProj={};
 
   const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
-  const curSeason=S.season||'2025';
+  const curSeason=S.season||String(new Date().getFullYear());
   const prevSeason=String(parseInt(curSeason)-1);
   const isOffseason=!S.nflState?.season_has_scores||S.currentWeek<=1;
 
@@ -149,14 +149,14 @@ function calcFantasyPts(stats,sc){
   let pts=0;
   const add=(stat,mult)=>{pts+=(stats[stat]||0)*(mult||0);};
   // Offense
-  add('pass_yd',sc.pass_yd||0);add('pass_td',sc.pass_td||4);add('pass_int',sc.pass_int||-1);
-  add('pass_2pt',sc.pass_2pt||0);add('pass_sack',sc.pass_sack||0);
-  add('rush_yd',sc.rush_yd||0.1);add('rush_td',sc.rush_td||6);add('rush_2pt',sc.rush_2pt||0);add('rush_fd',sc.rush_fd||0);
-  add('rec',sc.rec||0.5);add('rec_yd',sc.rec_yd||0.1);add('rec_td',sc.rec_td||6);add('rec_2pt',sc.rec_2pt||0);add('rec_fd',sc.rec_fd||0);
-  add('fum_lost',sc.fum_lost||-0.5);add('fum_rec_td',sc.fum_rec_td||0);
+  add('pass_yd',sc.pass_yd??0);add('pass_td',sc.pass_td??4);add('pass_int',sc.pass_int??-1);
+  add('pass_2pt',sc.pass_2pt??0);add('pass_sack',sc.pass_sack??0);
+  add('rush_yd',sc.rush_yd??0.1);add('rush_td',sc.rush_td??6);add('rush_2pt',sc.rush_2pt??0);add('rush_fd',sc.rush_fd??0);
+  add('rec',sc.rec??0.5);add('rec_yd',sc.rec_yd??0.1);add('rec_td',sc.rec_td??6);add('rec_2pt',sc.rec_2pt??0);add('rec_fd',sc.rec_fd??0);
+  add('fum_lost',sc.fum_lost??-0.5);add('fum_rec_td',sc.fum_rec_td??0);
   // Kicking
-  add('xpm',sc.xpm||0);add('xpmiss',sc.xpmiss||0);add('fgm_yds',sc.fgm_yds||0);
-  add('fgmiss',sc.fgmiss||0);add('fgmiss_0_19',sc.fgmiss_0_19||0);add('fgmiss_20_29',sc.fgmiss_20_29||0);
+  add('xpm',sc.xpm??0);add('xpmiss',sc.xpmiss??0);add('fgm_yds',sc.fgm_yds??0);
+  add('fgmiss',sc.fgmiss??0);add('fgmiss_0_19',sc.fgmiss_0_19??0);add('fgmiss_20_29',sc.fgmiss_20_29??0);
   // IDP — try both prefixed and non-prefixed field names (Sleeper uses both)
   const idpFields=[['idp_tkl_solo','tkl_solo'],['idp_tkl_ast','tkl_ast'],['idp_tkl_loss','tkl_loss'],
     ['idp_sack','sack'],['idp_qb_hit','qb_hit'],['idp_int','int'],['idp_ff','ff'],
@@ -164,7 +164,7 @@ function calcFantasyPts(stats,sc){
     ['idp_def_td','def_td'],['idp_blk_kick'],['idp_safe'],['idp_sack_yd'],['idp_int_ret_yd'],['idp_fum_ret_yd']];
   idpFields.forEach(names=>{
     const scKey=names[0]; // scoring setting key is always idp_ prefixed
-    const mult=sc[scKey]||0;
+    const mult=sc[scKey]??0;
     if(!mult)return;
     // Try each field name variant, use first non-zero
     let val=0;
@@ -172,8 +172,8 @@ function calcFantasyPts(stats,sc){
     pts+=val*mult;
   });
   // Special teams
-  add('st_td',sc.st_td||0);add('st_ff',sc.st_ff||0);add('st_fum_rec',sc.st_fum_rec||0);
-  add('st_tkl_solo',sc.st_tkl_solo||0);add('kr_yd',sc.kr_yd||0);add('pr_yd',sc.pr_yd||0);
+  add('st_td',sc.st_td??0);add('st_ff',sc.st_ff??0);add('st_fum_rec',sc.st_fum_rec??0);
+  add('st_tkl_solo',sc.st_tkl_solo??0);add('kr_yd',sc.kr_yd??0);add('pr_yd',sc.pr_yd??0);
   return Math.round(pts*10)/10;
 }
 

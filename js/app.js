@@ -11,7 +11,7 @@ let S={
   transactions:{},tradedPicks:[],players:{},
   ownership:{},nflState:null,bracket:{w:[],l:[]},
   currentLeagueId:null,myRosterId:null,apiKey:'',aiProvider:'anthropic',aiModel:'',chatHistory:[],
-  currentWeek:1,season:'2025',
+  currentWeek:1,season:String(new Date().getFullYear()),
   tradeCalc:{a:[],b:[]},agentLog:[],lastDigest:null,
   playerStats:{},playerProj:{},depthCharts:{},posRanks:{}
 };
@@ -113,7 +113,8 @@ async function connect(){
     S.nflState=await sf('/state/nfl');
     S.currentWeek=S.nflState?.display_week||S.nflState?.week||1;
     const manualSeason=$('season-sel').value;
-    S.season=manualSeason!=='2025'?manualSeason:(S.nflState?.league_create_season||S.nflState?.season||'2025');
+    const defaultSeason=String(new Date().getFullYear());
+    S.season=manualSeason!==defaultSeason?manualSeason:(S.nflState?.league_create_season||S.nflState?.season||defaultSeason);
     $('week-pill').textContent='Wk '+S.currentWeek+' · '+S.season;
     const sel=$('season-sel');
     if([...sel.options].some(o=>o.value===S.season))sel.value=S.season;
@@ -180,7 +181,9 @@ async function selectLeague(leagueId,userId){
   S.currentLeagueId=leagueId;
   try{localStorage.setItem('dynastyhq_league',leagueId);}catch(e){}
   const league=S.leagues.find(l=>l.league_id===leagueId);
-  $('league-pill').textContent=(league?.name||'League').substring(0,20);
+  const leagueName=(league?.name||'League').substring(0,20);
+  const isDynasty=league?.settings?.type===2;
+  $('league-pill').innerHTML=leagueName+(isDynasty?'':'<span style="font-size:10px;font-weight:500;color:var(--amber);background:rgba(255,180,0,.12);padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle">(Redraft — dynasty features limited)</span>');
   $('setup-block').innerHTML=`<div style="font-size:14px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
   try{
     await loadLeague(leagueId,userId);
@@ -331,18 +334,18 @@ function calcIDPScore(stats, sc){
   if(!stats)return 0;
   let pts=0;
   const add=(stat,mult)=>{pts+=(stats[stat]||0)*(mult||0);};
-  add('idp_tkl_solo', sc.idp_tkl_solo||0.5);
-  add('idp_tkl_ast', sc.idp_tkl_ast||0.25);
-  add('idp_tkl_loss', sc.idp_tkl_loss||2);
-  add('idp_sack', sc.idp_sack||4);
-  add('idp_ff', sc.idp_ff||3);
-  add('idp_int', sc.idp_int||5);
-  add('idp_pass_def', sc.idp_pass_def||3);
-  add('idp_qb_hit', sc.idp_qb_hit||1.25);
-  add('idp_safe', sc.idp_safe||2);
-  add('idp_blk_kick', sc.idp_blk_kick||3);
-  add('idp_def_td', sc.idp_def_td||6);
-  add('idp_pass_def_3p', sc.idp_pass_def_3p||1);
+  add('idp_tkl_solo', sc.idp_tkl_solo??0.5);
+  add('idp_tkl_ast', sc.idp_tkl_ast??0.25);
+  add('idp_tkl_loss', sc.idp_tkl_loss??2);
+  add('idp_sack', sc.idp_sack??4);
+  add('idp_ff', sc.idp_ff??3);
+  add('idp_int', sc.idp_int??5);
+  add('idp_pass_def', sc.idp_pass_def??3);
+  add('idp_qb_hit', sc.idp_qb_hit??1.25);
+  add('idp_safe', sc.idp_safe??2);
+  add('idp_blk_kick', sc.idp_blk_kick??3);
+  add('idp_def_td', sc.idp_def_td??6);
+  add('idp_pass_def_3p', sc.idp_pass_def_3p??1);
   return +pts.toFixed(1);
 }
 window.calcIDPScore = calcIDPScore;

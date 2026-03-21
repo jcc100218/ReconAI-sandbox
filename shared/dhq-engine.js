@@ -99,20 +99,20 @@ async function loadLeagueIntel(){
     if(!s)return 0;
     let pts=0;
     const add=(stat,mult)=>{pts+=(s[stat]||0)*(mult||0);};
-    add('pass_yd',sc.pass_yd||0);add('pass_td',sc.pass_td||4);add('pass_int',sc.pass_int||-1);
-    add('pass_2pt',sc.pass_2pt||0);add('pass_sack',sc.pass_sack||0);
-    add('rush_yd',sc.rush_yd||0.1);add('rush_td',sc.rush_td||6);add('rush_2pt',sc.rush_2pt||0);add('rush_fd',sc.rush_fd||0);
-    add('rec',sc.rec||0.5);add('rec_yd',sc.rec_yd||0.1);add('rec_td',sc.rec_td||6);add('rec_2pt',sc.rec_2pt||0);add('rec_fd',sc.rec_fd||0);
-    add('fum_lost',sc.fum_lost||-0.5);add('fum_rec_td',sc.fum_rec_td||0);
-    add('xpm',sc.xpm||0);add('xpmiss',sc.xpmiss||0);add('fgm_yds',sc.fgm_yds||0);
-    add('fgmiss',sc.fgmiss||0);add('fgmiss_0_19',sc.fgmiss_0_19||0);add('fgmiss_20_29',sc.fgmiss_20_29||0);
+    add('pass_yd',sc.pass_yd??0);add('pass_td',sc.pass_td??4);add('pass_int',sc.pass_int??-1);
+    add('pass_2pt',sc.pass_2pt??0);add('pass_sack',sc.pass_sack??0);
+    add('rush_yd',sc.rush_yd??0.1);add('rush_td',sc.rush_td??6);add('rush_2pt',sc.rush_2pt??0);add('rush_fd',sc.rush_fd??0);
+    add('rec',sc.rec??0.5);add('rec_yd',sc.rec_yd??0.1);add('rec_td',sc.rec_td??6);add('rec_2pt',sc.rec_2pt??0);add('rec_fd',sc.rec_fd??0);
+    add('fum_lost',sc.fum_lost??-0.5);add('fum_rec_td',sc.fum_rec_td??0);
+    add('xpm',sc.xpm??0);add('xpmiss',sc.xpmiss??0);add('fgm_yds',sc.fgm_yds??0);
+    add('fgmiss',sc.fgmiss??0);add('fgmiss_0_19',sc.fgmiss_0_19??0);add('fgmiss_20_29',sc.fgmiss_20_29??0);
     const idpF=[['idp_tkl_solo','tkl_solo'],['idp_tkl_ast','tkl_ast'],['idp_tkl_loss','tkl_loss'],
       ['idp_sack','sack'],['idp_qb_hit','qb_hit'],['idp_int','int'],['idp_ff','ff'],
       ['idp_fum_rec'],['idp_pass_def','pass_def'],['idp_pass_def_3p'],
       ['idp_def_td','def_td'],['idp_blk_kick'],['idp_safe'],['idp_sack_yd'],['idp_int_ret_yd'],['idp_fum_ret_yd']];
-    idpF.forEach(names=>{const mult=sc[names[0]]||0;if(!mult)return;let v=0;for(const n of names){if(s[n]){v=s[n];break;}}pts+=v*mult;});
-    add('st_td',sc.st_td||0);add('st_ff',sc.st_ff||0);add('st_fum_rec',sc.st_fum_rec||0);
-    add('st_tkl_solo',sc.st_tkl_solo||0);add('kr_yd',sc.kr_yd||0);add('pr_yd',sc.pr_yd||0);
+    idpF.forEach(names=>{const mult=sc[names[0]]??0;if(!mult)return;let v=0;for(const n of names){if(s[n]){v=s[n];break;}}pts+=v*mult;});
+    add('st_td',sc.st_td??0);add('st_ff',sc.st_ff??0);add('st_fum_rec',sc.st_fum_rec??0);
+    add('st_tkl_solo',sc.st_tkl_solo??0);add('kr_yd',sc.kr_yd??0);add('pr_yd',sc.pr_yd??0);
     return +pts.toFixed(1);
   }
 
@@ -128,7 +128,8 @@ async function loadLeagueIntel(){
     try{const raw=localStorage.getItem(HIST_KEY);if(raw)histCache=JSON.parse(raw);}catch(e){}
 
     let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns, tradeTxns;
-    const uniqueYears=[2021,2022,2023,2024,2025];
+    const curSeason = parseInt(S.season) || new Date().getFullYear();
+    const uniqueYears = Array.from({length:5}, (_,i) => curSeason - 4 + i); // e.g., [2022,2023,2024,2025,2026]
 
     if(histCache&&histCache.chain?.length>=5&&histCache.draftPicks?.length>0){
       // ── FAST PATH: Use permanent cache for historical data ──
@@ -205,7 +206,7 @@ async function loadLeagueIntel(){
 
       // FAAB (3 seasons × 9 weeks — all parallel)
       const faabPromise=(async()=>{
-        const faabLeagues=chain.filter(c=>parseInt(c.season)>=2023&&parseInt(c.season)<=2025);
+        const faabLeagues=chain.filter(c=>parseInt(c.season)>=curSeason-2&&parseInt(c.season)<=curSeason);
         const allWeekFetches=[];
         faabLeagues.forEach(c=>{
           [1,2,3,4,5,6,8,10,12].forEach(w=>{
@@ -228,7 +229,7 @@ async function loadLeagueIntel(){
       // TRADE HISTORY (all seasons × 18 weeks — all parallel)
       const tradeTxns=[];
       const tradePromise=(async()=>{
-        const tradeLeagues=chain.filter(c=>parseInt(c.season)>=2021);
+        const tradeLeagues=chain.filter(c=>parseInt(c.season)>=curSeason-4);
         const allTradeFetches=[];
         tradeLeagues.forEach(c=>{
           [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18].forEach(w=>{
@@ -272,7 +273,7 @@ async function loadLeagueIntel(){
     // ═══════════════════════════════════════════════════════════════
     // From here on: pure computation, no API calls
     // ═══════════════════════════════════════════════════════════════
-    const playerSeasons={}; // pid -> {seasons:{2021:{total,avg,gp},...}, pos, name}
+    const playerSeasons={}; // pid -> {seasons:{[year]:{total,avg,gp},...}, pos, name}
     uniqueYears.forEach(yr=>{
       const stats=seasonStatsRaw[yr];if(!stats)return;
       Object.entries(stats).forEach(([pid,s])=>{
@@ -362,9 +363,9 @@ async function loadLeagueIntel(){
         });
       }
 
-      // For recent drafts (2025), give benefit of doubt to high-ceiling rookies
+      // For recent drafts (current season), give benefit of doubt to high-ceiling rookies
       // They haven't had time to prove themselves yet
-      const seasonsAvailable=2025-draftYr;
+      const seasonsAvailable=curSeason-draftYr;
 
       const outcome={
         ...dp,bestTotal,bestAvg,bestYr,isHit,isStarter,
@@ -398,7 +399,7 @@ async function loadLeagueIntel(){
     // First: calculate raw expected value per pick slot from actual outcomes
     for(let pick=1;pick<=maxPicks;pick++){
       const data=pickSlotHistory[pick]||[];
-      const withTime=data.filter(d=>parseInt(d.season)<=2024);
+      const withTime=data.filter(d=>parseInt(d.season)<=curSeason-1);
       if(!withTime.length)continue;
       const starters=withTime.filter(d=>d.starter).length;
       const hits=withTime.filter(d=>d.hit).length;
@@ -460,7 +461,7 @@ async function loadLeagueIntel(){
     }
 
     // Future year discount for picks
-    const curYear=parseInt(S.season)||2026;
+    const curYear=curSeason;
     const dhqPickValueFn=(season,round,pickInRound)=>{
       const yr=parseInt(season)||curYear;
       const pick=(round-1)*totalTeams+Math.min(pickInRound||Math.ceil(totalTeams/2),totalTeams);
@@ -516,14 +517,14 @@ async function loadLeagueIntel(){
 
     // Score all players with recent production
     const recentPlayers=Object.entries(playerSeasons)
-      .filter(([pid,ps])=>ps.seasons[2025]||ps.seasons[2024]||ps.seasons[2023])
+      .filter(([pid,ps])=>ps.seasons[curSeason]||ps.seasons[curSeason-1]||ps.seasons[curSeason-2])
       .map(([pid,ps])=>{
         const pos=ps.pos;
         const p=S.players[pid];
 
         // ─── COMPONENT 1: Production Base (40%) ───
         let weightedTotal=0,weightSum=0;
-        const weights={2025:4,2024:3,2023:2,2022:1,2021:0.5};
+        const weights={}; uniqueYears.forEach((yr,i)=>weights[yr]=[0.5,1,2,3,4][i]||4);
         Object.entries(ps.seasons).forEach(([yr,s])=>{
           const w=weights[yr]||0.5;
           weightedTotal+=s.avg*w;
@@ -589,7 +590,7 @@ async function loadLeagueIntel(){
         }
 
         // B) Role detection: starter vs backup vs replacement
-        const recentPPG=ps.seasons[2025]?.avg||ps.seasons[2024]?.avg||0;
+        const recentPPG=ps.seasons[curSeason]?.avg||ps.seasons[curSeason-1]?.avg||0;
         const posStarterPPG=(avgThresh[pos]?.avgStarter||100)/17;
 
         if(recentPPG>0){
@@ -642,8 +643,8 @@ async function loadLeagueIntel(){
         }
 
         // E) Durability: games played penalty
-        const recentGP=ps.seasons[2025]?.gp||ps.seasons[2024]?.gp||17;
-        const prevGP=ps.seasons[2024]?.gp||ps.seasons[2023]?.gp||17;
+        const recentGP=ps.seasons[curSeason]?.gp||ps.seasons[curSeason-1]?.gp||17;
+        const prevGP=ps.seasons[curSeason-1]?.gp||ps.seasons[curSeason-2]?.gp||17;
         if(recentGP<=10&&prevGP<=10&&totalSeasons>=2){
           sitMult*=0.82; // Injury-prone: missed time in multiple seasons
         }else if(recentGP<=10&&totalSeasons>=1){
@@ -652,8 +653,8 @@ async function loadLeagueIntel(){
 
         // F) Elite production premium — BIGGER gaps between tiers
         const allPosPPG=Object.entries(playerSeasons)
-          .filter(([,pps])=>pps.pos===pos&&(pps.seasons[2025]||pps.seasons[2024]))
-          .map(([pid2,pps])=>({pid:pid2,ppg:pps.seasons[2025]?.avg||pps.seasons[2024]?.avg||0}))
+          .filter(([,pps])=>pps.pos===pos&&(pps.seasons[curSeason]||pps.seasons[curSeason-1]))
+          .map(([pid2,pps])=>({pid:pid2,ppg:pps.seasons[curSeason]?.avg||pps.seasons[curSeason-1]?.avg||0}))
           .sort((a,b)=>b.ppg-a.ppg);
         const posRank=allPosPPG.findIndex(p=>p.pid===pid)+1;
         const posTotal=allPosPPG.length;
@@ -669,9 +670,9 @@ async function loadLeagueIntel(){
         sitMult=Math.min(1.60,Math.max(0.40,sitMult));
 
         // Trend: compare most recent season to prior
-        const ppg25=ps.seasons[2025]?.avg||0;
-        const ppg24=ps.seasons[2024]?.avg||0;
-        const trend=ppg25&&ppg24?+(((ppg25-ppg24)/ppg24)*100).toFixed(0):0; // % change
+        const ppgCur=ps.seasons[curSeason]?.avg||0;
+        const ppgPrev=ps.seasons[curSeason-1]?.avg||0;
+        const trend=ppgCur&&ppgPrev?+(((ppgCur-ppgPrev)/ppgPrev)*100).toFixed(0):0; // % change
 
         return{pid,pos,name:ps.name,wPPG:adjustedWPPG,rawPPG:wPPG,bestTotal:bestSeason.total,bestAvg:bestSeason.avg,
           age,ageFactor:+ageFactor.toFixed(4),sitMult:+sitMult.toFixed(4),
@@ -722,8 +723,8 @@ async function loadLeagueIntel(){
         // Trend: compare most recent season PPG to prior
         trend:(()=>{
           const ps=playerSeasons[p.pid];if(!ps)return 0;
-          const cur=ps.seasons[2025]?.avg||0;
-          const prev=ps.seasons[2024]?.avg||ps.seasons[2023]?.avg||0;
+          const cur=ps.seasons[curSeason]?.avg||0;
+          const prev=ps.seasons[curSeason-1]?.avg||ps.seasons[curSeason-2]?.avg||0;
           if(!cur||!prev)return 0;
           const pctChange=((cur-prev)/prev)*100;
           return +pctChange.toFixed(0); // e.g., +15 means 15% improvement, -20 means 20% decline
@@ -951,7 +952,8 @@ async function loadLeagueIntel(){
     let rookieCount=0;
     let vetBlendCount=0;
     try{
-      const fcUrl=`https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${isSF?2:1}&numTeams=${totalTeams}&ppr=0.5`;
+      const pprVal = (sc.rec != null && sc.rec >= 0.9) ? 1 : (sc.rec != null && sc.rec >= 0.4) ? 0.5 : 0;
+      const fcUrl=`https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${isSF?2:1}&numTeams=${totalTeams}&ppr=${pprVal}`;
       const fcData=await fetch(fcUrl).then(r=>r.ok?r.json():[]).catch(()=>[]);
       if(fcData.length){
         // Find the FC-to-DHQ scale factor by comparing top players

@@ -333,8 +333,8 @@ async function sendWaiverChat(){
       const age=d.p.age>0?',age'+d.p.age:',rookie';
       return pName(d.id)+'('+d.p.position+age+',v'+d.val+statPart+')';
     }).join(';');
-    const ctx='MY TEAM:\n'+dhqContext(false)+'\n'+dhqBuildMentalityContext()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
-    const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)||4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)||5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)||3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
+    const ctx='MY TEAM:\n'+dhqContext(false)+'\n'+dhqBuildMentalityContext()+'\n'+(faab.isFAAB?'FAAB:$'+faab.remaining:'Waiver priority #'+(myR()?.settings?.waiver_position||'?'))+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
+    const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)??4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)??5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)??3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
     lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
   msgs.scrollTop=99999;
@@ -371,7 +371,7 @@ ${mentalityCtx}
 Team: ${dhqCompactContext()}
 My ${year} picks: ${myPicks||'none'}
 Aging starters past peak: ${agingStarters||'none'}
-Scoring: SF=${(sc.pass_td||4)>4?'premium':'standard'}, PPR=${sc.rec||0}, sack=${sc.idp_sack||4}, INT=${sc.idp_int||5}
+Scoring: SF=${(sc.pass_td??4)>4?'premium':'standard'}, PPR=${sc.rec??0}, sack=${sc.idp_sack??4}, INT=${sc.idp_int??5}
 DYNASTY DRAFT PRINCIPLES: In SF leagues, QBs are 2-3x more valuable. Draft for ceiling in rebuild, floor if contending. Consider league tendencies — if your league overdrafts a position, target the falling value at other positions.
 NOTE: Sleeper's rookie data improves as the NFL draft approaches. Pre-NFL draft rankings are speculative.`;
     const msgs=draftChatHistory.map((m,i)=>
@@ -458,7 +458,7 @@ async function runWaiverAgent(){
       return{avg};
     })();
     const histSpend={};
-    const isFAAB=faab.budget>0;
+    const isFAAB=faab.isFAAB;
     const spendCtx='';
     const myPlayers=myR()?.players||[];
     const myPosCounts={};
@@ -485,7 +485,7 @@ ${dhqBuildMentalityContext()}
 ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
 ${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
 AVAILABLE FREE AGENTS (ONLY pick from this list):${topAvailStr||'still loading'}
-IDP:sack=${sc.idp_sack||4},INT=${sc.idp_int||5},PD=${sc.idp_pass_def||3}
+IDP:sack=${sc.idp_sack??4},INT=${sc.idp_int??5},PD=${sc.idp_pass_def??3}
 ${slots.openBench===0?'ROSTER FULL — must suggest who to drop.':''}
 Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
 {"recommendations":[{"name":"player","position":"POS","team":"TM","rank":1,"age":0,"dynastyValue":0,"reason":"why",${faabFields}"copyText":"Sleeper msg"}]}`;

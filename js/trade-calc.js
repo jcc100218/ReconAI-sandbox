@@ -26,16 +26,67 @@ const DNA_TYPES = {
 
 const TRADE_PICK_VALUES = { 1: 7000, 2: 3500, 3: 1800, 4: 800, 5: 400, 6: 200, 7: 100 };
 
-const POS_WEIGHTS   = { QB: 14, RB: 14, WR: 14, TE: 8, K: 3, DL: 13, LB: 10, DB: 12 };
-const TOTAL_WEIGHT  = Object.values(POS_WEIGHTS).reduce((a, b) => a + b, 0);
-const MIN_STARTER_QUALITY = { QB: 2, RB: 3, WR: 3, TE: 2, K: 1, DL: 4, LB: 5, DB: 4 };
-const NFL_STARTER_POOL    = { QB: 32, RB: 40, WR: 64, TE: 32, K: 32, DL: 64, LB: 64, DB: 64 };
-const WEEKLY_TARGET = 243;
-
 const DEPTH_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
 
-// Ideal roster sizes per position (dynasty league)
-const IDEAL_ROSTER = { QB: 3, RB: 6, WR: 6, TE: 3, K: 1, DL: 6, LB: 6, DB: 6 };
+// ── Dynamic builders — derive from league roster_positions ──
+
+function buildIdealRoster(rosterPositions) {
+  const rp = rosterPositions || [];
+  const ideal = {};
+  const posCount = {};
+  rp.forEach(slot => {
+    const norm = normPos(slot);
+    if (['BN','IR','TAXI'].includes(slot)) return;
+    if (!posCount[norm]) posCount[norm] = 0;
+    posCount[norm]++;
+  });
+  Object.entries(posCount).forEach(([pos, count]) => {
+    ideal[pos] = Math.max(count, Math.ceil(count * 1.5));
+  });
+  return ideal;
+}
+
+function buildMinStarterQuality(rosterPositions) {
+  const rp = rosterPositions || [];
+  const msq = {};
+  const slots = {};
+  rp.forEach(slot => {
+    if (['BN','IR','TAXI'].includes(slot)) return;
+    const n = normPos(slot);
+    if (['QB','RB','WR','TE','K','DL','LB','DB'].includes(n)) {
+      slots[n] = (slots[n] || 0) + 1;
+    } else if (slot === 'FLEX') { slots.RB = (slots.RB||0)+0.4; slots.WR = (slots.WR||0)+0.4; slots.TE = (slots.TE||0)+0.2; }
+    else if (slot === 'SUPER_FLEX') { slots.QB = (slots.QB||0)+0.5; slots.RB = (slots.RB||0)+0.25; slots.WR = (slots.WR||0)+0.25; }
+    else if (slot === 'IDP_FLEX') { slots.DL = (slots.DL||0)+0.35; slots.LB = (slots.LB||0)+0.35; slots.DB = (slots.DB||0)+0.3; }
+    else if (slot === 'REC_FLEX') { slots.WR = (slots.WR||0)+0.5; slots.TE = (slots.TE||0)+0.5; }
+  });
+  Object.entries(slots).forEach(([pos, count]) => {
+    const rounded = Math.max(1, Math.round(count));
+    msq[pos] = Math.max(rounded, Math.ceil(rounded * 1.3));
+  });
+  return msq;
+}
+
+function buildPosWeights(rosterPositions) {
+  const base = { QB: 14, RB: 14, WR: 14, TE: 8, K: 3, DL: 13, LB: 10, DB: 12 };
+  const rp = rosterPositions || [];
+  const hasPos = new Set();
+  rp.forEach(slot => {
+    const n = normPos(slot);
+    if (['QB','RB','WR','TE','K','DL','LB','DB'].includes(n)) hasPos.add(n);
+    if (slot === 'FLEX') { hasPos.add('RB'); hasPos.add('WR'); hasPos.add('TE'); }
+    if (slot === 'SUPER_FLEX') { hasPos.add('QB'); hasPos.add('RB'); hasPos.add('WR'); hasPos.add('TE'); }
+    if (slot === 'IDP_FLEX') { hasPos.add('DL'); hasPos.add('LB'); hasPos.add('DB'); }
+  });
+  const weights = {};
+  hasPos.forEach(pos => { if (base[pos]) weights[pos] = base[pos]; });
+  return weights;
+}
+
+function buildNflStarterPool(totalTeams) {
+  const t = totalTeams || 12;
+  return { QB: t, RB: Math.round(t*2.5), WR: Math.round(t*4), TE: t, K: t, DL: Math.round(t*4), LB: Math.round(t*4), DB: Math.round(t*4) };
+}
 
 // Draft pick horizon and rounds
 const PICK_HORIZON  = 3;
@@ -71,10 +122,11 @@ const normPos = p => {
  * Build the NFL starter set — rank all players by dynasty value (or season pts),
  * take top N per position. Returns { pos: Set<pid> }
  */
-function buildNflStarterSet() {
+function buildNflStarterSet(nflStarterPool) {
+  const pool = nflStarterPool || buildNflStarterPool((S.rosters || []).length);
   const nflStarterSet = {};
   DEPTH_POSITIONS.forEach(pos => {
-    const poolSize = NFL_STARTER_POOL[pos] || 32;
+    const poolSize = pool[pos] || 32;
     const allAtPos = [];
     Object.keys(S.players).forEach(pid => {
       const p = S.players[pid]; if (!p) return;
@@ -188,8 +240,15 @@ function calcOptimalPPG(rosterPids) {
 /**
  * Assess a single team. Returns a full assessment object.
  */
-function assessTeam(roster, nflStarterSet, ownerPicks) {
+function assessTeam(roster, nflStarterSet, ownerPicks, dynamicConfig) {
+  const _cfg = dynamicConfig || {};
   const league = S.leagues.find(l => l.league_id === S.currentLeagueId);
+  const IDEAL_ROSTER = _cfg.idealRoster || buildIdealRoster(league?.roster_positions);
+  const MIN_STARTER_QUALITY = _cfg.minStarterQuality || buildMinStarterQuality(league?.roster_positions);
+  const POS_WEIGHTS = _cfg.posWeights || buildPosWeights(league?.roster_positions);
+  const TOTAL_WEIGHT = Object.values(POS_WEIGHTS).reduce((a, b) => a + b, 0);
+  const WEEKLY_TARGET = _cfg.weeklyTarget || 150;
+  const leaguePositions = new Set(Object.keys(POS_WEIGHTS));
   const users = S.leagueUsers || [];
   const user = users.find(u => u.user_id === roster.owner_id);
   const teamName  = user?.metadata?.team_name || `Team ${roster.roster_id}`;
@@ -214,9 +273,10 @@ function assessTeam(roster, nflStarterSet, ownerPicks) {
     posGroups[np].push(id);
   }
 
-  // Assess each position
+  // Assess each position — only positions that exist in the league
   const posAssessment = {};
   for (const [pos, ideal] of Object.entries(IDEAL_ROSTER)) {
+    if (!leaguePositions.has(pos)) continue; // skip positions not in this league
     const playerIds   = posGroups[pos] || [];
     const startingReq = MIN_STARTER_QUALITY[pos] || 1;
     const actual      = playerIds.length;
@@ -234,46 +294,16 @@ function assessTeam(roster, nflStarterSet, ownerPicks) {
       .sort((a, b) => b.ppg - a.ppg);
     const projectedPts = withPPG.slice(0, startingReq).reduce((s, p) => s + p.ppg, 0);
 
-    // Status determination — position-specific rules matching War Room
+    // Status determination — dynamic based on minQuality from league config
     let status;
     if (nflStarters === 0) {
       status = 'deficit';
-    } else if (pos === 'QB') {
-      if      (nflStarters === 1) status = 'thin';
-      else if (nflStarters === 2) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'RB') {
-      if      (nflStarters < 3) status = 'thin';
-      else if (nflStarters === 3) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'WR') {
-      if      (nflStarters < 3) status = 'thin';
-      else if (nflStarters === 3) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'TE') {
-      if      (nflStarters < 2) status = 'thin';
-      else if (nflStarters === 2) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'K') {
-      if      (nflStarters < 1) status = 'thin';
-      else if (nflStarters === 1) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'DL') {
-      if      (nflStarters < 4) status = 'thin';
-      else if (nflStarters === 4) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'LB') {
-      if      (nflStarters < 5) status = 'thin';
-      else if (nflStarters === 5) status = 'ok';
-      else                        status = 'surplus';
-    } else if (pos === 'DB') {
-      if      (nflStarters < 4) status = 'thin';
-      else if (nflStarters === 4) status = 'ok';
-      else                        status = 'surplus';
+    } else if (nflStarters < minQuality) {
+      status = 'thin';
+    } else if (nflStarters >= minQuality && actual >= ideal) {
+      status = 'surplus';
     } else {
-      if      (nflStarters < minQuality)  status = 'thin';
-      else if (actual >= ideal)           status = 'surplus';
-      else                                status = 'ok';
+      status = 'ok';
     }
 
     // Depth override
@@ -399,11 +429,28 @@ function assessTeam(roster, nflStarterSet, ownerPicks) {
  * Assess ALL teams in the league. Returns array of assessments.
  */
 function assessAllTeams() {
-  const nflStarterSet = buildNflStarterSet();
+  const league = S.leagues.find(l => l.league_id === S.currentLeagueId);
+  const rosterPositions = league?.roster_positions || [];
+  const totalTeams = (S.rosters || []).length;
+  const nflStarterPool = buildNflStarterPool(totalTeams);
+  const nflStarterSet = buildNflStarterSet(nflStarterPool);
   const picksByOwner  = buildPicksByOwner();
+
+  // Compute WEEKLY_TARGET from league data — median of all teams' optimal PPG
+  const allPPGs = (S.rosters || []).map(r => calcOptimalPPG(r.players || [])).filter(v => v > 0);
+  const WEEKLY_TARGET_DYN = allPPGs.length ? allPPGs.sort((a,b) => a-b)[Math.floor(allPPGs.length/2)] * 1.05 : 150;
+
+  // Build dynamic config from league settings
+  const dynamicConfig = {
+    idealRoster: buildIdealRoster(rosterPositions),
+    minStarterQuality: buildMinStarterQuality(rosterPositions),
+    posWeights: buildPosWeights(rosterPositions),
+    weeklyTarget: WEEKLY_TARGET_DYN,
+  };
+
   return (S.rosters || []).map(r => {
     const ownerPicks = picksByOwner[r.roster_id] || [];
-    return assessTeam(r, nflStarterSet, ownerPicks);
+    return assessTeam(r, nflStarterSet, ownerPicks, dynamicConfig);
   });
 }
 
@@ -1593,15 +1640,15 @@ window._tcSetDNA = _tcSetDNA;
 // ═══════════════════════════════════════════════════════════════
 
 Object.assign(window.App, {
-  // Constants
+  // Constants & builders
   DNA_TYPES,
   TRADE_PICK_VALUES,
-  POS_WEIGHTS,
-  MIN_STARTER_QUALITY,
-  NFL_STARTER_POOL,
-  WEEKLY_TARGET,
   POSTURES,
   FAAB_RATE,
+  buildIdealRoster,
+  buildMinStarterQuality,
+  buildPosWeights,
+  buildNflStarterPool,
 
   // Assessment
   buildNflStarterSet,

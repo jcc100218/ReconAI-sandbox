@@ -339,9 +339,11 @@ function pickValue(season,round,totalTeams,pickInRound){
 function getFAAB(){
   const my=myR();
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  const budget=league?.settings?.waiver_budget||100;
-  const spent=my?.settings?.waiver_budget_used||0;
-  return{budget,spent,remaining:budget-spent};
+  const waiverType = league?.settings?.waiver_type; // 0=normal, 1=FAAB, 2=continuous
+  const isFAAB = waiverType === 2 || (league?.settings?.waiver_budget > 0);
+  const budget = isFAAB ? (league?.settings?.waiver_budget || 0) : 0;
+  const spent = my?.settings?.waiver_budget_used || 0;
+  return { budget, spent, remaining: Math.max(0, budget - spent), isFAAB };
 }
 
 function getRosterSlots(){
@@ -541,13 +543,18 @@ function renderWaivers(){
     })();
     const bar=$('faab-bar');if(bar)bar.style.display='flex';
     const faabHint=$('waiver-faab-hint');
-    if(faabHint&&faab.budget>0){
-      const pct=Math.round((faab.remaining/faab.budget)*100);
-      faabHint.textContent=`$${faab.remaining} remaining (${pct}% of budget)`;
-      faabHint.style.color=pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)';
+    if(faabHint){
+      if(faab.isFAAB&&faab.budget>0){
+        const pct=Math.round((faab.remaining/faab.budget)*100);
+        faabHint.textContent=`$${faab.remaining} remaining (${pct}% of budget)`;
+        faabHint.style.color=pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)';
+      }else{
+        faabHint.textContent='Waiver priority #'+(myR()?.settings?.waiver_position||'?');
+        faabHint.style.color='var(--text3)';
+      }
     }
-    const mineEl=$('faab-mine');if(mineEl)mineEl.textContent='$'+faab.remaining;
-    const avgEl=$('faab-avg');if(avgEl)avgEl.textContent='$'+leagueFaab.avg;
+    const mineEl=$('faab-mine');if(mineEl)mineEl.textContent=faab.isFAAB?'$'+faab.remaining:'—';
+    const avgEl=$('faab-avg');if(avgEl)avgEl.textContent=faab.isFAAB?'$'+leagueFaab.avg:'—';
     const slotsEl=$('bench-slots');if(slotsEl){
       slotsEl.textContent=slots.openBench;
       slotsEl.style.color=slots.openBench>0?'var(--green)':'var(--red)';
@@ -923,7 +930,7 @@ function renderHomeSnapshot(){
           <div style="font-size:22px;font-weight:800;color:var(--text2);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${leagueAvg}</div>
           <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Lg Avg</div>
         </div>
-        ${faab.budget>0?`<div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
+        ${faab.isFAAB?`<div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">$${faab.remaining}</div>
           <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">FAAB</div>
         </div>`:''}
