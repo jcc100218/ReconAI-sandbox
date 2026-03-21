@@ -55,6 +55,25 @@ self.addEventListener('activate', event => {
   );
 });
 
+// ── Push notifications ──────────────────────────────────────
+self.addEventListener('push', event => {
+  const data = event.data?.json() || { title: 'ReconAI', body: 'New dynasty intel available' };
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icons/icon-192.svg',
+      badge: './icons/icon-192.svg',
+      data: data.url || './',
+      actions: data.actions || [],
+    })
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(clients.openWindow(event.notification.data || './'));
+});
+
 // ── Fetch: routing strategy ─────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);

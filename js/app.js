@@ -213,9 +213,12 @@ async function loadAllData(){
     try{if(typeof renderDraftNeeds==='function')renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
     try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
     try{if(typeof renderTeamOverview==='function')renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
+    try{if(typeof renderPowerRankings==='function')renderPowerRankings();}catch(e){console.warn('renderPowerRankings:',e);}
+    try{if(typeof renderHealthTimeline==='function')renderHealthTimeline();}catch(e){console.warn('renderHealthTimeline:',e);}
     try{if(typeof renderLeaguePulse==='function')renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
     try{if(typeof renderNewsFeed==='function')renderNewsFeed();}catch(e){console.warn('renderNewsFeed:',e);}
     try{if(typeof renderTradeIntel==='function')renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
+    try{checkForAlerts();}catch(e){console.warn('checkForAlerts:',e);}
     if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();
     if(!localStorage.getItem('dhq_strategy_done')&&(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))){
       setTimeout(()=>{if(typeof startStrategyWalkthrough==='function')startStrategyWalkthrough();},500);
@@ -357,6 +360,61 @@ let statsData={};
 Object.assign(window, {loadMemory,saveMemory,getMemory,setMemory,renderStatsTable,statsData});
 Object.assign(window.App, {loadMemory,saveMemory,getMemory,setMemory});
 
+// ── Notifications ───────────────────────────────────────────
+function enableNotifications(){
+  if(!('Notification' in window)){ss('notif-status','Notifications not supported in this browser',true);return;}
+  Notification.requestPermission().then(perm=>{
+    localStorage.setItem('dhq_notif_perm',perm);
+    const btn=$('notif-btn');
+    if(perm==='granted'){ss('notif-status','Notifications enabled ✓');if(btn)btn.textContent='Enabled ✓';}
+    else if(perm==='denied'){ss('notif-status','Notifications blocked — check browser settings',true);if(btn)btn.textContent='Blocked';}
+    else{ss('notif-status','Permission dismissed');}
+  });
+}
+window.enableNotifications = enableNotifications;
+
+function checkForAlerts(){
+  if(!('Notification' in window)||Notification.permission!=='granted')return;
+  const roster=myR();if(!roster?.players?.length)return;
+  const prev=JSON.parse(localStorage.getItem('dhq_last_alerts')||'{}');
+  const now={};const alerts=[];
+  // 1. Injury alerts for rostered players
+  roster.players.forEach(pid=>{
+    const p=S.players[pid];if(!p)return;
+    const status=p.injury_status||'';
+    if(status==='Out'||status==='IR'){
+      const key='inj_'+pid+'_'+status;
+      now[key]=1;
+      if(!prev[key])alerts.push({title:'\u{1F6A8} Injury Alert',body:pName(pid)+' has been ruled '+status});
+    }
+  });
+  // 2. Trending pickups matching roster needs
+  const trendingPlayers=window.App.trendingAdds||[];
+  const rosterPositions=new Set(roster.players.map(pid=>pPos(pid)));
+  trendingPlayers.slice(0,10).forEach(tp=>{
+    const pid=tp.player_id||tp.id;const p=S.players[pid];if(!p)return;
+    if(rosterPositions.has(p.position)){
+      const key='trend_'+pid;
+      now[key]=1;
+      if(!prev[key])alerts.push({title:'\u{1F4C8} Trending Pickup',body:pName(pid)+' is trending on waivers \u2014 matches your roster needs'});
+    }
+  });
+  // 3. Trade intel
+  if(window.App.LI?.tradeTargets?.length){
+    const key='trade_v'+Date.now().toString(36).slice(0,5);
+    if(!prev.trade_seen){now.trade_seen=1;alerts.push({title:'\u{1F504} Trade Intel',body:'New trade intel available for your league'});}
+    else{now.trade_seen=prev.trade_seen;}
+  }
+  // Fire notifications via SW if available, else fallback to Notification API
+  const reg=navigator.serviceWorker?.controller?navigator.serviceWorker.ready:null;
+  alerts.forEach(a=>{
+    if(reg)reg.then(r=>r.showNotification(a.title,{body:a.body,icon:'./icons/icon-192.svg',badge:'./icons/icon-192.svg'}));
+    else try{new Notification(a.title,{body:a.body,icon:'./icons/icon-192.svg'});}catch(e){}
+  });
+  localStorage.setItem('dhq_last_alerts',JSON.stringify(now));
+}
+window.checkForAlerts = checkForAlerts;
+
 // ── Boot: Restore API key + auto-connect ───────────────────────
 (function restoreApiKey(){
   try{
@@ -401,6 +459,8 @@ Object.assign(window.App, {loadMemory,saveMemory,getMemory,setMemory});
     }
     const xk=localStorage.getItem('dynastyhq_xai_key');
     if(xk){const xIn=$('xai-key-in');if(xIn)xIn.value=xk;}
+    // Restore notification button state
+    if('Notification' in window&&Notification.permission==='granted'){const nb=$('notif-btn');if(nb)nb.textContent='Enabled \u2713';}
     const savedUser = localStorage.getItem('dynastyhq_username');
     if(savedUser){
       const uInput = $('u-input');

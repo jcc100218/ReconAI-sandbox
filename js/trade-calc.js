@@ -564,36 +564,93 @@ function calcPsychTaxes(myAssessment, theirAssessment, theirDnaKey, theirPosture
 }
 
 /**
- * Derive DNA from trade history (LI.ownerProfiles)
- * Returns a DNA key string or null if insufficient data
+ * Derive DNA from trade history (LI.ownerProfiles enriched data)
+ * Returns { key: string, confidence: number (0-1) } or null if insufficient data (<3 trades)
  */
 function deriveDNAFromHistory(rosterId) {
-  // Primary: use LI.ownerProfiles from DHQ engine
   const profile = LI_LOADED && LI.ownerProfiles?.[rosterId];
-  if (!profile || profile.trades < 2) return null;
+  if (!profile || profile.trades < 3) return null;
 
-  const pickBuyer  = profile.picksAcquired > profile.picksSold * 1.5;
-  const pickSeller = profile.picksSold > profile.picksAcquired * 1.5;
+  const { trades, tradesWon, tradesLost, tradesFair, picksAcquired, picksSold, weekTiming } = profile;
+  const pickBuyer  = picksAcquired > picksSold * 1.5;
+  const pickSeller = picksSold > picksAcquired * 1.5;
   const totalTeams = S.rosters?.length || 12;
   const avgTrades  = (LI.leagueTradeTendencies?.totalTrades || 0) / totalTeams;
-  const highVolume = profile.trades >= avgTrades * 1.5;
-  const lowVolume  = profile.trades <= 1;
+  // Top 25% by trade count = above 75th percentile
+  const allCounts  = Object.values(LI.ownerProfiles || {}).map(p => p.trades).sort((a, b) => a - b);
+  const p75        = allCounts[Math.floor(allCounts.length * 0.75)] || avgTrades;
+  const highVolume = trades >= p75 && trades >= 3;
+  const lowVolume  = trades <= Math.max(1, avgTrades * 0.4);
 
-  // Get roster assessment for panic check
-  const roster = S.rosters?.find(r => r.roster_id === rosterId);
-  const wins   = roster?.settings?.wins || 0;
-  const losses = roster?.settings?.losses || 0;
-  const played = wins + losses;
-  const losingRecord = played > 0 && losses / played > 0.55;
+  // Assessment for panic / tier check
+  const assessment = _tcAssessments?.find(a => a.rosterId === rosterId);
+  const isRebuilding = assessment?.tier === 'REBUILDING';
+  const highPanic    = (assessment?.panic || 0) >= 3;
+  const lateSeason   = (weekTiming?.late || 0) > (weekTiming?.early || 0);
 
-  // Decision tree
-  if (highVolume && pickSeller) return 'FLEECER';
-  if (highVolume && !pickBuyer) return 'DOMINATOR';
-  if (!highVolume && !pickBuyer && !pickSeller && profile.trades >= 2) return 'STALWART';
-  if (pickBuyer) return 'ACCEPTOR';
-  if (lowVolume && losingRecord) return 'DESPERATE';
+  // Score each archetype (0-1 range per factor, then averaged)
+  const scores = {};
 
-  return null;
+  // FLEECER: tradesWon > tradesLost*2 AND trades >= 3
+  if (tradesWon > tradesLost * 2 && trades >= 3) {
+    let c = 0.6;
+    c += Math.min(0.2, (tradesWon - tradesLost * 2) / trades * 0.4); // margin above threshold
+    if (pickSeller) c += 0.1;  // pick sellers lean dominator/win-now
+    if (trades >= 5) c += 0.1; // more data = more confidence
+    scores.FLEECER = Math.min(1, c);
+  }
+
+  // DOMINATOR: tradesWon > tradesLost AND highVolume
+  if (tradesWon > tradesLost && highVolume) {
+    let c = 0.55;
+    c += Math.min(0.15, (tradesWon - tradesLost) / trades * 0.3);
+    if (pickSeller) c += 0.15; // selling picks = win-now posture
+    if (trades >= p75 * 1.3) c += 0.1; // well above volume threshold
+    scores.DOMINATOR = Math.min(1, c);
+  }
+
+  // STALWART: tradesFair >= trades*0.5 AND trades >= 3
+  if (tradesFair >= trades * 0.5 && trades >= 3) {
+    let c = 0.5;
+    c += Math.min(0.25, (tradesFair / trades - 0.5) * 1.0); // how far above 50% fair
+    if (!pickBuyer && !pickSeller) c += 0.1; // balanced pick activity
+    if (trades >= 5) c += 0.1;
+    scores.STALWART = Math.min(1, c);
+  }
+
+  // ACCEPTOR: tradesLost > tradesWon AND pickBuyer
+  if (tradesLost > tradesWon && pickBuyer) {
+    let c = 0.55;
+    c += Math.min(0.2, (tradesLost - tradesWon) / trades * 0.4);
+    c += Math.min(0.15, (picksAcquired - picksSold * 1.5) / (picksAcquired || 1) * 0.3);
+    if (isRebuilding) c += 0.1;
+    scores.ACCEPTOR = Math.min(1, c);
+  }
+
+  // DESPERATE: lowVolume AND (rebuilding or high panic)
+  if (lowVolume && (isRebuilding || highPanic)) {
+    let c = 0.45;
+    if (isRebuilding && highPanic) c += 0.2;
+    else if (isRebuilding || highPanic) c += 0.1;
+    if (lateSeason) c += 0.15; // late-season trades = panic
+    if (tradesLost > tradesWon) c += 0.1;
+    scores.DESPERATE = Math.min(1, c);
+  }
+
+  // Timing & pick modifiers — nudge existing scores
+  if (lateSeason && scores.DESPERATE != null) scores.DESPERATE = Math.min(1, scores.DESPERATE + 0.1);
+  if (pickBuyer) {
+    if (scores.ACCEPTOR != null) scores.ACCEPTOR = Math.min(1, scores.ACCEPTOR + 0.05);
+  }
+  if (pickSeller) {
+    if (scores.DOMINATOR != null) scores.DOMINATOR = Math.min(1, scores.DOMINATOR + 0.05);
+  }
+
+  // Pick the highest-scoring archetype
+  const entries = Object.entries(scores);
+  if (!entries.length) return null;
+  entries.sort((a, b) => b[1] - a[1]);
+  return { key: entries[0][0], confidence: +entries[0][1].toFixed(2) };
 }
 
 
@@ -730,7 +787,8 @@ let _tcBuilderMy = null;
 let _tcBuilderTheir = null;
 let _tcBuilderMyAssets = { players: [], picks: [], faab: 0 };
 let _tcBuilderTheirAssets = { players: [], picks: [], faab: 0 };
-let _tcActiveView = 'overview'; // 'overview' | 'scout' | 'partners' | 'builder' | 'dna'
+let _tcActiveView = 'overview'; // 'overview' | 'scout' | 'partners' | 'builder' | 'dna' | 'valuechart'
+let _vcShowCount = 50; // Value Chart: how many rows to render
 
 // ── renderTradeCalc — main entry point ───────────────────────
 
@@ -760,11 +818,11 @@ async function renderTradeCalc() {
     _tcDnaMap = await loadDNAProfiles(S.currentLeagueId);
   }
 
-  // Auto-derive missing DNA
+  // Auto-derive missing DNA (deriveDNAFromHistory returns {key,confidence} or null)
   _tcAssessments.forEach(a => {
     if (!_tcDnaMap[a.rosterId]) {
       const derived = deriveDNAFromHistory(a.rosterId);
-      if (derived) _tcDnaMap[a.rosterId] = derived;
+      if (derived) _tcDnaMap[a.rosterId] = derived.key;
     }
   });
 
@@ -779,6 +837,8 @@ function _renderTradeCalcShell(el) {
         <button class="btn btn-sm ${_tcActiveView === 'partners' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('partners')">Partner Finder</button>
         <button class="btn btn-sm ${_tcActiveView === 'builder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('builder')">Trade Builder</button>
         <button class="btn btn-sm ${_tcActiveView === 'dna' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('dna')">Owner DNA</button>
+        <button class="btn btn-sm ${_tcActiveView === 'valuechart' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('valuechart')">Value Chart</button>
+        <button class="btn btn-sm ${_tcActiveView === 'history' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('history')">History</button>
       </div>
     </div>
     <div id="tc-view-content"></div>
@@ -790,6 +850,8 @@ function _renderTradeCalcShell(el) {
   else if (_tcActiveView === 'partners') renderPartnerFinder(_tcMyAssessment, _tcAssessments, content);
   else if (_tcActiveView === 'builder') renderTradeBuilder(_tcBuilderMy?.rosterId || S.myRosterId, _tcBuilderTheir?.rosterId, content);
   else if (_tcActiveView === 'dna') renderDNAPanel(_tcAssessments, content);
+  else if (_tcActiveView === 'valuechart') renderValueChart(content);
+  else if (_tcActiveView === 'history') renderTradeHistory(content);
   else renderLeagueOverview(_tcAssessments, content);
 }
 
@@ -1425,7 +1487,7 @@ function renderDNAPanel(assessments, container) {
 
   let html = `<div class="sec">Owner DNA Profiles <span class="sec-line"></span></div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">
-      DNA profiles model each owner's trade psychology. Auto-derived from league trade history, or set manually.
+      DNA profiles model each owner's trade psychology. Auto-derived from league trade history, or set manually via Override.
     </div>`;
 
   const sorted = [...assessments].sort((a, b) => b.healthScore - a.healthScore);
@@ -1434,12 +1496,29 @@ function renderDNAPanel(assessments, container) {
     const dnaKey = _tcDnaMap[a.rosterId] || 'NONE';
     const dna = DNA_TYPES[dnaKey] || DNA_TYPES.NONE;
     const derived = deriveDNAFromHistory(a.rosterId);
-    const derivedDna = derived ? DNA_TYPES[derived] : null;
+    const derivedKey = derived ? derived.key : null;
+    const derivedDna = derivedKey ? DNA_TYPES[derivedKey] : null;
+    const derivedConf = derived ? derived.confidence : 0;
     const posture = calcOwnerPosture(a, dnaKey);
     const isMe = a.rosterId === S.myRosterId;
 
     // Trade history stats from LI.ownerProfiles
     const profile = LI_LOADED && LI.ownerProfiles?.[a.rosterId];
+
+    // Resolve most-traded-with partner name
+    let topPartnerStr = '';
+    if (profile?.partners) {
+      const partnerEntries = Object.entries(profile.partners).sort((x, y) => y[1] - x[1]);
+      if (partnerEntries.length) {
+        const [pRid, pCount] = partnerEntries[0];
+        const pAssessment = assessments.find(x => String(x.rosterId) === String(pRid));
+        topPartnerStr = `${pAssessment?.ownerName || 'Owner ' + pRid} (${pCount}x)`;
+      }
+    }
+
+    // Confidence display
+    const confPct = Math.round(derivedConf * 100);
+    const confColor = confPct >= 75 ? 'var(--green)' : confPct >= 50 ? 'var(--amber)' : 'var(--text3)';
 
     html += `
       <div class="card" style="margin-bottom:8px;${isMe ? 'border-color:rgba(124,107,248,.3)' : ''}">
@@ -1450,31 +1529,39 @@ function renderDNAPanel(assessments, container) {
               <span style="font-size:11px;color:${a.tierColor};font-weight:600">${a.tier}</span>
             </div>
 
-            <!-- Current DNA badge -->
+            <!-- Current DNA badge + posture -->
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
               <span style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:700;background:${dna.color}22;color:${dna.color};border:1px solid ${dna.color}40">${dna.label || 'Not Set'}</span>
               <span style="font-size:10px;padding:2px 6px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
             </div>
             ${dna.desc ? `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">${dna.desc}</div>` : ''}
 
-            <!-- Auto-derived suggestion -->
-            ${derived && derived !== dnaKey ? `<div style="font-size:11px;color:var(--amber);margin-bottom:6px">
-              Suggested: <span style="font-weight:700;color:${derivedDna.color}">${derivedDna.label}</span> (based on trade history)
-              <button class="btn btn-sm" style="font-size:10px;padding:2px 8px;margin-left:6px" onclick="_tcSetDNA(${a.rosterId},'${derived}')">Apply</button>
-            </div>` : ''}
+            <!-- Auto-derived DNA with confidence -->
+            ${derivedKey ? `<div style="font-size:11px;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span style="color:var(--text3)">Auto:</span>
+              <span style="font-weight:700;color:${derivedDna.color}">${derivedDna.label}</span>
+              <span style="color:${confColor};font-weight:600">(${confPct}% confidence)</span>
+              <span style="width:40px;height:4px;border-radius:2px;background:var(--bg3);display:inline-block;vertical-align:middle;overflow:hidden"><span style="display:block;width:${confPct}%;height:100%;background:${confColor};border-radius:2px"></span></span>
+              ${derivedKey !== dnaKey ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="_tcSetDNA(${a.rosterId},'${derivedKey}')">Apply</button>` : ''}
+            </div>` : profile && profile.trades < 3 ? `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Auto: Insufficient data (${profile.trades} trade${profile.trades !== 1 ? 's' : ''}, need 3+)</div>` : ''}
 
-            <!-- Trade history stats -->
-            ${profile ? `<div style="display:flex;gap:12px;font-size:11px;color:var(--text3);flex-wrap:wrap">
+            <!-- Trade history stats: wins/losses/fair, avg value diff, most traded with -->
+            ${profile ? `<div style="display:flex;gap:10px;font-size:11px;color:var(--text3);flex-wrap:wrap;margin-bottom:4px">
+              <span><span style="font-weight:600;color:var(--green)">${profile.tradesWon || 0}W</span> / <span style="font-weight:600;color:var(--red)">${profile.tradesLost || 0}L</span> / <span style="font-weight:600;color:var(--text2)">${profile.tradesFair || 0}F</span></span>
+              <span>Avg diff: <span style="font-weight:600;color:${(profile.avgValueDiff || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(profile.avgValueDiff || 0) >= 0 ? '+' : ''}${profile.avgValueDiff || 0}</span></span>
+              ${topPartnerStr ? `<span>Most traded with: <span style="font-weight:600;color:var(--accent)">${topPartnerStr}</span></span>` : ''}
+            </div>
+            <div style="display:flex;gap:10px;font-size:11px;color:var(--text3);flex-wrap:wrap">
               <span>Trades: <span style="font-weight:600;color:var(--text2)">${profile.trades}</span></span>
               <span>Picks In: <span style="font-weight:600;color:var(--green)">${profile.picksAcquired || 0}</span></span>
               <span>Picks Out: <span style="font-weight:600;color:var(--red)">${profile.picksSold || 0}</span></span>
               ${profile.targetPos ? `<span>Targets: <span style="font-weight:600;color:var(--accent)">${profile.targetPos}</span></span>` : ''}
-              ${profile.dna ? `<span>Style: <span style="font-weight:600;color:var(--text2)">${profile.dna}</span></span>` : ''}
             </div>` : '<div style="font-size:11px;color:var(--text3)">No trade history data</div>'}
           </div>
 
-          <!-- Manual override dropdown -->
-          <div style="flex-shrink:0">
+          <!-- Override dropdown -->
+          <div style="flex-shrink:0;text-align:right">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Override</div>
             <select style="font-size:11px;padding:4px 6px;width:110px" onchange="_tcSetDNA(${a.rosterId},this.value)">
               ${Object.entries(DNA_TYPES).map(([key, d]) => `<option value="${key}" ${key === dnaKey ? 'selected' : ''}>${d.label}</option>`).join('')}
             </select>
@@ -1540,6 +1627,307 @@ Object.assign(window.App, {
   fairnessGrade,
 });
 
+// ── renderValueChart — browseable trade value chart ──────────
+
+let _vcFilter = 'All';
+let _vcSearch = '';
+
+function renderValueChart(container) {
+  if (!container) container = $('tc-view-content');
+  if (!container) return;
+
+  const scores = (LI_LOADED && LI.playerScores) ? LI.playerScores : {};
+  const positions = ['All', 'QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB'];
+
+  // Build player list: id, name, team, pos, age, value, peak info
+  let players = [];
+  Object.keys(scores).forEach(pid => {
+    const val = scores[pid] || 0;
+    if (val <= 0) return;
+    const p = S.players?.[pid];
+    if (!p) return;
+    const pos = normPos(p.position);
+    const name = (p.first_name || '') + ' ' + (p.last_name || '');
+    players.push({ pid, name, team: p.team || 'FA', pos, age: p.age || 0, val });
+  });
+
+  // Apply position filter
+  if (_vcFilter !== 'All') players = players.filter(p => p.pos === _vcFilter);
+
+  // Apply search filter
+  if (_vcSearch) {
+    const q = _vcSearch.toLowerCase();
+    players = players.filter(p => p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q));
+  }
+
+  // Sort by value descending
+  players.sort((a, b) => b.val - a.val);
+
+  const total = players.length;
+  const visible = players.slice(0, _vcShowCount);
+
+  // Position filter buttons
+  let html = `<div class="sec">Trade Value Chart <span class="sec-line"></span></div>`;
+  html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">`;
+  html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">`;
+  positions.forEach(pos => {
+    const active = _vcFilter === pos;
+    html += `<button class="btn btn-sm ${active ? '' : 'btn-ghost'}" onclick="_vcSetFilter('${pos}')">${pos}</button>`;
+  });
+  html += `<div style="flex:1"></div>`;
+  html += `<input type="text" id="vc-search" placeholder="Search player or team…" value="${_vcSearch.replace(/"/g, '&quot;')}" oninput="_vcSetSearch(this.value)" style="font-size:13px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text1);width:180px;outline:none">`;
+  html += `</div>`;
+
+  // Count
+  html += `<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${total} player${total !== 1 ? 's' : ''} valued</div>`;
+
+  // Header row
+  html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.03em">`;
+  html += `<span>#</span><span></span><span>Player</span><span>Pos</span><span>Age</span><span>Value</span><span>Phase</span><span></span>`;
+  html += `</div>`;
+
+  // Player rows
+  html += `<div style="max-height:520px;overflow-y:auto">`;
+  visible.forEach((p, i) => {
+    const rank = i + 1;
+    const { tier, col } = tradeValueTier(p.val);
+    const pk = peakYears(p.pid);
+    const initials = p.name.split(' ').map(n => (n[0] || '')).join('');
+    // Trend arrow: Rising/Seedling = up, Peak = steady, Veteran/Declining = down
+    const arrow = pk.cls === 'rising' || pk.cls === 'seedling' ? '<span style="color:var(--green)">&#9650;</span>'
+      : pk.cls === 'peak' ? '<span style="color:var(--text3)">&#9654;</span>'
+      : pk.cls === 'veteran' || pk.cls === 'declining' ? '<span style="color:var(--red)">&#9660;</span>' : '';
+
+    html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:5px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${p.pid}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">`;
+    // Rank
+    html += `<span style="font-size:12px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${rank}</span>`;
+    // Photo
+    html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:700;color:var(--text3)\\'>${initials}</span>'" loading="lazy"/></div>`;
+    // Name + Team
+    html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.team}</div></div>`;
+    // Pos badge
+    html += `<span class="pos ${posClass(p.pos)}" style="font-size:11px;padding:1px 5px">${p.pos}</span>`;
+    // Age
+    html += `<span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace">${p.age || '—'}</span>`;
+    // Value
+    html += `<span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>`;
+    // Peak phase
+    html += `<span style="font-size:11px;color:${pk.color};font-weight:600">${pk.label}</span>`;
+    // Trend arrow
+    html += `<span style="font-size:11px;text-align:center">${arrow}</span>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // Show more button
+  if (_vcShowCount < total) {
+    const remaining = total - _vcShowCount;
+    html += `<div style="text-align:center;padding:10px"><button class="btn btn-sm btn-ghost" onclick="_vcShowMore()">Show ${Math.min(50, remaining)} more (${remaining} remaining)</button></div>`;
+  }
+
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+function _vcSetFilter(pos) {
+  _vcFilter = pos;
+  _vcShowCount = 50;
+  const el = $('tc-view-content');
+  if (el) renderValueChart(el);
+}
+window._vcSetFilter = _vcSetFilter;
+
+function _vcSetSearch(val) {
+  _vcSearch = val;
+  _vcShowCount = 50;
+  const el = $('tc-view-content');
+  if (el) renderValueChart(el);
+}
+window._vcSetSearch = _vcSetSearch;
+
+function _vcShowMore() {
+  _vcShowCount += 50;
+  const el = $('tc-view-content');
+  if (el) renderValueChart(el);
+}
+window._vcShowMore = _vcShowMore;
+
+
+// ── renderTradeHistory — Trade History Visualization ──────────
+
+let _thSeasonFilter = null;
+let _thOwnerFilter = null;
+
+function _thOwner(rid) {
+  const a = _tcAssessments.find(x => x.rosterId === rid);
+  return a ? a.ownerName : `Team ${rid}`;
+}
+function _thAvatar(rid) {
+  const a = _tcAssessments.find(x => x.rosterId === rid);
+  if (a?.avatar) return `<img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`;
+  return `<div style="width:22px;height:22px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text3)">${(_thOwner(rid)[0] || '?').toUpperCase()}</div>`;
+}
+
+function renderTradeHistory(container) {
+  if (!container) container = $('tc-view-content');
+  if (!container) return;
+  const trades = (LI_LOADED && LI.tradeHistory) || [];
+  const profiles = (LI_LOADED && LI.ownerProfiles) || {};
+  const myRid = S.myRosterId;
+  if (!trades.length) { container.innerHTML = '<div class="card" style="text-align:center;color:var(--text3);padding:20px">No trade history available</div>'; return; }
+
+  // Collect all seasons and owner rids
+  const seasons = [...new Set(trades.map(t => t.season))].sort();
+  const allRids = [...new Set(trades.flatMap(t => t.roster_ids))].sort((a, b) => a - b);
+  let html = '';
+
+  // ── 1. Trade Activity Heatmap ──
+  html += `<div class="sec">Trade Activity Heatmap <span class="sec-line"></span></div>`;
+  html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;overflow-x:auto;margin-bottom:16px">`;
+  html += `<div style="display:grid;grid-template-columns:140px repeat(${seasons.length},1fr);gap:2px;font-size:12px">`;
+  html += `<div style="font-weight:700;color:var(--text3)"></div>`;
+  seasons.forEach(s => { html += `<div style="text-align:center;font-weight:700;color:var(--text3)">${s}</div>`; });
+  allRids.forEach(rid => {
+    const isMe = rid === myRid;
+    html += `<div style="font-weight:${isMe ? '700' : '500'};color:${isMe ? 'var(--accent)' : 'var(--text2)'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_thOwner(rid)}</div>`;
+    seasons.forEach(s => {
+      const ct = trades.filter(t => t.season === s && t.roster_ids.includes(rid)).length;
+      const maxCt = Math.max(...allRids.map(r => trades.filter(t => t.season === s && t.roster_ids.includes(r)).length), 1);
+      const intensity = ct > 0 ? 0.2 + 0.8 * (ct / maxCt) : 0;
+      const bg = ct > 0 ? `rgba(69,183,209,${intensity.toFixed(2)})` : 'var(--bg3)';
+      const active = _thSeasonFilter === s && _thOwnerFilter === rid;
+      html += `<div onclick="_thFilterCell(${s},${rid})" style="text-align:center;padding:4px;border-radius:4px;background:${bg};cursor:pointer;font-weight:600;color:${ct > 0 ? 'var(--text1)' : 'var(--text3)'};${active ? 'outline:2px solid var(--accent)' : ''}">${ct || '·'}</div>`;
+    });
+  });
+  html += `</div></div>`;
+
+  // ── 2. Trade Network ──
+  html += `<div class="sec">Trade Network <span class="sec-line"></span></div>`;
+  html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:16px">`;
+  const pairMap = {};
+  trades.forEach(t => {
+    if (t.roster_ids.length !== 2) return;
+    const [a, b] = t.roster_ids.slice().sort((x, y) => x - y);
+    const key = `${a}-${b}`;
+    if (!pairMap[key]) pairMap[key] = { a, b, total: 0, aWon: 0, bWon: 0 };
+    pairMap[key].total++;
+    if (t.winner === a) pairMap[key].aWon++;
+    else if (t.winner === b) pairMap[key].bWon++;
+  });
+  const pairs = Object.values(pairMap).sort((x, y) => y.total - x.total);
+  if (!pairs.length) html += `<div style="color:var(--text3);text-align:center;padding:8px">No 2-team trades found</div>`;
+  pairs.slice(0, 20).forEach(p => {
+    const myInvolved = p.a === myRid || p.b === myRid;
+    const myWins = p.a === myRid ? p.aWon : p.b === myRid ? p.bWon : 0;
+    const myLoss = p.a === myRid ? p.bWon : p.b === myRid ? p.aWon : 0;
+    const col = myInvolved ? (myWins > myLoss ? 'var(--green)' : myLoss > myWins ? 'var(--red)' : 'var(--text2)') : 'var(--text2)';
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;color:${col}">`;
+    html += `${_thAvatar(p.a)} <span style="font-weight:600">${_thOwner(p.a)}</span>`;
+    html += `<span style="color:var(--text3);font-size:11px">\u21C4</span>`;
+    html += `${_thAvatar(p.b)} <span style="font-weight:600">${_thOwner(p.b)}</span>`;
+    html += `<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px">${p.total} trade${p.total > 1 ? 's' : ''}</span>`;
+    html += `<span style="font-size:11px;color:var(--text3)">(${_thOwner(p.a).split(' ')[0]} ${p.aWon}W, ${_thOwner(p.b).split(' ')[0]} ${p.bWon}W)</span>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // ── 3. Trade Leaderboard ──
+  html += `<div class="sec">Trade Leaderboard <span class="sec-line"></span></div>`;
+  html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:16px">`;
+  html += `<div style="display:grid;grid-template-columns:32px 22px 1fr 80px 60px 60px 60px 80px 90px;gap:4px;padding:4px 6px;font-size:11px;font-weight:700;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.03em">`;
+  html += `<span>#</span><span></span><span>Owner</span><span>Record</span><span>Won</span><span>Lost</span><span>Fair</span><span>Avg Val</span><span>Badge</span></div>`;
+  const ranked = allRids.map(rid => {
+    const p = profiles[rid] || {};
+    const total = (p.tradesWon || 0) + (p.tradesLost || 0) + (p.tradesFair || 0);
+    const score = total > 0 ? ((p.tradesWon || 0) - (p.tradesLost || 0)) / total : 0;
+    return { rid, ...p, total, score };
+  }).filter(r => r.total > 0).sort((a, b) => b.score - a.score);
+
+  const bestRid = ranked[0]?.rid;
+  const worstRid = ranked[ranked.length - 1]?.rid;
+  ranked.forEach((r, i) => {
+    const isMe = r.rid === myRid;
+    const badge = r.rid === bestRid ? '<span style="color:#D4AF37;font-weight:700" title="Best Trader">Best Trader</span>'
+      : r.rid === worstRid && ranked.length > 1 ? '<span style="color:var(--red);font-weight:700" title="Most Fleeced">Most Fleeced</span>' : '';
+    const avgCol = (r.avgValueDiff || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+    html += `<div style="display:grid;grid-template-columns:32px 22px 1fr 80px 60px 60px 60px 80px 90px;gap:4px;padding:5px 6px;align-items:center;border-bottom:1px solid var(--border);${isMe ? 'background:rgba(69,183,209,0.08);border-radius:6px' : ''}">`;
+    html += `<span style="font-size:12px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${i + 1}</span>`;
+    html += _thAvatar(r.rid);
+    html += `<span style="font-weight:${isMe ? '700' : '500'};color:${isMe ? 'var(--accent)' : 'var(--text1)'};font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_thOwner(r.rid)}</span>`;
+    html += `<span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${r.tradesWon || 0}-${r.tradesLost || 0}-${r.tradesFair || 0}</span>`;
+    html += `<span style="font-size:12px;color:var(--green);font-weight:600">${r.tradesWon || 0}</span>`;
+    html += `<span style="font-size:12px;color:var(--red);font-weight:600">${r.tradesLost || 0}</span>`;
+    html += `<span style="font-size:12px;color:var(--text3)">${r.tradesFair || 0}</span>`;
+    html += `<span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:${avgCol}">${(r.avgValueDiff || 0) >= 0 ? '+' : ''}${(r.avgValueDiff || 0).toLocaleString()}</span>`;
+    html += `<span style="font-size:11px">${badge}</span>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // ── 4. Recent Trades Feed ──
+  const filteredTrades = (_thSeasonFilter && _thOwnerFilter)
+    ? trades.filter(t => t.season === _thSeasonFilter && t.roster_ids.includes(_thOwnerFilter))
+    : null;
+  const feedTrades = (filteredTrades || trades.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))).slice(0, 10);
+  const feedTitle = filteredTrades ? `Trades: ${_thOwner(_thOwnerFilter)} in ${_thSeasonFilter}` : 'Recent Trades';
+  html += `<div class="sec">${feedTitle} ${filteredTrades ? `<span style="font-size:11px;cursor:pointer;color:var(--accent);margin-left:8px" onclick="_thClearFilter()">[clear filter]</span>` : ''}<span class="sec-line"></span></div>`;
+  html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">`;
+  if (!feedTrades.length) html += `<div style="color:var(--text3);text-align:center;padding:8px">No trades found</div>`;
+  feedTrades.forEach(t => {
+    const rids = t.roster_ids || [];
+    const date = t.ts ? new Date(t.ts * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : `S${t.season} W${t.week}`;
+    const fg = (() => {
+      const maxVal = Math.max(...rids.map(r => t.sides[r]?.totalValue || 0), 1);
+      const diff = t.valueDiff || 0;
+      const pct = diff / maxVal;
+      if (pct <= 0.05) return { grade: 'A+', color: 'var(--green)' };
+      if (pct <= 0.10) return { grade: 'A', color: 'var(--green)' };
+      if (pct <= 0.15) return { grade: 'B+', color: '#2ECC71' };
+      if (pct <= 0.22) return { grade: 'B', color: 'var(--accent)' };
+      if (pct <= 0.30) return { grade: 'C', color: 'var(--amber)' };
+      if (pct <= 0.40) return { grade: 'D', color: '#F0A500' };
+      return { grade: 'F', color: 'var(--red)' };
+    })();
+    html += `<div style="border-bottom:1px solid var(--border);padding:10px 0">`;
+    html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">`;
+    html += `<span style="font-size:11px;color:var(--text3)">${date}</span>`;
+    html += `<span style="font-size:13px;font-weight:700;color:${fg.color}">${fg.grade}</span>`;
+    html += `</div>`;
+    rids.forEach(rid => {
+      const side = t.sides[rid] || {};
+      const isWinner = t.winner === rid;
+      const players = (side.players || []).map(pid => pNameShort(pid)).join(', ') || 'none';
+      const picks = (side.picks || []).map(pk => `${pk.season} Rd${pk.round}`).join(', ');
+      const assets = [players, picks].filter(Boolean).join(' + ');
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">`;
+      html += `${_thAvatar(rid)} <span style="font-weight:600;color:${isWinner ? 'var(--green)' : 'var(--text2)'}${rid === myRid ? ';text-decoration:underline' : ''}">${_thOwner(rid)}${isWinner ? ' ✓' : ''}</span>`;
+      html += `<span style="color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${assets}">${assets}</span>`;
+      html += `<span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)">${(side.totalValue || 0).toLocaleString()}</span>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  container.innerHTML = html;
+}
+
+function _thFilterCell(season, rid) {
+  if (_thSeasonFilter === season && _thOwnerFilter === rid) { _thSeasonFilter = null; _thOwnerFilter = null; }
+  else { _thSeasonFilter = season; _thOwnerFilter = rid; }
+  const el = $('tc-view-content');
+  if (el) renderTradeHistory(el);
+}
+window._thFilterCell = _thFilterCell;
+
+function _thClearFilter() {
+  _thSeasonFilter = null; _thOwnerFilter = null;
+  const el = $('tc-view-content');
+  if (el) renderTradeHistory(el);
+}
+window._thClearFilter = _thClearFilter;
+
+
 // initTradeCalc — called when Trades tab is shown
 async function initTradeCalc() {
   if (!S.rosters?.length || !S.players || !Object.keys(S.players).length) return;
@@ -1556,4 +1944,6 @@ Object.assign(window, {
   renderPartnerFinder,
   renderTradeBuilder,
   renderDNAPanel,
+  renderValueChart,
+  renderTradeHistory,
 });

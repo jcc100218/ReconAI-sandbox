@@ -142,6 +142,8 @@
         </div>
         <!-- Team overview — replaces AI recommendations (saves API call) -->
         <div id="home-team-overview"></div>
+        <!-- Power Rankings — all teams ranked with AI commentary -->
+        <div id="power-rankings" style="margin-top:14px"></div>
         <!-- League Pulse — trending adds/drops from Sleeper -->
         <div id="league-pulse"></div>
       </div>
@@ -411,6 +413,7 @@
       <div id="draft-needs" style="display:none"></div>
       <!-- Historical success — league-wide + your picks -->
       <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
+      <div id="rookie-profiles" style="margin-top:14px"></div>
     </div>
 
     <!-- AI AGENT -->
@@ -487,6 +490,12 @@
           <button class="btn" onclick="saveMentality()">Save strategy</button>
           <div id="mentality-saved" style="font-size:12px;color:var(--green);display:none">Saved ✓</div>
         </div>
+      </div>
+      <div class="sec">Notifications <div class="sec-line"></div></div>
+      <div class="card">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Get alerts for injuries, trending pickups, and trade opportunities.</p>
+        <button class="btn" onclick="enableNotifications()" id="notif-btn">Enable notifications</button>
+        <div id="notif-status" class="status-txt"></div>
       </div>
       <div class="sec">Account <div class="sec-line"></div></div>
       <div class="card">

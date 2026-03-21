@@ -1241,6 +1241,206 @@ function renderTeamOverview(){
   }
 
   el.innerHTML=html;
+  recordHealthSnapshot(healthScore,hTier);
+}
+
+// ── Power Rankings ─────────────────────────────────────────────
+function renderPowerRankings(){
+  const el=$('power-rankings');if(!el)return;
+  if(!S.rosters?.length){el.innerHTML='';return;}
+
+  // Assess all teams
+  const teams=assessAllTeamsFromGlobal();
+  if(!teams.length){el.innerHTML='';return;}
+
+  // Sort by healthScore desc, tiebreak by weeklyPts desc
+  teams.sort((a,b)=>b.healthScore-a.healthScore||(b.weeklyPts-a.weeklyPts));
+
+  // Rank medal colors
+  const rankStyle=i=>i===0?'color:#D4AF37;font-weight:800':i===1?'color:#C0C0C0;font-weight:800':i===2?'color:#CD7F32;font-weight:800':'color:var(--text3);font-weight:700';
+
+  // Tier badge
+  const tierBadge=(tier,color,bg)=>`<span style="font-size:10px;font-weight:700;color:${color};background:${bg};padding:2px 7px;border-radius:10px;white-space:nowrap;letter-spacing:.03em">${tier}</span>`;
+
+  // Health bar color by tier
+  const barColor=tier=>tier==='ELITE'?'#D4AF37':tier==='CONTENDER'?'#2ECC71':tier==='CROSSROADS'?'#F0A500':'#E74C3C';
+
+  // Check for cached AI commentary
+  const cacheKey='dhq_power_rankings_'+(S.currentLeagueId||'');
+  let cached=null;
+  try{
+    const raw=localStorage.getItem(cacheKey);
+    if(raw){
+      const parsed=JSON.parse(raw);
+      if(parsed.ts&&Date.now()-parsed.ts<3600000)cached=parsed.posts;
+    }
+  }catch(e){}
+
+  // Build rows
+  const rows=teams.map((t,i)=>{
+    const isMe=t.rosterId===S.myRosterId;
+    const avatarUrl=t.avatar?`https://sleepercdn.com/avatars/thumbs/${t.avatar}`:'';
+    const avatarEl=avatarUrl
+      ?`<img src="${avatarUrl}" style="width:28px;height:28px;border-radius:50%;flex-shrink:0" alt="">`
+      :`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg3);flex-shrink:0"></div>`;
+    const commentary=cached?.[i]||'';
+    const pct=Math.max(0,Math.min(100,t.healthScore));
+
+    return`<div class="pr-row" data-rank="${i}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r);${isMe?'background:rgba(124,107,248,0.08);border:1px solid rgba(124,107,248,0.2)':'background:var(--bg3)'};transition:background .15s">
+      <span style="min-width:28px;text-align:center;font-size:14px;font-family:'JetBrains Mono',monospace;${rankStyle(i)}">#${i+1}</span>
+      ${avatarEl}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px" title="${t.teamName}">${t.teamName}</span>
+          <span style="font-size:11px;color:var(--text3)">${t.ownerName}</span>
+          <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${t.wins}-${t.losses}</span>
+          ${tierBadge(t.tier,t.tierColor,t.tierBg)}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+          <div style="flex:1;max-width:120px;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${barColor(t.tier)};border-radius:3px;transition:width .3s"></div>
+          </div>
+          <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;min-width:24px">${t.healthScore}</span>
+          <span style="font-size:11px;color:var(--text3)">${t.weeklyPts>0?t.weeklyPts.toFixed(1)+' ppg':''}</span>
+        </div>
+        ${commentary?`<div class="pr-commentary" style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4;font-style:italic">${commentary}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Power Rankings</span>
+        <span style="font-size:11px;color:var(--text3)">All teams ranked by health score</span>
+      </div>
+      <button id="pr-ai-btn" onclick="generatePowerCommentary()" style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(124,107,248,0.1);border:1px solid rgba(124,107,248,0.25);border-radius:6px;padding:3px 10px;cursor:pointer;transition:all .15s">${cached?'Refresh commentary':'Generate commentary'}</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">${rows}</div>
+  </div>`;
+}
+
+async function generatePowerCommentary(){
+  const btn=$('pr-ai-btn');if(!btn)return;
+  btn.disabled=true;btn.textContent='Generating...';btn.style.opacity='0.6';
+
+  try{
+    // Get ranked teams
+    const teams=assessAllTeamsFromGlobal();
+    if(!teams.length)throw new Error('No teams');
+    teams.sort((a,b)=>b.healthScore-a.healthScore||(b.weeklyPts-a.weeklyPts));
+
+    // Build context for AI
+    const ctx=teams.map((t,i)=>`#${i+1} ${t.teamName} (${t.ownerName}): ${t.wins}-${t.losses}, health ${t.healthScore}, ${t.tier}, ${t.weeklyPts.toFixed(1)} ppg, needs: ${t.needs.map(n=>n.pos).join('/')||'none'}, strengths: ${t.strengths.join('/')||'none'}`).join('\n');
+
+    const response=await dhqAI('power-posts',null,'POWER RANKINGS:\n'+ctx);
+
+    // Parse JSON from response
+    let posts=[];
+    try{
+      const jsonMatch=response.match(/\{[\s\S]*\}/);
+      if(jsonMatch){
+        const parsed=JSON.parse(jsonMatch[0]);
+        posts=(parsed.posts||[]).map(p=>p.post||'');
+      }
+    }catch(e){
+      // Fallback: split by newlines if not valid JSON
+      posts=response.split('\n').filter(l=>l.trim()).slice(0,teams.length);
+    }
+
+    // Inject commentary into DOM
+    const commentaryEls=document.querySelectorAll('.pr-row');
+    commentaryEls.forEach((row,i)=>{
+      const text=posts[i]||'';
+      if(!text)return;
+      let cel=row.querySelector('.pr-commentary');
+      if(!cel){
+        const container=row.querySelector('div[style*="flex:1"]');
+        if(!container)return;
+        cel=document.createElement('div');
+        cel.className='pr-commentary';
+        cel.style.cssText='font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4;font-style:italic';
+        container.appendChild(cel);
+      }
+      cel.textContent=text;
+    });
+
+    // Cache with 1-hour TTL
+    const cacheKey='dhq_power_rankings_'+(S.currentLeagueId||'');
+    try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),posts}));}catch(e){}
+
+    btn.textContent='Refresh commentary';
+  }catch(e){
+    console.warn('Power commentary error:',e);
+    btn.textContent='Retry commentary';
+  }finally{
+    btn.disabled=false;btn.style.opacity='1';
+  }
+}
+
+// ── Health Timeline ────────────────────────────────────────────
+function recordHealthSnapshot(score,tier){
+  if(!S.currentLeagueId||!score)return;
+  const key='dhq_health_timeline_'+S.currentLeagueId;
+  let timeline=[];
+  try{timeline=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  // Only record if last entry > 24h ago
+  if(timeline.length){
+    const last=new Date(timeline[timeline.length-1].date).getTime();
+    if(Date.now()-last<24*60*60*1000)return;
+  }
+  const today=new Date().toISOString().slice(0,10);
+  timeline.push({date:today,score,tier});
+  if(timeline.length>20)timeline=timeline.slice(-20);
+  try{localStorage.setItem(key,JSON.stringify(timeline));}catch(e){}
+}
+
+function renderHealthTimeline(){
+  const el=$('home-team-overview');if(!el)return;
+  if(!S.currentLeagueId)return;
+  const key='dhq_health_timeline_'+S.currentLeagueId;
+  let timeline=[];
+  try{timeline=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  if(timeline.length<2)return; // need at least 2 points
+
+  const pts=timeline.slice(-10);
+  const high=pts.reduce((a,b)=>b.score>a.score?b:a,pts[0]);
+  const low=pts.reduce((a,b)=>b.score<a.score?b:a,pts[0]);
+  const current=pts[pts.length-1];
+
+  const fmtDate=d=>{const m=new Date(d+'T12:00:00');return m.toLocaleDateString('en-US',{month:'short',day:'numeric'});};
+  const tierCol=tier=>{
+    if(tier==='Elite'||tier==='Contender')return'var(--green)';
+    if(tier==='Crossroads')return'var(--amber)';
+    return'var(--red)';
+  };
+
+  const maxH=40; // max bar height in px
+  const bars=pts.map(p=>{
+    const h=Math.max(3,Math.round((p.score/100)*maxH));
+    const col=tierCol(p.tier);
+    return`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0">
+      <span style="font-size:10px;font-weight:600;color:var(--text2);font-family:'JetBrains Mono',monospace">${p.score}</span>
+      <div style="width:100%;max-width:20px;height:${h}px;background:${col};border-radius:2px;transition:height .3s"></div>
+      <span style="font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42px">${fmtDate(p.date)}</span>
+    </div>`;
+  }).join('');
+
+  const card=document.createElement('div');
+  card.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-top:12px">
+    <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Roster Health Timeline</div>
+    <div style="display:flex;align-items:flex-end;gap:4px;padding:0 2px;min-height:${maxH+30}px">
+      ${bars}
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text2);line-height:1.6">
+      <span style="color:var(--green);font-weight:600">High: ${high.score}</span> <span style="color:var(--text3)">(${fmtDate(high.date)})</span>
+      <span style="margin:0 4px;color:var(--border)">·</span>
+      <span style="color:var(--red);font-weight:600">Low: ${low.score}</span> <span style="color:var(--text3)">(${fmtDate(low.date)})</span>
+      <span style="margin:0 4px;color:var(--border)">·</span>
+      <span style="font-weight:600;color:${tierCol(current.tier)}">Current: ${current.score}</span>
+    </div>
+  </div>`;
+  el.appendChild(card.firstElementChild);
 }
 
 // homeAsk: defined in ai-chat.js
@@ -1952,6 +2152,115 @@ function renderDraftNeeds(){
     </div>`;
     histEl.innerHTML=hHtml;
   }
+
+  renderRookieProfiles();
+}
+
+// ── Rookie Scouting Profiles ───────────────────────────────────
+window._rookieFilter='All';
+function setRookieFilter(f){window._rookieFilter=f;renderRookieProfiles();}
+function renderRookieProfiles(){
+  const el=$('rookie-profiles');if(!el)return;
+  if(!S.players||!LI_LOADED){el.innerHTML='';return;}
+
+  const peaks=LI.peakWindows||{QB:[24,33],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
+  const posMapR=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S','FS','SS'].includes(p))return'DB';return p;};
+  const idpSet=new Set(['DL','LB','DB','DE','DT','CB','S','FS','SS']);
+  const filterGroup=pos=>{const m=posMapR(pos);return idpSet.has(m)?'IDP':m;};
+
+  // 1. Find all rookies with DHQ value
+  const rookies=Object.entries(S.players)
+    .filter(([id,p])=>p.years_exp===0&&LI.playerScores?.[id]>0)
+    .map(([id,p])=>{
+      const val=LI.playerScores[id]||0;
+      const meta=LI.playerMeta?.[id]||{};
+      const pos=posMapR(p.position||'');
+      const grp=filterGroup(p.position||'');
+      const age=pAge(id)||21;
+      const [peakStart]=peaks[pos]||[24,30];
+      const yrsToPeak=Math.max(0,peakStart-age);
+      return{id,p,val,meta,pos,grp,age,yrsToPeak};
+    })
+    .sort((a,b)=>b.val-a.val);
+
+  if(!rookies.length){el.innerHTML='';return;}
+
+  // 2. Position filter tabs
+  const tabs=['All','QB','RB','WR','TE','IDP'];
+  const filtered=window._rookieFilter==='All'?rookies:rookies.filter(r=>r.grp===window._rookieFilter);
+
+  // 3. Profile text generator
+  const profileText=(r)=>{
+    const {pos,val,p}=r;
+    const wt=+(p.weight)||210;const ht=+(p.height?.replace?.(/"/,''))||72;
+    if(pos==='QB') return val>=6000?'Day 1 starter projection — elite arm talent':'Developmental — needs time behind a veteran';
+    if(pos==='RB'){
+      if(wt>=220&&val>=5000) return '3-down back — size + production profile';
+      if(wt<200) return 'Satellite back — receiving specialist';
+      return 'Change of pace — committee upside';
+    }
+    if(pos==='WR'){
+      if(ht>=74&&val>=6000) return 'Alpha WR1 — size/speed/production trifecta';
+      if(ht<72) return 'Slot specialist — quick-twitch separator';
+      return 'Deep threat — vertical stretch ability';
+    }
+    if(pos==='TE'){
+      if(val>=5500) return 'Move TE — mismatched receiving weapon';
+      if(val>=3500) return 'Receiving TE — route-running upside';
+      return 'Blocking TE — run-game asset with catch upside';
+    }
+    if(['DE','DT','DL'].includes(pos)) return val>=5000?'Pass rusher — high-motor edge':'Run stuffer — anchor at the point of attack';
+    if(pos==='LB') return val>=5000?'Ball hawk — sideline-to-sideline range':'Run stuffer — downhill thumper';
+    return val>=4500?'Ball hawk — playmaker in coverage':'Run stuffer — reliable tackler';
+  };
+
+  // 4. Render
+  let html=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Rookie Scouting Board</span>
+      <span style="font-size:11px;color:var(--text3)">${filtered.length} prospect${filtered.length!==1?'s':''}</span>
+      <div style="margin-left:auto;display:flex;gap:4px">
+        ${tabs.map(t=>`<button class="chip${window._rookieFilter===t?' active':''}" onclick="setRookieFilter('${t}')" style="font-size:11px;padding:2px 8px${window._rookieFilter===t?';background:var(--accent);color:#000':''}">${t}</button>`).join('')}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">`;
+
+  filtered.slice(0,30).forEach(r=>{
+    const {id,p,val,meta,pos,age,yrsToPeak}=r;
+    const name=p.first_name+' '+p.last_name;
+    const initials=(p.first_name?.[0]||'')+(p.last_name?.[0]||'');
+    const college=p.college||'—';
+    const ht=p.height||'—';const wt=p.weight?p.weight+'lb':'—';
+    const fcRank=meta.fcRank?`FC #${meta.fcRank} overall`:'';
+    const valStr=val.toLocaleString();
+    const {col}=tradeValueTier(val);
+    const pc=posClass(pos);
+    const profile=profileText(r);
+
+    html+=`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:12px;cursor:pointer;transition:border-color .15s" onclick="openPlayerModal('${id}')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--bg4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
+          <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:36px;height:36px;border-radius:50%" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:11px;font-weight:700;color:var(--text3)\\'>${initials}</span>'" loading="lazy"/>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+          <div style="font-size:11px;color:var(--text3)">${college} · ${ht} · ${wt}</div>
+        </div>
+        <span class="pos ${pc}" style="font-size:11px;padding:1px 5px">${pos}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px">
+        <span style="font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">DHQ ${valStr}</span>
+        ${fcRank?`<span style="color:var(--text3)">·</span><span style="color:var(--amber);font-weight:600">${fcRank}</span>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Age ${age} · ${yrsToPeak>0?yrsToPeak+'yr to peak':'At peak window'}</div>
+      <div style="font-size:12px;color:var(--text2);padding:6px 8px;background:var(--bg2);border-radius:6px;line-height:1.4">
+        <span style="font-weight:600;color:var(--text)">Profile:</span> ${profile}
+      </div>
+    </div>`;
+  });
+
+  html+=`</div></div>`;
+  el.innerHTML=html;
 }
 
 async function runDraftScouting(){
@@ -2119,7 +2428,8 @@ Object.assign(window.App, {
   handlePlayerSearch,
 
   // Home
-  renderHomeSnapshot, renderTeamOverview,
+  renderHomeSnapshot, renderTeamOverview, recordHealthSnapshot, renderHealthTimeline,
+  renderPowerRankings, generatePowerCommentary,
 
   // Strategy
   STRATEGY_QUESTIONS, startStrategyWalkthrough,
@@ -2134,7 +2444,7 @@ Object.assign(window.App, {
   idealDepth,
 
   // Draft Room
-  renderDraftNeeds, runDraftScouting,
+  renderDraftNeeds, runDraftScouting, renderRookieProfiles,
 
   // Mobile nav
   mobileTab,
@@ -2172,6 +2482,10 @@ window.assetName = assetName;
 window.handlePlayerSearch = handlePlayerSearch;
 window.renderHomeSnapshot = renderHomeSnapshot;
 window.renderTeamOverview = renderTeamOverview;
+window.recordHealthSnapshot = recordHealthSnapshot;
+window.renderHealthTimeline = renderHealthTimeline;
+window.renderPowerRankings = renderPowerRankings;
+window.generatePowerCommentary = generatePowerCommentary;
 window.startStrategyWalkthrough = startStrategyWalkthrough;
 window.selectStrategyAnswer = selectStrategyAnswer;
 window.loadStrategy = loadStrategy;
@@ -2183,6 +2497,8 @@ window.loadPlayerCardStats = loadPlayerCardStats;
 window.closePlayerModal = closePlayerModal;
 window.getPlayerFullCard = getPlayerFullCard;
 window.renderDraftNeeds = renderDraftNeeds;
+window.renderRookieProfiles = renderRookieProfiles;
+window.setRookieFilter = setRookieFilter;
 window.runDraftScouting = runDraftScouting;
 window.mobileTab = mobileTab;
 window.checkApiKeyCallout = checkApiKeyCallout;
