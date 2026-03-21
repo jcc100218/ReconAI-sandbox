@@ -248,34 +248,14 @@ League: ${league?.name || '?'} | ${S.rosters.length} teams | ${league?.roster_po
 
 function dhqBuildMentalityContext() {
   const loadMentality = window.loadMentality || window.App?.loadMentality;
-  const loadStrategy = window.loadStrategy || window.App?.loadStrategy;
   if (typeof loadMentality !== 'function') return '';
   const m = loadMentality();
   const labels = {
     mentality: { winnow: 'WIN NOW', rebuild: 'REBUILD', balanced: 'BALANCED', prime: '2-3YR WINDOW' },
-    window: { now: 'competing now', '1yr': '1yr out', '2yr': '2-3yr out', far: 'full rebuild' },
-    tradeStyle: { aggressive: 'aggressive', selective: 'selective', conservative: 'conservative', pick_seller: 'sells picks', pick_hoarder: 'hoards picks' },
-    age: { youth: 'youth<25', balanced_age: 'age neutral', vets: 'vet friendly', agnostic: 'age agnostic' },
-    risk: { high_risk: 'high risk', moderate_risk: 'moderate risk', low_risk: 'low risk', no_risk: 'zero risk' },
   };
-  const parts = [
-    labels.mentality[m.mentality] || m.mentality || 'balanced',
-    labels.window[m.window] || '',
-    labels.tradeStyle[m.tradeStyle] || '',
-    labels.age[m.agePreference] || '',
-    labels.risk[m.riskTolerance] || '',
-  ].filter(Boolean);
-  const lines = ['GM:' + parts.join(',')];
-  if (m.upgradePositions) lines.push('UPGRADING:' + m.upgradePositions);
-  if (m.targetPlayers) lines.push('TARGETS:' + m.targetPlayers);
-  if (m.shoppingPlayers) lines.push('SELLING:' + m.shoppingPlayers);
-  if (m.tradePrefs) lines.push('TRADE STYLE:' + m.tradePrefs.substring(0, 150));
+  const lines = ['GM:' + (labels.mentality[m.mentality] || m.mentality || 'balanced')];
   if (m.neverDrop) lines.push('UNTOUCHABLE:' + m.neverDrop);
   if (m.notes) lines.push('NOTES:' + m.notes.substring(0, 150));
-  if (typeof loadStrategy === 'function') {
-    const strat = loadStrategy();
-    if (strat) lines.push('STRATEGY:' + strat.mode + ',trades:' + strat.tradeStyle + ',IDP:' + strat.idpApproach + ',draft:' + strat.draftApproach + ',vets:' + strat.veteranApproach);
-  }
   return lines.join('\n');
 }
 

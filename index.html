@@ -423,16 +423,13 @@
     <div class="panel" id="panel-settings">
       <div class="sec">AI Provider <div class="sec-line"></div></div>
       <div class="card" style="border-color:rgba(124,107,248,.12)">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">Choose your AI provider and paste your API key. <strong style="color:var(--green)">Groq and Gemini are free.</strong> Keys stored locally only — never sent anywhere except the provider's API.</p>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">Choose your AI provider and paste your API key. <strong style="color:var(--green)">Gemini is free.</strong> Keys stored locally only — never sent anywhere except the provider's API.</p>
         <div class="grid-2" style="margin-bottom:10px">
           <div>
             <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Provider</div>
             <select id="ai-provider-sel" style="width:100%;font-size:13px" onchange="updateProviderHint()">
-              <option value="anthropic">Claude (Anthropic)</option>
-              <option value="groq">Groq — Free (Llama 3.3)</option>
               <option value="gemini">Gemini Flash — Free (Google)</option>
-              <option value="openai">GPT-4o (OpenAI)</option>
-              <option value="grok">Grok (xAI)</option>
+              <option value="anthropic">Claude (Anthropic) — Premium</option>
             </select>
           </div>
           <div>
@@ -463,105 +460,15 @@
       <div class="card" style="border-color:rgba(124,107,248,.15)">
         <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">This is your GM profile — it shapes every AI recommendation. The more specific you are, the sharper the advice.</p>
 
-        <!-- Row 1: Core identity -->
-        <div class="grid-2" style="margin-bottom:12px">
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Team mentality</div>
-            <select id="mentality-sel" style="width:100%;font-size:13px">
-              <option value="balanced">Balanced — compete + build</option>
-              <option value="winnow">Win Now — maximize this season</option>
-              <option value="rebuild">Rebuild — youth + picks</option>
-              <option value="prime">Dynasty Prime — 2–3yr window</option>
-            </select>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Championship window</div>
-            <select id="window-sel" style="width:100%;font-size:13px">
-              <option value="now">Competing right now</option>
-              <option value="1yr">1 year out</option>
-              <option value="2yr">2-3 years out</option>
-              <option value="far">3+ years — full rebuild</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Row 2: Trade & Risk -->
-        <div class="grid-2" style="margin-bottom:12px">
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Trade style</div>
-            <select id="trade-style-sel" style="width:100%;font-size:13px">
-              <option value="aggressive">Aggressive — always dealing</option>
-              <option value="selective">Selective — only clear wins</option>
-              <option value="conservative">Conservative — rarely trade</option>
-              <option value="pick_seller">Pick seller — players > picks</option>
-              <option value="pick_hoarder">Pick hoarder — stockpile draft capital</option>
-            </select>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Risk tolerance</div>
-            <select id="risk-sel" style="width:100%;font-size:13px">
-              <option value="moderate_risk">Moderate — calculated gambles</option>
-              <option value="high_risk">High risk — love boom/bust</option>
-              <option value="low_risk">Low risk — safe floors</option>
-              <option value="no_risk">Zero risk — proven only</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Row 3: Age & Waivers -->
-        <div class="grid-2" style="margin-bottom:12px">
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Age preference</div>
-            <select id="age-pref-sel" style="width:100%;font-size:13px">
-              <option value="balanced_age">Balanced — best value wins</option>
-              <option value="youth">Youth first — under 25</option>
-              <option value="vets">Vet friendly — proven production</option>
-              <option value="agnostic">Age agnostic</option>
-            </select>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Waiver priority</div>
-            <select id="priority-sel" style="width:100%;font-size:13px">
-              <option value="auto">Auto (AI decides)</option>
-              <option value="age">Age — prefer younger</option>
-              <option value="need">Position need — fill gaps</option>
-              <option value="bpa">Best available</option>
-              <option value="upside">Upside / stash</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Positions to upgrade -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Positions actively trying to upgrade</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap" id="upgrade-pos-btns">
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'QB')">QB</button>
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'RB')">RB</button>
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'WR')">WR</button>
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'TE')">TE</button>
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'DL')">DL</button>
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'LB')">LB</button>
-            <button class="rfbtn" onclick="toggleUpgradePos(this,'DB')">DB</button>
-          </div>
-          <input type="hidden" id="upgrade-positions" value=""/>
-        </div>
-
-        <!-- Trade preferences -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Trade philosophy (in your words)</div>
-          <textarea id="trade-prefs" placeholder="e.g. I love young WRs with route tree upside, will give picks for proven starters, never sell a QB early, targeting Team X's aging RB..." style="font-size:13px;min-height:60px"></textarea>
-        </div>
-
-        <!-- Targets & Shopping -->
-        <div class="grid-2" style="margin-bottom:10px">
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Players I'm targeting</div>
-            <input type="text" id="target-players" placeholder="e.g. Nico Collins, any young TE..." style="font-size:13px"/>
-          </div>
-          <div>
-            <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Players I'm shopping</div>
-            <input type="text" id="shopping-players" placeholder="e.g. Derrick Henry, my 2027 1st..." style="font-size:13px"/>
-          </div>
+        <!-- Team mentality -->
+        <div style="margin-bottom:12px">
+          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Team mentality</div>
+          <select id="mentality-sel" style="width:100%;font-size:13px">
+            <option value="balanced">Balanced — compete + build</option>
+            <option value="winnow">Win Now — maximize this season</option>
+            <option value="rebuild">Rebuild — youth + picks</option>
+            <option value="prime">Dynasty Prime — 2–3yr window</option>
+          </select>
         </div>
 
         <!-- Untouchables -->
@@ -570,15 +477,14 @@
           <input type="text" id="never-drop" placeholder="e.g. CeeDee Lamb, Bijan Robinson, my 2026 1st..." style="font-size:13px"/>
         </div>
 
-        <!-- Additional notes -->
+        <!-- Notes for AI -->
         <div style="margin-bottom:12px">
-          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Anything else the AI should know</div>
+          <div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Notes for AI</div>
           <textarea id="mentality-notes" placeholder="e.g. my dad runs Team X so we can't trade with each other, league has taxi squads, IDP is deep..." style="font-size:13px;min-height:50px"></textarea>
         </div>
 
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn" onclick="saveMentality()">Save strategy</button>
-          <button class="btn btn-ghost btn-sm" onclick="startSetupWizard()">Re-run setup wizard</button>
           <div id="mentality-saved" style="font-size:12px;color:var(--green);display:none">Saved ✓</div>
         </div>
       </div>
@@ -608,19 +514,6 @@
         <div style="display:flex;gap:8px">
           <button class="btn btn-ghost" onclick="switchTab('digest')">Go to home</button>
           <button class="btn btn-ghost" onclick="clearHistory()">Clear agent history</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- SETUP WIZARD MODAL -->
-    <div id="setup-wizard" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:2000;align-items:center;justify-content:center;padding:16px">
-      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:100%;max-width:480px;padding:28px;position:relative;box-shadow:0 16px 64px rgba(0,0,0,.5);animation:modalIn .3s ease">
-        <div style="font-size:12px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Setup wizard</div>
-        <div style="font-size:20px;font-weight:800;letter-spacing:-.03em;margin-bottom:16px" id="wiz-title">Let's set up your ReconAI</div>
-        <div id="wiz-messages" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;max-height:320px;overflow-y:auto"></div>
-        <div id="wiz-input-area"></div>
-        <div style="margin-top:12px;display:flex;justify-content:flex-end">
-          <button class="btn btn-ghost btn-sm" onclick="skipWizard()">Skip setup</button>
         </div>
       </div>
     </div>

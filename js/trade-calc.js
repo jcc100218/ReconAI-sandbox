@@ -54,18 +54,6 @@ const POSTURES = {
   LOCKED:    { key: 'LOCKED',    label: 'Locked In',     color: '#7F8C8D', desc: 'Satisfied roster, high attachment. Very hard to move.' },
 };
 
-// Grudge types for trade interaction logging
-const GRUDGE_TYPES = {
-  ACCEPTED_FAIR: { label: 'Accepted -- Fair Trade',   impact: +5,  color: '#2ECC71', cat: 'accepted', dnaSignal: { STALWART: 3 } },
-  ACCEPTED_WON:  { label: 'Accepted -- Fleeced Them', impact: -8,  color: '#E67E22', cat: 'accepted', dnaSignal: { FLEECER: 3, DOMINATOR: 1 } },
-  ACCEPTED_LOST: { label: 'Accepted -- Got Fleeced',  impact: +10, color: '#BB8FCE', cat: 'accepted', dnaSignal: { ACCEPTOR: 3, DESPERATE: 2 } },
-  REJECTED:      { label: 'Rejected',                  impact: -15, color: '#E74C3C', cat: 'rejected', dnaSignal: { DOMINATOR: 3, FLEECER: 1 } },
-  COUNTER_FAIR:  { label: 'Counter -- Fair',           impact: +3,  color: '#5DADE2', cat: 'counter',  dnaSignal: { STALWART: 2, FLEECER: 1 } },
-  COUNTER_LOWBALL:{ label: 'Counter -- Lowball',       impact: -10, color: '#E67E22', cat: 'counter',  dnaSignal: { FLEECER: 3, DOMINATOR: 2 } },
-};
-
-const grudgeDecay = d => d < 30 ? 1.0 : d < 60 ? 0.6 : d < 90 ? 0.3 : 0.1;
-
 // Local position normalization (fallback if pM is unavailable)
 const normPos = p => {
   if (!p) return '';
@@ -608,39 +596,6 @@ function deriveDNAFromHistory(rosterId) {
   return null;
 }
 
-/**
- * Derive DNA from grudge interaction history (fallback)
- */
-function deriveDNAFromGrudges(theirOwnerId, allGrudges) {
-  const entries = allGrudges.filter(g => g.theirOwnerId === theirOwnerId);
-  if (entries.length < 3) return null;
-  const scores = { FLEECER: 0, DOMINATOR: 0, STALWART: 0, ACCEPTOR: 0, DESPERATE: 0 };
-  for (const g of entries) {
-    const sig = GRUDGE_TYPES[g.type]?.dnaSignal || {};
-    for (const [dna, w] of Object.entries(sig)) scores[dna] = (scores[dna] || 0) + w;
-  }
-  const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  const [top, second] = ranked;
-  if (top[1] < 3) return null;
-  if (second && top[1] < second[1] * 1.5) return null;
-  return top[0];
-}
-
-/**
- * Calculate grudge tax between two owners
- */
-function calcGrudgeTax(myOwnerId, theirOwnerId, grudges, theirDnaKey) {
-  if (!myOwnerId || !theirOwnerId) return { total: 0, entries: [] };
-  const relevant = grudges.filter(g => g.myOwnerId === myOwnerId && g.theirOwnerId === theirOwnerId);
-  const dnaMult = { FLEECER: 0.7, DOMINATOR: 1.6, STALWART: 1.2, ACCEPTOR: 0.8, DESPERATE: 0.5, NONE: 1.0 }[theirDnaKey] || 1.0;
-  const now = Date.now();
-  let total = 0;
-  for (const g of relevant) {
-    const ageDays = (now - new Date(g.date).getTime()) / 86400000;
-    total += (GRUDGE_TYPES[g.type]?.impact || 0) * grudgeDecay(ageDays) * dnaMult;
-  }
-  return { total: Math.round(total), entries: relevant.sort((a, b) => new Date(b.date) - new Date(a.date)) };
-}
 
 // ── DNA Persistence ──────────────────────────────────────────
 
@@ -679,13 +634,6 @@ function saveDNAProfile(leagueId, rosterId, dnaKey) {
     try { window.OD.saveDNA(leagueId, map); } catch (e) { /* ignore */ }
   }
 }
-
-// ── Grudge Persistence ───────────────────────────────────────
-
-const GRUDGE_KEY = lid => `od_grudges_v1_${lid}`;
-function loadGrudges(lid) { try { return JSON.parse(localStorage.getItem(GRUDGE_KEY(lid)) || '[]'); } catch (e) { return []; } }
-function saveGrudges(lid, data) { localStorage.setItem(GRUDGE_KEY(lid), JSON.stringify(data)); }
-
 
 // ═══════════════════════════════════════════════════════════════
 // SECTION 5: Trade Value & Acceptance
@@ -777,7 +725,6 @@ function fairnessGrade(myValue, theirValue) {
 let _tcAssessments = [];
 let _tcMyAssessment = null;
 let _tcDnaMap = {};
-let _tcGrudges = [];
 let _tcSelectedScout = null;
 let _tcBuilderMy = null;
 let _tcBuilderTheir = null;
@@ -811,7 +758,6 @@ async function renderTradeCalc() {
   // Load DNA profiles
   if (S.currentLeagueId) {
     _tcDnaMap = await loadDNAProfiles(S.currentLeagueId);
-    _tcGrudges = loadGrudges(S.currentLeagueId);
   }
 
   // Auto-derive missing DNA
@@ -1568,7 +1514,6 @@ Object.assign(window.App, {
   NFL_STARTER_POOL,
   WEEKLY_TARGET,
   POSTURES,
-  GRUDGE_TYPES,
   FAAB_RATE,
 
   // Assessment
@@ -1586,12 +1531,8 @@ Object.assign(window.App, {
   calcOwnerPosture,
   calcPsychTaxes,
   deriveDNAFromHistory,
-  deriveDNAFromGrudges,
-  calcGrudgeTax,
   loadDNAProfiles,
   saveDNAProfile,
-  loadGrudges,
-  saveGrudges,
 
   // Trade value
   calcTradeValue,

@@ -364,188 +364,26 @@ function getRosterSlots(){
 
 // ── Mentality ──────────────────────────────────────────────────
 function loadMentality(){
-  const m=getMemory('mentality',{mentality:'balanced',priority:'auto',notes:'',tradePrefs:'',neverDrop:'',window:'now',tradeStyle:'selective',riskTolerance:'moderate_risk',agePreference:'balanced_age',upgradePositions:'',targetPlayers:'',shoppingPlayers:''});
-  const sel=$('mentality-sel');const pri=$('priority-sel');
-  const notes=$('mentality-notes');const tp=$('trade-prefs');const nd=$('never-drop');
+  const m=getMemory('mentality',{mentality:'balanced',neverDrop:'',notes:''});
+  const sel=$('mentality-sel');
+  const notes=$('mentality-notes');const nd=$('never-drop');
   if(sel)sel.value=m.mentality||'balanced';
-  if(pri)pri.value=m.priority||'auto';
   if(notes)notes.value=m.notes||'';
-  if(tp)tp.value=m.tradePrefs||'';
   if(nd)nd.value=m.neverDrop||'';
-  // New fields
-  const ws=$('window-sel');if(ws)ws.value=m.window||'now';
-  const ts=$('trade-style-sel');if(ts)ts.value=m.tradeStyle||'selective';
-  const rs=$('risk-sel');if(rs)rs.value=m.riskTolerance||'moderate_risk';
-  const ap=$('age-pref-sel');if(ap)ap.value=m.agePreference||'balanced_age';
-  const tgt=$('target-players');if(tgt)tgt.value=m.targetPlayers||'';
-  const shop=$('shopping-players');if(shop)shop.value=m.shoppingPlayers||'';
-  // Restore upgrade positions
-  const up=$('upgrade-positions');if(up)up.value=m.upgradePositions||'';
-  if(m.upgradePositions){
-    m.upgradePositions.split(',').filter(Boolean).forEach(pos=>{
-      const btns=document.querySelectorAll('#upgrade-pos-btns .rfbtn');
-      btns.forEach(b=>{if(b.textContent.trim()===pos)b.classList.add('active');});
-    });
-  }
   return m;
 }
 function saveMentality(){
   const m={
     mentality:$('mentality-sel')?.value||'balanced',
-    priority:$('priority-sel')?.value||'auto',
-    notes:$('mentality-notes')?.value||'',
-    tradePrefs:$('trade-prefs')?.value||'',
     neverDrop:$('never-drop')?.value||'',
-    window:$('window-sel')?.value||'now',
-    tradeStyle:$('trade-style-sel')?.value||'selective',
-    riskTolerance:$('risk-sel')?.value||'moderate_risk',
-    agePreference:$('age-pref-sel')?.value||'balanced_age',
-    upgradePositions:$('upgrade-positions')?.value||'',
-    targetPlayers:$('target-players')?.value||'',
-    shoppingPlayers:$('shopping-players')?.value||''
+    notes:$('mentality-notes')?.value||''
   };
   setMemory('mentality',m);
   const saved=$('mentality-saved');
   if(saved){saved.style.display='block';setTimeout(()=>saved.style.display='none',2000);}
 }
 
-function toggleUpgradePos(btn,pos){
-  btn.classList.toggle('active');
-  const active=[];
-  document.querySelectorAll('#upgrade-pos-btns .rfbtn.active').forEach(b=>active.push(b.textContent.trim()));
-  const hidden=$('upgrade-positions');
-  if(hidden)hidden.value=active.join(',');
-}
-
 // buildMentalityCtx: defined in ai-chat.js
-
-// ── Setup Wizard ───────────────────────────────────────────────
-const WIZARD_STEPS=[
-  {
-    id:'mentality',
-    msg:`Hey! I'm your ReconAI agent. Let me ask you a few quick questions so every recommendation is tuned to your actual situation.\n\n**What's your current team strategy?**`,
-    type:'choices',
-    choices:['Win Now 🏆','Rebuild 🔄','Balanced ⚖️','Dynasty Prime ⭐'],
-    values:['winnow','rebuild','balanced','prime']
-  },
-  {
-    id:'tradeStyle',
-    msg:`**How do you approach trades?**\n\nThis helps me know whether to suggest aggressive moves or patience.`,
-    type:'choices',
-    choices:['Aggressive — always looking to deal','Selective — only obvious wins','Conservative — rarely trade','Pick seller — love trading picks'],
-    values:['aggressive','selective','conservative','pick_seller']
-  },
-  {
-    id:'agePreference',
-    msg:`**What's your player age philosophy?**`,
-    type:'choices',
-    choices:['Youth first — under 25 only','Balanced — best value wins','Vets OK — proven production','Age agnostic'],
-    values:['youth','balanced_age','vets','agnostic']
-  },
-  {
-    id:'riskTolerance',
-    msg:`**How do you feel about high-risk, high-upside players?**\n\nThink injury-prone players, depth chart longshots, unproven rookies.`,
-    type:'choices',
-    choices:['Love the upside — go bold','Some risk is fine','Prefer proven commodities','Zero risk — show me safe floors'],
-    values:['high_risk','moderate_risk','low_risk','no_risk']
-  },
-  {
-    id:'tradePrefs',
-    msg:`**Describe your trade philosophy in your own words.** This is what I'll use when drafting Sleeper messages and evaluating offers.`,
-    type:'text',
-    placeholder:'e.g. I love young WRs with route tree upside, will give picks for proven starters, never sell a QB early...'
-  },
-  {
-    id:'neverDrop',
-    msg:`Last one: **Any players you\'d never trade or drop no matter what?** I\'ll treat these as untouchable.`,
-    type:'text',
-    placeholder:'e.g. Travis Kelce, my 2026 1st... or type "none"'
-  }
-];
-let wizardStep=0;
-let wizardAnswers={};
-
-function checkFirstTime(){
-  const done=getMemory('wizardDone',false);
-  if(!done&&(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI())))startSetupWizard();
-}
-
-function startSetupWizard(){
-  wizardStep=0;wizardAnswers={};
-  $('setup-wizard').style.display='flex';
-  $('wiz-messages').innerHTML='';
-  showWizardStep(0);
-}
-
-function showWizardStep(i){
-  const step=WIZARD_STEPS[i];if(!step){finishWizard();return;}
-  $('wiz-title').textContent=`Setup ${i+1} of ${WIZARD_STEPS.length}`;
-  // Add AI message
-  const d=document.createElement('div');
-  d.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);line-height:1.6;max-width:90%';
-  d.innerHTML=step.msg.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  $('wiz-messages').appendChild(d);
-  $('wiz-messages').scrollTop=99999;
-  // Input area
-  if(step.type==='choices'){
-    $('wiz-input-area').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap">${step.choices.map((c,ci)=>`
-      <button class="btn btn-ghost" style="font-size:14px;padding:8px 16px" onclick="wizardAnswer('${step.values[ci]}','${c}')">${c}</button>`).join('')}</div>`;
-  }else{
-    $('wiz-input-area').innerHTML=`<div class="row"><input type="text" id="wiz-text-in" placeholder="${step.placeholder}" style="font-size:14px" onkeydown="if(event.key==='Enter')submitWizardText()"/><button class="btn" onclick="submitWizardText()">Next →</button></div>`;
-    setTimeout(()=>$('wiz-text-in')?.focus(),100);
-  }
-}
-
-function wizardAnswer(value,label){
-  const step=WIZARD_STEPS[wizardStep];
-  wizardAnswers[step.id]=value;
-  addWizardUserMsg(label);
-  wizardStep++;
-  setTimeout(()=>showWizardStep(wizardStep),400);
-}
-
-function submitWizardText(){
-  const val=$('wiz-text-in')?.value?.trim();
-  if(!val)return;
-  const step=WIZARD_STEPS[wizardStep];
-  wizardAnswers[step.id]=val;
-  addWizardUserMsg(val);
-  wizardStep++;
-  setTimeout(()=>showWizardStep(wizardStep),400);
-}
-
-function addWizardUserMsg(text){
-  const d=document.createElement('div');
-  d.style.cssText='background:var(--accentL);border:1px solid rgba(108,99,245,.22);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);align-self:flex-end;max-width:90%;margin-left:auto';
-  d.textContent=text;
-  $('wiz-messages').appendChild(d);
-  $('wiz-messages').scrollTop=99999;
-}
-
-async function finishWizard(){
-  // Save all answers
-  const existing=loadMentality();
-  const merged={
-    ...existing,
-    mentality:wizardAnswers.mentality||existing.mentality,
-    tradePrefs:wizardAnswers.tradePrefs||existing.tradePrefs,
-    neverDrop:wizardAnswers.neverDrop==='none'?'':wizardAnswers.neverDrop||existing.neverDrop,
-  };
-  setMemory('mentality',merged);
-  setMemory('wizardDone',true);
-  // Sync settings UI
-  loadMentality();
-  // Show completion message
-  const d=document.createElement('div');
-  d.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);line-height:1.6';
-  d.innerHTML=`<strong>All set!</strong> I've saved your strategy. Every recommendation I make — waivers, trades, start/sit, daily digest — will now reflect your <strong>${merged.mentality}</strong> approach. You can update this anytime in Settings.`;
-  $('wiz-messages').appendChild(d);
-  $('wiz-input-area').innerHTML=`<button class="btn" onclick="closeWizard()">Start using ReconAI →</button>`;
-  $('wiz-messages').scrollTop=99999;
-}
-
-function closeWizard(){$('setup-wizard').style.display='none';}
-function skipWizard(){setMemory('wizardDone',true);closeWizard();}
 
 // ── Available players ──────────────────────────────────────────
 function getAvailablePlayers(){
@@ -2262,12 +2100,7 @@ Object.assign(window.App, {
   getFAAB, getRosterSlots,
 
   // Mentality
-  loadMentality, saveMentality, toggleUpgradePos,
-
-  // Setup Wizard
-  WIZARD_STEPS, checkFirstTime, startSetupWizard,
-  showWizardStep, wizardAnswer, submitWizardText,
-  addWizardUserMsg, finishWizard, closeWizard, skipWizard,
+  loadMentality, saveMentality,
 
   // Available players
   getAvailablePlayers, availSort, renderAvailable, renderWaivers,
@@ -2323,15 +2156,6 @@ window.getFAAB = getFAAB;
 window.getRosterSlots = getRosterSlots;
 window.loadMentality = loadMentality;
 window.saveMentality = saveMentality;
-window.toggleUpgradePos = toggleUpgradePos;
-window.checkFirstTime = checkFirstTime;
-window.startSetupWizard = startSetupWizard;
-window.showWizardStep = showWizardStep;
-window.wizardAnswer = wizardAnswer;
-window.submitWizardText = submitWizardText;
-window.finishWizard = finishWizard;
-window.closeWizard = closeWizard;
-window.skipWizard = skipWizard;
 window.getAvailablePlayers = getAvailablePlayers;
 window.availSort = availSort;
 window.renderAvailable = renderAvailable;

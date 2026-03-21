@@ -9,20 +9,6 @@ window.App = window.App || {};
 
 // ── AI Provider config ───────────────────────────────────────
 const PROVIDERS = {
-  anthropic: {
-    name: 'Claude (Anthropic)',
-    placeholder: 'sk-ant-...',
-    hint: 'Get your key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Supports web search.',
-    defaultModel: 'claude-sonnet-4-20250514',
-    validate: k => k.startsWith('sk-'),
-  },
-  groq: {
-    name: 'Groq (Free)',
-    placeholder: 'gsk_...',
-    hint: 'Free tier at <a href="https://console.groq.com" target="_blank">console.groq.com</a>. Fast Llama 3.3 70B. No web search.',
-    defaultModel: 'llama-3.3-70b-versatile',
-    validate: k => k.startsWith('gsk_'),
-  },
   gemini: {
     name: 'Gemini Flash (Free)',
     placeholder: 'AIza...',
@@ -30,19 +16,12 @@ const PROVIDERS = {
     defaultModel: 'gemini-1.5-flash',
     validate: k => k.length > 10,
   },
-  openai: {
-    name: 'GPT-4o (OpenAI)',
-    placeholder: 'sk-...',
-    hint: 'Get your key at <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>. Pay-per-use.',
-    defaultModel: 'gpt-4o',
+  anthropic: {
+    name: 'Claude (Anthropic)',
+    placeholder: 'sk-ant-...',
+    hint: 'Get your key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>. Supports web search.',
+    defaultModel: 'claude-sonnet-4-20250514',
     validate: k => k.startsWith('sk-'),
-  },
-  grok: {
-    name: 'Grok (xAI)',
-    placeholder: 'xai-...',
-    hint: 'Get your key at <a href="https://console.x.ai" target="_blank">console.x.ai</a>. Pay-per-use.',
-    defaultModel: 'grok-3-mini',
-    validate: k => k.length > 10,
   },
 };
 
@@ -51,11 +30,8 @@ function updateProviderHint(){
   const sel=(window.$||document.getElementById.bind(document))('ai-provider-sel');if(!sel)return;
   const prov=sel.value;
   const hints={
-    anthropic:{text:'Claude Sonnet — best quality, requires paid API key',color:'var(--accent)'},
-    groq:{text:'Groq Llama 3.3 — FREE tier, fast, great for most tasks',color:'var(--green)'},
     gemini:{text:'Gemini Flash — FREE tier, good quality',color:'var(--green)'},
-    openai:{text:'GPT-4o — requires paid API key',color:'var(--text2)'},
-    grok:{text:'Grok — requires xAI API key',color:'var(--text2)'},
+    anthropic:{text:'Claude Sonnet — best quality, requires paid API key',color:'var(--accent)'},
   };
   const h=hints[prov]||{text:'',color:'var(--text3)'};
   const el=(window.$||document.getElementById.bind(document))('provider-hint');
@@ -139,25 +115,6 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
         data = await res.json();
         if(data.error) throw new Error(data.error.message||'API error');
         return (data.content||[]).filter(c=>c.type==='text').map(c=>c.text||'').join('') || 'No response.';
-
-      } else if(provider === 'groq'){
-        const body = {model, max_tokens:maxTok, messages:[{role:'system',content:sys},...messages]};
-        res = await fetch('https://api.groq.com/openai/v1/chat/completions', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey}, body:JSON.stringify(body)});
-        if((res.status===429)&&attempt<_retries){await new Promise(r=>setTimeout(r,(attempt+1)*10000));continue;}
-        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'API error '+res.status);}
-        data = await res.json();
-        return data.choices?.[0]?.message?.content || 'No response.';
-
-      } else if(provider === 'openai' || provider === 'grok'){
-        const endpoint = provider === 'grok'
-          ? 'https://api.x.ai/v1/chat/completions'
-          : 'https://api.openai.com/v1/chat/completions';
-        const body = {model, max_tokens:maxTok, messages:[{role:'system',content:sys},...messages]};
-        res = await fetch(endpoint, {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey}, body:JSON.stringify(body)});
-        if((res.status===429)&&attempt<_retries){await new Promise(r=>setTimeout(r,(attempt+1)*10000));continue;}
-        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'API error '+res.status);}
-        data = await res.json();
-        return data.choices?.[0]?.message?.content || 'No response.';
 
       } else if(provider === 'gemini'){
         const body = {model, max_tokens:maxTok, messages:[{role:'system',content:sys},...messages]};
