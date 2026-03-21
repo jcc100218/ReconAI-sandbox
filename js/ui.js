@@ -35,7 +35,7 @@ function checkApiKeyCallout(){
     el.style.display='block';
     // Update messaging if Supabase is available but no session yet
     if(window.OD?.isConfigured && window.OD.isConfigured()){
-      el.innerHTML='<div style="font-size:12px;color:var(--amber);line-height:1.5">🔑 <strong>AI chat is included with your account.</strong> If chat isn\'t working, go to <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a> and add a free <strong>Groq</strong> or <strong>Gemini</strong> key as backup.</div>';
+      el.innerHTML='<div style="font-size:13px;color:var(--amber);line-height:1.5">🔑 <strong>AI chat is included with your account.</strong> If chat isn\'t working, go to <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a> and add a free <strong>Groq</strong> or <strong>Gemini</strong> key as backup.</div>';
     }
   }
 }
@@ -55,28 +55,28 @@ function renderLeaguePulse(){
       const onMyTeam=myPlayers.has(item.player_id);
       const val=dynastyValue(item.player_id);
       const {col}=tradeValueTier(val);
-      return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px">
-        <span style="color:${isAdds?'var(--green)':'var(--red)'};font-weight:700;font-size:11px;min-width:14px">${isAdds?'▲':'▼'}</span>
+      return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">
+        <span style="color:${isAdds?'var(--green)':'var(--red)'};font-weight:700;font-size:12px;min-width:14px">${isAdds?'▲':'▼'}</span>
         <span style="font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer" onclick="openPlayerModal('${item.player_id}')">${p.first_name} ${p.last_name}</span>
-        <span class="pos ${posMap(p.position)==='QB'?'qb':posMap(p.position)==='RB'?'rb':posMap(p.position)==='WR'?'wr':posMap(p.position)==='TE'?'te':'idp'}" style="font-size:10px;padding:1px 4px">${posMap(p.position)}</span>
-        ${val>0?`<span style="font-size:10px;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>`:''}
-        ${onMyTeam?'<span style="font-size:10px;color:var(--accent)" title="On your roster">✦</span>':''}
+        <span class="pos ${posMap(p.position)==='QB'?'qb':posMap(p.position)==='RB'?'rb':posMap(p.position)==='WR'?'wr':posMap(p.position)==='TE'?'te':'idp'}" style="font-size:11px;padding:1px 4px">${posMap(p.position)}</span>
+        ${val>0?`<span style="font-size:11px;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>`:''}
+        ${onMyTeam?'<span style="font-size:11px;color:var(--accent)" title="On your roster">✦</span>':''}
       </div>`;
     }).filter(Boolean).join('');
   };
 
   el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">League Pulse</span>
-      <span style="font-size:10px;color:var(--text3)">Trending across Sleeper · Last 24h</span>
+      <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">League Pulse</span>
+      <span style="font-size:11px;color:var(--text3)">Trending across Sleeper · Last 24h</span>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div>
-        <div style="font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Most Added</div>
+        <div style="font-size:12px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Most Added</div>
         ${renderList(t.adds,'adds',true)}
       </div>
       <div>
-        <div style="font-size:11px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Most Dropped</div>
+        <div style="font-size:12px;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Most Dropped</div>
         ${renderList(t.drops,'drops',false)}
       </div>
     </div>
@@ -130,7 +130,7 @@ function resetRosterSort(){rosterSortKey='val';rosterSortDir=-1;rosterFilter='al
 
 function buildRosterTable(){
   const my=myR();if(!my){
-    $('roster-tbody').innerHTML='<tr><td colspan="14" style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Connect to load roster.</td></tr>';
+    $('roster-tbody').innerHTML='<tr><td colspan="14" style="padding:20px;text-align:center;color:var(--text3);font-size:14px">Connect to load roster.</td></tr>';
     return;
   }
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
@@ -215,17 +215,17 @@ function buildRosterTable(){
 
     // DHQ trend arrow (year-over-year PPG change)
     const dhqTrend=LI_LOADED&&LI.playerMeta?.[pid]?.trend||0;
-    const trendHtml=dhqTrend>=15?'<span style="color:var(--green);font-size:11px;margin-left:2px" title="PPG up '+dhqTrend+'% YoY">▲</span>':dhqTrend<=-15?'<span style="color:var(--red);font-size:11px;margin-left:2px" title="PPG down '+Math.abs(dhqTrend)+'% YoY">▼</span>':'';
+    const trendHtml=dhqTrend>=15?'<span style="color:var(--green);font-size:12px;margin-left:2px" title="PPG up '+dhqTrend+'% YoY">▲</span>':dhqTrend<=-15?'<span style="color:var(--red);font-size:12px;margin-left:2px" title="PPG down '+Math.abs(dhqTrend)+'% YoY">▼</span>':'';
 
     html+=`<tr class="${rowCls}" onclick="openPlayerModal('${pid}')">
       <td><img class="rt-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rt-initials>${initials}</span>')" loading="lazy"/></td>
       <td><div class="rt-name">${pName(pid)}${isStarter?'<span class="rt-slot">'+posLabel(slot,pid)+'</span>':''}</div><div class="rt-team">${fullTeam(pTeam(pid))}</div></td>
-      <td><span class="pos ${pc}" style="font-size:11px">${pos}</span></td>
+      <td><span class="pos ${pc}" style="font-size:12px">${pos}</span></td>
       <td class="rt-num-cell rt-val">${age||'—'}</td>
-      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:12px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:7px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:11px;color:var(--text3)">—</span>':'...'}</td>
+      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:13px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:7px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:12px;color:var(--text3)">—</span>':'...'}</td>
       <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}</td>
       <td class="rt-num-cell rt-val dim">${prev?prev.toFixed(1):'—'}</td>
-      <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:11px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
+      <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:12px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
       <td>${inj?`<span class="rt-inj">${inj}</span>`:''}</td>
     </tr>`;
   });
@@ -507,16 +507,16 @@ function showWizardStep(i){
   $('wiz-title').textContent=`Setup ${i+1} of ${WIZARD_STEPS.length}`;
   // Add AI message
   const d=document.createElement('div');
-  d.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:13px;color:var(--text);line-height:1.6;max-width:90%';
+  d.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);line-height:1.6;max-width:90%';
   d.innerHTML=step.msg.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   $('wiz-messages').appendChild(d);
   $('wiz-messages').scrollTop=99999;
   // Input area
   if(step.type==='choices'){
     $('wiz-input-area').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap">${step.choices.map((c,ci)=>`
-      <button class="btn btn-ghost" style="font-size:13px;padding:8px 16px" onclick="wizardAnswer('${step.values[ci]}','${c}')">${c}</button>`).join('')}</div>`;
+      <button class="btn btn-ghost" style="font-size:14px;padding:8px 16px" onclick="wizardAnswer('${step.values[ci]}','${c}')">${c}</button>`).join('')}</div>`;
   }else{
-    $('wiz-input-area').innerHTML=`<div class="row"><input type="text" id="wiz-text-in" placeholder="${step.placeholder}" style="font-size:13px" onkeydown="if(event.key==='Enter')submitWizardText()"/><button class="btn" onclick="submitWizardText()">Next →</button></div>`;
+    $('wiz-input-area').innerHTML=`<div class="row"><input type="text" id="wiz-text-in" placeholder="${step.placeholder}" style="font-size:14px" onkeydown="if(event.key==='Enter')submitWizardText()"/><button class="btn" onclick="submitWizardText()">Next →</button></div>`;
     setTimeout(()=>$('wiz-text-in')?.focus(),100);
   }
 }
@@ -541,7 +541,7 @@ function submitWizardText(){
 
 function addWizardUserMsg(text){
   const d=document.createElement('div');
-  d.style.cssText='background:var(--accentL);border:1px solid rgba(108,99,245,.22);border-radius:10px;padding:10px 13px;font-size:13px;color:var(--text);align-self:flex-end;max-width:90%;margin-left:auto';
+  d.style.cssText='background:var(--accentL);border:1px solid rgba(108,99,245,.22);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);align-self:flex-end;max-width:90%;margin-left:auto';
   d.textContent=text;
   $('wiz-messages').appendChild(d);
   $('wiz-messages').scrollTop=99999;
@@ -562,7 +562,7 @@ async function finishWizard(){
   loadMentality();
   // Show completion message
   const d=document.createElement('div');
-  d.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:13px;color:var(--text);line-height:1.6';
+  d.style.cssText='background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 13px;font-size:14px;color:var(--text);line-height:1.6';
   d.innerHTML=`<strong>All set!</strong> I've saved your strategy. Every recommendation I make — waivers, trades, start/sit, daily digest — will now reflect your <strong>${merged.mentality}</strong> approach. You can update this anytime in Settings.`;
   $('wiz-messages').appendChild(d);
   $('wiz-input-area').innerHTML=`<button class="btn" onclick="closeWizard()">Start using ReconAI →</button>`;
@@ -638,7 +638,7 @@ function renderAvailable(){
         <div class="skeleton" style="height:14px;width:55%"></div>
         <div class="skeleton" style="height:14px;width:65%"></div>
       </div>
-      <div style="font-size:10px;color:var(--text3);margin-top:8px">Building DHQ values...</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">Building DHQ values...</div>
     </div>`;
     return;
   }
@@ -680,7 +680,7 @@ function renderAvailable(){
   // Tight roster-style table: Photo | Name+Team | Pos | Age | DHQ | PPG | FAAB | Ask
   const sortIcon=(key)=>availSortKey===key?(availSortDir===-1?'▼':'▲'):'';
   const hdrStyle='cursor:pointer;user-select:none';
-  const header=`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border2);align-items:center">
+  const header=`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:5px 8px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border2);align-items:center">
     <span></span><span>Player</span><span>Pos</span><span style="${hdrStyle}" onclick="availSortKey='age';availSortDir=availSortKey==='age'?-availSortDir:-1;renderAvailable()">Age ${sortIcon('age')}</span><span style="${hdrStyle}" onclick="availSortKey='value';availSortDir=availSortKey==='value'?-availSortDir:-1;renderAvailable()">DHQ ${sortIcon('value')}</span><span style="${hdrStyle}" onclick="availSortKey='ppg';availSortDir=availSortKey==='ppg'?-availSortDir:-1;renderAvailable()">PPG ${sortIcon('ppg')}</span><span style="${hdrStyle}" onclick="availSortKey='faab';availSortDir=availSortKey==='faab'?-availSortDir:-1;renderAvailable()">FAAB ${sortIcon('faab')}</span><span></span></div>`;
 
   const rows=filtered.slice(0,25).map(({id,p,val},i)=>{
@@ -701,17 +701,17 @@ function renderAvailable(){
 
     return`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:4px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
       <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
-      <div style="overflow:hidden"><div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</div><div style="font-size:10px;color:var(--text3)">${p.team||'FA'}</div></div>
-      <span class="pos ${posClass(p.position)}" style="font-size:10px;padding:1px 4px">${p.position||'?'}</span>
-      <span style="font-size:10px;color:var(--text2)">${p.age||'—'}</span>
-      <span style="font-size:10px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
-      <span style="font-size:10px;color:${ppg>=8?'var(--green)':ppg>=4?'var(--text2)':'var(--text3)'}">${ppg?ppg.toFixed(1):'—'}</span>
-      <span style="font-size:10px;font-weight:600;color:var(--amber)">${faabSug}</span>
-      <button class="copy-btn" style="font-size:10px;padding:1px 4px" onclick="event.stopPropagation();goAsk('Should I add ${pName(id).replace(/'/g,'')}? What FAAB bid?')">Ask</button>
+      <div style="overflow:hidden"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</div><div style="font-size:11px;color:var(--text3)">${p.team||'FA'}</div></div>
+      <span class="pos ${posClass(p.position)}" style="font-size:11px;padding:1px 4px">${p.position||'?'}</span>
+      <span style="font-size:11px;color:var(--text2)">${p.age||'—'}</span>
+      <span style="font-size:11px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
+      <span style="font-size:11px;color:${ppg>=8?'var(--green)':ppg>=4?'var(--text2)':'var(--text3)'}">${ppg?ppg.toFixed(1):'—'}</span>
+      <span style="font-size:11px;font-weight:600;color:var(--amber)">${faabSug}</span>
+      <button class="copy-btn" style="font-size:11px;padding:1px 4px" onclick="event.stopPropagation();goAsk('Should I add ${pName(id).replace(/'/g,'')}? What FAAB bid?')">Ask</button>
     </div>`;
   }).join('');
 
-  tbody.innerHTML=header+rows+(filtered.length>10?`<div style="padding:6px 8px;font-size:11px;color:var(--text3);text-align:center">${filtered.length-10} more — filter by position</div>`:'');
+  tbody.innerHTML=header+rows+(filtered.length>10?`<div style="padding:6px 8px;font-size:12px;color:var(--text3);text-align:center">${filtered.length-10} more — filter by position</div>`:'');
 }
 
 function renderWaivers(){
@@ -778,10 +778,10 @@ function renderTrades(){
     const sidesTxt=sideArr.map(s=>s.name+' gets: '+s.gets.join(', ')).join('. ');
     return`<div class="card-sm" style="${isMe?'border-color:rgba(108,99,245,.3)':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
-        <span style="font-size:12px;font-weight:500">${names.join(' ↔ ')}${isMe?' (you)':''}</span>
+        <span style="font-size:13px;font-weight:500">${names.join(' ↔ ')}${isMe?' (you)':''}</span>
         <span class="tag tag-t">Trade</span>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 18px 1fr;gap:6px;font-size:11px">
+      <div style="display:grid;grid-template-columns:1fr 18px 1fr;gap:6px;font-size:12px">
         <div><div style="color:var(--text3);margin-bottom:3px">${sideArr[0]?.name} gets</div><div style="color:var(--text2)">${sideArr[0]?.gets?.join(', ')||'—'}</div></div>
         <div style="display:flex;align-items:center;justify-content:center;color:var(--text3)">⇄</div>
         <div><div style="color:var(--text3);margin-bottom:3px">${sideArr[1]?.name} gets</div><div style="color:var(--text2)">${sideArr[1]?.gets?.join(', ')||'—'}</div></div>
@@ -837,22 +837,22 @@ function renderTradeIntel(){
 
   el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Surplus — sell high</div>
+      <div style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Surplus — sell high</div>
       ${depth.length?depth.map(([pos,v])=>{
         const sell=sellByPos[pos];
-        return`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, +${v.surplus} over need${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
-      }).join(''):'<div style="font-size:11px;color:var(--text3)">No surplus positions</div>'}
+        return`<div style="font-size:13px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, +${v.surplus} over need${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
+      }).join(''):'<div style="font-size:12px;color:var(--text3)">No surplus positions</div>'}
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Thin — buy low</div>
-      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:12px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, need ${Math.abs(v.surplus)} more</div>`).join(''):'<div style="font-size:11px;color:var(--text3)">All positions covered</div>'}
+      <div style="font-size:12px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Thin — buy low</div>
+      ${weak.length?weak.map(([pos,v])=>`<div style="font-size:13px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, need ${Math.abs(v.surplus)} more</div>`).join(''):'<div style="font-size:12px;color:var(--text3)">All positions covered</div>'}
     </div>
   </div>
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px;margin-top:8px">
-    <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Top trade chips</div>
+    <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Top trade chips</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      ${sellable.map(p=>`<span style="font-size:11px;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--text2);cursor:pointer" onclick="openPlayerModal('${p.pid}')">${p.name} <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:10px">${p.val.toLocaleString()}</span></span>`).join('')}
-      ${topPicks.map(p=>`<span style="font-size:11px;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--amber)">${p}</span>`).join('')}
+      ${sellable.map(p=>`<span style="font-size:12px;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--text2);cursor:pointer" onclick="openPlayerModal('${p.pid}')">${p.name} <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val.toLocaleString()}</span></span>`).join('')}
+      ${topPicks.map(p=>`<span style="font-size:12px;padding:4px 10px;background:var(--bg3);border-radius:6px;color:var(--amber)">${p}</span>`).join('')}
     </div>
   </div>`;
 }
@@ -907,21 +907,21 @@ function renderPicks(){
 
   el.innerHTML=Object.keys(byYear).sort().map(yr=>{
     return'<div style="margin-bottom:10px">'
-      +'<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">'+yr+'</div>'
+      +'<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">'+yr+'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:6px">'
       +byYear[yr].map(p=>{
         const val=pickValue(p.season,p.round,teams);
         const valCol=val>4000?'var(--green)':val>2000?'var(--amber)':val>800?'var(--text2)':'var(--text3)';
         return'<div style="background:var(--bg3);border:1px solid '+(p.original?'var(--border2)':'rgba(124,107,248,.25)')+';border-radius:8px;padding:8px 12px;min-width:100px">'
-          +'<div style="font-size:13px;font-weight:700;color:var(--accent)">Round '+p.round+'</div>'
-          +'<div style="font-size:10px;color:'+(p.original?'var(--text3)':'var(--accent)')+';margin-top:2px">'+(p.original?'Own pick':'from '+p.from)+'</div>'
-          +'<div style="font-size:12px;font-weight:600;color:'+valCol+';margin-top:4px;font-family:\'JetBrains Mono\',monospace">~'+val.toLocaleString()+'</div>'
+          +'<div style="font-size:14px;font-weight:700;color:var(--accent)">Round '+p.round+'</div>'
+          +'<div style="font-size:11px;color:'+(p.original?'var(--text3)':'var(--accent)')+';margin-top:2px">'+(p.original?'Own pick':'from '+p.from)+'</div>'
+          +'<div style="font-size:13px;font-weight:600;color:'+valCol+';margin-top:4px;font-family:\'JetBrains Mono\',monospace">~'+val.toLocaleString()+'</div>'
           +'</div>';
       }).join('')
       +'</div></div>';
   }).join('')
-  +(tradedAway.length?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Traded away</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+tradedAway.map(p=>'<div style="background:var(--redL);border:1px solid rgba(248,113,113,.15);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--red)">'+p.season+' R'+p.round+' → '+p.to+'</div>').join('')+'</div></div>':'')
-  +'<div style="font-size:11px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+myPicks.length+' picks · Total value: <strong style="color:var(--accent);font-family:\'JetBrains Mono\',monospace">~'+totalVal.toLocaleString()+'</strong></div>';
+  +(tradedAway.length?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Traded away</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+tradedAway.map(p=>'<div style="background:var(--redL);border:1px solid rgba(248,113,113,.15);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--red)">'+p.season+' R'+p.round+' → '+p.to+'</div>').join('')+'</div></div>':'')
+  +'<div style="font-size:12px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+myPicks.length+' picks · Total value: <strong style="color:var(--accent);font-family:\'JetBrains Mono\',monospace">~'+totalVal.toLocaleString()+'</strong></div>';
 }
 
 async function runPicksAI(){
@@ -949,10 +949,10 @@ Analyze my pick portfolio and give me:
 Be specific with round and year for each recommendation.`}]);
     $('picks-ai-content').innerHTML=`
       <div class="card" style="border-color:rgba(108,99,245,.2)">
-        <div style="font-size:10px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">AI Pick Analysis</div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.7">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/\n/g,'<br>')}</div>
+        <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">AI Pick Analysis</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.7">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/\n/g,'<br>')}</div>
       </div>`;
-  }catch(e){$('picks-ai-content').innerHTML=`<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;}
+  }catch(e){$('picks-ai-content').innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${e.message}</div>`;}
   btn.textContent='AI analysis ↗';btn.disabled=false;
 }
 
@@ -1089,7 +1089,7 @@ function handlePlayerSearch(query){
     .sort((a,b)=>b.val-a.val)
     .slice(0,8);
 
-  if(!matches.length){results.innerHTML='<div style="padding:12px;font-size:11px;color:var(--text3)">No players found</div>';return;}
+  if(!matches.length){results.innerHTML='<div style="padding:12px;font-size:12px;color:var(--text3)">No players found</div>';return;}
   const posMapS=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   results.innerHTML=matches.map(({id,p,name,val})=>{
     const meta=LI_LOADED?LI.playerMeta?.[id]:null;
@@ -1098,10 +1098,10 @@ function handlePlayerSearch(query){
     return`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s" onclick="openPlayerModal('${id}');$('player-search-results').style.display='none';$('player-search-in').value=''" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
       <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
       <div style="flex:1;overflow:hidden">
-        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:10px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
-        <div style="font-size:11px;color:var(--text3)">${posMapS(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:11px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
+        <div style="font-size:12px;color:var(--text3)">${posMapS(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
       </div>
-      <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
+      <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
     </div>`;
   }).join('');
 }
@@ -1141,28 +1141,28 @@ function renderHomeSnapshot(){
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
       <div>
         <div style="font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.03em">${S.user?.display_name||'GM'}</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">${league?.name||''}</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:2px">${league?.name||''}</div>
       </div>
       <div style="margin-left:auto;display:flex;gap:12px;flex-wrap:wrap">
         <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${s.wins||0}-${s.losses||0}</div>
-          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Record</div>
+          <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Record</div>
         </div>
         <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:${myAvg!=='—'&&parseFloat(myAvg)>=parseFloat(leagueAvg)?'var(--green)':'var(--amber)'};font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${myAvg}</div>
-          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">My PPG</div>
+          <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">My PPG</div>
         </div>
         <div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:var(--text2);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${leagueAvg}</div>
-          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Lg Avg</div>
+          <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Lg Avg</div>
         </div>
         ${faab.budget>0?`<div style="text-align:center;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 14px;min-width:56px">
           <div style="font-size:22px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">$${faab.remaining}</div>
-          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">FAAB</div>
+          <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600">FAAB</div>
         </div>`:''}
       </div>
     </div>
-    ${lastSession?`<div style="background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);padding:10px 14px;font-size:11px;color:var(--text3);line-height:1.5">
+    ${lastSession?`<div style="background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--text3);line-height:1.5">
       <span style="color:var(--accent);font-weight:700">Last session (${lastSession.date}):</span> ${lastSession.text}
     </div>`:''}`;
 }
@@ -1323,45 +1323,45 @@ function renderTeamOverview(){
   const dCol=myValRank<=3?'var(--green)':myValRank<=8?'var(--accent)':'var(--amber)';
   html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Health Score</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Health Score</div>
       <div style="display:flex;align-items:baseline;gap:6px">
         <span style="font-size:26px;font-weight:800;color:${hCol};font-family:'JetBrains Mono',monospace">${healthScore}</span>
-        <span style="font-size:11px;font-weight:600;color:${hCol}">${hTier}</span>
+        <span style="font-size:12px;font-weight:600;color:${hCol}">${hTier}</span>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px">Scoring ${scoringPct}% · Depth ${depthPct}%</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px">Scoring ${scoringPct}% · Depth ${depthPct}%</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${healthScore}%;height:100%;background:${hCol};border-radius:2px"></div></div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:${cCol};font-family:'JetBrains Mono',monospace">#${myContenderRank}</span>
-        <span style="font-size:11px;color:var(--text2)">/${teams}</span>
+        <span style="font-size:12px;color:var(--text2)">/${teams}</span>
       </div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${myContenderPPG.toFixed(1)} starter PPG</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${myContenderPPG.toFixed(1)} starter PPG</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(myContenderPPG/topContender*100)}%;height:100%;background:${cCol};border-radius:2px"></div></div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:${dCol};font-family:'JetBrains Mono',monospace">#${myValRank}</span>
-        <span style="font-size:11px;color:var(--text2)">/${teams}</span>
+        <span style="font-size:12px;color:var(--text2)">/${teams}</span>
       </div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${totalVal.toLocaleString()} DHQ</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${totalVal.toLocaleString()} DHQ</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(totalVal/topVal*100)}%;height:100%;background:var(--accent);border-radius:2px"></div></div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Draft Capital</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Draft Capital</div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalPicks}</span>
-        <span style="font-size:11px;color:var(--text2)">picks</span>
+        <span style="font-size:12px;color:var(--text2)">picks</span>
       </div>
-      <div style="font-size:11px;color:var(--text2);margin-top:2px">${myPickCount.map(p=>`'${String(p.yr).slice(2)}: ${p.count}`).join(' · ')}</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${myPickCount.map(p=>`'${String(p.yr).slice(2)}: ${p.count}`).join(' · ')}</div>
     </div>
   </div>`;
 
   // Position grades grid
   html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
-    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">`;
   positions.forEach(pos=>{
     const g=posGroups[pos];if(!g||!g.count)return;
@@ -1370,11 +1370,11 @@ function renderTeamOverview(){
     const topCol=topP?tradeValueTier(topP.val).col:'var(--text2)';
     html+=`<div style="background:var(--bg3);border-radius:var(--r);padding:8px 10px;min-height:62px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:700">${pos}</span>
-        <span style="font-size:14px;font-weight:800;color:${gradeColor(avgVal,pos)}">${gradeLetter(avgVal,pos)}</span>
+        <span style="font-size:13px;font-weight:700">${pos}</span>
+        <span style="font-size:15px;font-weight:800;color:${gradeColor(avgVal,pos)}">${gradeLetter(avgVal,pos)}</span>
       </div>
-      <div style="font-size:11px;color:var(--text2)">${g.count}p · ${avgVal.toLocaleString()}</div>
-      ${topP?`<div style="font-size:11px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} <span style="color:${topCol};font-family:'JetBrains Mono',monospace;font-size:10px">${topP.val.toLocaleString()}</span></div>`:''}
+      <div style="font-size:12px;color:var(--text2)">${g.count}p · ${avgVal.toLocaleString()}</div>
+      ${topP?`<div style="font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} <span style="color:${topCol};font-family:'JetBrains Mono',monospace;font-size:11px">${topP.val.toLocaleString()}</span></div>`:''}
     </div>`;
   });
   html+=`</div></div>`;
@@ -1384,7 +1384,7 @@ function renderTeamOverview(){
     .filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
   if(topPlayers.length){
     html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Crown Jewels</div>`;
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Crown Jewels</div>`;
     html+=topPlayers.map((p,i)=>{
       const {col}=tradeValueTier(p.val);
       const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
@@ -1399,13 +1399,13 @@ function renderTeamOverview(){
       else if(trend<=-20)reasons.push('declining');
       const reasonStr=reasons.length?reasons.slice(0,2).join(', '):'';
       return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0${i<4?';border-bottom:1px solid var(--border)':''};cursor:pointer" onclick="openPlayerModal('${p.pid}')">
-        <span style="font-size:11px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
+        <span style="font-size:12px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
         <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
         <div style="flex:1;overflow:hidden">
-          <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-          <div style="font-size:11px;color:var(--text3)">${p.pos} · ${p.age} · ${peakStr}${reasonStr?' · '+reasonStr:''}</div>
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+          <div style="font-size:12px;color:var(--text3)">${p.pos} · ${p.age} · ${peakStr}${reasonStr?' · '+reasonStr:''}</div>
         </div>
-        <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+        <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
       </div>`;
     }).join('');
     html+=`</div>`;
@@ -1451,7 +1451,7 @@ async function startStrategyWalkthrough(){
   if(!(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))||localStorage.getItem('dhq_strategy_done'))return;
   const msgs=$('home-chat-msgs');if(!msgs)return;
 
-  msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6">
+  msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:13px;line-height:1.6">
     <div style="font-weight:700;color:var(--accent);margin-bottom:4px">Welcome to ReconAI! Let's set up your strategy.</div>
     I'll ask you 5 quick questions so I can tailor my advice to how you like to play. This takes about 30 seconds.
   </div>`;
@@ -1459,8 +1459,8 @@ async function startStrategyWalkthrough(){
   const answers=[];
   for(let i=0;i<STRATEGY_QUESTIONS.length;i++){
     const sq=STRATEGY_QUESTIONS[i];
-    msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6;margin-top:6px">${sq.q}</div>`;
-    msgs.innerHTML+=`<div id="strat-opts-${i}" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0">${sq.opts.map((o,j)=>`<button class="chip" style="font-size:11px" onclick="selectStrategyAnswer(${i},${j})">${o}</button>`).join('')}</div>`;
+    msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:13px;line-height:1.6;margin-top:6px">${sq.q}</div>`;
+    msgs.innerHTML+=`<div id="strat-opts-${i}" style="display:flex;gap:6px;flex-wrap:wrap;padding:6px 0">${sq.opts.map((o,j)=>`<button class="chip" style="font-size:12px" onclick="selectStrategyAnswer(${i},${j})">${o}</button>`).join('')}</div>`;
     msgs.scrollTop=msgs.scrollHeight;
 
     await new Promise(resolve=>{
@@ -1479,7 +1479,7 @@ async function startStrategyWalkthrough(){
   };
   try{localStorage.setItem('dhq_strategy',JSON.stringify(strategy));localStorage.setItem('dhq_strategy_done','1');}catch(e){}
 
-  msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6;margin-top:6px">
+  msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:13px;line-height:1.6;margin-top:6px">
     <div style="font-weight:700;color:var(--green);margin-bottom:4px">Strategy saved! ✓</div>
     <strong>${strategy.mode}</strong> mode · <strong>${strategy.tradeStyle}</strong> · <strong>${strategy.idpApproach}</strong> · Draft: <strong>${strategy.draftApproach}</strong> · Veterans: <strong>${strategy.veteranApproach}</strong>
     <div style="margin-top:6px;color:var(--text3)">I'll use this to personalize all my advice. You can change it anytime in Settings.</div>
@@ -1487,7 +1487,7 @@ async function startStrategyWalkthrough(){
   msgs.scrollTop=msgs.scrollHeight;
 
   if((S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))&&LI_LOADED){
-    msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:12px;color:var(--text3)">Analyzing your roster with your strategy...</div>`;
+    msgs.innerHTML+=`<div class="hc-msg-a" style="font-size:13px;color:var(--text3)">Analyzing your roster with your strategy...</div>`;
     msgs.scrollTop=msgs.scrollHeight;
     try{
       const reply=await callClaude([{role:'user',content:`You are a dynasty fantasy football advisor. The user just set their strategy:
@@ -1500,9 +1500,9 @@ Veteran approach: ${strategy.veteranApproach}
 ${buildCtx()}
 
 Give a brief (3-4 sentences) personalized assessment of their roster given their strategy. Be specific about players. End with one actionable recommendation.`}]);
-      msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:12px;line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;
+      msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:13px;line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;
     }catch(e){
-      msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:12px;color:var(--text3)">Strategy saved! Ask me anything about your team.</div>`;
+      msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:13px;color:var(--text3)">Strategy saved! Ask me anything about your team.</div>`;
     }
     msgs.scrollTop=msgs.scrollHeight;
   }
@@ -1512,7 +1512,7 @@ function selectStrategyAnswer(qIdx,optIdx){
   const opt=STRATEGY_QUESTIONS[qIdx].opts[optIdx];
   window['_stratAnswer'+qIdx]=opt;
   const el=$('strat-opts-'+qIdx);
-  if(el)el.outerHTML=`<div class="hc-msg-u" style="font-size:12px">${opt}</div>`;
+  if(el)el.outerHTML=`<div class="hc-msg-u" style="font-size:13px">${opt}</div>`;
   if(window['_stratResolve'+qIdx])window['_stratResolve'+qIdx]();
 }
 
@@ -1537,16 +1537,16 @@ async function fetchPlayerNews(playerId){
 
 async function loadPlayerNewsNow(playerId){
   const newsEl=$('pm-news');if(!newsEl)return;
-  newsEl.innerHTML='<div style="color:var(--text3);font-size:11px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>Loading from X...</div>';
+  newsEl.innerHTML='<div style="color:var(--text3);font-size:12px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>Loading from X...</div>';
   try{
     const news=await fetchPlayerNews(playerId);
     if(news){
-      newsEl.innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.5">${news.replace(/\n/g,'<br>')}</div><div style="font-size:11px;color:var(--text3);margin-top:4px">via Grok · X/Twitter</div>`;
+      newsEl.innerHTML=`<div style="font-size:13px;color:var(--text2);line-height:1.5">${news.replace(/\n/g,'<br>')}</div><div style="font-size:12px;color:var(--text3);margin-top:4px">via Grok · X/Twitter</div>`;
     }else{
-      newsEl.innerHTML='<div style="color:var(--text3);font-size:11px">No recent news found for this player.</div>';
+      newsEl.innerHTML='<div style="color:var(--text3);font-size:12px">No recent news found for this player.</div>';
     }
   }catch(e){
-    newsEl.innerHTML='<div style="color:var(--red);font-size:11px">Error loading news. Check your xAI key in Settings.</div>';
+    newsEl.innerHTML='<div style="color:var(--red);font-size:12px">Error loading news. Check your xAI key in Settings.</div>';
   }
 }
 
@@ -1573,8 +1573,8 @@ function openPlayerModal(playerId){
   $('pm-initials').style.display='none';
   $('pm-pos-badge').textContent=pos;
   $('pm-pos-badge').className='';
-  $('pm-pos-badge').style.cssText=`position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;${getPosBadgeStyle(pos)}`;
-  $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:12px;color:var(--green);font-weight:400">✓ on roster</span>':''}`;
+  $('pm-pos-badge').style.cssText=`position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;${getPosBadgeStyle(pos)}`;
+  $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:13px;color:var(--green);font-weight:400">✓ on roster</span>':''}`;
   $('pm-bio').innerHTML=`${pos} · ${fullTeam(p.team)} · Age ${age} · ${exp}yr exp${p.college?' · '+p.college:''}`;
   // IDP scoring badge
   const isIDPModal=['DL','LB','DB'].includes(pos);
@@ -1603,10 +1603,10 @@ function openPlayerModal(playerId){
       idpBadge2.innerHTML=
         '<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:8px;padding:8px 12px;margin:6px 0">'
         +'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-        +'<span style="font-size:14px;font-weight:800;color:var(--green)">⚡ '+idpPPGModal+' IDP PPG</span>'
-        +'<span style="font-size:10px;color:var(--text3)">2024 season ('+gp+'gp)</span>'
+        +'<span style="font-size:15px;font-weight:800;color:var(--green)">⚡ '+idpPPGModal+' IDP PPG</span>'
+        +'<span style="font-size:11px;color:var(--text3)">2024 season ('+gp+'gp)</span>'
         +'</div>'
-        +(statParts.length?'<div style="font-size:11px;color:var(--text2);margin-top:4px">'+statParts.join(' · ')+'</div>':'')
+        +(statParts.length?'<div style="font-size:12px;color:var(--text2);margin-top:4px">'+statParts.join(' · ')+'</div>':'')
         +'</div>';
     }
   }
@@ -1669,17 +1669,17 @@ function openPlayerModal(playerId){
 
       if(blurb){
         const bg=blurbColor==='var(--red)'?'rgba(248,113,113,.06)':blurbColor==='var(--green)'?'rgba(52,211,153,.06)':'rgba(251,191,36,.06)';
-        insightEl.innerHTML=`<div style="font-size:11px;color:${blurbColor};line-height:1.5;padding:8px 12px;background:${bg};border-radius:8px">${blurb}</div>`;
+        insightEl.innerHTML=`<div style="font-size:12px;color:${blurbColor};line-height:1.5;padding:8px 12px;background:${bg};border-radius:8px">${blurb}</div>`;
       }else insightEl.innerHTML='';
     }else insightEl.innerHTML='';
   }
 
   // Tags
   const tags=[];
-  if(p.injury_status)tags.push(`<span style="background:var(--redL);color:var(--red);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">${p.injury_status}</span>`);
-  if(dcLbl)tags.push(`<span style="background:var(--bg4);color:var(--text2);font-size:10px;padding:2px 7px;border-radius:20px">${dcLbl}</span>`);
-  if(posRank)tags.push(`<span style="background:var(--accentL);color:var(--accent);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px">${pos}${posRank} in league</span>`);
-  if(p.height||p.weight)tags.push(`<span style="background:var(--bg4);color:var(--text3);font-size:10px;padding:2px 7px;border-radius:20px">${[(p.height?Math.floor((p.height||0)/12)+"'"+(( p.height||0)%12)+'"':''),p.weight?p.weight+'lbs':''].filter(Boolean).join(' · ')}</span>`);
+  if(p.injury_status)tags.push(`<span style="background:var(--redL);color:var(--red);font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px">${p.injury_status}</span>`);
+  if(dcLbl)tags.push(`<span style="background:var(--bg4);color:var(--text2);font-size:11px;padding:2px 7px;border-radius:20px">${dcLbl}</span>`);
+  if(posRank)tags.push(`<span style="background:var(--accentL);color:var(--accent);font-size:11px;font-weight:700;padding:2px 7px;border-radius:20px">${pos}${posRank} in league</span>`);
+  if(p.height||p.weight)tags.push(`<span style="background:var(--bg4);color:var(--text3);font-size:11px;padding:2px 7px;border-radius:20px">${[(p.height?Math.floor((p.height||0)/12)+"'"+(( p.height||0)%12)+'"':''),p.weight?p.weight+'lbs':''].filter(Boolean).join(' · ')}</span>`);
   $('pm-tags').innerHTML=tags.join('');
 
   // Stats bar
@@ -1755,14 +1755,14 @@ function openPlayerModal(playerId){
   // News
   const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
   if(_newsCache[playerId]){
-    $('pm-news').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.5">${_newsCache[playerId].replace(/\n/g,'<br>')}</div><div style="font-size:11px;color:var(--text3);margin-top:4px">via Grok · X/Twitter (cached)</div>`;
+    $('pm-news').innerHTML=`<div style="font-size:13px;color:var(--text2);line-height:1.5">${_newsCache[playerId].replace(/\n/g,'<br>')}</div><div style="font-size:12px;color:var(--text3);margin-top:4px">via Grok · X/Twitter (cached)</div>`;
   }else if(xaiKey){
     $('pm-news').innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:2px 0">
-      <button class="btn btn-sm" onclick="loadPlayerNewsNow('${playerId}')" style="font-size:11px">Load news from X ↗</button>
-      <span style="font-size:10px;color:var(--text3)">Powered by Grok</span>
+      <button class="btn btn-sm" onclick="loadPlayerNewsNow('${playerId}')" style="font-size:12px">Load news from X ↗</button>
+      <span style="font-size:11px;color:var(--text3)">Powered by Grok</span>
     </div>`;
   }else{
-    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px;padding:4px 0">Add an xAI key in Settings for live X/Twitter news.</div>';
+    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:12px;padding:4px 0">Add an xAI key in Settings for live X/Twitter news.</div>';
   }
   // Load career stats
   const cardWrap=$('pm-card-stats');if(cardWrap)cardWrap.style.display='none';
@@ -1789,7 +1789,7 @@ async function loadPlayerCardStats(playerId){
 
   if(!curRaw&&!prevRaw){
     wrap.style.display='block';
-    inner.innerHTML='<div style="color:var(--text3);font-size:11px;padding:4px 0">Stats load automatically with your roster. If empty, check the Stats tab to load data.</div>';
+    inner.innerHTML='<div style="color:var(--text3);font-size:12px;padding:4px 0">Stats load automatically with your roster. If empty, check the Stats tab to load data.</div>';
     return;
   }
 
@@ -1836,7 +1836,7 @@ async function loadPlayerCardStats(playerId){
   const rows=[toRow(curRaw,curYear),toRow(prevRaw,prevYear)].filter(Boolean);
 
   if(!rows.length){
-    inner.innerHTML='<div style="color:var(--text3);font-size:11px;padding:4px 0">No stats recorded for this player yet.</div>';
+    inner.innerHTML='<div style="color:var(--text3);font-size:12px;padding:4px 0">No stats recorded for this player yet.</div>';
     return;
   }
 
@@ -1853,15 +1853,15 @@ async function loadPlayerCardStats(playerId){
 
   inner.innerHTML=`
     <div style="display:grid;grid-template-columns:${gridCols};align-items:center;padding:0 0 5px;border-bottom:2px solid var(--border2);margin-bottom:2px;gap:4px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase">YR</div>
-      <div style="font-size:11px;font-weight:700;color:var(--text3)">TM</div>
-      ${cols.map(c=>`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right">${c.l}</div>`).join('')}
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase">YR</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3)">TM</div>
+      ${cols.map(c=>`<div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;text-align:right">${c.l}</div>`).join('')}
     </div>
     ${rows.map(r=>`
       <div style="display:grid;grid-template-columns:${gridCols};align-items:center;padding:6px 0;border-bottom:1px solid var(--border);gap:4px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3)">${r.yr}</div>
-        <div style="font-size:11px;font-weight:700;padding:2px 4px;border-radius:4px;background:var(--bg4);color:var(--text3);text-align:center">${p.team||'FA'}</div>
-        ${cols.map(c=>`<div style="font-size:12px;font-weight:600;text-align:right">${fmt(r[c.k],c.k)}</div>`).join('')}
+        <div style="font-size:12px;font-weight:700;color:var(--text3)">${r.yr}</div>
+        <div style="font-size:12px;font-weight:700;padding:2px 4px;border-radius:4px;background:var(--bg4);color:var(--text3);text-align:center">${p.team||'FA'}</div>
+        ${cols.map(c=>`<div style="font-size:13px;font-weight:600;text-align:right">${fmt(r[c.k],c.k)}</div>`).join('')}
       </div>`).join('')}`;
 }
 
@@ -1871,7 +1871,7 @@ async function getPlayerFullCard(playerId){
   if(!hasAnyAI())return;
   const p=S.players[playerId];if(!p)return;
   const name=pName(playerId);const pos=p.position;const age=p.age||'?';const team=p.team||'FA';
-  $('pm-news').innerHTML='<div style="color:var(--text3);font-size:11px">🔍 Searching for news...</div>';
+  $('pm-news').innerHTML='<div style="color:var(--text3);font-size:12px">🔍 Searching for news...</div>';
   try{
     const reply=await callClaude([{role:'user',content:`IMPORTANT: Search for news ONLY about ${name} (${pos}, ${fullTeam(team)}, age ${age}). Do NOT include news about any other player. If you cannot find recent news specifically about ${name}, say "No recent news found for ${name}."
 Return JSON only: {"news":[{"source":"source","text":"one sentence about ${name} only","date":"date"}],"tweet":"@ReconAI_FW dynasty take on ${name} specifically, max 280 chars"}`}],true,1,500);
@@ -1881,7 +1881,7 @@ Return JSON only: {"news":[{"source":"source","text":"one sentence about ${name}
       const clean=reply.replace(/```json|```/g,'').trim();
       const start=clean.indexOf('{');const end=clean.lastIndexOf('}');
       if(start>=0)data=JSON.parse(clean.substring(start,end+1));
-    }catch(e){$('pm-news').innerHTML=`<div style="font-size:12px;color:var(--text2);line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;return;}
+    }catch(e){$('pm-news').innerHTML=`<div style="font-size:13px;color:var(--text2);line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;return;}
 
     const playerLast=p.last_name||'';
     if(data.news)data.news=data.news.filter(n=>n.text&&(n.text.includes(playerLast)||n.text.includes(name)));
@@ -1889,23 +1889,23 @@ Return JSON only: {"news":[{"source":"source","text":"one sentence about ${name}
     $('pm-news').innerHTML=data.news?.length?data.news.slice(0,3).map(n=>`
       <div style="padding:7px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
-          <span style="font-size:10px;color:var(--accent);font-weight:600">${n.source||'NFL'}</span>
-          ${n.date?`<span style="font-size:10px;color:var(--text3)">${n.date}</span>`:''}
+          <span style="font-size:11px;color:var(--accent);font-weight:600">${n.source||'NFL'}</span>
+          ${n.date?`<span style="font-size:11px;color:var(--text3)">${n.date}</span>`:''}
         </div>
-        <div style="font-size:12px;color:var(--text2);line-height:1.5">${n.text}</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.5">${n.text}</div>
       </div>`).join('')
-    :'<div style="color:var(--text3);font-size:12px">No recent news found for '+name+'.</div>';
+    :'<div style="color:var(--text3);font-size:13px">No recent news found for '+name+'.</div>';
 
     if(data.tweet&&data.tweet.includes(playerLast)){
       $('pm-tweet').style.display='block';
       $('pm-tweet').innerHTML=`
         <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);padding:12px 14px;margin-top:8px">
-          <div style="font-size:11px;color:var(--accent);font-weight:600;margin-bottom:5px">@ReconAI_FW</div>
-          <div style="font-size:13px;color:var(--text);line-height:1.6">${data.tweet}</div>
+          <div style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:5px">@ReconAI_FW</div>
+          <div style="font-size:14px;color:var(--text);line-height:1.6">${data.tweet}</div>
         </div>
         <button class="copy-btn" style="margin-top:8px" onclick="copyText(${JSON.stringify(data.tweet)},this)">Copy tweet</button>`;
     }else{$('pm-tweet').style.display='none';}
-  }catch(e){$('pm-news').innerHTML=`<div style="color:var(--red);font-size:11px">Error: ${e.message}</div>`;}
+  }catch(e){$('pm-news').innerHTML=`<div style="color:var(--red);font-size:12px">Error: ${e.message}</div>`;}
 }
 
 // ── Opponent Scouting ──────────────────────────────────────────
@@ -1993,7 +1993,7 @@ function scoutTeam(rosterId){
 
   const theirPicks=S.tradedPicks.filter(p=>p.owner_id===r.roster_id)
     .sort((a,b)=>a.season-b.season||a.round-b.round)
-    .map(p=>`<span style="background:rgba(108,99,245,.12);border:1px solid rgba(108,99,245,.25);border-radius:4px;padding:2px 7px;font-size:11px;font-weight:600;color:var(--accent)">${p.season} R${p.round}</span>`).join('');
+    .map(p=>`<span style="background:rgba(108,99,245,.12);border:1px solid rgba(108,99,245,.25);border-radius:4px;padding:2px 7px;font-size:12px;font-weight:600;color:var(--accent)">${p.season} R${p.round}</span>`).join('');
 
   const posScores2=Object.keys(starterSlots).map(pos=>{
     const d=byPos[pos]||{total:0,startable:0,players:[]};
@@ -2016,21 +2016,21 @@ function scoutTeam(rosterId){
     const emptyDots=Array(empty).fill('<span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:1px dashed var(--border2);flex-shrink:0"></span>').join('');
     return`<div style="background:var(--bg2);border-radius:var(--r);padding:9px 11px;border:1px solid ${gradeBorder[grade]}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:700">${pos}</span>
-        <span style="font-size:11px;font-weight:600;color:${gradeColors[grade]}">${gradeLabels[grade]}</span>
+        <span style="font-size:13px;font-weight:700">${pos}</span>
+        <span style="font-size:12px;font-weight:600;color:${gradeColors[grade]}">${gradeLabels[grade]}</span>
       </div>
-      <div style="font-size:16px;font-weight:700;line-height:1;margin-bottom:3px">${d.startable}<span style="font-size:11px;font-weight:400;color:var(--text3)">/${need}</span></div>
+      <div style="font-size:16px;font-weight:700;line-height:1;margin-bottom:3px">${d.startable}<span style="font-size:12px;font-weight:400;color:var(--text3)">/${need}</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:3px">${dots}${emptyDots}</div>
-      <div style="font-size:11px;color:var(--text3)">${d.total}/${depth}</div>
+      <div style="font-size:12px;color:var(--text3)">${d.total}/${depth}</div>
     </div>`;
   };
 
   const posCards=(strengths2.length?
-    '<div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their strengths</div>'
+    '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their strengths</div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">'
     +strengths2.map(makeCard2).join('')+'</div>':'')
   +(weaknesses2.length?
-    '<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their needs (your leverage)</div>'
+    '<div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their needs (your leverage)</div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">'
     +weaknesses2.map(makeCard2).join('')+'</div>':'');
 
@@ -2040,11 +2040,11 @@ function scoutTeam(rosterId){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
         <div>
           <div style="font-size:15px;font-weight:700">${name}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">Rank #${rank}/${S.rosters.length} · ${s.wins||0}-${s.losses||0}${faab!==null?' · $'+faab+' FAAB':''}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">Rank #${rank}/${S.rosters.length} · ${s.wins||0}-${s.losses||0}${faab!==null?' · $'+faab+' FAAB':''}</div>
         </div>
-        <button class="btn btn-sm" onclick="runScoutAI()" id="scout-ai-btn" style="font-size:11px">Full war room ↗</button>
+        <button class="btn btn-sm" onclick="runScoutAI()" id="scout-ai-btn" style="font-size:12px">Full war room ↗</button>
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text3);margin-bottom:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text3);margin-bottom:10px">
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:2px"></span>Elite/Starter</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:2px"></span>Depth</span>
         <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(245,158,11,.7);margin-right:2px"></span>Marginal</span>
@@ -2055,15 +2055,15 @@ function scoutTeam(rosterId){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their surplus → target</div>
-          <div style="font-size:12px;color:var(--green);font-weight:600">${strengths2.filter(p=>p.score>1).map(p=>p.pos).join(', ')||'None identified'}</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their surplus → target</div>
+          <div style="font-size:13px;color:var(--green);font-weight:600">${strengths2.filter(p=>p.score>1).map(p=>p.pos).join(', ')||'None identified'}</div>
         </div>
         <div>
-          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their needs → your leverage</div>
-          <div style="font-size:12px;color:var(--amber);font-weight:600">${weaknesses2.map(p=>p.pos).join(', ')||'No obvious gaps'}</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their needs → your leverage</div>
+          <div style="font-size:13px;color:var(--amber);font-weight:600">${weaknesses2.map(p=>p.pos).join(', ')||'No obvious gaps'}</div>
         </div>
       </div>
-      ${theirPicks?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Their traded picks</div><div style="display:flex;flex-wrap:wrap;gap:4px">${theirPicks}</div></div>`:''}
+      ${theirPicks?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Their traded picks</div><div style="display:flex;flex-wrap:wrap;gap:4px">${theirPicks}</div></div>`:''}
     </div>`;
 }
 
@@ -2164,7 +2164,7 @@ function renderDraftNeeds(){
       if(bestEarlyNeed.elite===0&&bestEarlyNeed.slotsNeeded>0)reasons.push('no elite talent');
       if(bestEarlyNeed.young===0)reasons.push('no young depth');
       const reasonStr=reasons.length?reasons.join(', '):'biggest positional need';
-      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:12px;color:var(--green);line-height:1.5">
+      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:13px;color:var(--green);line-height:1.5">
         🎯 <strong>Priority target:</strong> Use your R${earlyRounds[0]} pick on <strong>${bestEarlyNeed.pos}</strong> — ${reasonStr}.
       </div>`;
     } else if(!earlyRounds.length&&ownPickRounds.length){
@@ -2174,14 +2174,14 @@ function renderDraftNeeds(){
         if(bestMidNeed.starterGap>0)reasons.push(`${bestMidNeed.startable}/${bestMidNeed.slotsNeeded} starters`);
         if(bestMidNeed.aging>0)reasons.push(`${bestMidNeed.aging} aging past peak`);
         const reasonStr=reasons.length?reasons.join(', '):'biggest need';
-        betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:12px;color:var(--green);line-height:1.5">
+        betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:13px;color:var(--green);line-height:1.5">
           🎯 <strong>Priority target:</strong> Look for <strong>${bestMidNeed.pos}</strong> value in mid rounds — ${reasonStr}.
         </div>`;
       }
     }
     if(lateRounds.length&&bestLateIDP&&bestLateIDP[1]>0){
       const avgLateHit=lateRounds.map(r=>LI.hitRateByRound[r]?.rate||0).reduce((a,b)=>a+b,0)/lateRounds.length;
-      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r);font-size:12px;color:var(--amber);line-height:1.5">
+      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r);font-size:13px;color:var(--amber);line-height:1.5">
         ⚠️ Late picks (R${lateRounds.join(', R')}): ${avgLateHit.toFixed(0)}% starter rate. Best bet: <strong>${bestLateIDP[0]}</strong> — highest late-round hit rate in your league's history.
       </div>`;
     }
@@ -2207,11 +2207,11 @@ function renderDraftNeeds(){
       const pickLabel=p.round+'.'+String(estPos).padStart(2,'0');
       const fromName=p.own?'Own':'From '+p.from;
       return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg4)':'rgba(124,107,248,.12)'};border:1px solid ${p.own?'var(--border2)':'rgba(124,107,248,.25)'};border-radius:8px;padding:6px 12px">
-        <span style="font-size:13px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</span>
-        <span style="font-size:11px;color:var(--text3)">${fromName}</span>
-        <span style="font-size:10px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace">~${val.toLocaleString()}</span>
+        <span style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</span>
+        <span style="font-size:12px;color:var(--text3)">${fromName}</span>
+        <span style="font-size:11px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace">~${val.toLocaleString()}</span>
       </div>`;
-    }).join(''):`<span style="color:var(--text3);font-size:12px">No picks for ${year}</span>`;
+    }).join(''):`<span style="color:var(--text3);font-size:13px">No picks for ${year}</span>`;
   }
 
   // === RENDER: Draft Priority ===
@@ -2224,22 +2224,22 @@ function renderDraftNeeds(){
   const gradeLabelD=ns=>ns>=50?'Critical':ns>=20?'Need':ns>0?'Thin':'Solid';
 
   let dhtml=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-    <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Draft priority</span>
-    ${LI_LOADED?`<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(52,211,153,.1);color:var(--green)">DHQ · ${LI.leagueYears?.length||0}yr</span>`:''}
-    <span style="font-size:11px;color:var(--text3);margin-left:auto">Picks: ${ownPickRounds.map(r=>'R'+r).join(', ')||'none'}</span>
+    <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Draft priority</span>
+    ${LI_LOADED?`<span style="font-size:11px;padding:2px 6px;border-radius:4px;background:rgba(52,211,153,.1);color:var(--green)">DHQ · ${LI.leagueYears?.length||0}yr</span>`:''}
+    <span style="font-size:12px;color:var(--text3);margin-left:auto">Picks: ${ownPickRounds.map(r=>'R'+r).join(', ')||'none'}</span>
   </div>`;
 
   dhtml+=posAnalysis.map(p=>{
     const bar=Math.min(100,Math.max(5,p.needScore*1.2));
     const barCol=gradeColorD(p.needScore);
     return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-      <span style="font-size:11px;font-weight:700;min-width:24px;color:${barCol}">${p.pos}</span>
+      <span style="font-size:12px;font-weight:700;min-width:24px;color:${barCol}">${p.pos}</span>
       <div style="flex:1;display:flex;flex-direction:column;gap:2px">
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:10px;color:${barCol};min-width:44px">${gradeLabelD(p.needScore)}</span>
+          <span style="font-size:11px;color:${barCol};min-width:44px">${gradeLabelD(p.needScore)}</span>
           <div style="flex:1;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${bar}%;height:100%;background:${barCol};border-radius:2px"></div></div>
         </div>
-        <span style="font-size:11px;color:var(--text3)">${p.startable}/${p.slotsNeeded} starters${p.aging?' · '+p.aging+' aging':''}${p.young?' · '+p.young+' young':''}</span>
+        <span style="font-size:12px;color:var(--text3)">${p.startable}/${p.slotsNeeded} starters${p.aging?' · '+p.aging+' aging':''}${p.young?' · '+p.young+' young':''}</span>
       </div>
     </div>`;
   }).join('');
@@ -2252,9 +2252,9 @@ function renderDraftNeeds(){
   if(histEl&&LI_LOADED&&LI.hitRateByRound){
     histEl.style.display='block';
     let hHtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Historical starter rate by round — ${LI.totalPicks||0} picks across ${LI.draftMeta?.length||0} drafts</div>`;
+      <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Historical starter rate by round — ${LI.totalPicks||0} picks across ${LI.draftMeta?.length||0} drafts</div>`;
 
-    hHtml+=`<div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:10px;margin-bottom:6px">
+    hHtml+=`<div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:11px;margin-bottom:6px">
       <span style="font-weight:700;color:var(--text3)">Round</span><span style="font-weight:700;color:var(--text3)">League-wide</span><span style="font-weight:700;color:var(--text3)">Rate</span><span style="font-weight:700;color:var(--text3)">Best positions</span>`;
 
     for(let rd=1;rd<=draftRounds;rd++){
@@ -2277,7 +2277,7 @@ function renderDraftNeeds(){
     }
 
     hHtml+=`</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">% = starter rate (top 15% at position). 🎯 = matches your need. ► = you have this pick.</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">% = starter rate (top 15% at position). 🎯 = matches your need. ► = you have this pick.</div>
     </div>`;
     histEl.innerHTML=hHtml;
   }
@@ -2368,10 +2368,10 @@ Search the web for current ${year} rookie rankings. Be specific with prospect na
     $('draft-scout-content').innerHTML=`
       <div class="card" style="border-color:rgba(108,99,245,.2)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <div style="font-size:14px;font-weight:600">${year} Draft Scouting Report</div>
+          <div style="font-size:15px;font-weight:600">${year} Draft Scouting Report</div>
           <button class="copy-btn" style="margin-left:auto" onclick="copyText(${JSON.stringify(reply)},this)">Copy</button>
         </div>
-        <div style="font-size:13px;color:var(--text2);line-height:1.7">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/#{1,3} /g,'').replace(/\n\n/g,'</p><p style="margin-top:10px">').replace(/\n/g,'<br>')}</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.7">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/#{1,3} /g,'').replace(/\n\n/g,'</p><p style="margin-top:10px">').replace(/\n/g,'<br>')}</div>
       </div>`;
     draftChatHistory=[];
     addDraftMsg(`I've analyzed your ${year} draft position. What would you like to dig into?`,'a');

@@ -136,16 +136,16 @@ function showLeaguePicker(leagues,userId){
   const statusLabel=s=>({pre_draft:'Pre-draft',drafting:'Drafting',in_season:'In Season',complete:'Complete'}[s]||s||'');
   $('setup-block').innerHTML=`
     <h3 style="font-size:18px;text-align:center">Choose your league</h3>
-    <p style="font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.6;text-align:center">Found ${leagues.length} league${leagues.length>1?'s':''} for ${S.season}. Select the one you want to manage.</p>
+    <p style="font-size:14px;color:var(--text2);margin-bottom:18px;line-height:1.6;text-align:center">Found ${leagues.length} league${leagues.length>1?'s':''} for ${S.season}. Select the one you want to manage.</p>
     <div id="league-pick-list" style="max-width:440px;margin:0 auto">
       ${leagues.map((l,i)=>`
         <div onclick="selectLeague('${l.league_id}','${userId}')" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);margin-bottom:8px;cursor:pointer;transition:all .2s;animation:cardIn .3s ease both;animation-delay:${i*0.05}s" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(124,107,248,.15)'" onmouseout="this.style.borderColor='var(--border2)';this.style.transform='none';this.style.boxShadow='none'">
           ${l.avatar?`<img src="https://sleepercdn.com/avatars/thumbs/${l.avatar}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`:`<div style="width:40px;height:40px;border-radius:10px;background:var(--accentL);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏈</div>`}
           <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em">${l.name||'Unnamed League'}</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:3px">${l.total_rosters} teams · ${typeLabel(l.settings?.type)} · ${statusLabel(l.status)}</div>
+            <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em">${l.name||'Unnamed League'}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:3px">${l.total_rosters} teams · ${typeLabel(l.settings?.type)} · ${statusLabel(l.status)}</div>
           </div>
-          <div style="font-size:11px;color:var(--text3);text-align:right;flex-shrink:0">
+          <div style="font-size:12px;color:var(--text3);text-align:right;flex-shrink:0">
             <div style="color:var(--accent);font-weight:600">${l.season}</div>
             <div style="margin-top:2px;font-weight:500">${l.settings?.type===2?'Dynasty':'Redraft'}</div>
           </div>
@@ -167,7 +167,7 @@ async function selectLeague(leagueId,userId){
   try{localStorage.setItem('dynastyhq_league',leagueId);}catch(e){}
   const league=S.leagues.find(l=>l.league_id===leagueId);
   $('league-pill').textContent=(league?.name||'League').substring(0,20);
-  $('setup-block').innerHTML=`<div style="font-size:13px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
+  $('setup-block').innerHTML=`<div style="font-size:14px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
   try{
     await loadLeague(leagueId,userId);
     const sb2=$('setup-block');if(sb2)sb2.style.display='none';
@@ -182,7 +182,7 @@ async function selectLeague(leagueId,userId){
     });
   }catch(e){
     const sb=$('setup-block');
-    if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:13px">Error: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
+    if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:14px">Error: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
   }
 }
 window.selectLeague = selectLeague;
@@ -278,11 +278,11 @@ function reconnect(){
     sb.innerHTML=`<div style="text-align:center;margin-bottom:16px">
       <div style="font-size:28px;margin-bottom:8px">🔄</div>
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">Switching account</div>
-      <div style="font-size:12px;color:var(--text3)">Connecting as <strong style="color:var(--accent)">${u}</strong></div>
+      <div style="font-size:13px;color:var(--text3)">Connecting as <strong style="color:var(--accent)">${u}</strong></div>
     </div>
     <div class="row" style="max-width:380px;margin:0 auto">
-      <input type="text" id="u-input" value="${u}" placeholder="Sleeper username" style="font-size:14px;padding:12px 16px;border-radius:12px" onkeydown="if(event.key==='Enter')connect()"/>
-      <button class="btn" id="conn-btn" onclick="connect()" style="padding:12px 24px;font-size:13px;font-weight:700;border-radius:12px">Connect</button>
+      <input type="text" id="u-input" value="${u}" placeholder="Sleeper username" style="font-size:15px;padding:12px 16px;border-radius:12px" onkeydown="if(event.key==='Enter')connect()"/>
+      <button class="btn" id="conn-btn" onclick="connect()" style="padding:12px 24px;font-size:14px;font-weight:700;border-radius:12px">Connect</button>
     </div>
     <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
     <div class="prog" id="prog" style="display:none;max-width:380px;margin:0 auto"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>`;
@@ -298,7 +298,7 @@ function reloadSeason(){
   S.season=$('season-sel').value;
   S.leagues=[];S.matchups={};S.transactions={};S.rosters=[];
   if(S.user){
-    const sb=$('setup-block');if(sb){sb.style.display='block';sb.innerHTML=`<div style="font-size:13px;color:var(--text2)">Reloading for ${S.season}...</div>`;}
+    const sb=$('setup-block');if(sb){sb.style.display='block';sb.innerHTML=`<div style="font-size:14px;color:var(--text2)">Reloading for ${S.season}...</div>`;}
     const dc=$('digest-content');if(dc)dc.style.display='none';
     connect();
   }

@@ -720,7 +720,7 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
       }
       data=JSON.parse(clean);
     }catch(err){
-      $('wq-list').innerHTML=`<div class="card"><div style="font-size:12px;color:var(--text2);line-height:1.6;padding:4px">${reply.replace(/\n/g,'<br>')}</div></div>`;
+      $('wq-list').innerHTML=`<div class="card"><div style="font-size:13px;color:var(--text2);line-height:1.6;padding:4px">${reply.replace(/\n/g,'<br>')}</div></div>`;
       btn.textContent='Generate';btn.disabled=false;return;
     }
     const mentLabel={balanced:'⚖️ Balanced',winnow:'🏆 Win Now',rebuild:'🔄 Rebuild',prime:'⭐ Dynasty Prime'}[loadMentality().mentality]||'';
@@ -733,7 +733,7 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
       });
     }
     $('wq-list').innerHTML=`
-      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap">
         <span>${mentLabel}</span><span>${avail.length} available</span>
         <span style="color:${slots.openBench>0?'var(--green)':'var(--red)'}">${slots.openBench} open slot${slots.openBench!==1?'s':''}</span>
         ${isFAAB?`<span style="color:var(--green)">$${faab.remaining} FAAB remaining</span>`:''}
@@ -742,18 +742,18 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
         <div class="action-item priority-${r.rank===1?'high':r.rank<=3?'med':'low'}" style="margin-bottom:10px">
           <div class="action-body" style="width:100%">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
-              <span style="font-size:13px;font-weight:700;color:var(--accent)">#${r.rank}</span>
-              <span class="pos ${posClass(r.position)}" style="font-size:11px">${r.position||'?'}</span>
-              <span style="font-size:13px;font-weight:500">${r.name}</span>
-              ${r.age?`<span style="font-size:11px;color:var(--text3)">age ${r.age}</span>`:''}
-              ${r.dynastyValue?`<span style="font-size:11px;color:var(--accent);font-weight:600">${r.dynastyValue.toLocaleString()}</span>`:''}
+              <span style="font-size:14px;font-weight:700;color:var(--accent)">#${r.rank}</span>
+              <span class="pos ${posClass(r.position)}" style="font-size:12px">${r.position||'?'}</span>
+              <span style="font-size:14px;font-weight:500">${r.name}</span>
+              ${r.age?`<span style="font-size:12px;color:var(--text3)">age ${r.age}</span>`:''}
+              ${r.dynastyValue?`<span style="font-size:12px;color:var(--accent);font-weight:600">${r.dynastyValue.toLocaleString()}</span>`:''}
             </div>
-            <div style="font-size:11px;color:var(--text3);margin-bottom:5px">${fullTeam(r.team)||''}${r.drop?` · Drop: <span style="color:var(--red);font-weight:500">${r.drop}</span>${r.drop_reason?' ('+r.drop_reason+')':''}`:''}</div>
-            <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:7px">${r.reason}</div>
+            <div style="font-size:12px;color:var(--text3);margin-bottom:5px">${fullTeam(r.team)||''}${r.drop?` · Drop: <span style="color:var(--red);font-weight:500">${r.drop}</span>${r.drop_reason?' ('+r.drop_reason+')':''}`:''}</div>
+            <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:7px">${r.reason}</div>
             ${isFAAB&&r.faab_low!=null?`<div style="background:var(--bg3);border-radius:6px;padding:7px 10px;margin-bottom:7px;display:inline-flex;align-items:center;gap:10px">
-              <span style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">FAAB bid</span>
+              <span style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">FAAB bid</span>
               <span style="font-size:17px;font-weight:700;color:var(--green)">$${r.faab_low}–$${r.faab_high}</span>
-              ${r.faab_rationale?`<span style="font-size:11px;color:var(--text2)">${r.faab_rationale}</span>`:''}
+              ${r.faab_rationale?`<span style="font-size:12px;color:var(--text2)">${r.faab_rationale}</span>`:''}
             </div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               ${r.copyText?`<button class="copy-btn" onclick="copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}
@@ -881,10 +881,10 @@ Be direct and specific. Name real players and real offers. IDP in this league: s
     aiCard.style.cssText='border-color:rgba(108,99,245,.2);margin-top:10px';
     aiCard.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
       +(avatarUrl(S.leagueUsers.find(u=>u.user_id===r.owner_id))?`<img src="${avatarUrl(S.leagueUsers.find(u=>u.user_id===r.owner_id))}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">`:'')
-      +`<div style="font-size:13px;font-weight:600">${oppName} — War Room</div>`
-      +`<button class="copy-btn" style="margin-left:auto;font-size:10px" onclick="copyText(${JSON.stringify(reply)},this)">Copy</button>`
+      +`<div style="font-size:14px;font-weight:600">${oppName} — War Room</div>`
+      +`<button class="copy-btn" style="margin-left:auto;font-size:11px" onclick="copyText(${JSON.stringify(reply)},this)">Copy</button>`
       +'</div>'
-      +`<div style="font-size:12px;color:var(--text2);line-height:1.8">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/#{1,3} /g,'').replace(/\n\n/g,'</p><p style="margin-top:10px">').replace(/\n/g,'<br>')}</div>`;
+      +`<div style="font-size:13px;color:var(--text2);line-height:1.8">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/#{1,3} /g,'').replace(/\n\n/g,'</p><p style="margin-top:10px">').replace(/\n/g,'<br>')}</div>`;
     if(out)out.appendChild(aiCard);
 
   }catch(e){if(out)out.innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;}
