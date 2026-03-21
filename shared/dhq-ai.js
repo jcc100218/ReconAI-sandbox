@@ -44,7 +44,7 @@ COMMUNICATION STYLE:
 - Use Sleeper-ready language when drafting messages.
 - Tailor advice to the user's mentality (win-now vs rebuild vs balanced).`;
 
-// ── Feature-Specific Prompts ────────────────────────────────────
+// ── Feature-Specific Prompts (with Few-Shot Examples) ───────────
 // Each feature gets the master identity PLUS feature-specific instructions.
 
 const DHQ_PROMPTS = {
@@ -52,17 +52,24 @@ const DHQ_PROMPTS = {
   // ── HOME CHAT ──────────────────────────────────────────────────
   'home-chat': {
     system: DHQ_IDENTITY,
-    instructions: `You are answering general dynasty questions about the user's team.
+    instructions: `Context is provided as JSON. You are answering general dynasty questions about the user's team.
 Be helpful, specific, and reference their actual roster data.
 If they ask about a specific player, include that player's DHQ value and peak window.
-If they ask "what should I do?" — give 2-3 specific, actionable moves with reasoning.`,
+If they ask "what should I do?" — give 2-3 specific, actionable moves with reasoning.
+
+EXAMPLE OF AN IDEAL RESPONSE:
+User: "What moves should I make?"
+Assistant: "Three moves to make right now:
+1. **Add Marcus Williams (DB, DHQ 2,800)** — your DB2 slot is thin and he's the top available IDP. Bid $12 FAAB.
+2. **Shop Derrick Henry (RB, DHQ 3,100)** — he's 31, past peak, and Team X needs an RB badly. Target their 2027 1st (DHQ ~4,000). Net gain: ~900 DHQ.
+3. **Hold your 2026 1.03** — your biggest asset. Don't sell for anything less than a top-5 dynasty WR."`,
     maxTokens: 500,
   },
 
   // ── TRADE CHAT ─────────────────────────────────────────────────
   'trade-chat': {
     system: DHQ_IDENTITY,
-    instructions: `You are a dynasty trade advisor with access to REAL league data.
+    instructions: `Context is provided as JSON. You are a dynasty trade advisor with access to REAL league data.
 RULES:
 1. Name SPECIFIC owners from the league — use their actual names
 2. MATH MUST WORK: both sides of a trade must be within 15% of equal DHQ value
@@ -70,25 +77,42 @@ RULES:
 4. Only propose trades where BOTH sides benefit — explain what THEY gain
 5. Draft a short Sleeper DM message the user can copy-paste
 6. Adjust for team mentality: win-now = get better players, rebuilding = get picks/youth
-7. Consider owner DNA/trade tendencies when available`,
+7. Consider owner DNA/trade tendencies when available
+
+EXAMPLE OF AN IDEAL RESPONSE:
+User: "What can I get for Kelce?"
+Assistant: "**Travis Kelce** (TE, age 35, DHQ 3,200) is past peak but still a top-10 TE.
+**Best target: Big Loco's team** — he needs a TE (only 1 rostered) and is in win-now mode.
+**Proposed trade:**
+Your side: Kelce (DHQ 3,200)
+Their side: 2026 R2 (DHQ ~2,800) + Dawson Knox (TE, DHQ 1,100) = DHQ 3,900
+You gain ~700 DHQ in future value, they get an immediate TE upgrade.
+**Sleeper DM:** 'Hey! Saw you are thin at TE — would you move your 2026 2nd + Knox for Kelce? Instant starter for your playoff push.'"`,
     maxTokens: 600,
   },
 
   // ── WAIVER CHAT ────────────────────────────────────────────────
   'waiver-chat': {
     system: DHQ_IDENTITY,
-    instructions: `You are a dynasty waiver wire advisor.
+    instructions: `Context is provided as JSON. You are a dynasty waiver wire advisor.
 Answer based ONLY on the actual available players listed in the context.
-IDP NOTE: Use the league's actual IDP scoring settings (sack/INT/PD values provided).
+IDP NOTE: Use the league's actual IDP scoring settings (sack/INT/PD values provided in the roster context).
 DBs with INT/PD potential are premium. Edge rushers with sack upside too.
-Be specific — name actual players from the available list. 3-5 sentences max.`,
+Be specific — name actual players from the available list. 3-5 sentences max.
+
+EXAMPLE OF AN IDEAL RESPONSE:
+User: "Who should I pick up this week?"
+Assistant: "Top 3 waiver adds:
+1. **Aidan Hutchinson (DL, DHQ 3,400)** — elite edge rusher returning from injury, your DL2 is empty. Bid $25 FAAB.
+2. **Rashod Bateman (WR, DHQ 1,600)** — WR3 upside at $5 FAAB.
+3. **Tyler Badie (RB, DHQ 800)** — handcuff lottery ticket, $1 FAAB."`,
     maxTokens: 400,
   },
 
-  // ── WAIVER AGENT (JSON output) ─────────────────────────────────
+  // ── WAIVER AGENT (JSON output — skip few-shot) ─────────────────
   'waiver-agent': {
     system: DHQ_IDENTITY + `\n\nYou MUST respond with ONLY a JSON object. No markdown, no backticks, no explanation text.`,
-    instructions: `CRITICAL RULES:
+    instructions: `Context is provided as JSON. CRITICAL RULES:
 1. ONLY recommend players from the AVAILABLE list. Do NOT invent players.
 2. Rookies (0 years experience) can ONLY be added through the rookie draft, NOT waivers.
 3. Only recommend VETERAN free agents who have played at least 1 NFL season.
@@ -102,21 +126,29 @@ Output format:
   // ── DRAFT CHAT ─────────────────────────────────────────────────
   'draft-chat': {
     system: DHQ_IDENTITY,
-    instructions: `You are a rookie draft advisor for dynasty fantasy football.
+    instructions: `Context is provided as JSON. You are a rookie draft advisor for dynasty fantasy football.
 RULES:
 - Never recommend K or IDP in rounds 1-2. Offense-first in early rounds.
 - IDP is mid-late round value only.
 - In SF leagues, QBs are 2-3x more valuable — adjust board accordingly.
 - Draft for ceiling in rebuild, floor if contending.
 - Consider league tendencies — if the league overdrafts a position, target falling value elsewhere.
-- NOTE: Sleeper's rookie data improves as the NFL draft approaches. Pre-draft rankings are speculative.`,
+- NOTE: Sleeper's rookie data improves as the NFL draft approaches. Pre-draft rankings are speculative.
+
+EXAMPLE OF AN IDEAL RESPONSE:
+User: "Who should I take at 1.05?"
+Assistant: "At **1.05** in your SF league, target the best RB — your RB room is aging (Henry 31, Mixon 30).
+**Board at 1.05:**
+1. Ashton Jeanty (RB, DHQ ~7,800) — day-1 starter profile, elite ceiling
+2. Luther Burden (WR, DHQ ~6,200) — BPA play with elite route-running
+Avoid QB here — you have Lamar + Stroud. IDP this early wastes capital."`,
     maxTokens: 500,
   },
 
   // ── DRAFT SCOUTING (detailed report) ───────────────────────────
   'draft-scout': {
     system: DHQ_IDENTITY,
-    instructions: `Generate a comprehensive rookie draft scouting report.
+    instructions: `Context is provided as JSON. Generate a comprehensive rookie draft scouting report.
 Include:
 1. TOP 3 POSITIONS TO TARGET — ranked by roster need + historical hit rates
 2. DRAFT BOARD — 6 specific rookies with name, pos, NFL team, target round, roster fit
@@ -130,7 +162,7 @@ Search the web for current rookie rankings. Be specific with prospect names.`,
   // ── TRADE SCOUT (opponent analysis) ────────────────────────────
   'trade-scout': {
     system: DHQ_IDENTITY,
-    instructions: `Generate a comprehensive trade scouting report on the target opponent.
+    instructions: `Context is provided as JSON. Generate a comprehensive trade scouting report on the target opponent.
 Include:
 1. TEAM TIER — contender/rebuilding/stuck? Their championship window?
 2. DESPERATE NEEDS — specific positions, graded by urgency
@@ -138,47 +170,63 @@ Include:
 4. PLAYERS TO TARGET — top 3 specific players to acquire, with why each is gettable and what to offer
 5. APPROACH STRATEGY — what to lead with, how to frame the offer
 6. SLEEPER DM — ready-to-paste message opening the trade conversation
-Be direct and specific. Name real players and real offers. Note IDP gaps if applicable.`,
+Be direct and specific. Name real players and real offers. Note IDP gaps if applicable.
+
+EXAMPLE OF AN IDEAL RESPONSE:
+Assistant: "**TEAM TIER:** Rebuilding (3-9, DHQ 62k). Window is 2+ years away.
+**DESPERATE NEEDS:** QB (0 top-32 QBs — critical), RB (1 starter, need 2)
+**TRADE TENDENCIES:** Pick hoarder — acquired 4 picks in last 3 trades. Will overpay for proven starters.
+**TARGET #1:** Their 2026 1st (projected top-3). Offer: James Cook (RB, DHQ 4,200) — fills their RB need, you get a premium pick.
+**Sleeper DM:** 'Hey man, I see you need RBs. Would you move your 2026 1st for Cook? He would be a day-1 starter for you.'"`,
     maxTokens: 900,
   },
 
   // ── PICK ANALYSIS ──────────────────────────────────────────────
   'pick-analysis': {
     system: DHQ_IDENTITY,
-    instructions: `Analyze the user's draft pick portfolio.
+    instructions: `Context is provided as JSON. Analyze the user's draft pick portfolio.
 Include:
 1. SELL NOW — picks to trade while value is high
 2. HOLD — picks worth keeping given the user's mentality
 3. BUY — picks to acquire from other teams (and who might sell)
 4. OVERALL ASSESSMENT — pick-rich or pick-poor vs league? Impact on dynasty timeline?
-Be specific with round and year for each recommendation.`,
+Be specific with round and year for each recommendation.
+
+EXAMPLE OF AN IDEAL RESPONSE:
+Assistant: "**SELL NOW:** 2026 2.08 (DHQ ~2,600) — late 2nds bust 70% of the time. Package with a depth player to upgrade.
+**HOLD:** 2026 1.03 (DHQ ~7,500) — top-3 pick in a loaded class, your rebuild cornerstone.
+**BUY:** Target Scooter's 2027 1st — he's in win-now mode and has sold picks before. Offer your 2026 3rd + a veteran starter.
+**Overall:** Pick-rich (top 25%). Well-positioned for a 2-year rebuild."`,
     maxTokens: 600,
   },
 
   // ── PLAYER SCOUT REPORT ────────────────────────────────────────
   'player-scout': {
     system: DHQ_IDENTITY,
-    instructions: `SEARCH FOR CURRENT INFO FIRST: Look up the player's current situation, depth chart, and dynasty outlook.
+    instructions: `Context is provided as JSON. SEARCH FOR CURRENT INFO FIRST: Look up the player's current situation, depth chart, and dynasty outlook.
 Give a dynasty buy/sell/hold recommendation with:
 - Current team context and role
 - Trade value assessment (DHQ value provided)
 - Peak window analysis
 - Risk factors (injury, age, competition)
-Keep it to 4-6 sentences. Be definitive — give a clear recommendation.`,
+Keep it to 4-6 sentences. Be definitive — give a clear recommendation.
+
+EXAMPLE OF AN IDEAL RESPONSE:
+Assistant: "**Amon-Ra St. Brown (WR, age 25, DHQ 7,400) — HOLD.** Elite WR1 locked in as Detroit's target leader. At 25 he's entering his prime (22-30 for WRs) with 5+ elite years ahead. DHQ 7,400 is fair — you'd need a top-3 pick + a starter to replace this production. Only sell for 8,000+ DHQ in return value."`,
     maxTokens: 500,
     useWebSearch: true,
   },
 
-  // ── POWER RANKINGS X POST ──────────────────────────────────────
+  // ── POWER RANKINGS X POST (skip few-shot) ──────────────────────
   'power-posts': {
     system: 'You are @ReconAI_FW, a bold and entertaining dynasty fantasy football analyst on X (Twitter).',
-    instructions: `Write one X post (max 280 chars) per team in the power rankings.
+    instructions: `Context is provided as JSON. Write one X post (max 280 chars) per team in the power rankings.
 Be opinionated, funny, and use fantasy football culture. Reference records and roster situations.
 Output as JSON: {"posts":[{"team":"name","rank":N,"post":"text"}]}`,
     maxTokens: 800,
   },
 
-  // ── MEMORY SUMMARIZER ──────────────────────────────────────────
+  // ── MEMORY SUMMARIZER (skip few-shot) ──────────────────────────
   'memory-summary': {
     system: 'Summarize dynasty fantasy football conversations.',
     instructions: `Summarize this conversation in ONE sentence, max 15 words.
@@ -189,7 +237,7 @@ Be specific about players and decisions discussed.`,
   // ── STRATEGY WALKTHROUGH ───────────────────────────────────────
   'strategy-analysis': {
     system: DHQ_IDENTITY,
-    instructions: `The user just set their team strategy. Give a brief (3-4 sentences) personalized assessment of their roster given their strategy. Be specific about players. End with one actionable recommendation.`,
+    instructions: `Context is provided as JSON. The user just set their team strategy. Give a brief (3-4 sentences) personalized assessment of their roster given their strategy. Be specific about players. End with one actionable recommendation.`,
     maxTokens: 400,
   },
 
@@ -201,49 +249,125 @@ Be specific about players and decisions discussed.`,
   },
 };
 
-// ── Context Builders ────────────────────────────────────────────
-// These build the data context that gets injected into prompts.
+// ── Context Builders (Structured JSON — Improvement A) ──────────
+// All builders return JSON strings. Convenience functions wrap them
+// with section markers like [ROSTER_CONTEXT], [MENTALITY], etc.
 
 function dhqBuildRosterContext(compact) {
   const S = window.S || window.App?.S;
-  if (!S?.user) return compact ? '' : 'No account connected.';
+  if (!S?.user) return '';
   const myR = window.myR || window.App?.myR;
   const my = typeof myR === 'function' ? myR() : null;
   if (!my) return '';
   const pName = window.pName || window.App?.pName || (id => id);
   const pPos = window.pPos || window.App?.pPos || (() => '');
   const pAge = window.pAge || window.App?.pAge || (() => '');
+  const pM = window.pM || window.App?.pM || (p => p);
   const dynastyValue = window.dynastyValue || window.App?.dynastyValue || (() => 0);
+  const playerStats = S.playerStats || {};
+  const peakWindows = window.App?.peakWindows || { QB: [24, 34], RB: [22, 27], WR: [22, 30], TE: [23, 30], DL: [23, 29], LB: [23, 28], DB: [23, 29] };
   const s = my.settings || {};
   const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+  const sc = league?.scoring_settings || {};
+  const isSF = !!(league?.roster_positions?.includes('SUPER_FLEX'));
+  const isIDP = !!(league?.roster_positions?.some(p => ['DL', 'LB', 'DB', 'IDP_FLEX'].includes(p)));
+  const rp = league?.roster_positions || [];
   const sorted = [...(S.rosters || [])].sort((a, b) => (b.settings?.wins || 0) - (a.settings?.wins || 0));
   const rank = sorted.findIndex(r => r.roster_id === S.myRosterId) + 1;
   const totalVal = (my.players || []).reduce((sum, p) => sum + dynastyValue(p), 0);
 
+  const peakLabel = (pid) => {
+    const pos = pM(pPos(pid));
+    const age = pAge(pid);
+    if (!age || !pos) return 'Unknown';
+    const pw = peakWindows[pos] || [23, 29];
+    if (age < pw[0]) return 'Pre-peak';
+    if (age <= pw[1]) return 'Peak';
+    return 'Post-peak';
+  };
+
+  const starterPids = (my.starters || []).filter(p => p && p !== '0');
+  const starterObjs = starterPids
+    .map(pid => {
+      const val = dynastyValue(pid);
+      const age = pAge(pid) || 0;
+      const ppg = playerStats[pid]?.seasonAvg || playerStats[pid]?.prevAvg || 0;
+      return { name: pName(pid), pos: pPos(pid), age, dhq: val, ppg: +ppg.toFixed(1), peak: peakLabel(pid) };
+    })
+    .sort((a, b) => b.dhq - a.dhq);
+
+  const benchPids = (my.players || []).filter(p => !starterPids.includes(p) && !(my.reserve || []).includes(p) && !(my.taxi || []).includes(p));
+  const benchObjs = benchPids
+    .map(pid => ({ name: pName(pid), pos: pPos(pid), age: pAge(pid) || 0, dhq: dynastyValue(pid) }))
+    .filter(x => x.dhq > 0)
+    .sort((a, b) => b.dhq - a.dhq);
+
+  const record = (s.wins || 0) + '-' + (s.losses || 0);
+  const leagueName = league?.name || '?';
+  const teams = (S.rosters || []).length;
+  const formatStr = teams + '-team' + (isSF ? ' Superflex' : ' 1QB') + (isIDP ? ' IDP' : '');
+
   if (compact) {
-    const topStarters = (my.starters || []).filter(p => p && p !== '0')
-      .map(pid => ({ pid, val: dynastyValue(pid) })).sort((a, b) => b.val - a.val).slice(0, 5)
-      .map(x => pName(x.pid) + '(' + pPos(x.pid) + ',' + dynastyValue(x.pid) + ')').join('; ');
-    return [
-      S.user.display_name + '|#' + rank + '/' + S.rosters.length + '|' + (s.wins || 0) + '-' + (s.losses || 0) + '|DHQ:' + totalVal.toLocaleString(),
-      'TOP5:' + topStarters,
-      'DHQ scale 0-10000. 7000+=elite 4000+=starter. ALWAYS refer to values as "DHQ" not "FC" or "FantasyCalc".'
-    ].filter(Boolean).join('\n');
+    return JSON.stringify({
+      user: S.user.display_name,
+      rank: rank,
+      teams: teams,
+      record: record,
+      dhqTotal: totalVal,
+      starters: starterObjs.slice(0, 5),
+      topBench: benchObjs.slice(0, 5),
+      league: leagueName,
+      format: formatStr,
+    });
   }
 
-  // Full context
-  const pStr = pid => {
-    const val = dynastyValue(pid); const age = pAge(pid);
-    return pName(pid) + '(' + pPos(pid) + (age ? ',' + age : '') + (val > 0 ? ',DHQ' + val : '') + ')';
-  };
-  const starters = (my.starters || []).filter(p => p && p !== '0').map(pStr);
-  const benchPids = (my.players || []).filter(p => !(my.starters || []).includes(p) && !(my.reserve || []).includes(p) && !(my.taxi || []).includes(p));
-  const bench = benchPids.map(p => ({ pid: p, val: dynastyValue(p) })).filter(x => x.val > 0).sort((a, b) => b.val - a.val).slice(0, 8).map(x => pStr(x.pid));
+  // Full context — includes gaps, surpluses, picks, FAAB, IDP scoring
+  const posCounts = {};
+  (my.players || []).forEach(pid => { const pos = pM(pPos(pid)); if (pos) posCounts[pos] = (posCounts[pos] || 0) + 1; });
 
-  return `${S.user.display_name} | #${rank}/${S.rosters.length} | ${s.wins || 0}-${s.losses || 0} | DHQ: ${totalVal.toLocaleString()}
-STARTERS: ${starters.join(', ')}
-TOP BENCH: ${bench.join(', ')}
-League: ${league?.name || '?'} | ${S.rosters.length} teams | ${league?.roster_positions?.includes('SUPER_FLEX') ? 'Superflex' : '1QB'}`;
+  const offPositions = ['QB', 'RB', 'WR', 'TE'];
+  const idpPositions = ['DL', 'LB', 'DB'];
+  const allPositions = isIDP ? offPositions.concat(idpPositions) : offPositions;
+  const gaps = [];
+  const surpluses = [];
+  allPositions.forEach(pos => {
+    const need = rp.filter(sl => sl === pos || (sl === 'FLEX' && ['RB', 'WR', 'TE'].includes(pos)) || (sl === 'SUPER_FLEX' && pos === 'QB') || (sl === 'IDP_FLEX' && idpPositions.includes(pos))).length;
+    const have = posCounts[pos] || 0;
+    if (have <= need) gaps.push(pos);
+    if (have >= need + 3) surpluses.push(pos);
+  });
+
+  const picks = (S.tradedPicks || [])
+    .filter(p => p.owner_id === S.myRosterId)
+    .map(p => p.season + ' R' + p.round)
+    .sort();
+
+  const getFAAB = window.getFAAB || window.App?.getFAAB;
+  const faabData = typeof getFAAB === 'function' ? getFAAB() : null;
+  const faab = faabData ? { remaining: faabData.remaining || 0, budget: faabData.budget || 200 } : { remaining: 0, budget: 200 };
+
+  const idpScoring = {
+    sack: sc.idp_sack || 4,
+    int: sc.idp_int || 5,
+    pd: sc.idp_pass_def || 3,
+  };
+
+  return JSON.stringify({
+    user: S.user.display_name,
+    rank: rank,
+    teams: teams,
+    record: record,
+    dhqTotal: totalVal,
+    starters: starterObjs,
+    topBench: benchObjs.slice(0, 8),
+    league: leagueName,
+    format: formatStr,
+    gaps: gaps,
+    surpluses: surpluses,
+    picks: picks,
+    faab: faab,
+    idpScoring: idpScoring,
+  });
 }
 
 function dhqBuildMentalityContext() {
@@ -253,22 +377,30 @@ function dhqBuildMentalityContext() {
   const labels = {
     mentality: { winnow: 'WIN NOW', rebuild: 'REBUILD', balanced: 'BALANCED', prime: '2-3YR WINDOW' },
   };
-  const lines = ['GM:' + (labels.mentality[m.mentality] || m.mentality || 'balanced')];
-  if (m.neverDrop) lines.push('UNTOUCHABLE:' + m.neverDrop);
-  if (m.notes) lines.push('NOTES:' + m.notes.substring(0, 150));
-  return lines.join('\n');
+  return JSON.stringify({
+    mentality: labels.mentality[m.mentality] || m.mentality || 'BALANCED',
+    untouchable: m.neverDrop || '',
+    notes: m.notes ? m.notes.substring(0, 150) : '',
+  });
 }
 
 function dhqBuildLeagueContext() {
   const S = window.S || window.App?.S;
   const LI = window.App?.LI || {};
   if (!S?.rosters?.length) return '';
-  const lines = [];
-  if (LI.leagueTradeTendencies?.totalTrades > 0) {
-    const lt = LI.leagueTradeTendencies;
-    lines.push(`LEAGUE: ${lt.totalTrades} trades in history, ${lt.pickHeavy} involved picks`);
-  }
-  return lines.join('\n');
+  const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+  const sc = league?.scoring_settings || {};
+  const isSF = !!(league?.roster_positions?.includes('SUPER_FLEX'));
+  const isIDP = !!(league?.roster_positions?.some(p => ['DL', 'LB', 'DB', 'IDP_FLEX'].includes(p)));
+  const lt = LI.leagueTradeTendencies || {};
+  return JSON.stringify({
+    totalTrades: lt.totalTrades || 0,
+    pickHeavy: lt.pickHeavy || 0,
+    avgAssetsPerSide: lt.avgAssetsPerSide || 0,
+    scoringType: (sc.rec === 1) ? 'full-ppr' : (sc.rec === 0.5) ? 'half-ppr' : (sc.rec === 0) ? 'standard' : 'custom',
+    isSF: isSF,
+    isIDP: isIDP,
+  });
 }
 
 function dhqBuildOwnerProfiles() {
@@ -284,10 +416,10 @@ function dhqBuildOwnerProfiles() {
   const allTotals = S.rosters.map(r => (r.players || []).reduce((sum, pid) => sum + dynastyValue(pid), 0));
   const avgTotal = allTotals.length ? allTotals.reduce((a, b) => a + b, 0) / allTotals.length : 80000;
 
-  return S.rosters.filter(r => r.roster_id !== S.myRosterId).map(r => {
+  const profiles = S.rosters.filter(r => r.roster_id !== S.myRosterId).map(r => {
     const name = S.leagueUsers.find(u => u.user_id === r.owner_id)?.display_name || 'Team';
-    const s = r.settings || {};
-    const record = (s.wins || 0) + '-' + (s.losses || 0);
+    const st = r.settings || {};
+    const record = (st.wins || 0) + '-' + (st.losses || 0);
     const totalVal = (r.players || []).reduce((sum, pid) => sum + dynastyValue(pid), 0);
     const posCounts = {};
     (r.players || []).forEach(pid => { const pos = pM(pPos(pid)); if (pos) posCounts[pos] = (posCounts[pos] || 0) + 1; });
@@ -296,12 +428,195 @@ function dhqBuildOwnerProfiles() {
       return (posCounts[pos] || 0) <= need;
     });
     const topPlayers = (r.players || []).map(pid => ({ pid, val: dynastyValue(pid) })).sort((a, b) => b.val - a.val).slice(0, 2)
-      .map(x => pNameShort(x.pid) + '(' + pPos(x.pid) + ',DHQ' + x.val + ')').join(', ');
+      .map(x => ({ name: pNameShort(x.pid), pos: pPos(x.pid), dhq: x.val }));
     const dna = LI.ownerProfiles?.[r.roster_id];
-    const dnaStr = dna?.trades > 0 ? ' · ' + dna.dna : '';
     const contending = totalVal > avgTotal * 1.1 ? 'contender' : totalVal < avgTotal * 0.85 ? 'rebuilder' : 'mid-tier';
-    return `${name}: ${record}, ${contending}, DHQ${Math.round(totalVal / 1000)}k, needs ${weakPositions.join('/') || 'nothing'}, stars: ${topPlayers}${dnaStr}`;
-  }).slice(0, 12).join('\n');
+    return {
+      name: name,
+      record: record,
+      tier: contending,
+      dhqTotal: totalVal,
+      needs: weakPositions,
+      stars: topPlayers,
+      dna: dna?.trades > 0 ? dna.dna : '',
+      tradesWon: dna?.tradesWon || 0,
+      tradesLost: dna?.tradesLost || 0,
+    };
+  }).slice(0, 12);
+
+  return JSON.stringify(profiles);
+}
+
+// ── News Enrichment — Improvement D ─────────────────────────────
+// Extracts player names from user message, checks caches, fires
+// non-blocking news fetch to warm cache for next request.
+
+function dhqEnrichWithNews(message) {
+  if (!message) return '';
+  const S = window.S || window.App?.S;
+  const pName = window.pName || window.App?.pName || (id => id);
+
+  // Extract possible player names — 2+ word capitalized sequences
+  const namePatterns = message.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z'.()-]+)+/g) || [];
+
+  // Match against S.players to confirm real players
+  const playerNames = [];
+  if (S?.players) {
+    const rawLower = new Set(namePatterns.map(n => n.toLowerCase()));
+    for (const pid of Object.keys(S.players)) {
+      const p = S.players[pid];
+      const fullName = ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+      if (fullName && rawLower.has(fullName.toLowerCase())) {
+        playerNames.push({ id: pid, name: fullName });
+      }
+    }
+  }
+  // Keep unmatched raw patterns too (user might reference players not in S.players)
+  namePatterns.forEach(n => {
+    if (!playerNames.find(p => p.name.toLowerCase() === n.toLowerCase())) {
+      playerNames.push({ id: null, name: n });
+    }
+  });
+
+  if (!playerNames.length) return '';
+
+  const newsLines = [];
+
+  // 1. Check window._newsCache (populated by callGrokNews)
+  const grokCache = window._newsCache || {};
+  playerNames.forEach(function(entry) {
+    const key = Object.keys(grokCache).find(function(k) {
+      return k.toLowerCase().includes(entry.name.toLowerCase()) || entry.name.toLowerCase().includes(k.toLowerCase());
+    });
+    if (key && grokCache[key]) {
+      var headline = typeof grokCache[key] === 'string' ? grokCache[key] : (grokCache[key].headline || grokCache[key].text || '');
+      if (headline) newsLines.push(entry.name + ': ' + headline.substring(0, 120));
+    }
+  });
+
+  // 2. Check localStorage dhq_news_cache (ESPN RSS)
+  try {
+    var espnRaw = localStorage.getItem('dhq_news_cache');
+    if (espnRaw) {
+      var espnCache = JSON.parse(espnRaw);
+      var espnItems = espnCache.items || espnCache.headlines || [];
+      if (Array.isArray(espnItems)) {
+        playerNames.forEach(function(entry) {
+          var nameLower = entry.name.toLowerCase();
+          var match = espnItems.find(function(item) {
+            var text = (item.title || item.headline || '').toLowerCase();
+            return text.includes(nameLower) || nameLower.split(' ').every(function(w) { return text.includes(w); });
+          });
+          if (match && !newsLines.find(function(l) { return l.startsWith(entry.name + ':'); })) {
+            newsLines.push(entry.name + ': ' + (match.title || match.headline).substring(0, 120));
+          }
+        });
+      }
+    }
+  } catch (e) { /* localStorage unavailable or parse error */ }
+
+  // 3. Fire non-blocking callGrokNews to populate cache for next time
+  var callGrokNews = window.callGrokNews || window.App?.callGrokNews;
+  if (typeof callGrokNews === 'function') {
+    playerNames.forEach(function(entry) {
+      try { callGrokNews(entry.name); } catch (e) { /* non-blocking */ }
+    });
+  }
+
+  if (!newsLines.length) return '';
+  return '[PLAYER_NEWS]\n' + newsLines.join('\n') + '\n';
+}
+
+// ── Response Validation — Improvement C ─────────────────────────
+// Scans AI responses for player names and validates them against
+// the league's actual player database.
+
+function extractPlayerNames(text) {
+  var names = new Set();
+  // Match **Name** patterns (bold markdown)
+  var boldPattern = /\*\*([A-Z][a-z]+(?:\s+[A-Z][a-z'.()-]+)+)/g;
+  var match;
+  while ((match = boldPattern.exec(text)) !== null) {
+    var name = match[1].replace(/\s*\(.*$/, '').trim();
+    if (name.split(' ').length >= 2) names.add(name);
+  }
+  // Match Name (POS patterns without bold
+  var posPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z'.()-]+)+)\s*\((QB|RB|WR|TE|DL|LB|DB|K|DEF)/g;
+  while ((match = posPattern.exec(text)) !== null) {
+    var name2 = match[1].trim();
+    if (name2.split(' ').length >= 2) names.add(name2);
+  }
+  return Array.from(names);
+}
+
+function findPlayerId(name) {
+  var S = window.S || window.App?.S;
+  if (!S?.players) return null;
+  var nameLower = name.toLowerCase().trim();
+  for (var pid of Object.keys(S.players)) {
+    var p = S.players[pid];
+    var fullName = ((p.first_name || '') + ' ' + (p.last_name || '')).toLowerCase().trim();
+    if (fullName === nameLower) return pid;
+  }
+  // Fuzzy fallback: match last name + first initial
+  var parts = nameLower.split(' ');
+  var lastName = parts[parts.length - 1];
+  for (var pid2 of Object.keys(S.players)) {
+    var p2 = S.players[pid2];
+    if ((p2.last_name || '').toLowerCase() === lastName && (p2.first_name || '').toLowerCase().startsWith(parts[0])) {
+      return pid2;
+    }
+  }
+  return null;
+}
+
+function validateAIResponse(type, response) {
+  var S = window.S || window.App?.S;
+  var warnings = [];
+  var text = typeof response === 'string' ? response : (response?.text || response?.content || '');
+  if (!text || !S?.players) return { text: text, warnings: warnings };
+
+  var myR = window.myR || window.App?.myR;
+  var my = typeof myR === 'function' ? myR() : null;
+  var myPlayers = new Set(my?.players || []);
+
+  var mentionedNames = extractPlayerNames(text);
+
+  mentionedNames.forEach(function(name) {
+    var pid = findPlayerId(name);
+
+    // Check 1: Does this player exist in S.players?
+    if (!pid) {
+      warnings.push('\u26a0\ufe0f "' + name + '" was not found in the player database — verify this player exists.');
+      return;
+    }
+
+    // Check 2: For waiver recs, player should NOT already be rostered
+    if (type === 'waiver-chat' || type === 'waiver-agent') {
+      var isRostered = (S.rosters || []).some(function(r) { return (r.players || []).includes(pid); });
+      if (isRostered) {
+        warnings.push('\u26a0\ufe0f "' + name + '" is already rostered in this league — not available on waivers.');
+      }
+    }
+
+    // Check 3: For trade recs, don't suggest trading for your own player
+    if (type === 'trade-chat' || type === 'trade-scout') {
+      if (myPlayers.has(pid)) {
+        var idx = text.indexOf(name);
+        var surrounding = text.substring(Math.max(0, idx - 100), Math.min(text.length, idx + 100)).toLowerCase();
+        if (surrounding.includes('target') || surrounding.includes('acquire') || surrounding.includes('their side')) {
+          warnings.push('\u26a0\ufe0f "' + name + '" is already on your roster — you cannot trade for your own player.');
+        }
+      }
+    }
+  });
+
+  var finalText = text;
+  if (warnings.length) {
+    finalText = text + '\n\n---\n' + warnings.join('\n');
+  }
+
+  return { text: finalText, warnings: warnings };
 }
 
 // ── Main Entry Point ────────────────────────────────────────────
@@ -318,9 +633,17 @@ async function dhqAI(type, message, context, options) {
   const maxTokens = config.maxTokens || 500;
   const useWebSearch = config.useWebSearch || false;
 
+  // Improvement D: Inject real-time news for applicable types
+  const newsTypes = ['home-chat', 'trade-chat', 'player-scout', 'draft-chat'];
+  let newsContext = '';
+  if (newsTypes.includes(type)) {
+    newsContext = dhqEnrichWithNews(message);
+  }
+
   // Build the full prompt
   let fullContext = '';
   if (config.instructions) fullContext += config.instructions + '\n\n';
+  if (newsContext) fullContext += newsContext + '\n';
   if (context) fullContext += context + '\n\n';
 
   // Construct messages array
@@ -344,9 +667,7 @@ async function dhqAI(type, message, context, options) {
   const callClaude = window.callClaude || window.App?.callClaude;
   if (typeof callClaude !== 'function') throw new Error('No AI engine available');
 
-  // Temporarily override the system prompt in callClaude
-  // callClaude uses its own system prompt, but we want ours
-  // We prepend system to the first user message instead
+  // We prepend system to the first user message
   const systemPrefixed = messages.map((m, i) => {
     if (i === 0 && m.role === 'user') {
       return { role: 'user', content: '[System: ' + system + ']\n\n' + m.content };
@@ -354,27 +675,46 @@ async function dhqAI(type, message, context, options) {
     return m;
   });
 
-  return callClaude(systemPrefixed, useWebSearch, 2, maxTokens);
+  const result = await callClaude(systemPrefixed, useWebSearch, 2, maxTokens);
+
+  // Improvement C: Validate response for applicable types
+  const validateTypes = ['home-chat', 'trade-chat', 'waiver-chat', 'waiver-agent', 'draft-chat'];
+  if (validateTypes.includes(type)) {
+    const validated = validateAIResponse(type, result);
+    if (validated.warnings.length) {
+      return validated.text;
+    }
+  }
+
+  return result;
 }
 
 // ── Convenience Functions ───────────────────────────────────────
 
-// Quick context builder — assembles standard context for most features
+// Full context builder — assembles labeled JSON sections for detailed prompts
 function dhqContext(includeOwners) {
-  const parts = [
-    dhqBuildRosterContext(false),
-    dhqBuildMentalityContext(),
-    dhqBuildLeagueContext(),
-  ];
-  if (includeOwners) parts.push('LEAGUE OWNERS:\n' + dhqBuildOwnerProfiles());
-  return parts.filter(Boolean).join('\n');
+  const parts = [];
+  const roster = dhqBuildRosterContext(false);
+  if (roster) parts.push('[ROSTER_CONTEXT]\n' + roster);
+  const mentality = dhqBuildMentalityContext();
+  if (mentality) parts.push('[MENTALITY]\n' + mentality);
+  const league = dhqBuildLeagueContext();
+  if (league) parts.push('[LEAGUE]\n' + league);
+  if (includeOwners) {
+    const owners = dhqBuildOwnerProfiles();
+    if (owners) parts.push('[OWNERS]\n' + owners);
+  }
+  return parts.join('\n\n');
 }
 
+// Compact context builder — assembles labeled JSON sections for chat
 function dhqCompactContext() {
-  return [
-    dhqBuildRosterContext(true),
-    dhqBuildMentalityContext(),
-  ].filter(Boolean).join('\n');
+  const parts = [];
+  const roster = dhqBuildRosterContext(true);
+  if (roster) parts.push('[ROSTER_CONTEXT]\n' + roster);
+  const mentality = dhqBuildMentalityContext();
+  if (mentality) parts.push('[MENTALITY]\n' + mentality);
+  return parts.join('\n\n');
 }
 
 // ── Exports ─────────────────────────────────────────────────────
@@ -388,6 +728,10 @@ Object.assign(window.App, {
   dhqBuildMentalityContext,
   dhqBuildLeagueContext,
   dhqBuildOwnerProfiles,
+  dhqEnrichWithNews,
+  extractPlayerNames,
+  findPlayerId,
+  validateAIResponse,
 });
 
 Object.assign(window, {
@@ -398,4 +742,8 @@ Object.assign(window, {
   dhqBuildMentalityContext,
   dhqBuildLeagueContext,
   dhqBuildOwnerProfiles,
+  dhqEnrichWithNews,
+  extractPlayerNames,
+  findPlayerId,
+  validateAIResponse,
 });
