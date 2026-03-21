@@ -360,13 +360,24 @@ Object.assign(window.App, {loadMemory,saveMemory,getMemory,setMemory});
 // ── Boot: Restore API key + auto-connect ───────────────────────
 (function restoreApiKey(){
   try{
-    // Check for Fantasy Wars email session first
+    // Check for Fantasy Wars email session or profile for Sleeper username
     try {
-      const fwRaw = localStorage.getItem('fw_session_v1');
-      if (fwRaw) {
-        const fw = JSON.parse(fwRaw);
-        const fwUsername = fw?.user?.sleeperUsername;
-        if (fwUsername && !localStorage.getItem('dynastyhq_username')) {
+      if (!localStorage.getItem('dynastyhq_username')) {
+        let fwUsername = null;
+        // Try fw_session_v1 first
+        const fwRaw = localStorage.getItem('fw_session_v1');
+        if (fwRaw) { const fw = JSON.parse(fwRaw); fwUsername = fw?.user?.sleeperUsername; }
+        // Fallback: od_profile_v1 (set during War Room onboarding)
+        if (!fwUsername) {
+          const profRaw = localStorage.getItem('od_profile_v1');
+          if (profRaw) { const prof = JSON.parse(profRaw); fwUsername = prof?.sleeperUsername; }
+        }
+        // Fallback: od_auth_v1 (legacy War Room login)
+        if (!fwUsername) {
+          const authRaw = localStorage.getItem('od_auth_v1');
+          if (authRaw) { const auth = JSON.parse(authRaw); fwUsername = auth?.sleeperUsername || auth?.username; }
+        }
+        if (fwUsername) {
           localStorage.setItem('dynastyhq_username', fwUsername);
           console.log('[ReconAI] Auto-connected from Fantasy Wars session:', fwUsername);
         }
