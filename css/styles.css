@@ -504,3 +504,12 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .snap-pill{display:inline-flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--text2);transition:all .15s}
 .snap-pill:hover{border-color:var(--border2)}
 .snap-pill strong{color:var(--text);font-weight:700}
+/* Tooltips */
+.tip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--bg4);color:var(--text3);font-size:10px;font-weight:700;cursor:pointer;margin-left:4px;transition:all .15s;flex-shrink:0;vertical-align:middle;line-height:1}
+.tip-icon:hover{background:var(--accent);color:#fff}
+.tip-box{display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.6;margin-top:6px;animation:tipIn .2s ease}
+.tip-box.show{display:block}
+@keyframes tipIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.tip-box strong{color:var(--text);font-weight:600}
+.tip-box .tip-scale{display:flex;gap:4px;margin:6px 0;font-size:10px}
+.tip-box .tip-scale span{padding:2px 6px;border-radius:4px}

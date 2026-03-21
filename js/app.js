@@ -503,6 +503,13 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape');
 });
 
+// ── Tooltip helper ──────────────────────────────────────────
+function toggleTip(id){
+  const el=document.getElementById(id);
+  if(el)el.classList.toggle('show');
+}
+window.toggleTip=toggleTip;
+
 // Click outside search results to close
 document.addEventListener('click',e=>{
   const wrap=$('player-search-wrap');

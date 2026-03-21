@@ -1155,7 +1155,7 @@ function renderTeamOverview(){
   const dCol=myValRank<=3?'var(--green)':myValRank<=8?'var(--accent)':'var(--amber)';
   html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Health Score</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Health Score <span class="tip-icon" onclick="toggleTip('tip-health')">?</span></div>
       <div style="display:flex;align-items:baseline;gap:6px">
         <span style="font-size:26px;font-weight:800;color:${hCol};font-family:'JetBrains Mono',monospace">${healthScore}</span>
         <span style="font-size:12px;font-weight:600;color:${hCol}">${hTier}</span>
@@ -1163,24 +1163,42 @@ function renderTeamOverview(){
       </div>
       <div style="font-size:12px;color:var(--text3);margin-top:2px">Scoring ${scoringPct}% · Depth ${depthPct}%${criticals?' · '+criticals+' pos gap'+(criticals>1?'s':''):''}</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${healthScore}%;height:100%;background:${hCol};border-radius:2px"></div></div>
+      <div class="tip-box" id="tip-health">
+        <strong>Health Score (0-100)</strong> measures your team's competitive readiness.<br><br>
+        <strong>60% Scoring</strong> — your optimal starting lineup's weekly PPG vs the league median. Higher = more weekly firepower.<br>
+        <strong>40% Coverage</strong> — how many NFL-starter-quality players you have at each position, weighted by importance (QB/RB/WR matter most).<br>
+        <strong>+Bonus</strong> for elite teams scoring above the league target.<br><br>
+        <div class="tip-scale">
+          <span style="background:var(--greenL);color:var(--green)">90+ Elite</span>
+          <span style="background:var(--accentL);color:var(--accent)">75+ Contender</span>
+          <span style="background:var(--amberL);color:var(--amber)">60+ Crossroads</span>
+          <span style="background:var(--redL);color:var(--red)">&lt;60 Rebuilding</span>
+        </div>
+      </div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Contender <span class="tip-icon" onclick="toggleTip('tip-contender')">?</span></div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:${cCol};font-family:'JetBrains Mono',monospace">#${myContenderRank}</span>
         <span style="font-size:12px;color:var(--text2)">/${teams}</span>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px">${myContenderPPG.toFixed(1)} starter PPG</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(myContenderPPG/topContender*100)}%;height:100%;background:${cCol};border-radius:2px"></div></div>
+      <div class="tip-box" id="tip-contender">
+        <strong>Contender Rank</strong> ranks all teams by optimal starting lineup PPG — your best possible weekly score using your league's actual scoring settings and roster positions. This shows who can put up the most points RIGHT NOW, regardless of bench depth or dynasty value.
+      </div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty</div>
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Dynasty <span class="tip-icon" onclick="toggleTip('tip-dynasty')">?</span></div>
       <div style="display:flex;align-items:baseline;gap:4px">
         <span style="font-size:22px;font-weight:800;color:${dCol};font-family:'JetBrains Mono',monospace">#${myValRank}</span>
         <span style="font-size:12px;color:var(--text2)">/${teams}</span>
       </div>
       <div style="font-size:12px;color:var(--text2);margin-top:2px">${totalVal.toLocaleString()} DHQ</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(totalVal/topVal*100)}%;height:100%;background:var(--accent);border-radius:2px"></div></div>
+      <div class="tip-box" id="tip-dynasty">
+        <strong>Dynasty Rank</strong> ranks all teams by total DHQ value — the sum of every player's dynasty trade value on your roster. This measures long-term asset strength, not just weekly scoring. A team with young stars and draft picks can rank high here even with a losing record.
+      </div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
       <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Draft Capital</div>
@@ -1194,7 +1212,16 @@ function renderTeamOverview(){
 
   // Position grades grid
   html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
-    <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades <span class="tip-icon" onclick="toggleTip('tip-grades')">?</span></div>
+    <div class="tip-box" id="tip-grades" style="margin-bottom:8px">
+      <strong>Position Grades (A-F)</strong> compare your total DHQ value at each position vs the league average total at that position.<br><br>
+      <strong>A</strong> = 30%+ above league average — elite depth<br>
+      <strong>B</strong> = 5-30% above — solid<br>
+      <strong>C</strong> = within 15% of average — adequate<br>
+      <strong>D</strong> = 15-35% below — thin<br>
+      <strong>F</strong> = 35%+ below — critical need<br><br>
+      The number shown is your total positional DHQ. More players with value = better grade.
+    </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">`;
   positions.forEach(pos=>{
     const g=posGroups[pos];if(!g||!g.count)return;
@@ -1216,7 +1243,10 @@ function renderTeamOverview(){
     .filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
   if(topPlayers.length){
     html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Crown Jewels</div>`;
+      <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Crown Jewels <span class="tip-icon" onclick="toggleTip('tip-jewels')">?</span></div>
+      <div class="tip-box" id="tip-jewels" style="margin-bottom:6px">
+        <strong>Crown Jewels</strong> are your 5 most valuable dynasty assets ranked by DHQ value. These are the players you should protect in trades — they're the foundation of your roster's long-term strength. Selling a crown jewel should only happen for a massive overpay.
+      </div>`;
     html+=topPlayers.map((p,i)=>{
       const {col}=tradeValueTier(p.val);
       const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
@@ -1315,9 +1345,13 @@ function renderPowerRankings(){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Power Rankings</span>
+        <span class="tip-icon" onclick="toggleTip('tip-power')">?</span>
         <span style="font-size:11px;color:var(--text3)">All teams ranked by health score</span>
       </div>
       <button id="pr-ai-btn" onclick="generatePowerCommentary()" style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(124,107,248,0.1);border:1px solid rgba(124,107,248,0.25);border-radius:6px;padding:3px 10px;cursor:pointer;transition:all .15s">${cached?'Refresh commentary':'Generate commentary'}</button>
+    </div>
+    <div class="tip-box" id="tip-power" style="margin-bottom:10px">
+      <strong>Power Rankings</strong> rank all teams by Health Score (0-100), with tiebreaks by weekly PPG. The Health Score combines scoring potential (60%) and roster coverage depth (40%). Click "Generate commentary" for AI-written analysis of each team.
     </div>
     <div style="display:flex;flex-direction:column;gap:4px">${rows}</div>
   </div>`;
@@ -1761,10 +1795,15 @@ function openPlayerModal(playerId){
       const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
 
       rightPanel.innerHTML=`
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile</div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile <span class="tip-icon" onclick="toggleTip('tip-trade-profile')" style="font-size:9px">?</span></div>
         <div style="font-size:20px;font-weight:800;color:${recCol}">${rec}</div>
         <div style="font-size:12px;color:var(--text2);margin-top:4px">
           <span style="color:${trendCol}">${trendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
+        </div>
+        <div class="tip-box" id="tip-trade-profile">
+          <strong>BUY</strong> = player has peak years ahead and is undervalued — acquire now<br>
+          <strong>HOLD</strong> = player is producing at peak or trending up — keep<br>
+          <strong>SELL</strong> = player is past peak or trending down — trade while value remains
         </div>`;
     }
   }

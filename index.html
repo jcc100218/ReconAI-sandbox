@@ -163,6 +163,22 @@
         <div class="spacer"></div>
         <div style="font-size:12px;color:var(--text3)" id="roster-sort-hint">Click column header to sort</div>
       </div>
+      <div class="tip-box" id="tip-dhq" style="margin-bottom:10px">
+        <strong>DHQ Value (0-10,000)</strong> is a dynasty trade value computed from YOUR league's actual data.<br><br>
+        <strong>How it's calculated:</strong><br>
+        &bull; <strong>40% Production</strong> — weighted PPG from the last 5 seasons of your league's scoring settings<br>
+        &bull; <strong>25% Age curve</strong> — position-specific peak windows (RBs peak 22-27, QBs 24-34, etc.)<br>
+        &bull; <strong>20% Situation</strong> — roster status, role, trajectory, durability<br>
+        &bull; <strong>10% Scarcity</strong> — supply vs demand at the position in your league<br>
+        &bull; <strong>5% Peak bonus</strong> — years of prime production remaining<br><br>
+        Then blended <strong>75% DHQ engine + 25% FantasyCalc market consensus</strong> to anchor against the broader dynasty market.<br><br>
+        <div class="tip-scale">
+          <span style="background:var(--greenL);color:var(--green)">7000+ Elite</span>
+          <span style="background:var(--accentL);color:var(--accent)">4000+ Starter</span>
+          <span style="background:rgba(255,255,255,.05);color:var(--text2)">2000+ Depth</span>
+          <span style="background:rgba(255,255,255,.03);color:var(--text3)">&lt;2000 Stash</span>
+        </div>
+      </div>
       <div style="overflow-x:auto">
         <table class="roster-table" id="roster-table">
           <thead>
@@ -171,7 +187,7 @@
               <th class="rt-th rt-sortable" onclick="sortRoster('name')" style="min-width:140px">Player</th>
               <th class="rt-th rt-sortable" onclick="sortRoster('pos')" style="width:36px">Pos</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('age')">Age</th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('value')" style="min-width:64px">DHQ Value</th>
+              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('value')" style="min-width:64px">DHQ Value <span class="tip-icon" onclick="event.stopPropagation();toggleTip('tip-dhq')" style="font-size:9px">?</span></th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('avg')">PPG</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('prev')" id="th-prev">'24avg</th>
               <th class="rt-th rt-sortable rt-num" onclick="sortRoster('peak')">Peak</th>
@@ -322,9 +338,12 @@
           <!-- Trade value + peak projection -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
             <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
-              <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dynasty trade value</div>
+              <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dynasty trade value <span class="tip-icon" onclick="toggleTip('tip-dhq-modal')" style="font-size:9px">?</span></div>
               <div id="pm-trade-val" style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--accent)"></div>
               <div id="pm-trade-tier" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
+              <div class="tip-box" id="tip-dhq-modal">
+                This player's DHQ value is derived from 5 years of production in your league's scoring system, adjusted for age, situation, scarcity, and market consensus. It represents what this player is worth in a dynasty trade within YOUR specific league context.
+              </div>
             </div>
             <div id="pm-right-panel" style="background:var(--bg3);border-radius:var(--r);padding:12px">
               <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Peak years projection</div>
