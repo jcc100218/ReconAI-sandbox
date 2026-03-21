@@ -1236,25 +1236,64 @@ function renderTeamOverview(){
   const myContenderRank=contenderRanks.findIndex(r=>r.rid===S.myRosterId)+1;
   const topContender=contenderRanks[0]?.ppg||1;
 
-  // ── Health Score ──
+  // ── Health Score (War Room formula: 60% scoring + 40% weighted coverage) ──
+  const POS_WEIGHTS_H={QB:14,RB:14,WR:14,TE:8,K:3,DL:13,LB:10,DB:12};
+  const TOTAL_WEIGHT_H=Object.values(POS_WEIGHTS_H).reduce((a,b)=>a+b,0);
+  const MIN_STARTER_QUALITY_H={QB:2,RB:3,WR:3,TE:2,K:1,DL:4,LB:5,DB:4};
+
+  // Weekly target: league average × 1.1 or 243 default
   const allPPGs=contenderRanks.map(r=>r.ppg).filter(p=>p>0);
   const weeklyTarget=allPPGs.length?Math.round(allPPGs.reduce((a,b)=>a+b,0)/allPPGs.length*1.1):243;
-  const scoringPct=Math.min(100,Math.round((myContenderPPG/weeklyTarget)*100));
 
-  const depthPositions=['QB','RB','WR','TE','DL','LB','DB'];
-  let depthMet=0,depthTotal=0;
+  // Scoring component (60%)
+  const scoringScore=Math.min(60,(myContenderPPG/weeklyTarget)*60);
+
+  // Coverage component (40%) — weighted by position importance
+  let coverageScore=0;
+  const depthPositions=['QB','RB','WR','TE','K','DL','LB','DB'];
   const rosterSlots=league?.roster_positions||[];
   depthPositions.forEach(pos=>{
-    const need=rosterSlots.filter(s=>s===pos||(s==='FLEX'&&['RB','WR','TE'].includes(pos))||(s==='SUPER_FLEX'&&pos==='QB')||(s==='IDP_FLEX'&&['DL','LB','DB'].includes(pos))).length;
-    if(!need)return;
-    depthTotal++;
-    const myAtPos=(my.players||[]).filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>0);
-    if(myAtPos.length>need)depthMet++;
+    const minQuality=MIN_STARTER_QUALITY_H[pos]||1;
+    // Count players at this position with meaningful value (proxy for NFL starter quality)
+    const myAtPos=(my.players||[]).filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>500);
+    const ratio=Math.min(1,myAtPos.length/minQuality);
+    coverageScore+=ratio*((POS_WEIGHTS_H[pos]||0)/TOTAL_WEIGHT_H)*40;
   });
-  const depthPct=depthTotal>0?Math.round((depthMet/depthTotal)*100):50;
-  const healthScore=Math.round(scoringPct*0.6+depthPct*0.4);
-  const hCol=healthScore>=90?'var(--green)':healthScore>=80?'var(--accent)':'var(--red)';
-  const hTier=healthScore>=90?'Contending':healthScore>=80?'Building':'Rebuilding';
+
+  // Projection bonus: elite teams score above target
+  const projBonus=myContenderPPG>weeklyTarget+10?3:myContenderPPG>=weeklyTarget?1:0;
+  const healthScore=Math.min(100,Math.round(scoringScore+coverageScore+projBonus));
+
+  // Tier classification (War Room tiers: ELITE/CONTENDER/CROSSROADS/REBUILDING)
+  let hTier,hCol;
+  if(myContenderPPG>0){
+    if(myContenderPPG>weeklyTarget+10){hTier='Elite';hCol='var(--green)';}
+    else if(myContenderPPG>=weeklyTarget-15){hTier='Contender';hCol='var(--accent)';}
+    else if(myContenderPPG>=weeklyTarget*0.85){hTier='Crossroads';hCol='var(--amber)';}
+    else{hTier='Rebuilding';hCol='var(--red)';}
+  }else{
+    // No scoring data — use coverage as proxy
+    if(coverageScore>=36){hTier='Contender';hCol='var(--accent)';}
+    else if(coverageScore>=26){hTier='Crossroads';hCol='var(--amber)';}
+    else{hTier='Rebuilding';hCol='var(--red)';}
+  }
+
+  // Panic meter (0-5)
+  let panic=0;
+  if(myContenderPPG>0&&myContenderPPG<weeklyTarget*0.85)panic+=2;
+  else if(myContenderPPG>0&&myContenderPPG<weeklyTarget)panic+=1;
+  const criticals=depthPositions.filter(pos=>{
+    const minQ=MIN_STARTER_QUALITY_H[pos]||1;
+    const have=(my.players||[]).filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>500).length;
+    return have<minQ;
+  }).length;
+  if(criticals>=3)panic+=2;else if(criticals>=1)panic+=1;
+  const played=(my.settings?.wins||0)+(my.settings?.losses||0)+(my.settings?.ties||0);
+  if(played>0&&(my.settings?.losses||0)/played>0.6)panic+=1;
+  panic=Math.min(5,panic);
+
+  const scoringPct=Math.min(100,Math.round((myContenderPPG/weeklyTarget)*100));
+  const depthPct=Math.round(coverageScore/40*100);
 
   const cCol=myContenderRank<=3?'var(--green)':myContenderRank<=8?'var(--accent)':'var(--amber)';
   const dCol=myValRank<=3?'var(--green)':myValRank<=8?'var(--accent)':'var(--amber)';
@@ -1264,8 +1303,9 @@ function renderTeamOverview(){
       <div style="display:flex;align-items:baseline;gap:6px">
         <span style="font-size:26px;font-weight:800;color:${hCol};font-family:'JetBrains Mono',monospace">${healthScore}</span>
         <span style="font-size:12px;font-weight:600;color:${hCol}">${hTier}</span>
+        ${panic>=3?'<span style="font-size:11px;color:var(--red);margin-left:4px">🔥 Panic '+panic+'/5</span>':''}
       </div>
-      <div style="font-size:12px;color:var(--text3);margin-top:2px">Scoring ${scoringPct}% · Depth ${depthPct}%</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:2px">Scoring ${scoringPct}% · Depth ${depthPct}%${criticals?' · '+criticals+' pos gap'+(criticals>1?'s':''):''}</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${healthScore}%;height:100%;background:${hCol};border-radius:2px"></div></div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
