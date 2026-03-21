@@ -7,7 +7,7 @@ window.App = window.App || {};
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v8';
+const LI_CACHE_KEY='dhq_leagueintel_v9';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -825,6 +825,90 @@ async function loadLeagueIntel(){
     console.log(`Trade analysis: ${leagueTradeTendencies.totalTrades} trades across ${Object.keys(ownerProfiles).length} owners`);
 
     // ═══════════════════════════════════════════════════════════════
+    // STEP 9c: Trade value analysis — per-trade fairness + enriched owner profiles
+    // ═══════════════════════════════════════════════════════════════
+    const PICK_VALUE_FALLBACK={1:7000,2:3500,3:1800,4:800};
+    const getPickVal=(season,round)=>{
+      if(typeof dhqPickValueFn==='function'){
+        const v=dhqPickValueFn(season,round,Math.ceil(totalTeams/2));
+        if(v>0)return v;
+      }
+      return PICK_VALUE_FALLBACK[round]||400;
+    };
+
+    const tradeHistory=(tradeTxns||[]).map(t=>{
+      const rids=t.roster_ids||[];
+      const sides={};
+      rids.forEach(rid=>{
+        const s=t.sides[rid]||{players:[],picks:[]};
+        const playerVal=s.players.reduce((sum,pid)=>sum+(playerScores[pid]||0),0);
+        const pickVal=s.picks.reduce((sum,pk)=>sum+getPickVal(pk.season,pk.round),0);
+        sides[rid]={players:s.players,picks:s.picks,totalValue:playerVal+pickVal};
+      });
+      const vals=rids.map(rid=>sides[rid]?.totalValue||0);
+      const maxVal=Math.max(...vals,1);
+      const diff=rids.length===2?Math.abs(vals[0]-vals[1]):0;
+      const diffPct=+(diff/maxVal*100).toFixed(1);
+      const fairness=Math.round(100-Math.min(100,diffPct));
+      let winner=null;
+      if(rids.length===2&&vals[0]!==vals[1])winner=vals[0]>vals[1]?rids[0]:rids[1];
+      return {
+        season:t.season,week:t.week,ts:t.ts,
+        roster_ids:rids,sides,
+        fairness,winner,valueDiff:diff,valueDiffPct:diffPct
+      };
+    });
+
+    // Enrich ownerProfiles with value-based trade metrics
+    Object.values(ownerProfiles).forEach(p=>{
+      p.tradesWon=0;p.tradesLost=0;p.tradesFair=0;
+      p.avgValueDiff=0;p.partners={};
+      p.biggestWin=null;p.biggestLoss=null;
+      p.seasonActivity={};p.weekTiming={early:0,mid:0,late:0};
+    });
+    tradeHistory.forEach(t=>{
+      const rids=t.roster_ids||[];
+      rids.forEach(rid=>{
+        const p=ownerProfiles[rid];if(!p)return;
+        const otherRid=rids.find(r=>r!==rid);
+        const myVal=t.sides[rid]?.totalValue||0;
+        const theirVal=otherRid?t.sides[otherRid]?.totalValue||0:0;
+        const net=myVal-theirVal;
+
+        // Win/loss/fair
+        if(t.valueDiffPct<=15)p.tradesFair++;
+        else if(t.winner===rid)p.tradesWon++;
+        else if(t.winner!==null)p.tradesLost++;
+
+        p.avgValueDiff+=net;
+
+        // Partners
+        if(otherRid!=null)p.partners[otherRid]=(p.partners[otherRid]||0)+1;
+
+        // Biggest win/loss
+        if(net>0&&(!p.biggestWin||net>(p.biggestWin._net||0)))p.biggestWin={...t,_net:net};
+        if(net<0&&(!p.biggestLoss||net<(p.biggestLoss._net||0)))p.biggestLoss={...t,_net:net};
+
+        // Season activity
+        p.seasonActivity[t.season]=(p.seasonActivity[t.season]||0)+1;
+
+        // Week timing
+        const w=t.week;
+        if(w>=1&&w<=6)p.weekTiming.early++;
+        else if(w>=7&&w<=12)p.weekTiming.mid++;
+        else p.weekTiming.late++;
+      });
+    });
+    // Finalize averages and clean up temp fields
+    Object.values(ownerProfiles).forEach(p=>{
+      if(p.trades>0)p.avgValueDiff=Math.round(p.avgValueDiff/p.trades);
+      if(p.biggestWin)delete p.biggestWin._net;
+      if(p.biggestLoss)delete p.biggestLoss._net;
+    });
+
+    console.log(`Trade value analysis: ${tradeHistory.length} trades enriched with fairness scores`);
+
+    // ═══════════════════════════════════════════════════════════════
     // STEP 10: ADP by position in this league's drafts
     // ═══════════════════════════════════════════════════════════════
     const adpByPos={};
@@ -945,9 +1029,10 @@ async function loadLeagueIntel(){
       totalPicks:allDraftPicks.length,
       totalFAABTxns:faabTxns.length,
       // Trade intelligence
-      ownerProfiles,        // roster_id -> {trades,dna,targetPos,picksAcquired,...}
+      ownerProfiles,        // roster_id -> {trades,dna,targetPos,picksAcquired,tradesWon,tradesLost,...}
       playerTradeHistory,   // pid -> [{season,week}]
       leagueTradeTendencies, // {totalTrades,avgAssetsPerSide,pickHeavy,playerHeavy}
+      tradeHistory,         // [{season,week,ts,roster_ids,sides,fairness,winner,valueDiff,valueDiffPct}]
       rookieCount,
       leagueYears:uniqueYears,
       builtAt:new Date().toISOString(),
@@ -1047,4 +1132,10 @@ window.App.bestValue = bestValue;
 window.App.livScore = livScore;
 window.App.livFAABRange = livFAABRange;
 window.App.livDraftADP = livDraftADP;
+
+// Bare window globals for inline handlers / cross-module access
+window.dynastyValue = dynastyValue;
+window.getPlayerRank = getPlayerRank;
+window.isNoValue = isNoValue;
 window.App.faabBidStr = faabBidStr;
+x
