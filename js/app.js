@@ -5,6 +5,21 @@
 
 window.App = window.App || {};
 
+// ── Dev Mode ────────────────────────────────────────────────────
+const DEV_MODE = new URLSearchParams(window.location.search).has('dev') || window.location.hostname.includes('sandbox');
+window.App.DEV_MODE = DEV_MODE;
+window.DEV_MODE = DEV_MODE;
+if(DEV_MODE){
+  console.log('%c[DEV MODE] All features unlocked, auth bypassed','color:#fbbf24;font-weight:bold;font-size:14px');
+  // Inject dev banner
+  document.addEventListener('DOMContentLoaded',()=>{
+    const b=document.createElement('div');
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;font-size:11px;font-weight:700;text-align:center;padding:3px;letter-spacing:.05em;font-family:monospace';
+    b.textContent='⚡ SANDBOX — changes here do not affect production';
+    document.body.prepend(b);
+  });
+}
+
 // ── Global State ────────────────────────────────────────────────
 let S={
   user:null,leagues:[],leagueUsers:[],rosters:[],matchups:{},
