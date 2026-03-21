@@ -214,6 +214,7 @@ async function loadAllData(){
     try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
     try{if(typeof renderTeamOverview==='function')renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
     try{if(typeof renderLeaguePulse==='function')renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
+    try{if(typeof renderNewsFeed==='function')renderNewsFeed();}catch(e){console.warn('renderNewsFeed:',e);}
     try{if(typeof renderTradeIntel==='function')renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
     if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();
     if(!localStorage.getItem('dhq_strategy_done')&&(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))){
@@ -359,6 +360,19 @@ Object.assign(window.App, {loadMemory,saveMemory,getMemory,setMemory});
 // ── Boot: Restore API key + auto-connect ───────────────────────
 (function restoreApiKey(){
   try{
+    // Check for Fantasy Wars email session first
+    try {
+      const fwRaw = localStorage.getItem('fw_session_v1');
+      if (fwRaw) {
+        const fw = JSON.parse(fwRaw);
+        const fwUsername = fw?.user?.sleeperUsername;
+        if (fwUsername && !localStorage.getItem('dynastyhq_username')) {
+          localStorage.setItem('dynastyhq_username', fwUsername);
+          console.log('[ReconAI] Auto-connected from Fantasy Wars session:', fwUsername);
+        }
+      }
+    } catch(e) {}
+
     const k = localStorage.getItem('dynastyhq_apikey');
     const prov = localStorage.getItem('dynastyhq_provider') || 'anthropic';
     const model = localStorage.getItem('dynastyhq_model') || '';

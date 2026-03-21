@@ -83,6 +83,59 @@ function renderLeaguePulse(){
   </div>`;
 }
 
+// ── NFL News Feed ──────────────────────────────────────────────
+const DHQ_NEWS_KEY='dhq_news_cache';
+const DHQ_NEWS_TTL=10*60*1000;
+
+async function renderNewsFeed(){
+  const el=$('league-pulse');if(!el)return;
+  // Check cache
+  let items=null;
+  try{
+    const cached=JSON.parse(localStorage.getItem(DHQ_NEWS_KEY)||'null');
+    if(cached&&Date.now()-cached.ts<DHQ_NEWS_TTL)items=cached.items;
+  }catch(e){}
+  // Fetch if no cache
+  if(!items){
+    try{
+      const url='https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent('https://www.espn.com/espn/rss/nfl/news');
+      const resp=await fetch(url);
+      if(resp.ok){
+        const data=await resp.json();
+        if(data.status==='ok'&&data.items?.length){
+          items=data.items.slice(0,8).map(i=>({title:i.title,link:i.link,pubDate:i.pubDate}));
+          try{localStorage.setItem(DHQ_NEWS_KEY,JSON.stringify({ts:Date.now(),items}));}catch(e){}
+        }
+      }
+    }catch(e){console.warn('News feed fetch failed:',e);}
+  }
+  if(!items||!items.length)return;
+  // Render — append after existing league-pulse content
+  const timeAgo=d=>{
+    const diff=Date.now()-new Date(d).getTime();
+    const mins=Math.floor(diff/60000);
+    if(mins<60)return mins+'m ago';
+    const hrs=Math.floor(mins/60);
+    if(hrs<24)return hrs+'h ago';
+    return Math.floor(hrs/24)+'d ago';
+  };
+  const newsHtml=items.map(i=>`<div style="display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:12px;line-height:1.5">
+    <span style="flex-shrink:0;font-size:10px;font-weight:700;color:var(--accent);background:var(--accentL);padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em">NFL</span>
+    <a href="${i.link}" target="_blank" rel="noopener" style="flex:1;color:var(--text1);text-decoration:none;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text1)'">${i.title}</a>
+    <span style="flex-shrink:0;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${timeAgo(i.pubDate)}</span>
+  </div>`).join('');
+
+  const card=document.createElement('div');
+  card.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">NFL News</span>
+      <span style="font-size:11px;color:var(--text3)">via ESPN</span>
+    </div>
+    ${newsHtml}
+  </div>`;
+  el.appendChild(card.firstElementChild);
+}
+
 // ── Roster ─────────────────────────────────────────────────────
 function getDcLabel(pid){
   const p=S.players[pid];const team=pTeam(pid);
@@ -2195,6 +2248,7 @@ Object.assign(window.App, {
 
   // League Pulse
   renderLeaguePulse,
+  renderNewsFeed,
 
   // Roster
   getDcLabel, renderRoster, peakYears,
@@ -2309,6 +2363,7 @@ window.runDraftScouting = runDraftScouting;
 window.mobileTab = mobileTab;
 window.checkApiKeyCallout = checkApiKeyCallout;
 window.renderLeaguePulse = renderLeaguePulse;
+window.renderNewsFeed = renderNewsFeed;
 window.getMemory = getMemory;
 window.setMemory = setMemory;
 window.loadMemory = loadMemory;
