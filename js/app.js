@@ -50,7 +50,11 @@ function switchTab(tab,btn){
   if(tab==='draftroom'&&typeof renderDraftNeeds==='function')renderDraftNeeds();
   if(tab==='digest'&&typeof renderHomeSnapshot==='function')renderHomeSnapshot();
   if(tab==='roster'&&typeof buildRosterTable==='function')buildRosterTable();
-  if(tab==='trades'&&typeof renderTradeIntel==='function')renderTradeIntel();
+  if(tab==='trades'){
+    if(typeof renderTradeIntel==='function')renderTradeIntel();
+    // Initialize trade calc sub-tabs if data is loaded
+    if(typeof initTradeCalc==='function')initTradeCalc();
+  }
 }
 window.switchTab = switchTab;
 window.App.switchTab = switchTab;
@@ -269,7 +273,7 @@ function reconnect(){
   S.playerStats={};S.posRanks={};
   const LI_ref = window.App;
   if(LI_ref){LI_ref.LI_LOADED=false;LI_ref.LI={};window._liLoading=false;}
-  try{localStorage.removeItem('dhq_leagueintel_v8');
+  try{localStorage.removeItem('dhq_leagueintel_v9');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   const sb=$('setup-block');

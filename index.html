@@ -242,39 +242,37 @@
     <!-- TRADE FINDER -->
     <!-- TRADES -->
     <div class="panel" id="panel-trades">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <!-- Header + sub-nav -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div>
           <div style="font-size:16px;font-weight:800;letter-spacing:-.03em">Trades</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:3px">Scout any team's roster · find their weakness · AI drafts your Sleeper DM</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:3px">Scout · partner match · build trades · AI advisor</div>
         </div>
-        <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/trade-calculator.html" target="_blank"
-           class="btn btn-sm" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:12px">
-          Trade Calculator ↗
-        </a>
+      </div>
+      <!-- AI Trade Advisor Chat -->
+      <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2);margin-bottom:14px">
+        <div id="trade-chat-msgs" style="max-height:64px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
+          <div class="hc-msg-a" style="font-size:13px">Tell me what you need and I'll find the right trade partner.</div>
+        </div>
+        <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;align-items:center;background:var(--bg3)">
+          <input type="text" id="trade-chat-in" placeholder="Should I trade Kelce? What can I get for my 1st?" style="flex:1;font-size:14px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendTradeChat()"/>
+          <button onclick="sendTradeChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div style="padding:6px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;background:var(--bg3)">
+          <button class="chip" onclick="sendTradeChatMsg('Which team is the best trade partner for me right now?')">Best trade partner?</button>
+          <button class="chip" onclick="sendTradeChatMsg('What is my most tradeable asset and what can I get for it?')">What can I sell?</button>
+          <button class="chip" onclick="sendTradeChatMsg('Draft a trade offer I can copy into Sleeper')">Draft an offer</button>
+        </div>
       </div>
 
-      <!-- Trade chat — the AI does the scouting -->
-      <div>
-        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Trade advisor</div>
-        <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2)">
-          <div id="trade-chat-msgs" style="max-height:64px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
-            <div class="hc-msg-a" style="font-size:13px">Tell me what you need and I'll find the right trade partner.</div>
-          </div>
-          <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;align-items:center;background:var(--bg3)">
-            <input type="text" id="trade-chat-in" placeholder="Should I trade Kelce? What can I get for my 1st?" style="flex:1;font-size:14px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendTradeChat()"/>
-            <button onclick="sendTradeChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
-          </div>
-          <div style="padding:6px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;background:var(--bg3)">
-            <button class="chip" onclick="sendTradeChatMsg('Which team is the best trade partner for me right now?')">Best trade partner?</button>
-            <button class="chip" onclick="sendTradeChatMsg('What is my most tradeable asset and what can I get for it?')">What can I sell?</button>
-            <button class="chip" onclick="sendTradeChatMsg('Draft a trade offer I can copy into Sleeper')">Draft an offer</button>
-          </div>
-        </div>
-      </div>
+      <!-- Trade Calculator (league overview, partner finder, builder, DNA) -->
+      <div id="trade-calc-container"></div>
+
       <!-- Trade Intel — depth, needs, top assets -->
       <div id="trade-intel" style="margin-top:14px"></div>
+
       <!-- Recent league trades -->
       <div style="margin-top:14px">
         <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Recent league trades</div>
@@ -671,6 +669,7 @@
 <script src="js/sleeper-api.js"></script>
 <script src="js/ai-chat.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/trade-calc.js"></script>
 
 <!-- Service Worker registration -->
 <script>
