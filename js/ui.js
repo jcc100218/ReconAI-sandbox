@@ -414,35 +414,7 @@ function toggleUpgradePos(btn,pos){
   if(hidden)hidden.value=active.join(',');
 }
 
-// ── Mentality Context Builder ──────────────────────────────────
-function buildMentalityCtx(){
-  const m=loadMentality();
-  const s={winnow:'WIN NOW',rebuild:'REBUILD',balanced:'BALANCED',prime:'2-3YR WINDOW'};
-  const w={now:'competing now','1yr':'1yr out','2yr':'2-3yr out',far:'full rebuild'};
-  const t={aggressive:'aggressive',selective:'selective',conservative:'conservative',pick_seller:'sells picks',pick_hoarder:'hoards picks'};
-  const a={youth:'youth<25',balanced_age:'age neutral',vets:'vet friendly',agnostic:'age agnostic'};
-  const r={high_risk:'high risk',moderate_risk:'moderate risk',low_risk:'low risk',no_risk:'zero risk'};
-  const parts=[
-    s[m.mentality]||m.mentality||'balanced',
-    w[m.window]||'',
-    t[m.tradeStyle]||'',
-    a[m.agePreference]||'',
-    r[m.riskTolerance]||'',
-  ].filter(Boolean);
-  const lines=['GM:'+parts.join(',')];
-  if(m.upgradePositions)lines.push('UPGRADING:'+m.upgradePositions);
-  if(m.targetPlayers)lines.push('TARGETS:'+m.targetPlayers);
-  if(m.shoppingPlayers)lines.push('SELLING:'+m.shoppingPlayers);
-  if(m.tradePrefs)lines.push('TRADE STYLE:'+m.tradePrefs.substring(0,150));
-  if(m.neverDrop)lines.push('UNTOUCHABLE:'+m.neverDrop);
-  if(m.notes)lines.push('NOTES:'+m.notes.substring(0,150));
-  // Inject strategy walkthrough answers if available
-  const strat=loadStrategy();
-  if(strat){
-    lines.push('STRATEGY:'+strat.mode+',trades:'+strat.tradeStyle+',IDP:'+strat.idpApproach+',draft:'+strat.draftApproach+',vets:'+strat.veteranApproach);
-  }
-  return lines.join('\n');
-}
+// buildMentalityCtx: defined in ai-chat.js
 
 // ── Setup Wizard ───────────────────────────────────────────────
 const WIZARD_STEPS=[
@@ -700,7 +672,7 @@ function renderAvailable(){
     }
 
     return`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:4px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+      <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:700;color:var(--text3)\\'>'+(this.alt||'??')+'</span>'" alt="${(pName(id)||'??').split(' ').map(n=>n[0]).join('')}" loading="lazy"/></div>
       <div style="overflow:hidden"><div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</div><div style="font-size:11px;color:var(--text3)">${p.team||'FA'}</div></div>
       <span class="pos ${posClass(p.position)}" style="font-size:11px;padding:1px 4px">${p.position||'?'}</span>
       <span style="font-size:11px;color:var(--text2)">${p.age||'—'}</span>
@@ -1013,45 +985,10 @@ async function resyncAllData(){
   showToast('Data refreshed ✓');
 }
 
-// ── Player Value — DHQ Primary ─────────────────────────────────
-function tradeValueTier(val){
-  if(val>=7000)return{tier:'Elite',col:'var(--green)'};
-  if(val>=4000)return{tier:'Starter',col:'var(--accent)'};
-  if(val>=2000)return{tier:'Depth',col:'var(--text2)'};
-  if(val>0)return{tier:'Stash',col:'var(--text3)'};
-  return{tier:'—',col:'var(--text3)'};
-}
-
-function dynastyValue(playerId){
-  const p=S.players[playerId];if(!p)return 0;
-  if(p.status==='Inactive'||p.status==='Retired')return 0;
-  // DHQ value (league-derived) is the sole value source
-  if(LI_LOADED&&LI.playerScores?.[playerId]>0)return LI.playerScores[playerId];
-  // If DHQ is loaded but player has no score, they're worthless
-  if(LI_LOADED)return 0;
-  return 0;
-}
-
-function getPlayerRank(playerId){
-  if(LI_LOADED&&LI.playerScores?.[playerId]>0){
-    // Rank among ALL rostered players in the league (not all 2240 DHQ players)
-    const rosteredPids=new Set();
-    S.rosters.forEach(r=>(r.players||[]).forEach(pid=>rosteredPids.add(pid)));
-    const allScores=Object.entries(LI.playerScores)
-      .filter(([pid])=>rosteredPids.has(pid))
-      .sort((a,b)=>b[1]-a[1]);
-    const overall=allScores.findIndex(([pid])=>pid===String(playerId))+1;
-    const pos=LI.playerMeta?.[playerId]?.pos;
-    const posScores=allScores.filter(([pid])=>LI.playerMeta?.[pid]?.pos===pos);
-    const posRank=posScores.findIndex(([pid])=>pid===String(playerId))+1;
-    return{overall:overall||999,pos:posRank||99,trend:0};
-  }
-  return null;
-}
-
-function isNoValue(playerId){
-  return LI_LOADED && dynastyValue(playerId)===0;
-}
+// tradeValueTier: defined in shared/constants.js
+// dynastyValue: defined in shared/dhq-engine.js
+// getPlayerRank: defined in shared/dhq-engine.js
+// isNoValue: defined in shared/dhq-engine.js
 
 function ktcNormalize(name){return(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
 
@@ -1414,29 +1351,9 @@ function renderTeamOverview(){
   el.innerHTML=html;
 }
 
-// ── Home Chat Helpers ──────────────────────────────────────────
-function homeAsk(text){
-  const input=$('home-chat-in');
-  if(input)input.value=text;
-  sendHomeChat();
-}
-function goAsk(text){
-  const modal=$('player-modal');
-  if(modal&&modal.style.display!=='none')closePlayerModal();
-  switchTab('digest',null);
-  setTimeout(()=>{
-    homeAsk(text);
-    const chatEl=$('home-chat-msgs');
-    if(chatEl)chatEl.scrollIntoView({behavior:'smooth',block:'start'});
-  },200);
-}
-
-function expandChat(el){
-  if(!el)return;
-  el.style.maxHeight='300px';
-  el.style.overflow='auto';
-  el.style.padding='14px';
-}
+// homeAsk: defined in ai-chat.js
+// goAsk: defined in ai-chat.js
+// expandChat: defined in ai-chat.js
 
 // ── Strategy Walkthrough ───────────────────────────────────────
 const STRATEGY_QUESTIONS=[
@@ -2379,13 +2296,8 @@ Search the web for current ${year} rookie rankings. Be specific with prospect na
   btn.textContent='Scout ↗';btn.disabled=false;
 }
 
-function sendDraftChatMsg(text){const inp=$('draft-chat-in');if(inp)inp.value=text;sendDraftChat();}
-
-function addDraftMsg(text,role){
-  const d=document.createElement('div');d.className=`msg msg-${role}`;d.style.fontSize='12px';
-  d.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  $('draft-msgs').appendChild(d);$('draft-msgs').scrollTop=99999;
-}
+// sendDraftChatMsg: defined in ai-chat.js
+// addDraftMsg: defined in ai-chat.js
 
 // ── Mobile nav ─────────────────────────────────────────────────
 function mobileTab(tab, btn) {
@@ -2440,7 +2352,6 @@ Object.assign(window.App, {
 
   // Mentality
   loadMentality, saveMentality, toggleUpgradePos,
-  buildMentalityCtx,
 
   // Setup Wizard
   WIZARD_STEPS, checkFirstTime, startSetupWizard,
@@ -2459,8 +2370,7 @@ Object.assign(window.App, {
   // Value system
   FC_VALUES, FC_LOADED, FC_CACHE_KEY,
   updateDataFreshness, updateSyncStatus, resyncAllData,
-  tradeValueTier, dynastyValue, getPlayerRank,
-  isNoValue, ktcNormalize, removeFromSide,
+  ktcNormalize, removeFromSide,
   assetValue, assetName,
 
   // Player Search
@@ -2468,7 +2378,6 @@ Object.assign(window.App, {
 
   // Home
   renderHomeSnapshot, renderTeamOverview,
-  homeAsk, goAsk, expandChat,
 
   // Strategy
   STRATEGY_QUESTIONS, startStrategyWalkthrough,
@@ -2484,7 +2393,6 @@ Object.assign(window.App, {
 
   // Draft Room
   renderDraftNeeds, runDraftScouting,
-  sendDraftChatMsg, addDraftMsg,
 
   // Mobile nav
   mobileTab,
@@ -2510,7 +2418,6 @@ window.getRosterSlots = getRosterSlots;
 window.loadMentality = loadMentality;
 window.saveMentality = saveMentality;
 window.toggleUpgradePos = toggleUpgradePos;
-window.buildMentalityCtx = buildMentalityCtx;
 window.checkFirstTime = checkFirstTime;
 window.startSetupWizard = startSetupWizard;
 window.showWizardStep = showWizardStep;
@@ -2530,10 +2437,6 @@ window.runPicksAI = runPicksAI;
 window.updateDataFreshness = updateDataFreshness;
 window.updateSyncStatus = updateSyncStatus;
 window.resyncAllData = resyncAllData;
-window.tradeValueTier = tradeValueTier;
-window.dynastyValue = dynastyValue;
-window.getPlayerRank = getPlayerRank;
-window.isNoValue = isNoValue;
 window.ktcNormalize = ktcNormalize;
 window.removeFromSide = removeFromSide;
 window.assetValue = assetValue;
@@ -2541,9 +2444,6 @@ window.assetName = assetName;
 window.handlePlayerSearch = handlePlayerSearch;
 window.renderHomeSnapshot = renderHomeSnapshot;
 window.renderTeamOverview = renderTeamOverview;
-window.homeAsk = homeAsk;
-window.goAsk = goAsk;
-window.expandChat = expandChat;
 window.startStrategyWalkthrough = startStrategyWalkthrough;
 window.selectStrategyAnswer = selectStrategyAnswer;
 window.loadStrategy = loadStrategy;
@@ -2557,8 +2457,6 @@ window.getPlayerFullCard = getPlayerFullCard;
 window.scoutTeam = scoutTeam;
 window.renderDraftNeeds = renderDraftNeeds;
 window.runDraftScouting = runDraftScouting;
-window.sendDraftChatMsg = sendDraftChatMsg;
-window.addDraftMsg = addDraftMsg;
 window.mobileTab = mobileTab;
 window.checkApiKeyCallout = checkApiKeyCallout;
 window.renderLeaguePulse = renderLeaguePulse;

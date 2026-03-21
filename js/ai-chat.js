@@ -890,3 +890,11 @@ Be direct and specific. Name real players and real offers. IDP in this league: s
   }catch(e){if(out)out.innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;}
   btn.textContent='Full war room ↗';btn.disabled=false;
 }
+
+// Bare window globals for inline handlers / cross-module access
+window.buildMentalityCtx = buildMentalityCtx;
+window.homeAsk = homeAsk;
+window.goAsk = goAsk;
+window.expandChat = expandChat;
+window.sendDraftChatMsg = sendDraftChatMsg;
+window.addDraftMsg = addDraftMsg;
