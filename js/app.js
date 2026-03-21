@@ -236,6 +236,7 @@ async function loadAllData(){
     if(!localStorage.getItem('dhq_strategy_done')&&(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))){
       setTimeout(()=>{if(typeof startStrategyWalkthrough==='function')startStrategyWalkthrough();},500);
     }
+    try{if(typeof runMemoryCapture==='function')runMemoryCapture(S.currentLeagueId);}catch(e){}
   }catch(e){
     console.warn('loadAllData error:',e);
     if(loadBanner)loadBanner.style.display='none';
@@ -375,6 +376,10 @@ Object.assign(window.App, {loadMemory,saveMemory,getMemory,setMemory});
 
 // ── Notifications ───────────────────────────────────────────
 function enableNotifications(){
+  if (typeof canAccess === 'function' && !canAccess('notifications')) {
+    showUpgradePrompt('notifications', document.getElementById('notif-status')?.parentElement || document.body);
+    return;
+  }
   if(!('Notification' in window)){ss('notif-status','Notifications not supported in this browser',true);return;}
   Notification.requestPermission().then(perm=>{
     localStorage.setItem('dhq_notif_perm',perm);
@@ -480,6 +485,9 @@ window.checkForAlerts = checkForAlerts;
       if(uInput) uInput.value = savedUser;
       setTimeout(()=>{if(!S.user)connect();},500);
     }
+    // Load user tier for paywall
+    if (typeof loadUserTier === 'function') loadUserTier().catch(() => {});
+
     setTimeout(()=>{
       if(S.myRosterId&&!window.App.LI_LOADED&&!window._liLoading){
         console.log('FAILSAFE: data not loaded after 8s, forcing loadAllData');

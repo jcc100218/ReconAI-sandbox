@@ -843,6 +843,13 @@ async function renderTradeCalc() {
   const el = $('trade-calc-container');
   if (!el) return;
 
+  // Paywall gate for trade calculator
+  if (typeof canAccess === 'function' && !canAccess('trade-calc')) {
+    el.innerHTML = '';
+    showUpgradePrompt('trade-calc', el);
+    return;
+  }
+
   if (!S.rosters?.length || !S.players || !Object.keys(S.players).length) {
     el.innerHTML = `<div class="card" style="text-align:center;padding:32px;color:var(--text3)">
       <div style="font-size:14px">Connect to a league to use the Trade Calculator</div>

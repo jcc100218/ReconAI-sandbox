@@ -208,7 +208,7 @@ function goAsk(text){
 
 // ── Home Chat ─────────────────────────────────────────────────
 async function sendHomeChat(){
-  if(!hasAnyAI()){return;}
+  if(!hasAnyAI(true)){return;}
   const input=$('home-chat-in');const text=(input?.value||'').trim();if(!text)return;
   if(input)input.value='';
 
@@ -256,7 +256,7 @@ function sendTradeChatMsg(text){
 }
 
 async function sendTradeChat(){
-  if(!hasAnyAI()){switchTab('settings');return;}
+  if(!hasAnyAI(true)){return;}
   const input=$('trade-chat-in');const text=(input&&input.value||'').trim();if(!text)return;
   if(input)input.value='';
   const msgsEl=$('trade-chat-msgs');
@@ -304,7 +304,7 @@ ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
 
 // ── Waiver Chat ────────────────────────────────────────────────
 async function sendWaiverChat(){
-  if(!hasAnyAI()){switchTab('settings');return;}
+  if(!hasAnyAI(true)){return;}
   const input=$('wq-chat-in');const text=input?.value?.trim();if(!text)return;
   input.value='';
 
@@ -344,7 +344,7 @@ async function sendWaiverChat(){
 function sendDraftChatMsg(text){const inp=$('draft-chat-in');if(inp)inp.value=text;sendDraftChat();}
 
 async function sendDraftChat(){
-  if(!hasAnyAI()){switchTab('settings');return;}
+  if(!hasAnyAI(true)){return;}
   const input=$('draft-chat-in');const text=input.value.trim();if(!text)return;
   input.value='';
   expandChat($('draft-msgs'));
@@ -442,7 +442,7 @@ Object.assign(window.App, {
 
 // ── Waiver AI Agent ────────────────────────────────────────────
 async function runWaiverAgent(){
-  if(!hasAnyAI()){switchTab('settings');return;}
+  if(!hasAnyAI(true)){return;}
   const btn=$('wq-btn');btn.textContent='Scanning...';btn.disabled=true;
   $('wq-list').innerHTML='<div class="card"><div class="empty">Computing available players, FAAB context, and roster slots...</div></div>';
   try{

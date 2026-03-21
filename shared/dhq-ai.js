@@ -674,11 +674,26 @@ async function dhqAI(type, message, context, options) {
     newsContext = dhqEnrichWithNews(message);
   }
 
+  // Capture user preferences for chat types
+  const chatTypes = ['home-chat','trade-chat','waiver-chat','draft-chat'];
+  if (chatTypes.includes(type) && message) {
+    try { if (typeof captureUserPreferences === 'function') captureUserPreferences(message); } catch (e) {}
+  }
+
   // Build the full prompt
   let fullContext = '';
   if (config.instructions) fullContext += config.instructions + '\n\n';
   if (newsContext) fullContext += newsContext + '\n';
   if (context) fullContext += context + '\n\n';
+
+  // Inject league memory for context-rich types
+  const memoryTypes = ['home-chat','trade-chat','waiver-chat','draft-chat','trade-scout','player-scout','pick-analysis'];
+  if (memoryTypes.includes(type)) {
+    try {
+      const memCtx = await buildMemoryContext(window.S?.currentLeagueId);
+      if (memCtx) fullContext += memCtx + '\n\n';
+    } catch (e) {}
+  }
 
   // Construct messages array
   let messages;
@@ -709,7 +724,7 @@ async function dhqAI(type, message, context, options) {
     return m;
   });
 
-  const reply = await callClaude(systemPrefixed, useWebSearch, 2, maxTokens);
+  const reply = await callClaude(systemPrefixed, useWebSearch, 2, maxTokens, type);
 
   // Validate response — fast, non-blocking, appends notes if issues found
   const validated = validateAIResponse(type, reply, {

@@ -25,6 +25,25 @@ const PROVIDERS = {
   },
 };
 
+// Smart model routing — use the best model for each task type
+const MODEL_ROUTING = {
+  // Complex reasoning — needs best model
+  'trade-chat': { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  'trade-scout': { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  'draft-scout': { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  'pick-analysis': { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  'player-scout': { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+  // Medium complexity — good cheap model
+  'home-chat': { provider: 'gemini', model: 'gemini-2.0-flash' },
+  'waiver-chat': { provider: 'gemini', model: 'gemini-2.0-flash' },
+  'waiver-agent': { provider: 'gemini', model: 'gemini-2.0-flash' },
+  'draft-chat': { provider: 'gemini', model: 'gemini-2.0-flash' },
+  'strategy-analysis': { provider: 'gemini', model: 'gemini-2.0-flash' },
+  // Simple tasks — cheapest model
+  'memory-summary': { provider: 'gemini', model: 'gemini-2.0-flash' },
+  'power-posts': { provider: 'gemini', model: 'gemini-2.0-flash' },
+};
+
 // ── Provider hint UI helper ──────────────────────────────────
 function updateProviderHint(){
   const sel=(window.$||document.getElementById.bind(document))('ai-provider-sel');if(!sel)return;
@@ -44,16 +63,50 @@ function hasServerAI(){
 }
 
 // ── Helper: check if ANY AI is available (server or client key) ─
-function hasAnyAI(){
+function hasAnyAI(showPrompt=false){
   const S = window.S || window.App?.S || {};
+  // Paywall check: free tier has no AI access
+  if (typeof canAccess === 'function' && !canAccess('ai-unlimited')) {
+    if (showPrompt && typeof showUpgradePrompt === 'function') {
+      const containers = ['home-chat-msgs','trade-chat-msgs','wq-chat-msgs','draft-msgs'];
+      const el = containers.map(id => document.getElementById(id)).find(e => e && e.offsetParent !== null);
+      if (el) showUpgradePrompt('ai-unlimited', el);
+    }
+    return false;
+  }
   return !!(S.apiKey || hasServerAI());
 }
 
 // ── Core AI call ──────────────────────────────────────────────
 // Priority: 1) Server-side via OD.callAI (no user key needed)
 //           2) Client-side via user's API key (existing behavior)
-async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
+async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600, callType=null){
+  // Smart model routing: if callType is set AND user has the required API key, route to optimal model
+  // If user has manually set a provider/model in settings, respect that (user override)
   const S = window.S || window.App?.S || {};
+  const userOverride = S.aiProvider && S.apiKey; // user explicitly configured a provider
+
+  let effectiveProvider, effectiveModel;
+  if (userOverride) {
+    // User set their own key — use their choice
+    effectiveProvider = S.aiProvider;
+    effectiveModel = S.aiModel || PROVIDERS[S.aiProvider]?.defaultModel;
+  } else if (callType && MODEL_ROUTING[callType]) {
+    // Smart routing — pick optimal model for this task
+    const route = MODEL_ROUTING[callType];
+    effectiveProvider = route.provider;
+    effectiveModel = route.model;
+  } else {
+    effectiveProvider = S.aiProvider || 'gemini';
+    effectiveModel = S.aiModel || PROVIDERS[effectiveProvider]?.defaultModel;
+  }
+
+  // Web search only available on Anthropic — fall back if needed
+  if (useWebSearch && effectiveProvider !== 'anthropic') {
+    effectiveProvider = 'anthropic';
+    effectiveModel = PROVIDERS.anthropic.defaultModel;
+  }
+
   const sys = (typeof DHQ_IDENTITY !== 'undefined') ? DHQ_IDENTITY : 'Dynasty FF advisor. Values from DHQ (0-10000 scale, league-derived). Be specific with player names and DHQ values. Sleeper-ready messages when asked.';
 
   // ── SERVER-SIDE PATH: use OD.callAI Edge Function ──────────
@@ -68,6 +121,7 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
         context: JSON.stringify({
           system: sys,
           messages: messages,
+          callType: callType || 'recon-chat',
           userMessage: lastUserMsg?.content || '',
           maxTokens: maxTok,
           useWebSearch: useWebSearch,
@@ -95,11 +149,10 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
   // ── CLIENT-SIDE PATH: direct API calls with user's key ─────
   if(!S.apiKey) throw new Error('No AI available. Connect your account or add an API key in Settings.');
 
-  const rawProvider = S.aiProvider || 'gemini';
   // Fallback: if saved provider was removed (groq/openai/grok), default to gemini
-  const provider = PROVIDERS[rawProvider] ? rawProvider : 'gemini';
+  const provider = PROVIDERS[effectiveProvider] ? effectiveProvider : 'gemini';
   const apiKey = S.apiKey;
-  const model = S.aiModel || PROVIDERS[provider]?.defaultModel || 'claude-sonnet-4-20250514';
+  const model = effectiveModel || PROVIDERS[provider]?.defaultModel || 'claude-sonnet-4-20250514';
   // Web search only works with Anthropic — silently disable for other providers
   if(provider !== 'anthropic') useWebSearch = false;
 
@@ -159,6 +212,7 @@ async function callGrokNews(query, maxTok=300){
 // ── Expose on window.App AND window (for dhq-ai.js compatibility) ──
 Object.assign(window.App, {
   PROVIDERS,
+  MODEL_ROUTING,
   _newsCache,
   updateProviderHint,
   hasServerAI,
