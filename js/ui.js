@@ -125,7 +125,12 @@ function sortRoster(key){
   if(rosterSortKey===key)rosterSortDir*=-1;else{rosterSortKey=key;rosterSortDir=-1;}
   buildRosterTable();
 }
-function setRosterFilter(f){rosterFilter=f;buildRosterTable();}
+function setRosterFilter(f, btn){
+  rosterFilter=f;
+  document.querySelectorAll('#roster-filter-btns .rfbtn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  buildRosterTable();
+}
 function resetRosterSort(){rosterSortKey='val';rosterSortDir=-1;rosterFilter='all';buildRosterTable();}
 
 function buildRosterTable(){
@@ -222,7 +227,7 @@ function buildRosterTable(){
       <td><div class="rt-name">${pName(pid)}${isStarter?'<span class="rt-slot">'+posLabel(slot,pid)+'</span>':''}</div><div class="rt-team">${fullTeam(pTeam(pid))}</div></td>
       <td><span class="pos ${pc}" style="font-size:12px">${pos}</span></td>
       <td class="rt-num-cell rt-val">${age||'—'}</td>
-      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:13px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:7px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:12px;color:var(--text3)">—</span>':'...'}</td>
+      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:13px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:9px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:12px;color:var(--text3)">—</span>':'...'}</td>
       <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}</td>
       <td class="rt-num-cell rt-val dim">${prev?prev.toFixed(1):'—'}</td>
       <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:12px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
@@ -275,61 +280,6 @@ function pickValue(season,round,totalTeams,pickInRound){
   const key=`${round}.${String(midPick).padStart(2,'0')}`;
   const base=BASE_PICK_VALUES[key]||BASE_PICK_VALUES[`${round}.06`]||500;
   return Math.round(base*yearDiscount);
-}
-
-// ── Trade Finder Mode ──────────────────────────────────────────
-let extraTeams=[];
-document.addEventListener('change',e=>{
-  if(e.target.id==='tf-multi'){
-    /* removed */
-  }
-});
-function toggleTheirAsset(id,type,pickData){
-  const existing=tradeBuilderAssets.theirs.find(a=>a.id===id);
-  const check=$(`theircheck-${id}`);
-  const row=$(`their-asset-${id}`);
-  if(existing){
-    tradeBuilderAssets.theirs=tradeBuilderAssets.theirs.filter(a=>a.id!==id);
-    check.classList.remove('on');check.textContent='';
-    row.classList.remove('selected');
-  }else{
-    if(tradeBuilderAssets.theirs.length>=10){showToast('Max 10 assets');return;}
-    tradeBuilderAssets.theirs.push({id,type,pickData:pickData||null});
-    check.classList.add('on');check.textContent='✓';
-    row.classList.add('selected');
-  }
-}
-
-// ── Power Rankings ─────────────────────────────────────────────
-function avatarUrl(user){
-  if(user?.avatar)return`https://sleepercdn.com/avatars/thumbs/${user.avatar}`;
-  return null;
-}
-async function generatePowerXPosts(){
-  if(!hasAnyAI()){switchTab('settings');return;}
-  const btn=$('power-x-btn');btn.textContent='Generating...';btn.disabled=true;
-  /* removed */
-  try{
-    const snapshot='current';
-    const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-    const scores=S.rosters.map(r=>{
-      const s=r.settings||{};
-      return{name:getUser(r.owner_id),record:`${s.wins||0}-${s.losses||0}`,pts:((s.fpts||0)+(s.fpts_decimal||0)/100).toFixed(1),me:r.roster_id===S.myRosterId};
-    });
-    const prompt=`You are @ReconAI_FW, a bold and entertaining dynasty fantasy football analyst on X (Twitter).
-
-Write one X post (max 280 chars each) for each team in the ${league?.name||'dynasty league'} dynasty power rankings. Be opinionated, funny, and use fantasy football culture. Use relevant hashtags. Reference their record or roster situation.
-
-Teams: ${scores.map((s,i)=>`#${i+1} ${s.name} (${s.record}, ${s.pts}pts)`).join(', ')}
-
-JSON: {"posts":[{"team":"name","rank":N,"post":"X post text"}]}
-Return ONLY JSON.`;
-    const reply=await callClaude([{role:'user',content:prompt}]);
-    let data={posts:[]};
-    try{data=JSON.parse(reply.replace(/```json|```/g,'').trim());}catch(e){}
-    /* removed */
-  }catch(e){/* removed */}
-  btn.textContent='Generate X posts ↗';btn.disabled=false;
 }
 
 // ── FAAB / Roster slot helpers ─────────────────────────────────
@@ -928,11 +878,6 @@ Be specific with round and year for each recommendation.`}]);
   btn.textContent='AI analysis ↗';btn.disabled=false;
 }
 
-// ── Value System Stubs ─────────────────────────────────────────
-let FC_VALUES={}; // kept as empty stub so old references don't crash
-let FC_LOADED=false;
-const FC_CACHE_KEY='_deprecated';
-
 function updateDataFreshness(){
   const pill=$('week-pill');if(!pill)return;
   const base='Wk '+S.currentWeek+' · '+S.season;
@@ -989,12 +934,6 @@ async function resyncAllData(){
 // dynastyValue: defined in shared/dhq-engine.js
 // getPlayerRank: defined in shared/dhq-engine.js
 // isNoValue: defined in shared/dhq-engine.js
-
-function ktcNormalize(name){return(name||'').toLowerCase().replace(/[^a-z0-9]/g,'');}
-
-function removeFromSide(side,playerId){
-  S.tradeCalc[side]=S.tradeCalc[side].filter(p=>p!==playerId);
-}
 
 function assetValue(id){
   if(String(id).startsWith('pick:')){
@@ -1606,7 +1545,7 @@ function openPlayerModal(playerId){
       let blurb='',blurbColor='var(--amber)';
 
       if(meta.source==='FC_ROOKIE'){
-        blurb=`Incoming rookie with ${meta.peakYrsLeft||'?'} peak years ahead. Value based on FantasyCalc dynasty consensus — no NFL production yet.`;
+        blurb=`Incoming rookie with ${meta.peakYrsLeft||'?'} peak years ahead. Value based on DHQ dynasty consensus — no NFL production yet.`;
         blurbColor='var(--green)';
       }else if(meta.sitMult<=0.45){
         blurb=`Not rostered by anyone in the league and no NFL team. ${yrsPast>=2?'Likely retired or out of football.':'Needs a landing spot to have any value.'}`;
@@ -1890,162 +1829,6 @@ Return JSON only: {"news":[{"source":"source","text":"one sentence about ${name}
 // ── Opponent Scouting ──────────────────────────────────────────
 // idealDepth: default depth targets per position (may be overridden by other modules)
 const idealDepth=window.idealDepth||{QB:3,RB:6,WR:7,TE:3,K:1,DL:5,LB:5,DB:5};
-
-function scoutTeam(rosterId){
-  if(!rosterId){const sc=$('scout-content');if(sc)sc.innerHTML='<div class="card"><div class="empty">Select a team.</div></div>';const sb=$('scout-ai-btn');if(sb)sb.style.display='none';return;}
-  const sb2=$('scout-ai-btn');if(sb2){sb2.style.display='';sb2.dataset.roster=rosterId;}
-  const r=S.rosters.find(r=>r.roster_id===parseInt(rosterId));
-  if(!r)return;
-
-  const name=getUser(r.owner_id);
-  const s=r.settings||{};
-  const players=r.players||[];
-  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  const rp=league?.roster_positions||[];
-
-  const starterSlots={QB:0,RB:0,WR:0,TE:0,K:0,DL:0,LB:0,DB:0};
-  rp.forEach(slot=>{
-    if(slot==='QB')starterSlots.QB++;
-    else if(slot==='RB')starterSlots.RB++;
-    else if(slot==='WR')starterSlots.WR++;
-    else if(slot==='TE')starterSlots.TE++;
-    else if(slot==='K')starterSlots.K++;
-    else if(slot==='DL'||slot==='DE'||slot==='DT')starterSlots.DL++;
-    else if(slot==='LB')starterSlots.LB++;
-    else if(slot==='DB'||slot==='CB'||slot==='S')starterSlots.DB++;
-    else if(slot==='FLEX'){starterSlots.RB+=0.4;starterSlots.WR+=0.4;starterSlots.TE+=0.2;}
-    else if(slot==='SUPER_FLEX'){starterSlots.QB+=0.5;starterSlots.WR+=0.25;starterSlots.RB+=0.25;}
-    else if(slot==='IDP_FLEX'){starterSlots.DL+=0.35;starterSlots.LB+=0.35;starterSlots.DB+=0.3;}
-    else if(slot==='REC_FLEX'){starterSlots.WR+=0.5;starterSlots.TE+=0.5;}
-  });
-  Object.keys(starterSlots).forEach(p=>starterSlots[p]=Math.round(starterSlots[p]));
-
-  const sc7=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
-  const startThresh={QB:18,RB:10,WR:10,TE:8,K:6,
-    DL:Math.max(1.5,+(calcIDPScore({idp_sack:4,idp_tkl_solo:30,idp_tkl_ast:10,idp_qb_hit:10},sc7)/17).toFixed(1)),
-    LB:Math.max(1.5,+(calcIDPScore({idp_tkl_solo:60,idp_tkl_ast:20,idp_sack:2},sc7)/17).toFixed(1)),
-    DB:Math.max(1.5,+(calcIDPScore({idp_int:2,idp_pass_def:8,idp_tkl_solo:50,idp_tkl_ast:15},sc7)/17).toFixed(1)),
-  };
-
-  const eliteByPos={};
-  if(S.players){
-    Object.keys(starterSlots).forEach(pos=>{
-      Object.keys(S.players).filter(pid=>pPos(pid)===pos&&dynastyValue(pid)>0)
-        .sort((a,b)=>dynastyValue(b)-dynastyValue(a)).slice(0,5)
-        .forEach(pid=>eliteByPos[pid]=true);
-    });
-  }
-
-  const byPos={};
-  players.forEach(pid=>{
-    const pos=pPos(pid);if(!(pos in starterSlots))return;
-    if(!byPos[pos])byPos[pos]={total:0,startable:0,players:[]};
-    byPos[pos].total++;
-    const avg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||0;
-    const isStartable=avg>=startThresh[pos];
-    if(isStartable)byPos[pos].startable++;
-    byPos[pos].players.push({pid,avg,isStartable,isElite:!!eliteByPos[pid]});
-  });
-  Object.values(byPos).forEach(d=>{
-    d.players.sort((a,b)=>{
-      if(a.isElite!==b.isElite)return a.isElite?-1:1;
-      if(a.isStartable!==b.isStartable)return a.isStartable?-1:1;
-      return b.avg-a.avg;
-    });
-  });
-
-  const gradeColors={surplus:'var(--green)',ok:'var(--green)',thin:'var(--text2)',need:'var(--amber)',desperate:'var(--red)'};
-  const gradeLabels={surplus:'Stacked',ok:'Solid',thin:'Thin',need:'Need',desperate:'Weak'};
-  const gradeBorder={surplus:'rgba(34,197,94,.2)',ok:'var(--border)',thin:'var(--border)',need:'rgba(245,158,11,.3)',desperate:'rgba(239,68,68,.4)'};
-
-  const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
-  const rank=sorted.findIndex(r2=>r2.roster_id===r.roster_id)+1;
-  const faab=r.settings?.waiver_budget_used!==undefined?((r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0)):null;
-
-  const surplusPos=[];const needPos=[];
-  Object.keys(starterSlots).forEach(pos=>{
-    const d=byPos[pos]||{startable:0,total:0};
-    const gap=starterSlots[pos]-d.startable;
-    if(gap>=starterSlots[pos])needPos.push(pos);
-    else if(gap<=0&&d.total>=idealDepth[pos])surplusPos.push(pos);
-  });
-
-  const theirPicks=S.tradedPicks.filter(p=>p.owner_id===r.roster_id)
-    .sort((a,b)=>a.season-b.season||a.round-b.round)
-    .map(p=>`<span style="background:rgba(108,99,245,.12);border:1px solid rgba(108,99,245,.25);border-radius:4px;padding:2px 7px;font-size:12px;font-weight:600;color:var(--accent)">${p.season} R${p.round}</span>`).join('');
-
-  const posScores2=Object.keys(starterSlots).map(pos=>{
-    const d=byPos[pos]||{total:0,startable:0,players:[]};
-    const need=starterSlots[pos];const depth=idealDepth[pos];
-    const gap=Math.max(0,need-d.startable);
-    const grade=gap>=need?'desperate':gap>0?'need':Math.max(0,depth-d.total)>2?'thin':d.total>=depth?'surplus':'ok';
-    const score=d.startable-need+(d.total-depth)*0.3;
-    return{pos,d,need,depth,gap,grade,score};
-  }).sort((a,b)=>b.score-a.score);
-
-  const strengths2=posScores2.filter(p=>p.score>=0);
-  const weaknesses2=posScores2.filter(p=>p.score<0).reverse();
-
-  const makeCard2=({pos,d,need,depth,grade})=>{
-    const dots=d.players.slice(0,8).map(({pid,isStartable,isElite,avg})=>{
-      const col=isElite?'var(--green)':isStartable?'var(--accent)':avg>0?'rgba(245,158,11,.7)':'var(--red)';
-      return`<span title="${pName(pid)} (${avg>0?avg.toFixed(1)+' avg':'no stats'})${isElite?' ⭐':''}" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;cursor:default"></span>`;
-    }).join('');
-    const empty=Math.max(0,Math.min(3,depth-d.players.slice(0,8).length));
-    const emptyDots=Array(empty).fill('<span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:1px dashed var(--border2);flex-shrink:0"></span>').join('');
-    return`<div style="background:var(--bg2);border-radius:var(--r);padding:9px 11px;border:1px solid ${gradeBorder[grade]}">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-size:13px;font-weight:700">${pos}</span>
-        <span style="font-size:12px;font-weight:600;color:${gradeColors[grade]}">${gradeLabels[grade]}</span>
-      </div>
-      <div style="font-size:16px;font-weight:700;line-height:1;margin-bottom:3px">${d.startable}<span style="font-size:12px;font-weight:400;color:var(--text3)">/${need}</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:3px">${dots}${emptyDots}</div>
-      <div style="font-size:12px;color:var(--text3)">${d.total}/${depth}</div>
-    </div>`;
-  };
-
-  const posCards=(strengths2.length?
-    '<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their strengths</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">'
-    +strengths2.map(makeCard2).join('')+'</div>':'')
-  +(weaknesses2.length?
-    '<div style="font-size:11px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Their needs (your leverage)</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">'
-    +weaknesses2.map(makeCard2).join('')+'</div>':'');
-
-  const scOut=$('scout-content');
-  if(scOut) scOut.innerHTML=`
-    <div class="card" style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
-        <div>
-          <div style="font-size:15px;font-weight:700">${name}</div>
-          <div style="font-size:12px;color:var(--text3);margin-top:2px">Rank #${rank}/${S.rosters.length} · ${s.wins||0}-${s.losses||0}${faab!==null?' · $'+faab+' FAAB':''}</div>
-        </div>
-        <button class="btn btn-sm" onclick="runScoutAI()" id="scout-ai-btn" style="font-size:12px">Full war room ↗</button>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--text3);margin-bottom:10px">
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:2px"></span>Elite/Starter</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:2px"></span>Depth</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:rgba(245,158,11,.7);margin-right:2px"></span>Marginal</span>
-        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:2px"></span>No stats</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:7px;margin-bottom:12px">
-        ${posCards}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their surplus → target</div>
-          <div style="font-size:13px;color:var(--green);font-weight:600">${strengths2.filter(p=>p.score>1).map(p=>p.pos).join(', ')||'None identified'}</div>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Their needs → your leverage</div>
-          <div style="font-size:13px;color:var(--amber);font-weight:600">${weaknesses2.map(p=>p.pos).join(', ')||'No obvious gaps'}</div>
-        </div>
-      </div>
-      ${theirPicks?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Their traded picks</div><div style="display:flex;flex-wrap:wrap;gap:4px">${theirPicks}</div></div>`:''}
-    </div>`;
-}
-
 // ── Draft Room ─────────────────────────────────────────────────
 // draftChatHistory declared in ai-chat.js
 
@@ -2403,12 +2186,6 @@ Object.assign(window.App, {
   // Pick values
   BASE_PICK_VALUES, pickValue,
 
-  // Trade Finder
-  extraTeams, toggleTheirAsset,
-
-  // Power Rankings
-  avatarUrl, generatePowerXPosts,
-
   // FAAB / Roster slots
   getFAAB, getRosterSlots,
 
@@ -2430,9 +2207,7 @@ Object.assign(window.App, {
   renderPicks, runPicksAI,
 
   // Value system
-  FC_VALUES, FC_LOADED, FC_CACHE_KEY,
   updateDataFreshness, updateSyncStatus, resyncAllData,
-  ktcNormalize, removeFromSide,
   assetValue, assetName,
 
   // Player Search
@@ -2451,7 +2226,7 @@ Object.assign(window.App, {
   closePlayerModal, getPlayerFullCard,
 
   // Opponent Scouting
-  idealDepth, scoutTeam,
+  idealDepth,
 
   // Draft Room
   renderDraftNeeds, runDraftScouting,
@@ -2472,9 +2247,6 @@ window.setRosterFilter = setRosterFilter;
 window.resetRosterSort = resetRosterSort;
 window.buildRosterTable = buildRosterTable;
 window.pickValue = pickValue;
-window.toggleTheirAsset = toggleTheirAsset;
-window.avatarUrl = avatarUrl;
-window.generatePowerXPosts = generatePowerXPosts;
 window.getFAAB = getFAAB;
 window.getRosterSlots = getRosterSlots;
 window.loadMentality = loadMentality;
@@ -2499,8 +2271,6 @@ window.runPicksAI = runPicksAI;
 window.updateDataFreshness = updateDataFreshness;
 window.updateSyncStatus = updateSyncStatus;
 window.resyncAllData = resyncAllData;
-window.ktcNormalize = ktcNormalize;
-window.removeFromSide = removeFromSide;
 window.assetValue = assetValue;
 window.assetName = assetName;
 window.handlePlayerSearch = handlePlayerSearch;
@@ -2516,7 +2286,6 @@ window.getPosBadgeStyle = getPosBadgeStyle;
 window.loadPlayerCardStats = loadPlayerCardStats;
 window.closePlayerModal = closePlayerModal;
 window.getPlayerFullCard = getPlayerFullCard;
-window.scoutTeam = scoutTeam;
 window.renderDraftNeeds = renderDraftNeeds;
 window.runDraftScouting = runDraftScouting;
 window.mobileTab = mobileTab;

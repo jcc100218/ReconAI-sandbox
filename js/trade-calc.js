@@ -1220,7 +1220,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   </div>`;
 
   // Two-column trade layout
-  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">`;
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:10px;margin-bottom:12px">`;
 
   // MY SIDE
   html += _renderTradeSide(myAssessment, _tcBuilderMyAssets, 'my', true);

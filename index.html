@@ -96,8 +96,6 @@
             <div style="font-size:18px;font-weight:800;letter-spacing:-.03em" id="home-team-name">ReconAI</div>
             <div style="font-size:12px;color:var(--text3);margin-top:2px" id="home-league-meta"></div>
           </div>
-          <div style="display:flex;gap:6px">
-          </div>
         </div>
         <!-- Data sync status -->
         <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--text2);align-items:center">
@@ -195,7 +193,7 @@
     <!-- WAIVERS -->
     <div class="panel" id="panel-waivers">
       <!-- FAAB status bar -->
-      <div id="faab-bar" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div id="faab-bar" style="display:none;background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;gap:16px;align-items:center;flex-wrap:wrap">
         <div><div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">My FAAB</div><div style="font-size:18px;font-weight:700;color:var(--green)" id="faab-mine">—</div></div>
         <div><div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">League avg</div><div style="font-size:18px;font-weight:700;color:var(--text2)" id="faab-avg">—</div></div>
         <div><div style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">Open slots</div><div style="font-size:18px;font-weight:700;color:var(--accent)" id="bench-slots">—</div></div>
@@ -204,7 +202,7 @@
 
       <!-- AI queue -->
       <div class="sec">AI waiver queue <div class="sec-line"></div>
-        <span id="available-count" style="font-size:11px;color:var(--text3)"></span>
+        <span id="available-count-queue" style="font-size:11px;color:var(--text3)"></span>
         <button class="btn btn-ghost btn-sm" onclick="runWaiverAgent()" id="wq-btn" style="margin-left:6px">Generate</button>
         <span id="waiver-faab-hint" style="font-size:11px;color:var(--text3);margin-left:8px"></span>
       </div>
@@ -235,8 +233,6 @@
       <div id="avail-tbody-wrap">
         <div id="avail-tbody" style="display:flex;flex-direction:column;gap:4px"><div class="empty">Connect to see available players.</div></div>
       </div>
-      <!-- Keep hidden table element for any JS that references it -->
-      <table id="avail-table" style="display:none"><tbody></tbody></table>
     </div>
 
     <!-- TRADE FINDER -->
