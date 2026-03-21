@@ -28,7 +28,17 @@ const pNameShort=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;c
 const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 const pTeam=id=>S.players[id]?.team||'';
 const pPos=id=>S.players[id]?.position||'';
-const pAge=id=>S.players[id]?.age||'';
+const pAge=id=>{
+  const p=S.players[id]; if(!p) return '';
+  if(p.age&&p.age>0) return p.age;
+  if(p.birth_date){
+    const birth=new Date(p.birth_date);
+    const age=Math.floor((Date.now()-birth.getTime())/(365.25*24*60*60*1000));
+    if(age>0&&age<50) return age;
+  }
+  if(p.years_exp===0) return 22;
+  return '';
+};
 const pExp=id=>S.players[id]?.years_exp??'';
 const getUser=oid=>{const u=S.leagueUsers.find(u=>u.user_id===oid);return u?(u.metadata?.team_name||u.display_name||u.username||'Team'):'Team'};
 const myR=()=>S.rosters.find(r=>r.roster_id===S.myRosterId);

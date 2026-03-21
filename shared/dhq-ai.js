@@ -570,53 +570,87 @@ function findPlayerId(name) {
   return null;
 }
 
-function validateAIResponse(type, response) {
-  var S = window.S || window.App?.S;
-  var warnings = [];
-  var text = typeof response === 'string' ? response : (response?.text || response?.content || '');
-  if (!text || !S?.players) return { text: text, warnings: warnings };
+// Response name extraction — uses regex patterns to find player names in AI output
+function extractResponseNames(text) {
+  const names = [];
+  const patterns = [
+    /\*\*([A-Z][a-z]+ [A-Z][a-z']+)\*\*/g,   // **First Last**
+    /([A-Z][a-z]+ [A-Z][a-z']+)\s*\(/g,       // First Last (
+  ];
+  patterns.forEach(p => { let m; while ((m = p.exec(text))) names.push(m[1]); });
+  return [...new Set(names)];
+}
 
-  var myR = window.myR || window.App?.myR;
-  var my = typeof myR === 'function' ? myR() : null;
-  var myPlayers = new Set(my?.players || []);
+function isRostered(pid) {
+  const S = window.S || window.App?.S;
+  if (!S?.rosters) return false;
+  return S.rosters.some(r => (r.players || []).includes(pid));
+}
 
-  var mentionedNames = extractPlayerNames(text);
+function isOnMyRoster(pid) {
+  const S = window.S || window.App?.S;
+  if (!S?.rosters || !S.myRosterId) return false;
+  const my = S.rosters.find(r => r.roster_id === S.myRosterId);
+  return my ? (my.players || []).includes(pid) : false;
+}
 
-  mentionedNames.forEach(function(name) {
-    var pid = findPlayerId(name);
+function checkTradeMath(text) {
+  const valPattern = /(?:DHQ\s*~?|~)\s*([\d,]+)/gi;
+  const vals = [];
+  let m;
+  while ((m = valPattern.exec(text))) vals.push(parseInt(m[1].replace(/,/g, ''), 10));
+  if (vals.length < 2) return null;
+  const mid = Math.floor(vals.length / 2);
+  const sideA = vals.slice(0, mid).reduce((a, b) => a + b, 0);
+  const sideB = vals.slice(mid).reduce((a, b) => a + b, 0);
+  if (sideA === 0 || sideB === 0) return null;
+  const ratio = Math.abs(sideA - sideB) / Math.max(sideA, sideB);
+  return ratio > 0.20 ? { sideA, sideB, ratio: Math.round(ratio * 100) } : null;
+}
 
-    // Check 1: Does this player exist in S.players?
+const VALIDATION_TYPES = ['home-chat', 'trade-chat', 'waiver-chat', 'waiver-agent', 'draft-chat'];
+
+function validateAIResponse(type, response, ctx) {
+  if (!VALIDATION_TYPES.includes(type)) return { text: response, issues: [] };
+  const text = typeof response === 'string' ? response : JSON.stringify(response);
+  const issues = [];
+  const names = extractResponseNames(text);
+  const isWaiver = type === 'waiver-chat' || type === 'waiver-agent';
+  const isTrade = type === 'trade-chat';
+
+  for (const name of names) {
+    const pid = findPlayerId(name);
+    // Check 1: Player existence — flag possible hallucinations
     if (!pid) {
-      warnings.push('\u26a0\ufe0f "' + name + '" was not found in the player database — verify this player exists.');
-      return;
+      issues.push(`[${name}] could not be verified in your league's player database`);
+      continue;
     }
-
-    // Check 2: For waiver recs, player should NOT already be rostered
-    if (type === 'waiver-chat' || type === 'waiver-agent') {
-      var isRostered = (S.rosters || []).some(function(r) { return (r.players || []).includes(pid); });
-      if (isRostered) {
-        warnings.push('\u26a0\ufe0f "' + name + '" is already rostered in this league — not available on waivers.');
+    // Check 2: Waiver recs — player should NOT already be rostered
+    if (isWaiver && isRostered(pid)) {
+      issues.push(`[${name}] appears to already be rostered \u2014 this recommendation may need adjustment`);
+    }
+    // Check 3: Trade recs — don't suggest acquiring your own player
+    if (isTrade && isOnMyRoster(pid)) {
+      const nameIdx = text.indexOf(name);
+      const preceding = text.substring(Math.max(0, nameIdx - 80), nameIdx).toLowerCase();
+      if (/target|acquire|get|their side/.test(preceding)) {
+        issues.push(`[${name}] is already on your roster \u2014 this recommendation may need adjustment`);
       }
     }
-
-    // Check 3: For trade recs, don't suggest trading for your own player
-    if (type === 'trade-chat' || type === 'trade-scout') {
-      if (myPlayers.has(pid)) {
-        var idx = text.indexOf(name);
-        var surrounding = text.substring(Math.max(0, idx - 100), Math.min(text.length, idx + 100)).toLowerCase();
-        if (surrounding.includes('target') || surrounding.includes('acquire') || surrounding.includes('their side')) {
-          warnings.push('\u26a0\ufe0f "' + name + '" is already on your roster — you cannot trade for your own player.');
-        }
-      }
-    }
-  });
-
-  var finalText = text;
-  if (warnings.length) {
-    finalText = text + '\n\n---\n' + warnings.join('\n');
   }
 
-  return { text: finalText, warnings: warnings };
+  // Check 4: Trade math — verify both sides within 20%
+  if (isTrade) {
+    const imbalance = checkTradeMath(text);
+    if (imbalance) {
+      issues.push(`Trade values appear imbalanced (${imbalance.sideA.toLocaleString()} vs ${imbalance.sideB.toLocaleString()}, ${imbalance.ratio}% gap)`);
+    }
+  }
+
+  if (!issues.length) return { text: response, issues: [] };
+  const notes = '\n\n' + issues.map(i => '\u26A0\uFE0F Note: ' + i + '.').join('\n');
+  const validated = typeof response === 'string' ? response + notes : response;
+  return { text: validated, issues };
 }
 
 // ── Main Entry Point ────────────────────────────────────────────
@@ -675,18 +709,15 @@ async function dhqAI(type, message, context, options) {
     return m;
   });
 
-  const result = await callClaude(systemPrefixed, useWebSearch, 2, maxTokens);
+  const reply = await callClaude(systemPrefixed, useWebSearch, 2, maxTokens);
 
-  // Improvement C: Validate response for applicable types
-  const validateTypes = ['home-chat', 'trade-chat', 'waiver-chat', 'waiver-agent', 'draft-chat'];
-  if (validateTypes.includes(type)) {
-    const validated = validateAIResponse(type, result);
-    if (validated.warnings.length) {
-      return validated.text;
-    }
-  }
+  // Validate response — fast, non-blocking, appends notes if issues found
+  const validated = validateAIResponse(type, reply, {
+    myRosterId: window.S?.myRosterId,
+    rosters: window.S?.rosters,
+  });
 
-  return result;
+  return validated.text;
 }
 
 // ── Convenience Functions ───────────────────────────────────────

@@ -982,29 +982,26 @@ function renderTeamOverview(){
 
   // Position grades — RELATIVE to league average at each position
   const positions=['QB','RB','WR','TE','K','DL','LB','DB'];
-  const leagueAvgByPos={};
+  const leagueTotalByPos={};
   positions.forEach(pos=>{
-    let totalVal2=0,totalCount=0;
-    S.rosters.forEach(r=>{
-      (r.players||[]).forEach(pid=>{
-        if(pM(pPos(pid))===pos){
-          const v=dynastyValue(pid);
-          if(v>0){totalVal2+=v;totalCount++;}
-        }
-      });
+    const teamTotals=S.rosters.map(r=>{
+      return (r.players||[]).reduce((sum,pid)=>{
+        if(pM(pPos(pid))===pos) sum+=dynastyValue(pid);
+        return sum;
+      },0);
     });
-    leagueAvgByPos[pos]=totalCount>0?Math.round(totalVal2/totalCount):1500;
+    leagueTotalByPos[pos]=teamTotals.length?Math.round(teamTotals.reduce((a,b)=>a+b,0)/teamTotals.length):5000;
   });
 
-  const gradeColor=(avgVal,pos)=>{
-    const la=leagueAvgByPos[pos]||1500;
-    const pct=avgVal/la;
-    return pct>=1.4?'var(--green)':pct>=1.0?'var(--accent)':pct>=0.7?'var(--amber)':'var(--red)';
+  const gradeColor=(myTotal,pos)=>{
+    const la=leagueTotalByPos[pos]||5000;
+    const pct=myTotal/la;
+    return pct>=1.3?'var(--green)':pct>=1.0?'var(--accent)':pct>=0.75?'var(--amber)':'var(--red)';
   };
-  const gradeLetter=(avgVal,pos)=>{
-    const la=leagueAvgByPos[pos]||1500;
-    const pct=avgVal/la;
-    return pct>=1.4?'A':pct>=1.1?'B':pct>=0.85?'C':pct>=0.6?'D':'F';
+  const gradeLetter=(myTotal,pos)=>{
+    const la=leagueTotalByPos[pos]||5000;
+    const pct=myTotal/la;
+    return pct>=1.3?'A':pct>=1.05?'B':pct>=0.85?'C':pct>=0.65?'D':'F';
   };
 
   let html='';
@@ -1194,15 +1191,14 @@ function renderTeamOverview(){
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">`;
   positions.forEach(pos=>{
     const g=posGroups[pos];if(!g||!g.count)return;
-    const avgVal=Math.round(g.total/g.count);
     const topP=g.top[0];
     const topCol=topP?tradeValueTier(topP.val).col:'var(--text2)';
     html+=`<div style="background:var(--bg3);border-radius:var(--r);padding:8px 10px;min-height:62px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
         <span style="font-size:13px;font-weight:700">${pos}</span>
-        <span style="font-size:15px;font-weight:800;color:${gradeColor(avgVal,pos)}">${gradeLetter(avgVal,pos)}</span>
+        <span style="font-size:15px;font-weight:800;color:${gradeColor(g.total,pos)}">${gradeLetter(g.total,pos)}</span>
       </div>
-      <div style="font-size:12px;color:var(--text2)">${g.count}p · ${avgVal.toLocaleString()}</div>
+      <div style="font-size:12px;color:var(--text2)">${g.count}p · ${g.total.toLocaleString()} DHQ</div>
       ${topP?`<div style="font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} <span style="color:${topCol};font-family:'JetBrains Mono',monospace;font-size:11px">${topP.val.toLocaleString()}</span></div>`:''}
     </div>`;
   });
@@ -1748,11 +1744,21 @@ function openPlayerModal(playerId){
           ${tklLoss?`<div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${tklLoss}</strong> TFL</div>`:''}
         </div>`;
     }else{
-      // Offensive: show peak years projection (original behavior)
+      // Offensive: Trade Profile
+      const tpMeta=LI_LOADED?LI.playerMeta?.[playerId]:null;
+      const trend=tpMeta?.trend||0;
+      const peakYrsLeft=tpMeta?.peakYrsLeft||0;
+      const rec=peakYrsLeft<=0?'SELL':peakYrsLeft<=2?(trend>=10?'HOLD':'SELL'):(val>=7000?'HOLD':'BUY');
+      const recCol=rec==='BUY'?'var(--green)':rec==='HOLD'?'var(--accent)':'var(--red)';
+      const trendLabel=trend>=15?'▲ '+trend+'%':trend<=-15?'▼ '+Math.abs(trend)+'%':'→ Stable';
+      const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
+
       rightPanel.innerHTML=`
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Peak years projection</div>
-        <div id="pm-peak-years" style="font-size:16px;font-weight:700;color:var(--green)">${pk.label}</div>
-        <div id="pm-peak-desc" style="font-size:12px;color:var(--text2);margin-top:2px;line-height:1.4">${pk.desc}</div>`;
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile</div>
+        <div style="font-size:20px;font-weight:800;color:${recCol}">${rec}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">
+          <span style="color:${trendCol}">${trendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
+        </div>`;
     }
   }
 
@@ -1813,6 +1819,17 @@ async function loadPlayerCardStats(playerId){
   const prevRaw=pStats.prevRawStats||null;
   const curYear=parseInt(S.season)||2025;
   const prevYear=curYear-1;
+
+  // Update label to show actual years instead of "Career stats"
+  const lbl=$('pm-card-stats-label');
+  if(lbl){
+    const hasCur=curRaw&&Object.keys(curRaw).length;
+    const hasPrev=prevRaw&&Object.keys(prevRaw).length;
+    if(hasCur&&hasPrev) lbl.textContent=`'${String(prevYear).slice(-2)}–'${String(curYear).slice(-2)} Stats`;
+    else if(hasCur) lbl.textContent=`'${String(curYear).slice(-2)} Season Stats`;
+    else if(hasPrev) lbl.textContent=`'${String(prevYear).slice(-2)} Season Stats`;
+    else lbl.textContent='Season Stats';
+  }
 
   if(!curRaw&&!prevRaw){
     wrap.style.display='block';

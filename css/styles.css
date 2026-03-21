@@ -283,7 +283,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .rt-peak.veteran{color:var(--amber)}
 .rt-peak.declining{color:var(--red)}
 .rt-section-row td{background:var(--bg3);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:5px 8px}
-.rfbtn{font-size:12px;padding:3px 10px;border:1px solid var(--border2);border-radius:20px;background:var(--bg2);color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s}
+.rfbtn{font-size:12px;padding:7px 14px;border:1px solid var(--border2);border-radius:20px;background:var(--bg2);color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s}
 .rfbtn.active,.rfbtn:hover{background:var(--accentL);color:var(--accent);border-color:rgba(108,99,245,.3)}
 
 /* ── Trade builder asset list ─────────────────────────────────── */

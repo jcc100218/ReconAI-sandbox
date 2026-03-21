@@ -95,7 +95,9 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
   // ── CLIENT-SIDE PATH: direct API calls with user's key ─────
   if(!S.apiKey) throw new Error('No AI available. Connect your account or add an API key in Settings.');
 
-  const provider = S.aiProvider || 'anthropic';
+  const rawProvider = S.aiProvider || 'gemini';
+  // Fallback: if saved provider was removed (groq/openai/grok), default to gemini
+  const provider = PROVIDERS[rawProvider] ? rawProvider : 'gemini';
   const apiKey = S.apiKey;
   const model = S.aiModel || PROVIDERS[provider]?.defaultModel || 'claude-sonnet-4-20250514';
   // Web search only works with Anthropic — silently disable for other providers
