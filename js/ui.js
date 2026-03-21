@@ -1236,27 +1236,51 @@ function renderTeamOverview(){
   const myContenderRank=contenderRanks.findIndex(r=>r.rid===S.myRosterId)+1;
   const topContender=contenderRanks[0]?.ppg||1;
 
-  // ── Health Score (War Room formula: 60% scoring + 40% weighted coverage) ──
+  // ── Health Score (War Room formula — exact 1:1 port) ──────────
+  const WEEKLY_TARGET_H=243;
   const POS_WEIGHTS_H={QB:14,RB:14,WR:14,TE:8,K:3,DL:13,LB:10,DB:12};
   const TOTAL_WEIGHT_H=Object.values(POS_WEIGHTS_H).reduce((a,b)=>a+b,0);
   const MIN_STARTER_QUALITY_H={QB:2,RB:3,WR:3,TE:2,K:1,DL:4,LB:5,DB:4};
+  const NFL_STARTER_POOL_H={QB:32,RB:40,WR:64,TE:32,K:32,DL:64,LB:64,DB:64};
 
-  // Weekly target: league average × 1.1 or 243 default
-  const allPPGs=contenderRanks.map(r=>r.ppg).filter(p=>p>0);
-  const weeklyTarget=allPPGs.length?Math.round(allPPGs.reduce((a,b)=>a+b,0)/allPPGs.length*1.1):243;
+  // Build NFL starter sets — rank ALL players by season pts, take top N per position
+  // This matches War Room's calcNflStarterSet exactly
+  const nflStarterSet={};
+  const depthPositions=['QB','RB','WR','TE','K','DL','LB','DB'];
+  depthPositions.forEach(pos=>{
+    const poolSize=NFL_STARTER_POOL_H[pos]||32;
+    const allAtPos=[];
+    Object.keys(S.players).forEach(pid=>{
+      const p=S.players[pid];if(!p)return;
+      if(pM(p.position)!==pos)return;
+      if(!p.team)return; // skip released/cut
+      const pts=S.playerStats?.[pid]?.seasonTotal||S.playerStats?.[pid]?.prevTotal||0;
+      if(pts>0)allAtPos.push({pid,pts});
+    });
+    allAtPos.sort((a,b)=>b.pts-a.pts);
+    nflStarterSet[pos]=new Set(allAtPos.slice(0,poolSize).map(p=>p.pid));
+  });
 
-  // Scoring component (60%)
+  // Position assessment — count how many of MY players are NFL-starter quality
+  const posAssessment={};
+  depthPositions.forEach(pos=>{
+    const myAtPos=(my.players||[]).filter(pid=>pM(pPos(pid))===pos);
+    const minQuality=MIN_STARTER_QUALITY_H[pos]||1;
+    const starterSet=nflStarterSet[pos]||new Set();
+    const nflStarters=myAtPos.filter(pid=>starterSet.has(pid)).length;
+    posAssessment[pos]={nflStarters,minQuality,actual:myAtPos.length};
+  });
+
+  // Scoring component (60%) — uses hardcoded 243 target like War Room
+  const weeklyTarget=WEEKLY_TARGET_H;
   const scoringScore=Math.min(60,(myContenderPPG/weeklyTarget)*60);
 
-  // Coverage component (40%) — weighted by position importance
+  // Coverage component (40%) — weighted by position importance, using NFL starter ratio
   let coverageScore=0;
-  const depthPositions=['QB','RB','WR','TE','K','DL','LB','DB'];
   const rosterSlots=league?.roster_positions||[];
   depthPositions.forEach(pos=>{
-    const minQuality=MIN_STARTER_QUALITY_H[pos]||1;
-    // Count players at this position with meaningful value (proxy for NFL starter quality)
-    const myAtPos=(my.players||[]).filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>500);
-    const ratio=Math.min(1,myAtPos.length/minQuality);
+    const pa=posAssessment[pos];if(!pa)return;
+    const ratio=Math.min(1,pa.nflStarters/(pa.minQuality||1));
     coverageScore+=ratio*((POS_WEIGHTS_H[pos]||0)/TOTAL_WEIGHT_H)*40;
   });
 
@@ -1264,7 +1288,7 @@ function renderTeamOverview(){
   const projBonus=myContenderPPG>weeklyTarget+10?3:myContenderPPG>=weeklyTarget?1:0;
   const healthScore=Math.min(100,Math.round(scoringScore+coverageScore+projBonus));
 
-  // Tier classification (War Room tiers: ELITE/CONTENDER/CROSSROADS/REBUILDING)
+  // Tier classification (War Room tiers)
   let hTier,hCol;
   if(myContenderPPG>0){
     if(myContenderPPG>weeklyTarget+10){hTier='Elite';hCol='var(--green)';}
@@ -1272,7 +1296,6 @@ function renderTeamOverview(){
     else if(myContenderPPG>=weeklyTarget*0.85){hTier='Crossroads';hCol='var(--amber)';}
     else{hTier='Rebuilding';hCol='var(--red)';}
   }else{
-    // No scoring data — use coverage as proxy
     if(coverageScore>=36){hTier='Contender';hCol='var(--accent)';}
     else if(coverageScore>=26){hTier='Crossroads';hCol='var(--amber)';}
     else{hTier='Rebuilding';hCol='var(--red)';}
@@ -1283,9 +1306,8 @@ function renderTeamOverview(){
   if(myContenderPPG>0&&myContenderPPG<weeklyTarget*0.85)panic+=2;
   else if(myContenderPPG>0&&myContenderPPG<weeklyTarget)panic+=1;
   const criticals=depthPositions.filter(pos=>{
-    const minQ=MIN_STARTER_QUALITY_H[pos]||1;
-    const have=(my.players||[]).filter(pid=>pM(pPos(pid))===pos&&dynastyValue(pid)>500).length;
-    return have<minQ;
+    const pa=posAssessment[pos];if(!pa)return false;
+    return pa.nflStarters<pa.minQuality;
   }).length;
   if(criticals>=3)panic+=2;else if(criticals>=1)panic+=1;
   const played=(my.settings?.wins||0)+(my.settings?.losses||0)+(my.settings?.ties||0);
