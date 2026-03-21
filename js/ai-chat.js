@@ -37,7 +37,7 @@ async function autoSaveMemory(history,label){
   if(!hasAnyAI()||!history||history.length<2)return;
   try{
     const recent=history.slice(-4).map(m=>m.role.toUpperCase()+': '+String(m.content).slice(0,150)).join('\n');
-    const reply=await callClaude([{role:'user',content:'Summarize this dynasty fantasy football conversation in ONE sentence, max 15 words. Be specific about players/decisions.\n\n'+recent}],false,1,80);
+    const reply=await dhqAI('memory-summary', recent);
     if(reply&&reply.length>5)addConvMemory((label?label+': ':'')+reply.trim().replace(/^["']/,'').replace(/["']$/,''));
   }catch(e){}
 }
@@ -243,7 +243,7 @@ window.App.hasAnyAI = hasAnyAI;
 // Priority: 1) Server-side via OD.callAI (no user key needed)
 //           2) Client-side via user's API key (existing behavior)
 async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600){
-  const sys = 'Dynasty FF advisor. Values from DHQ (0-10000 scale, league-derived). Be specific with player names and DHQ values. Sleeper-ready messages when asked.';
+  const sys = (typeof DHQ_IDENTITY !== 'undefined') ? DHQ_IDENTITY : 'Dynasty FF advisor. Values from DHQ (0-10000 scale, league-derived). Be specific with player names and DHQ values. Sleeper-ready messages when asked.';
 
   // ── SERVER-SIDE PATH: use OD.callAI Edge Function ──────────
   // Available when user has a Supabase session (no API key required)
@@ -349,7 +349,7 @@ async function callGrokNews(query, maxTok=300){
   const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
   if(!xaiKey)return null;
   try{
-    const sys=`You are a dynasty fantasy football news reporter. IMPORTANT: ONLY report news about the SPECIFIC player asked about. Do NOT mention any other players. Give 2-3 sentences of the latest news from X/Twitter about this one player. Focus on: trades, injuries, depth chart changes, contract news. If you have no recent news about this specific player, say "No recent news found."`;
+    const sys=DHQ_PROMPTS['player-news'].system;
     const res=await fetch('https://api.x.ai/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+xaiKey},
@@ -411,11 +411,11 @@ async function sendHomeChat(){
       // Keep history short to stay under token limits
       if(homeChatHistory.length>4)homeChatHistory=homeChatHistory.slice(-4);
       // Build compact context — attach to latest message only
-      const ctxStr=buildCtxCompact();
+      const ctxStr=dhqCompactContext();
       const msgs=homeChatHistory.map((m,i)=>{
         // Attach context to the LAST user message only
         if(m.role==='user'&&i===homeChatHistory.length-1){
-          return{role:'user',content:'[Team context]\n'+ctxStr+'\n\n'+m.content};
+          return{role:'user',content:ctxStr+'\n\n'+m.content};
         }
         // Trim old assistant messages to save tokens
         if(m.role==='assistant'&&m.content.length>400){
@@ -452,39 +452,11 @@ async function sendTradeChat(){
   try{
     tradeChatHistory.push({role:'user',content:text});
     if(tradeChatHistory.length>4)tradeChatHistory=tradeChatHistory.slice(-4);
-    const ctx=buildCtxCompact();
+    const ctx=dhqCompactContext();
     // Build rich owner context — who they are, what they need, how they trade
     let ownerCtx='';
-    if(LI_LOADED){
-      const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
-      const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-      const rp=league?.roster_positions||[];
-      // Calculate league average DHQ to set contending threshold dynamically
-      const allTotals=S.rosters.map(r=>(r.players||[]).reduce((sum,pid)=>sum+dynastyValue(pid),0));
-      const avgTotal=allTotals.length?allTotals.reduce((a,b)=>a+b,0)/allTotals.length:80000;
-      const profiles=S.rosters.filter(r=>r.roster_id!==S.myRosterId).map(r=>{
-        const name=S.leagueUsers.find(u=>u.user_id===r.owner_id)?.display_name||'Team';
-        const s=r.settings||{};
-        const record=(s.wins||0)+'-'+(s.losses||0);
-        const totalVal=(r.players||[]).reduce((sum,pid)=>sum+dynastyValue(pid),0);
-        // Find their weakest positions
-        const posCounts={};
-        (r.players||[]).forEach(pid=>{const pos=pM(pPos(pid));if(pos)posCounts[pos]=(posCounts[pos]||0)+1;});
-        const weakPositions=['QB','RB','WR','TE'].filter(pos=>{
-          const need=rp.filter(s2=>s2===pos||(s2==='FLEX'&&['RB','WR','TE'].includes(pos))||(s2==='SUPER_FLEX'&&pos==='QB')).length;
-          return(posCounts[pos]||0)<=need;
-        });
-        // Top 2 players on this roster (so AI knows what they have to offer)
-        const topPlayers=(r.players||[]).map(pid=>({pid,val:dynastyValue(pid)})).sort((a,b)=>b.val-a.val).slice(0,2)
-          .map(x=>pNameShort(x.pid)+'('+pPos(x.pid)+',DHQ'+x.val+')').join(', ');
-        // Trade DNA — only include if data exists
-        const dna=LI.ownerProfiles?.[r.roster_id];
-        const dnaStr=dna?.trades>0?' · '+dna.dna:'';
-        const contending=totalVal>avgTotal*1.1?'contender':totalVal<avgTotal*0.85?'rebuilder':'mid-tier';
-        return`${name}: ${record}, ${contending}, DHQ${Math.round(totalVal/1000)}k, needs ${weakPositions.join('/')||'nothing'}, stars: ${topPlayers}${dnaStr}`;
-      }).slice(0,12);
-      if(profiles.length)ownerCtx='\nLEAGUE OWNERS (use these specific names and needs in your answer):\n'+profiles.join('\n');
-    }
+    const ownerProfileStr=dhqBuildOwnerProfiles();
+    if(ownerProfileStr)ownerCtx='\nLEAGUE OWNERS (use these specific names and needs in your answer):\n'+ownerProfileStr;
     let tradeStats='';
     if(LI_LOADED&&LI.leagueTradeTendencies?.totalTrades>0){
       const lt=LI.leagueTradeTendencies;
@@ -544,7 +516,7 @@ async function sendWaiverChat(){
       const age=d.p.age>0?',age'+d.p.age:',rookie';
       return pName(d.id)+'('+d.p.position+age+',v'+d.val+statPart+')';
     }).join(';');
-    const ctx='MY TEAM:\n'+buildCtx()+'\n'+buildMentalityCtx()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
+    const ctx='MY TEAM:\n'+dhqContext(false)+'\n'+dhqBuildMentalityContext()+'\nFAAB:$'+faab.remaining+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
     const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)||4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)||5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)||3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
     lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
@@ -569,7 +541,7 @@ async function sendDraftChat(){
     if(draftChatHistory.length>4)draftChatHistory=draftChatHistory.slice(-4);
     // Build rich draft context
     const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&String(p.season)===year).map(p=>'R'+p.round).join(',');
-    const mentalityCtx=buildMentalityCtx();
+    const mentalityCtx=dhqBuildMentalityContext();
     const agingStarters=(myR()?.players||[]).filter(pid=>{
       const pos=pM(pPos(pid));const age=pAge(pid)||26;
       const peakEnd=(LI.peakWindows||{})[pos]?.[1]||29;
@@ -579,7 +551,7 @@ async function sendDraftChat(){
     const draftCtx=`${year} ROOKIE DRAFT ADVISOR.
 RULES: Never recommend K or IDP in R1-R2. Offense-first in early rounds. IDP is mid-late round value only.
 ${mentalityCtx}
-Team: ${buildCtxCompact()}
+Team: ${dhqCompactContext()}
 My ${year} picks: ${myPicks||'none'}
 Aging starters past peak: ${agingStarters||'none'}
 Scoring: SF=${(sc.pass_td||4)>4?'premium':'standard'}, PPR=${sc.rec||0}, sack=${sc.idp_sack||4}, INT=${sc.idp_int||5}
@@ -698,7 +670,7 @@ CRITICAL RULES:
 2. Rookies (0 years experience) can ONLY be added through the rookie draft, NOT waivers.
 3. Only recommend VETERAN free agents who have played at least 1 NFL season.
 4. Respond with ONLY a JSON object — no markdown, no backticks, no explanation.
-${buildMentalityCtx()}
+${dhqBuildMentalityContext()}
 ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
 ${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
 AVAILABLE FREE AGENTS (ONLY pick from this list):${topAvailStr||'still loading'}
@@ -755,7 +727,7 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
             </div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               ${r.copyText?`<button class="copy-btn" onclick="copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}
-              <button class="deep-btn" onclick="goAsk('Deep dive: should I add ${(r.name||'').replace(/'/g,'')} to my roster? ${buildMentalityCtx()}')">Ask more ↗</button>
+              <button class="deep-btn" onclick="goAsk('Deep dive: should I add ${(r.name||'').replace(/'/g,'')} to my roster? ${dhqBuildMentalityContext()}')">Ask more ↗</button>
             </div>
           </div>
         </div>`).join('')

@@ -859,8 +859,8 @@ async function runPicksAI(){
 
 MY PICKS: ${myPickStr||'No traded picks — only own my own picks'}
 ALL LEAGUE TRADED PICKS: ${allLeaguePicks}
-${buildMentalityCtx()}
-${buildCtx()}
+${dhqBuildMentalityContext()}
+${dhqContext(false)}
 
 Analyze my pick portfolio and give me:
 1. SELL NOW — any picks I should trade away immediately while value is high
@@ -1415,7 +1415,7 @@ IDP approach: ${strategy.idpApproach}
 Draft approach: ${strategy.draftApproach}
 Veteran approach: ${strategy.veteranApproach}
 
-${buildCtx()}
+${dhqContext(false)}
 
 Give a brief (3-4 sentences) personalized assessment of their roster given their strategy. Be specific about players. End with one actionable recommendation.`}]);
       msgs.lastElementChild.outerHTML=`<div class="hc-msg-a" style="font-size:13px;line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;
@@ -2125,10 +2125,10 @@ async function runDraftScouting(){
     }
 
     const prompt=`${year} rookie draft scouting for ${teams}-team dynasty league.
-${buildCtx()}
+${dhqContext(false)}
 MY NEEDS: ${needsStr}
 MY PICKS: ${pickStr}
-${buildMentalityCtx()}
+${dhqBuildMentalityContext()}
 ${historyCtx}
 IDP:sack=${sc7.idp_sack||4},INT=${sc7.idp_int||5},PD=${sc7.idp_pass_def||3}
 
