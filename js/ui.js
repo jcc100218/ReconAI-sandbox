@@ -293,21 +293,21 @@ function buildRosterTable(){
 
 // ── Draft pick values ──────────────────────────────────────────
 const BASE_PICK_VALUES={
-  '1.01':9000,'1.02':8200,'1.03':7500,'1.04':6800,'1.05':6200,
-  '1.06':5600,'1.07':5100,'1.08':4700,'1.09':4300,'1.10':4000,
-  '1.11':3700,'1.12':3400,
-  '2.01':3100,'2.02':2900,'2.03':2700,'2.04':2500,'2.05':2300,
-  '2.06':2100,'2.07':1950,'2.08':1800,'2.09':1650,'2.10':1500,
-  '2.11':1400,'2.12':1300,
-  '3.01':1200,'3.02':1100,'3.03':1000,'3.04':900,'3.05':820,
-  '3.06':750,'3.07':680,'3.08':620,'3.09':560,'3.10':510,
-  '3.11':460,'3.12':420,
-  '4.01':380,'4.02':350,'4.03':320,'4.04':295,'4.05':270,
-  '4.06':250,'4.07':230,'4.08':210,'4.09':195,'4.10':180,
-  '4.11':165,'4.12':150,
-  '5.01':140,'5.02':130,'5.03':120,'5.04':110,'5.05':100,
-  '5.06':90,'5.07':80,'5.08':70,'5.09':65,'5.10':60,
-  '5.11':55,'5.12':50,
+  '1.01':10050,'1.02':9150,'1.03':8350,'1.04':7600,'1.05':6900,
+  '1.06':6250,'1.07':5700,'1.08':5250,'1.09':4800,'1.10':4450,
+  '1.11':4150,'1.12':3800,
+  '2.01':4650,'2.02':4350,'2.03':4050,'2.04':3750,'2.05':3450,
+  '2.06':3150,'2.07':2950,'2.08':2700,'2.09':2500,'2.10':2250,
+  '2.11':2100,'2.12':1950,
+  '3.01':2650,'3.02':2400,'3.03':2200,'3.04':2000,'3.05':1800,
+  '3.06':1650,'3.07':1500,'3.08':1350,'3.09':1250,'3.10':1100,
+  '3.11':1000,'3.12':925,
+  '4.01':1300,'4.02':1200,'4.03':1100,'4.04':1000,'4.05':925,
+  '4.06':850,'4.07':775,'4.08':725,'4.09':675,'4.10':600,
+  '4.11':550,'4.12':500,
+  '5.01':700,'5.02':650,'5.03':600,'5.04':550,'5.05':500,
+  '5.06':450,'5.07':400,'5.08':350,'5.09':325,'5.10':300,
+  '5.11':275,'5.12':250,
 };
 
 function pickValue(season,round,totalTeams,pickInRound){
@@ -1070,85 +1070,24 @@ function renderTeamOverview(){
   const myContenderRank=contenderRanks.findIndex(r=>r.rid===S.myRosterId)+1;
   const topContender=contenderRanks[0]?.ppg||1;
 
-  // ── Health Score (War Room formula — exact 1:1 port) ──────────
-  const WEEKLY_TARGET_H=243;
-  const POS_WEIGHTS_H={QB:14,RB:14,WR:14,TE:8,K:3,DL:13,LB:10,DB:12};
-  const TOTAL_WEIGHT_H=Object.values(POS_WEIGHTS_H).reduce((a,b)=>a+b,0);
-  const MIN_STARTER_QUALITY_H={QB:2,RB:3,WR:3,TE:2,K:1,DL:4,LB:5,DB:4};
-  const NFL_STARTER_POOL_H={QB:32,RB:40,WR:64,TE:32,K:32,DL:64,LB:64,DB:64};
+  // ── Health Score — delegates to shared team-assess.js (War Room formula) ──
+  const myAssessment=assessTeamFromGlobal(S.myRosterId);
+  const healthScore=myAssessment?.healthScore||0;
+  const panic=myAssessment?.panic||0;
+  const criticals=Object.values(myAssessment?.posAssessment||{}).filter(p=>p.status==='deficit').length;
 
-  // Build NFL starter sets — rank ALL players by season pts, take top N per position
-  // This matches War Room's calcNflStarterSet exactly
-  const nflStarterSet={};
-  const depthPositions=['QB','RB','WR','TE','K','DL','LB','DB'];
-  depthPositions.forEach(pos=>{
-    const poolSize=NFL_STARTER_POOL_H[pos]||32;
-    const allAtPos=[];
-    Object.keys(S.players).forEach(pid=>{
-      const p=S.players[pid];if(!p)return;
-      if(pM(p.position)!==pos)return;
-      if(!p.team)return; // skip released/cut
-      const pts=S.playerStats?.[pid]?.seasonTotal||S.playerStats?.[pid]?.prevTotal||0;
-      if(pts>0)allAtPos.push({pid,pts});
-    });
-    allAtPos.sort((a,b)=>b.pts-a.pts);
-    nflStarterSet[pos]=new Set(allAtPos.slice(0,poolSize).map(p=>p.pid));
-  });
+  // Tier display — map shared UPPER tier keys to display labels & CSS vars
+  const tierDisplayMap={ELITE:['Elite','var(--green)'],CONTENDER:['Contender','var(--accent)'],CROSSROADS:['Crossroads','var(--amber)'],REBUILDING:['Rebuilding','var(--red)']};
+  const [hTier,hCol]=tierDisplayMap[myAssessment?.tier]||['Rebuilding','var(--red)'];
 
-  // Position assessment — count how many of MY players are NFL-starter quality
-  const posAssessment={};
-  depthPositions.forEach(pos=>{
-    const myAtPos=(my.players||[]).filter(pid=>pM(pPos(pid))===pos);
-    const minQuality=MIN_STARTER_QUALITY_H[pos]||1;
-    const starterSet=nflStarterSet[pos]||new Set();
-    const nflStarters=myAtPos.filter(pid=>starterSet.has(pid)).length;
-    posAssessment[pos]={nflStarters,minQuality,actual:myAtPos.length};
-  });
-
-  // Scoring component (60%) — uses hardcoded 243 target like War Room
-  const weeklyTarget=WEEKLY_TARGET_H;
-  const scoringScore=Math.min(60,(myContenderPPG/weeklyTarget)*60);
-
-  // Coverage component (40%) — weighted by position importance, using NFL starter ratio
-  let coverageScore=0;
-  const rosterSlots=league?.roster_positions||[];
-  depthPositions.forEach(pos=>{
-    const pa=posAssessment[pos];if(!pa)return;
-    const ratio=Math.min(1,pa.nflStarters/(pa.minQuality||1));
-    coverageScore+=ratio*((POS_WEIGHTS_H[pos]||0)/TOTAL_WEIGHT_H)*40;
-  });
-
-  // Projection bonus: elite teams score above target
-  const projBonus=myContenderPPG>weeklyTarget+10?3:myContenderPPG>=weeklyTarget?1:0;
-  const healthScore=Math.min(100,Math.round(scoringScore+coverageScore+projBonus));
-
-  // Tier classification (War Room tiers)
-  let hTier,hCol;
-  if(myContenderPPG>0){
-    if(myContenderPPG>weeklyTarget+10){hTier='Elite';hCol='var(--green)';}
-    else if(myContenderPPG>=weeklyTarget-15){hTier='Contender';hCol='var(--accent)';}
-    else if(myContenderPPG>=weeklyTarget*0.85){hTier='Crossroads';hCol='var(--amber)';}
-    else{hTier='Rebuilding';hCol='var(--red)';}
-  }else{
-    if(coverageScore>=36){hTier='Contender';hCol='var(--accent)';}
-    else if(coverageScore>=26){hTier='Crossroads';hCol='var(--amber)';}
-    else{hTier='Rebuilding';hCol='var(--red)';}
-  }
-
-  // Panic meter (0-5)
-  let panic=0;
-  if(myContenderPPG>0&&myContenderPPG<weeklyTarget*0.85)panic+=2;
-  else if(myContenderPPG>0&&myContenderPPG<weeklyTarget)panic+=1;
-  const criticals=depthPositions.filter(pos=>{
-    const pa=posAssessment[pos];if(!pa)return false;
-    return pa.nflStarters<pa.minQuality;
-  }).length;
-  if(criticals>=3)panic+=2;else if(criticals>=1)panic+=1;
-  const played=(my.settings?.wins||0)+(my.settings?.losses||0)+(my.settings?.ties||0);
-  if(played>0&&(my.settings?.losses||0)/played>0.6)panic+=1;
-  panic=Math.min(5,panic);
-
-  const scoringPct=Math.min(100,Math.round((myContenderPPG/weeklyTarget)*100));
+  // Scoring / coverage breakdowns for the detail line
+  // Derive weekly target the same way shared module does: median of all teams' PPG * 1.05
+  const allPPGs=contenderRanks.map(r=>r.ppg).filter(v=>v>0).sort((a,b)=>a-b);
+  const _weeklyTarget=allPPGs.length?allPPGs[Math.floor(allPPGs.length/2)]*1.05:150;
+  const scoringPct=myContenderPPG>0?Math.min(100,Math.round((myContenderPPG/_weeklyTarget)*100)):0;
+  const _scoringComponent=Math.min(60,(myContenderPPG/_weeklyTarget)*60);
+  const _projBonus=myContenderPPG>_weeklyTarget+10?3:myContenderPPG>=_weeklyTarget?1:0;
+  const coverageScore=Math.max(0,healthScore-_scoringComponent-_projBonus);
   const depthPct=Math.round(coverageScore/40*100);
 
   const cCol=myContenderRank<=3?'var(--green)':myContenderRank<=8?'var(--accent)':'var(--amber)';

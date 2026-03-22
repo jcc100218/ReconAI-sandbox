@@ -24,7 +24,7 @@ const DNA_TYPES = {
   DESPERATE: { label: 'Desperate',     color: '#F0A500',      mult: 1.3,  desc: 'Overpays for immediate help' },
 };
 
-const TRADE_PICK_VALUES = { 1: 7000, 2: 3500, 3: 1800, 4: 800, 5: 400, 6: 200, 7: 100 };
+const TRADE_PICK_VALUES = { 1: 6250, 2: 3150, 3: 1650, 4: 850, 5: 450, 6: 225, 7: 125 };
 
 const DEPTH_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
 
