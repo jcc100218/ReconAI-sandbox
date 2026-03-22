@@ -173,11 +173,21 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
   }
   document.getElementById('fwpm-tags').innerHTML = tags.join('');
 
-  // Stats bar
+  // Stats bar — handle both ReconAI format ({prevAvg, prevRawStats}) and raw Sleeper format ({gp, pass_yd, ...})
   const sc = scoringSettings || (window.S && window.S.leagues?.find(l=>l.league_id===window.S?.currentLeagueId)?.scoring_settings) || {};
   const rawStats = stats.prevRawStats || stats.curRawStats || stats;
-  const ppg = stats.prevAvg || stats.seasonAvg || 0;
-  const total = stats.prevTotal || stats.seasonTotal || 0;
+  const gamesPlayed = stats.gp || rawStats?.gp || 0;
+  let ppg = stats.prevAvg || stats.seasonAvg || 0;
+  let total = stats.prevTotal || stats.seasonTotal || 0;
+  // Compute from raw if ReconAI-formatted stats not available
+  if (!ppg && gamesPlayed > 0 && typeof calcRawPts === 'function') {
+    const pts = calcRawPts(rawStats, sc);
+    if (pts) { total = Math.round(pts * 10) / 10; ppg = +(pts / gamesPlayed).toFixed(1); }
+  }
+  if (!ppg && gamesPlayed > 0 && typeof window.App?.Sleeper?.calcFantasyPts === 'function') {
+    const pts = window.App.Sleeper.calcFantasyPts(rawStats, sc);
+    if (pts) { total = Math.round(pts * 10) / 10; ppg = +(pts / gamesPlayed).toFixed(1); }
+  }
 
   let statBoxes;
   if (isIDP && rawStats) {
