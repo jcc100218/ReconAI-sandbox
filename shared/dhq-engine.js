@@ -18,8 +18,8 @@ function loadLICache(){
     if(!raw)return false;
     const d=JSON.parse(raw);
     if(Date.now()-d.ts>LI_TTL)return false;
-    const S=window.App.S;
-    if(d.leagueId!==S.currentLeagueId)return false;
+    const S=window.App.S||window.S;
+    if(!S||d.leagueId!==S.currentLeagueId)return false;
     LI=d.data;LI_LOADED=true;
     console.log('LeagueIntel loaded from cache');
     return true;
@@ -28,7 +28,7 @@ function loadLICache(){
 
 function saveLICache(){
   try{
-    const S=window.App.S;
+    const S=window.App.S||window.S;
     // Strip non-serializable functions before caching
     const cacheable={...LI};
     delete cacheable.dhqPickValueFn;
@@ -63,8 +63,9 @@ async function loadLeagueIntel(){
   if(LI_LOADED)return; // already loaded
   if(window._liLoading)return; // already in progress
   window._liLoading=true;
-  const S=window.App.S;
-  const posMap=window.App.posMap;
+  const S=window.App.S||window.S;
+  if(!S){console.warn('[DHQ] No state object found (window.App.S or window.S)');window._liLoading=false;return;}
+  const posMap=window.App.posMap||window.posMap;
   const pName=window.App.pName||window.pName||(id=>{const p=S.players?.[id];return p?(p.full_name||((p.first_name||'')+' '+(p.last_name||'')).trim()||id):id;});
   const pPos=window.App.pPos||window.pPos||(id=>S.players?.[id]?.position||'');
   const pAge=window.App.pAge||window.pAge||(id=>S.players?.[id]?.age||'');
@@ -1071,8 +1072,8 @@ function faabBidStr(pos,budget){
 }
 
 function dynastyValue(playerId){
-  const S=window.App.S;
-  const p=S.players[playerId];if(!p)return 0;
+  const S=window.App.S||window.S||{};
+  const p=S.players?.[playerId];if(!p)return 0;
   if(p.status==='Inactive'||p.status==='Retired')return 0;
   // DHQ value (league-derived) is the sole value source
   if(LI_LOADED&&LI.playerScores?.[playerId]>0)return LI.playerScores[playerId];
@@ -1082,7 +1083,7 @@ function dynastyValue(playerId){
 }
 
 function getPlayerRank(playerId){
-  const S=window.App.S;
+  const S=window.App.S||window.S||{};
   if(LI_LOADED&&LI.playerScores?.[playerId]>0){
     // Rank among ALL rostered players in the league (not all 2240 DHQ players)
     const rosteredPids=new Set();
