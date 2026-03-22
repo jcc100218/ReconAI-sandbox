@@ -65,11 +65,11 @@ async function loadLeagueIntel(){
   window._liLoading=true;
   const S=window.App.S;
   const posMap=window.App.posMap;
-  const pName=window.App.pName||window.pName;
-  const pPos=window.App.pPos||window.pPos;
-  const pAge=window.App.pAge||window.pAge;
-  const sf=window.App.sf||window.sf;
-  const SLEEPER=window.App.SLEEPER||window.SLEEPER;
+  const pName=window.App.pName||window.pName||(id=>{const p=S.players?.[id];return p?(p.full_name||((p.first_name||'')+' '+(p.last_name||'')).trim()||id):id;});
+  const pPos=window.App.pPos||window.pPos||(id=>S.players?.[id]?.position||'');
+  const pAge=window.App.pAge||window.pAge||(id=>S.players?.[id]?.age||'');
+  const sf=window.App.sf||window.sf||window.Sleeper?.sleeperFetch||(path=>fetch('https://api.sleeper.app/v1'+path).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}));
+  const SLEEPER=window.App.SLEEPER||window.SLEEPER||'https://api.sleeper.app/v1';
   try{
   if(loadLICache()){window._liLoading=false;return;}
   if(!S.currentLeagueId){window._liLoading=false;return;}

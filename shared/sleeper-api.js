@@ -203,3 +203,7 @@ var SleeperAPI = {
 
 window.App.Sleeper = SleeperAPI;
 window.Sleeper     = SleeperAPI;
+// Alias sf for DHQ engine compatibility
+window.App.sf = sleeperFetch;
+window.sf = sleeperFetch;
+window.App.SLEEPER = SLEEPER_BASE;
