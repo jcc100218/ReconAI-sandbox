@@ -241,10 +241,8 @@ async function loadAllData(){
     try{if(typeof renderDraftNeeds==='function')renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
     try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
     try{if(typeof renderTeamOverview==='function')renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
-    try{if(typeof renderPowerRankings==='function')renderPowerRankings();}catch(e){console.warn('renderPowerRankings:',e);}
     try{if(typeof renderHealthTimeline==='function')renderHealthTimeline();}catch(e){console.warn('renderHealthTimeline:',e);}
     try{if(typeof renderLeaguePulse==='function')renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
-    try{if(typeof renderNewsFeed==='function')renderNewsFeed();}catch(e){console.warn('renderNewsFeed:',e);}
     try{if(typeof renderTradeIntel==='function')renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
     try{checkForAlerts();}catch(e){console.warn('checkForAlerts:',e);}
     if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();

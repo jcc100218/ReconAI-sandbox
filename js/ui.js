@@ -83,59 +83,6 @@ function renderLeaguePulse(){
   </div>`;
 }
 
-// ── NFL News Feed ──────────────────────────────────────────────
-const DHQ_NEWS_KEY='dhq_news_cache';
-const DHQ_NEWS_TTL=10*60*1000;
-
-async function renderNewsFeed(){
-  const el=$('league-pulse');if(!el)return;
-  // Check cache
-  let items=null;
-  try{
-    const cached=JSON.parse(localStorage.getItem(DHQ_NEWS_KEY)||'null');
-    if(cached&&Date.now()-cached.ts<DHQ_NEWS_TTL)items=cached.items;
-  }catch(e){}
-  // Fetch if no cache
-  if(!items){
-    try{
-      const url='https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent('https://www.espn.com/espn/rss/nfl/news');
-      const resp=await fetch(url);
-      if(resp.ok){
-        const data=await resp.json();
-        if(data.status==='ok'&&data.items?.length){
-          items=data.items.slice(0,8).map(i=>({title:i.title,link:i.link,pubDate:i.pubDate}));
-          try{localStorage.setItem(DHQ_NEWS_KEY,JSON.stringify({ts:Date.now(),items}));}catch(e){}
-        }
-      }
-    }catch(e){console.warn('News feed fetch failed:',e);}
-  }
-  if(!items||!items.length)return;
-  // Render — append after existing league-pulse content
-  const timeAgo=d=>{
-    const diff=Date.now()-new Date(d).getTime();
-    const mins=Math.floor(diff/60000);
-    if(mins<60)return mins+'m ago';
-    const hrs=Math.floor(mins/60);
-    if(hrs<24)return hrs+'h ago';
-    return Math.floor(hrs/24)+'d ago';
-  };
-  const newsHtml=items.map(i=>`<div style="display:flex;align-items:baseline;gap:8px;padding:4px 0;font-size:12px;line-height:1.5">
-    <span style="flex-shrink:0;font-size:10px;font-weight:700;color:var(--accent);background:var(--accentL);padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em">NFL</span>
-    <a href="${i.link}" target="_blank" rel="noopener" style="flex:1;color:var(--text1);text-decoration:none;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text1)'">${i.title}</a>
-    <span style="flex-shrink:0;font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${timeAgo(i.pubDate)}</span>
-  </div>`).join('');
-
-  const card=document.createElement('div');
-  card.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">NFL News</span>
-      <span style="font-size:11px;color:var(--text3)">via ESPN</span>
-    </div>
-    ${newsHtml}
-  </div>`;
-  el.appendChild(card.firstElementChild);
-}
-
 // ── Roster ─────────────────────────────────────────────────────
 function getDcLabel(pid){
   const p=S.players[pid];const team=pTeam(pid);
@@ -1216,144 +1163,6 @@ function renderTeamOverview(){
   recordHealthSnapshot(healthScore,hTier);
 }
 
-// ── Power Rankings ─────────────────────────────────────────────
-function renderPowerRankings(){
-  const el=$('power-rankings');if(!el)return;
-  if(!S.rosters?.length){el.innerHTML='';return;}
-
-  // Assess all teams
-  const teams=assessAllTeamsFromGlobal();
-  if(!teams.length){el.innerHTML='';return;}
-
-  // Sort by healthScore desc, tiebreak by weeklyPts desc
-  teams.sort((a,b)=>b.healthScore-a.healthScore||(b.weeklyPts-a.weeklyPts));
-
-  // Rank medal colors
-  const rankStyle=i=>i===0?'color:#D4AF37;font-weight:800':i===1?'color:#C0C0C0;font-weight:800':i===2?'color:#CD7F32;font-weight:800':'color:var(--text3);font-weight:700';
-
-  // Tier badge
-  const tierBadge=(tier,color,bg)=>`<span style="font-size:10px;font-weight:700;color:${color};background:${bg};padding:2px 7px;border-radius:10px;white-space:nowrap;letter-spacing:.03em">${tier}</span>`;
-
-  // Health bar color by tier
-  const barColor=tier=>tier==='ELITE'?'#D4AF37':tier==='CONTENDER'?'#2ECC71':tier==='CROSSROADS'?'#F0A500':'#E74C3C';
-
-  // Check for cached AI commentary
-  const cacheKey='dhq_power_rankings_'+(S.currentLeagueId||'');
-  let cached=null;
-  try{
-    const raw=localStorage.getItem(cacheKey);
-    if(raw){
-      const parsed=JSON.parse(raw);
-      if(parsed.ts&&Date.now()-parsed.ts<3600000)cached=parsed.posts;
-    }
-  }catch(e){}
-
-  // Build rows
-  const rows=teams.map((t,i)=>{
-    const isMe=t.rosterId===S.myRosterId;
-    const avatarUrl=t.avatar?`https://sleepercdn.com/avatars/thumbs/${t.avatar}`:'';
-    const avatarEl=avatarUrl
-      ?`<img src="${avatarUrl}" style="width:28px;height:28px;border-radius:50%;flex-shrink:0" alt="">`
-      :`<div style="width:28px;height:28px;border-radius:50%;background:var(--bg3);flex-shrink:0"></div>`;
-    const commentary=cached?.[i]||'';
-    const pct=Math.max(0,Math.min(100,t.healthScore));
-
-    return`<div class="pr-row" data-rank="${i}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r);${isMe?'background:rgba(124,107,248,0.08);border:1px solid rgba(124,107,248,0.2)':'background:var(--bg3)'};transition:background .15s">
-      <span style="min-width:28px;text-align:center;font-size:14px;font-family:'JetBrains Mono',monospace;${rankStyle(i)}">#${i+1}</span>
-      ${avatarEl}
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px" title="${t.teamName}">${t.teamName}</span>
-          <span style="font-size:11px;color:var(--text3)">${t.ownerName}</span>
-          <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${t.wins}-${t.losses}</span>
-          ${tierBadge(t.tier,t.tierColor,t.tierBg)}
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
-          <div style="flex:1;max-width:120px;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden">
-            <div style="width:${pct}%;height:100%;background:${barColor(t.tier)};border-radius:3px;transition:width .3s"></div>
-          </div>
-          <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;min-width:24px">${t.healthScore}</span>
-          <span style="font-size:11px;color:var(--text3)">${t.weeklyPts>0?t.weeklyPts.toFixed(1)+' ppg':''}</span>
-        </div>
-        ${commentary?`<div class="pr-commentary" style="font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4;font-style:italic">${commentary}</div>`:''}
-      </div>
-    </div>`;
-  }).join('');
-
-  el.innerHTML=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Power Rankings</span>
-        <span class="tip-icon" onclick="toggleTip('tip-power')">?</span>
-        <span style="font-size:11px;color:var(--text3)">All teams ranked by health score</span>
-      </div>
-      <button id="pr-ai-btn" onclick="generatePowerCommentary()" style="font-size:11px;font-weight:600;color:var(--accent);background:rgba(124,107,248,0.1);border:1px solid rgba(124,107,248,0.25);border-radius:6px;padding:3px 10px;cursor:pointer;transition:all .15s">${cached?'Refresh commentary':'Generate commentary'}</button>
-    </div>
-    <div class="tip-box" id="tip-power" style="margin-bottom:10px">
-      <strong>Power Rankings</strong> rank all teams by Health Score (0-100), with tiebreaks by weekly PPG. The Health Score combines scoring potential (60%) and roster coverage depth (40%). Click "Generate commentary" for AI-written analysis of each team.
-    </div>
-    <div style="display:flex;flex-direction:column;gap:4px">${rows}</div>
-  </div>`;
-}
-
-async function generatePowerCommentary(){
-  const btn=$('pr-ai-btn');if(!btn)return;
-  btn.disabled=true;btn.textContent='Generating...';btn.style.opacity='0.6';
-
-  try{
-    // Get ranked teams
-    const teams=assessAllTeamsFromGlobal();
-    if(!teams.length)throw new Error('No teams');
-    teams.sort((a,b)=>b.healthScore-a.healthScore||(b.weeklyPts-a.weeklyPts));
-
-    // Build context for AI
-    const ctx=teams.map((t,i)=>`#${i+1} ${t.teamName} (${t.ownerName}): ${t.wins}-${t.losses}, health ${t.healthScore}, ${t.tier}, ${t.weeklyPts.toFixed(1)} ppg, needs: ${t.needs.map(n=>n.pos).join('/')||'none'}, strengths: ${t.strengths.join('/')||'none'}`).join('\n');
-
-    const response=await dhqAI('power-posts',null,'POWER RANKINGS:\n'+ctx);
-
-    // Parse JSON from response
-    let posts=[];
-    try{
-      const jsonMatch=response.match(/\{[\s\S]*\}/);
-      if(jsonMatch){
-        const parsed=JSON.parse(jsonMatch[0]);
-        posts=(parsed.posts||[]).map(p=>p.post||'');
-      }
-    }catch(e){
-      // Fallback: split by newlines if not valid JSON
-      posts=response.split('\n').filter(l=>l.trim()).slice(0,teams.length);
-    }
-
-    // Inject commentary into DOM
-    const commentaryEls=document.querySelectorAll('.pr-row');
-    commentaryEls.forEach((row,i)=>{
-      const text=posts[i]||'';
-      if(!text)return;
-      let cel=row.querySelector('.pr-commentary');
-      if(!cel){
-        const container=row.querySelector('div[style*="flex:1"]');
-        if(!container)return;
-        cel=document.createElement('div');
-        cel.className='pr-commentary';
-        cel.style.cssText='font-size:11px;color:var(--text2);margin-top:3px;line-height:1.4;font-style:italic';
-        container.appendChild(cel);
-      }
-      cel.textContent=text;
-    });
-
-    // Cache with 1-hour TTL
-    const cacheKey='dhq_power_rankings_'+(S.currentLeagueId||'');
-    try{localStorage.setItem(cacheKey,JSON.stringify({ts:Date.now(),posts}));}catch(e){}
-
-    btn.textContent='Refresh commentary';
-  }catch(e){
-    console.warn('Power commentary error:',e);
-    btn.textContent='Retry commentary';
-  }finally{
-    btn.disabled=false;btn.style.opacity='1';
-  }
-}
-
 // ── Health Timeline ────────────────────────────────────────────
 function recordHealthSnapshot(score,tier){
   if(!S.currentLeagueId||!score)return;
@@ -2397,7 +2206,6 @@ Object.assign(window.App, {
 
   // League Pulse
   renderLeaguePulse,
-  renderNewsFeed,
 
   // Roster
   getDcLabel, renderRoster, peakYears,
@@ -2431,7 +2239,6 @@ Object.assign(window.App, {
 
   // Home
   renderHomeSnapshot, renderTeamOverview, recordHealthSnapshot, renderHealthTimeline,
-  renderPowerRankings, generatePowerCommentary,
 
   // Strategy
   STRATEGY_QUESTIONS, startStrategyWalkthrough,
@@ -2486,8 +2293,6 @@ window.renderHomeSnapshot = renderHomeSnapshot;
 window.renderTeamOverview = renderTeamOverview;
 window.recordHealthSnapshot = recordHealthSnapshot;
 window.renderHealthTimeline = renderHealthTimeline;
-window.renderPowerRankings = renderPowerRankings;
-window.generatePowerCommentary = generatePowerCommentary;
 window.startStrategyWalkthrough = startStrategyWalkthrough;
 window.selectStrategyAnswer = selectStrategyAnswer;
 window.loadStrategy = loadStrategy;
@@ -2505,7 +2310,6 @@ window.runDraftScouting = runDraftScouting;
 window.mobileTab = mobileTab;
 window.checkApiKeyCallout = checkApiKeyCallout;
 window.renderLeaguePulse = renderLeaguePulse;
-window.renderNewsFeed = renderNewsFeed;
 window.getMemory = getMemory;
 window.setMemory = setMemory;
 window.loadMemory = loadMemory;
