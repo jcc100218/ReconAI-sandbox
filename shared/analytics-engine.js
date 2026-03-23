@@ -667,6 +667,7 @@ function runLeagueAnalytics() {
       projection,
       window: competitiveWindow,
       gaps,
+      ownerHistory: buildOwnerHistory(),
       computedAt: new Date().toISOString(),
     };
 
@@ -713,6 +714,169 @@ function detectRivalries(rosterId) {
     .sort((a, b) => b.total - a.total);
 }
 
+// ══════════════════════════════════════════════════════════════════
+// Section 9: Full League History by Owner
+// ══════════════════════════════════════════════════════════════════
+
+function buildOwnerHistory() {
+    const S = window.S || window.App?.S;
+    const LI = window.App?.LI || {};
+    if (!S?.rosters?.length) return {};
+
+    const championships = LI.championships || {};
+    const bracketData = LI.bracketData || {};
+    const usersHistory = LI.leagueUsersHistory || {};
+    const draftOutcomes = LI.draftOutcomes || [];
+    const tradeHistory = LI.tradeHistory || [];
+    const ownerProfiles = LI.ownerProfiles || {};
+
+    const history = {}; // rosterId -> full history object
+
+    S.rosters.forEach(roster => {
+        const rid = roster.roster_id;
+        const user = S.leagueUsers?.find(u => u.user_id === roster.owner_id);
+        const profile = ownerProfiles[rid] || {};
+        const s = roster.settings || {};
+
+        // Current season record
+        const wins = s.wins || 0;
+        const losses = s.losses || 0;
+        const ties = s.ties || 0;
+        const pf = (s.fpts || 0) + ((s.fpts_decimal || 0) / 100);
+        const pa = (s.fpts_against || 0) + ((s.fpts_against_decimal || 0) / 100);
+
+        // Championships
+        const champSeasons = [];
+        const runnerUpSeasons = [];
+        const playoffSeasons = [];
+        Object.entries(championships).forEach(([season, c]) => {
+            if (c.champion === rid) champSeasons.push(season);
+            if (c.runnerUp === rid) runnerUpSeasons.push(season);
+            if (c.champion === rid || c.runnerUp === rid || (c.semiFinals || []).includes(rid)) playoffSeasons.push(season);
+        });
+
+        // Playoff record from brackets
+        let playoffWins = 0, playoffLosses = 0;
+        Object.entries(bracketData).forEach(([season, { winners, losers }]) => {
+            (winners || []).forEach(m => {
+                if (m.w === rid) playoffWins++;
+                if (m.l === rid) playoffLosses++;
+            });
+        });
+
+        // Draft history — #1 overall picks
+        const numberOnePicks = [];
+        const allDraftPicks = draftOutcomes.filter(d => d.roster_id === rid);
+        const firstOveralls = draftOutcomes.filter(d => d.pick_no === 1 && d.roster_id === rid);
+        firstOveralls.forEach(d => numberOnePicks.push({ season: d.season, player: d.name, pos: d.pos }));
+
+        // Draft hit rate
+        const draftHits = allDraftPicks.filter(d => d.isStarter).length;
+        const draftTotal = allDraftPicks.length;
+        const draftHitRate = draftTotal > 0 ? Math.round(draftHits / draftTotal * 100) : 0;
+
+        // Best draft pick (highest bestTotal)
+        const bestPick = allDraftPicks.sort((a, b) => (b.bestTotal || 0) - (a.bestTotal || 0))[0] || null;
+
+        // Worst draft pick (drafted in R1-R2 but never became starter)
+        const bustPicks = allDraftPicks.filter(d => d.round <= 2 && !d.isStarter && d.seasonsAvailable >= 2);
+
+        // Trade history
+        const tradesWon = profile.tradesWon || 0;
+        const tradesLost = profile.tradesLost || 0;
+        const tradesFair = profile.tradesFair || 0;
+        const totalTrades = profile.trades || 0;
+        const avgValueDiff = profile.avgValueDiff || 0;
+        const biggestWin = profile.biggestWin || null;
+        const biggestLoss = profile.biggestLoss || null;
+
+        // Season-by-season record (from bracket/roster data)
+        const seasonHistory = [];
+        const allSeasons = Object.keys(usersHistory).sort();
+        allSeasons.forEach(season => {
+            const wasInLeague = (usersHistory[season] || []).some(u => u.user_id === roster.owner_id);
+            if (!wasInLeague) return;
+
+            const champ = championships[season];
+            let finish = 'Regular Season';
+            if (champ?.champion === rid) finish = 'Champion';
+            else if (champ?.runnerUp === rid) finish = 'Runner-Up';
+            else if ((champ?.semiFinals || []).includes(rid)) finish = 'Semi-Finals';
+            else {
+                // Check if in bracket at all
+                const bracket = bracketData[season]?.winners || [];
+                const inBracket = bracket.some(m => m.t1 === rid || m.t2 === rid);
+                if (inBracket) finish = 'Playoffs';
+            }
+
+            // Check for #1 pick
+            const hadFirstPick = draftOutcomes.some(d => d.season === season && d.pick_no === 1 && d.roster_id === rid);
+
+            seasonHistory.push({ season, finish, hadFirstPick });
+        });
+
+        // Tenure
+        const tenure = seasonHistory.length;
+
+        // Current DHQ value
+        const totalDHQ = (roster.players || []).reduce((sum, pid) => sum + (LI.playerScores?.[pid] || 0), 0);
+
+        // Rivalries
+        const rivalries = typeof detectRivalries === 'function' ? detectRivalries(rid) : [];
+
+        history[rid] = {
+            rosterId: rid,
+            ownerId: roster.owner_id,
+            ownerName: user?.metadata?.team_name || user?.display_name || user?.username || 'Team',
+            avatar: user?.avatar,
+
+            // Current
+            record: `${wins}-${losses}${ties ? '-' + ties : ''}`,
+            wins, losses, ties,
+            pointsFor: +pf.toFixed(1),
+            pointsAgainst: +pa.toFixed(1),
+            totalDHQ,
+
+            // Championships
+            championships: champSeasons.length,
+            champSeasons,
+            runnerUps: runnerUpSeasons.length,
+            runnerUpSeasons,
+            playoffAppearances: playoffSeasons.length,
+            playoffSeasons,
+            playoffRecord: `${playoffWins}-${playoffLosses}`,
+            playoffWins,
+            playoffLosses,
+
+            // Draft
+            numberOnePicks,
+            draftHitRate,
+            draftTotal,
+            draftHits,
+            bestPick: bestPick ? { name: bestPick.name, season: bestPick.season, round: bestPick.round, pos: bestPick.pos } : null,
+            bustPicks: bustPicks.slice(0, 3).map(d => ({ name: d.name, season: d.season, round: d.round, pos: d.pos })),
+
+            // Trades
+            totalTrades,
+            tradesWon,
+            tradesLost,
+            tradesFair,
+            avgValueDiff: Math.round(avgValueDiff),
+            biggestWin,
+            biggestLoss,
+
+            // Season history
+            seasonHistory,
+            tenure,
+
+            // Rivalries
+            rivalries: rivalries.slice(0, 3),
+        };
+    });
+
+    return history;
+}
+
 // ── Exports ──────────────────────────────────────────────────────
 
 Object.assign(window.App, {
@@ -726,5 +890,6 @@ Object.assign(window.App, {
   projectCompetitiveWindow,
   generateGapAnalysis,
   detectRivalries,
+  buildOwnerHistory,
 });
-Object.assign(window, { runLeagueAnalytics, detectRivalries });
+Object.assign(window, { runLeagueAnalytics, detectRivalries, buildOwnerHistory });
