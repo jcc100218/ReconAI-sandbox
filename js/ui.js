@@ -857,11 +857,16 @@ function renderHomeSnapshot(){
   }).filter(v=>v>0);
   const leagueAvg=leagueAvgs.length?(leagueAvgs.reduce((a,b)=>a+b,0)/leagueAvgs.length).toFixed(1):'—';
 
+  // Championship badge
+  const championships = window.App?.LI?.championships || {};
+  const myChamps = Object.values(championships).filter(c => c.champion === S.myRosterId).length;
+  const champBadge = myChamps > 0 ? `<span style="font-size:11px;color:var(--amber);font-weight:700;margin-left:8px">${myChamps > 1 ? myChamps + 'x ' : ''}Champion</span>` : '';
+
   const el=$('home-snapshot');if(!el)return;
   el.innerHTML=`
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
       <div>
-        <div style="font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.03em">${S.user?.display_name||'GM'}</div>
+        <div style="font-size:20px;font-weight:800;color:var(--text);letter-spacing:-.03em">${S.user?.display_name||'GM'}${champBadge}</div>
         <div style="font-size:13px;color:var(--text3);margin-top:2px">${league?.name||''}</div>
       </div>
       <div style="margin-left:auto;display:flex;gap:12px;flex-wrap:wrap">

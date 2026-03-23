@@ -678,6 +678,41 @@ function runLeagueAnalytics() {
   }
 }
 
+// ── Section 8: Rivalry Detection ─────────────────────────────
+
+function detectRivalries(rosterId) {
+  const brackets = window.App?.LI?.bracketData || {};
+  const matchups = {};
+
+  Object.entries(brackets).forEach(([season, { winners, losers }]) => {
+    (winners || []).forEach(m => {
+      if (m.t1 === rosterId || m.t2 === rosterId) {
+        const opponent = m.t1 === rosterId ? m.t2 : m.t1;
+        if (!opponent || typeof opponent !== 'number') return;
+        if (!matchups[opponent]) matchups[opponent] = { wins: 0, losses: 0, seasons: [] };
+        if (m.w === rosterId) matchups[opponent].wins++;
+        else if (m.l === rosterId) matchups[opponent].losses++;
+        matchups[opponent].seasons.push(season);
+      }
+    });
+    (losers || []).forEach(m => {
+      if (m.t1 === rosterId || m.t2 === rosterId) {
+        const opponent = m.t1 === rosterId ? m.t2 : m.t1;
+        if (!opponent || typeof opponent !== 'number') return;
+        if (!matchups[opponent]) matchups[opponent] = { wins: 0, losses: 0, seasons: [] };
+        if (m.w === rosterId) matchups[opponent].wins++;
+        else if (m.l === rosterId) matchups[opponent].losses++;
+        matchups[opponent].seasons.push(season);
+      }
+    });
+  });
+
+  return Object.entries(matchups)
+    .map(([rid, data]) => ({ rosterId: parseInt(rid), ...data, total: data.wins + data.losses }))
+    .filter(r => r.total >= 2)
+    .sort((a, b) => b.total - a.total);
+}
+
 // ── Exports ──────────────────────────────────────────────────────
 
 Object.assign(window.App, {
@@ -690,5 +725,6 @@ Object.assign(window.App, {
   projectRoster,
   projectCompetitiveWindow,
   generateGapAnalysis,
+  detectRivalries,
 });
-Object.assign(window, { runLeagueAnalytics });
+Object.assign(window, { runLeagueAnalytics, detectRivalries });

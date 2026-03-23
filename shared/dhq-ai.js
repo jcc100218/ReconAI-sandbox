@@ -416,6 +416,31 @@ function dhqBuildOwnerProfiles() {
   const allTotals = S.rosters.map(r => (r.players || []).reduce((sum, pid) => sum + dynastyValue(pid), 0));
   const avgTotal = allTotals.length ? allTotals.reduce((a, b) => a + b, 0) / allTotals.length : 80000;
 
+  // Championship data
+  const championships = window.App?.LI?.championships || {};
+  const leagueUsersHistory = window.App?.LI?.leagueUsersHistory || {};
+
+  // Count championships per roster
+  const champCounts = {};
+  const runnerUpCounts = {};
+  Object.values(championships).forEach(c => {
+    if (c.champion) champCounts[c.champion] = (champCounts[c.champion] || 0) + 1;
+    if (c.runnerUp) runnerUpCounts[c.runnerUp] = (runnerUpCounts[c.runnerUp] || 0) + 1;
+  });
+
+  // Count tenure per user
+  const tenureByUser = {};
+  Object.values(leagueUsersHistory).forEach(users => {
+    (users || []).forEach(u => {
+      if (!tenureByUser[u.user_id]) tenureByUser[u.user_id] = 0;
+      tenureByUser[u.user_id]++;
+    });
+  });
+
+  // Detect rivalries for the current user
+  const detectRivalries = window.App?.detectRivalries;
+  const rivalries = detectRivalries ? detectRivalries(S.myRosterId) : [];
+
   const profiles = S.rosters.filter(r => r.roster_id !== S.myRosterId).map(r => {
     const name = S.leagueUsers.find(u => u.user_id === r.owner_id)?.display_name || 'Team';
     const st = r.settings || {};
@@ -431,11 +456,29 @@ function dhqBuildOwnerProfiles() {
       .map(x => ({ name: pNameShort(x.pid), pos: pPos(x.pid), dhq: x.val }));
     const dna = LI.ownerProfiles?.[r.roster_id];
     const contending = totalVal > avgTotal * 1.1 ? 'contender' : totalVal < avgTotal * 0.85 ? 'rebuilder' : 'mid-tier';
+
+    // Championship + tenure data
+    const champs = champCounts[r.roster_id] || 0;
+    const runners = runnerUpCounts[r.roster_id] || 0;
+    const tenure = tenureByUser[r.owner_id] || 1;
+    const isNew = tenure <= 1;
+    const tenureNote = isNew ? 'NEW OWNER' : tenure >= 4 ? tenure + 'yr veteran' : '';
+
+    // Rivalry detection
+    const isRival = rivalries.find(rv => rv.rosterId === r.roster_id);
+
     return {
       name: name,
       record: record,
       tier: contending,
       dhqTotal: totalVal,
+      championships: champs,
+      runnerUps: runners,
+      playoffAppearances: 0, // populated when bracket data is richer
+      tenure: tenure,
+      isNewOwner: isNew,
+      tenureNote: tenureNote,
+      rivalry: isRival ? { wins: isRival.wins, losses: isRival.losses } : null,
       needs: weakPositions,
       stars: topPlayers,
       dna: dna?.trades > 0 ? dna.dna : '',
