@@ -306,7 +306,7 @@ function reconnect(){
   S.playerStats={};S.posRanks={};
   const LI_ref = window.App;
   if(LI_ref){LI_ref.LI_LOADED=false;LI_ref.LI={};window._liLoading=false;}
-  try{localStorage.removeItem('dhq_leagueintel_v9');
+  try{localStorage.removeItem('dhq_leagueintel_v10');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   const sb=$('setup-block');

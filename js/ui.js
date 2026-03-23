@@ -819,7 +819,7 @@ async function resyncAllData(){
   if(!S.currentLeagueId){showToast('Connect first');return;}
   showToast('Resyncing all data...');
   try{
-    localStorage.removeItem('dhq_leagueintel_v9');
+    localStorage.removeItem('dhq_leagueintel_v10');
     Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
   }catch(e){}
   _availCache=null;LI_LOADED=false;LI={};S.playerStats={};window._liLoading=false;

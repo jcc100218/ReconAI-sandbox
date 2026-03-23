@@ -15,7 +15,54 @@ function identifyWinners(rosters, leagueHistory) {
 
   if (!rosters || !rosters.length) return result;
 
-  // Current season: top 3 by wins (settings.wins on Sleeper rosters)
+  // ── Try REAL championship data first (from bracket API) ──
+  const championships = LI.championships || {};
+  const champRosterIds = new Set();
+  const runnerUpIds = new Set();
+
+  Object.values(championships).forEach(c => {
+    if (c.champion) champRosterIds.add(c.champion);
+    if (c.runnerUp) runnerUpIds.add(c.runnerUp);
+    (c.semiFinals || []).forEach(rid => runnerUpIds.add(rid));
+  });
+
+  if (champRosterIds.size > 0) {
+    // Use actual championship data
+    champRosterIds.forEach(rid => {
+      result.winners.add(rid);
+      result.winnerSeasons[rid] = (result.winnerSeasons[rid] || 0) + 1;
+    });
+    runnerUpIds.forEach(rid => {
+      if (!champRosterIds.has(rid)) {
+        result.winners.add(rid); // Runner-ups and semi-finalists are still "winners"
+        result.winnerSeasons[rid] = (result.winnerSeasons[rid] || 0) + 1;
+      }
+    });
+
+    // Losers: everyone not in winners set
+    rosters.forEach(r => {
+      if (!result.winners.has(r.roster_id)) result.losers.add(r.roster_id);
+    });
+
+    // Also add current season top performers (bracket may not exist yet for current season)
+    const sorted = [...rosters].sort((a, b) => {
+      const wA = a.settings?.wins || 0;
+      const wB = b.settings?.wins || 0;
+      if (wB !== wA) return wB - wA;
+      return (b.settings?.fpts || 0) - (a.settings?.fpts || 0);
+    });
+    const topN = Math.min(3, Math.ceil(rosters.length * 0.25));
+    sorted.slice(0, topN).forEach(r => {
+      result.winners.add(r.roster_id);
+      result.losers.delete(r.roster_id);
+      result.winnerSeasons[r.roster_id] = (result.winnerSeasons[r.roster_id] || 0) + 1;
+    });
+
+    result.source = 'brackets';
+    return result;
+  }
+
+  // ── Fallback: standings-based (no bracket data available) ──
   const sorted = [...rosters].sort((a, b) => {
     const wA = a.settings?.wins || 0;
     const wB = b.settings?.wins || 0;
@@ -53,6 +100,7 @@ function identifyWinners(rosters, leagueHistory) {
     }
   });
 
+  result.source = 'standings';
   return result;
 }
 

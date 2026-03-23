@@ -7,7 +7,7 @@ window.App = window.App || {};
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v9';
+const LI_CACHE_KEY='dhq_leagueintel_v10';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -128,7 +128,7 @@ async function loadLeagueIntel(){
     let histCache=null;
     try{const raw=localStorage.getItem(HIST_KEY);if(raw)histCache=JSON.parse(raw);}catch(e){}
 
-    let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns, tradeTxns;
+    let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns, tradeTxns, bracketData, leagueUsersHistory;
     const curSeason = parseInt(S.season) || new Date().getFullYear();
     const uniqueYears = Array.from({length:5}, (_,i) => curSeason - 4 + i); // e.g., [2022,2023,2024,2025,2026]
 
@@ -139,6 +139,8 @@ async function loadLeagueIntel(){
       draftMeta=histCache.draftMeta;
       faabTxns=histCache.faabTxns||[];
       tradeTxns=histCache.tradeTxns||[];
+      bracketData=histCache.bracketData||{};
+      leagueUsersHistory=histCache.leagueUsersHistory||{};
       // Only fetch stats fresh (they're large but fast from Sleeper CDN)
       seasonStatsRaw={};
       await Promise.all(uniqueYears.map(async yr=>{
@@ -253,15 +255,66 @@ async function loadLeagueIntel(){
       })();
       fetchPromises.push(txnPromise);
 
+      // BRACKETS (all seasons — championship data)
+      bracketData={}; // { season: { winners: [], losers: [] } }
+      const bracketPromise=(async()=>{
+        await Promise.all(chain.map(async c=>{
+          try{
+            const [winners,losers]=await Promise.all([
+              fetch(`${SLEEPER}/league/${c.id}/winners_bracket`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+              fetch(`${SLEEPER}/league/${c.id}/losers_bracket`).then(r=>r.ok?r.json():[]).catch(()=>[]),
+            ]);
+            bracketData[c.season]={winners:winners||[],losers:losers||[]};
+          }catch(e){}
+        }));
+      })();
+      fetchPromises.push(bracketPromise);
+
+      // LEAGUE USERS (per season — track owner changes)
+      leagueUsersHistory={}; // { season: [{ user_id, display_name, ... }] }
+      const usersPromise=(async()=>{
+        await Promise.all(chain.map(async c=>{
+          try{
+            const users=await fetch(`${SLEEPER}/league/${c.id}/users`).then(r=>r.ok?r.json():[]).catch(()=>[]);
+            leagueUsersHistory[c.season]=(users||[]).map(u=>({
+              user_id:u.user_id,
+              display_name:u.display_name||u.username,
+              avatar:u.avatar,
+            }));
+          }catch(e){}
+        }));
+      })();
+      fetchPromises.push(usersPromise);
+
       // Fire everything at once
       await Promise.all(fetchPromises);
 
       // Cache historical data permanently (drafts/chain/faab/trades never change)
-      try{localStorage.setItem(HIST_KEY,JSON.stringify({chain,draftPicks:allDraftPicks,draftMeta,faabTxns,tradeTxns,ts:Date.now()}));}catch(e){}
-      console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length})`);
+      try{localStorage.setItem(HIST_KEY,JSON.stringify({chain,draftPicks:allDraftPicks,draftMeta,faabTxns,tradeTxns,bracketData,leagueUsersHistory,ts:Date.now()}));}catch(e){}
+      console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}), brackets(${Object.keys(bracketData).length}), users(${Object.keys(leagueUsersHistory).length})`);
     }
 
     console.log('Stats:',Object.entries(seasonStatsRaw).map(([y,s])=>y+':'+Object.keys(s).length+'p').join(' '));
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP: Extract championship results from brackets
+    // ═══════════════════════════════════════════════════════════════
+    const championships={}; // { season: { champion: rosterId, runnerUp: rosterId, semiFinals: [rid, rid] } }
+    Object.entries(bracketData||{}).forEach(([season,{winners,losers}])=>{
+      if(!winners?.length)return;
+      // Championship game = matchup with highest round number
+      const maxRound=Math.max(...winners.map(m=>m.r||0));
+      const champMatch=winners.find(m=>m.r===maxRound);
+      if(champMatch){
+        championships[season]={
+          champion:champMatch.w||null,
+          runnerUp:champMatch.l||null,
+          // Semi-finalists (second-to-last round losers)
+          semiFinals:winners.filter(m=>m.r===maxRound-1).map(m=>m.l).filter(Boolean),
+        };
+      }
+    });
+    console.log('Championships:',Object.keys(championships).length,'seasons with bracket data');
 
     // ═══════════════════════════════════════════════════════════════
     // From here on: pure computation, no API calls
@@ -1029,6 +1082,10 @@ async function loadLeagueIntel(){
       leagueTradeTendencies, // {totalTrades,avgAssetsPerSide,pickHeavy,playerHeavy}
       tradeHistory,         // [{season,week,ts,roster_ids,sides,fairness,winner,valueDiff,valueDiffPct}]
       rookieCount,
+      // Championships & brackets (NEW)
+      championships,        // { season: { champion, runnerUp, semiFinals } }
+      bracketData,          // { season: { winners: [], losers: [] } }
+      leagueUsersHistory,   // { season: [{ user_id, display_name }] }
       leagueYears:uniqueYears,
       builtAt:new Date().toISOString(),
     };
