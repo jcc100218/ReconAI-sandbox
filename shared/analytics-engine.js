@@ -877,6 +877,129 @@ function buildOwnerHistory() {
     return history;
 }
 
+// ── Section 7: Weighted DNA Computation ─────────────────────────
+
+function computeWeightedDNA(rosterId) {
+    const LI = window.App?.LI || {};
+    const profile = LI.ownerProfiles?.[rosterId];
+    const trades = (LI.tradeHistory || []).filter(t => t.roster_ids?.includes(rosterId));
+    if (!profile || trades.length < 3) return null;
+
+    const curSeason = parseInt(window.S?.season || window.App?.S?.season || new Date().getFullYear());
+
+    // Weight trades by recency: current year = 4x, last year = 2x, 2 years ago = 1x, older = 0.5x
+    let weightedWins = 0, weightedLosses = 0, weightedFair = 0, totalWeight = 0;
+    let weightedPicksBought = 0, weightedPicksSold = 0;
+    let weightedVolume = 0;
+    let lateTrades = 0, earlyTrades = 0;
+
+    trades.forEach(t => {
+        const season = parseInt(t.season) || 0;
+        const yearsAgo = curSeason - season;
+        const weight = yearsAgo === 0 ? 4 : yearsAgo === 1 ? 2 : yearsAgo === 2 ? 1 : 0.5;
+
+        totalWeight += weight;
+        weightedVolume += weight;
+
+        // Win/loss based on value
+        const mySide = t.sides?.[rosterId];
+        const otherRid = t.roster_ids?.find(r => r !== rosterId);
+        const theirSide = t.sides?.[otherRid];
+        const myVal = mySide?.totalValue || 0;
+        const theirVal = theirSide?.totalValue || 0;
+
+        if (myVal > theirVal * 1.15) weightedWins += weight;
+        else if (theirVal > myVal * 1.15) weightedLosses += weight;
+        else weightedFair += weight;
+
+        // Pick direction
+        const gotPicks = (mySide?.picks || []).length;
+        const gavePicks = (theirSide?.picks || []).length;
+        weightedPicksBought += gotPicks * weight;
+        weightedPicksSold += gavePicks * weight;
+
+        // Timing
+        if ((t.week || 0) <= 6) earlyTrades += weight;
+        else if ((t.week || 0) >= 12) lateTrades += weight;
+    });
+
+    if (totalWeight === 0) return null;
+
+    // Normalize
+    const winRate = weightedWins / totalWeight;
+    const lossRate = weightedLosses / totalWeight;
+    const fairRate = weightedFair / totalWeight;
+    const pickBuyer = weightedPicksBought > weightedPicksSold * 1.5;
+    const pickSeller = weightedPicksSold > weightedPicksBought * 1.5;
+    const highVolume = weightedVolume / totalWeight > 0.7;
+    const lateSeason = lateTrades > earlyTrades;
+
+    // Score each archetype
+    const scores = {
+        FLEECER: 0,
+        DOMINATOR: 0,
+        STALWART: 0,
+        ACCEPTOR: 0,
+        DESPERATE: 0,
+    };
+
+    // FLEECER: consistently wins trades
+    if (winRate > lossRate * 2 && trades.length >= 3) scores.FLEECER = 0.5 + winRate * 0.3;
+    if (pickSeller) scores.FLEECER += 0.1;
+
+    // DOMINATOR: wins trades AND high volume
+    if (winRate > lossRate && highVolume) scores.DOMINATOR = 0.4 + winRate * 0.3;
+    if (pickSeller) scores.DOMINATOR += 0.15;
+
+    // STALWART: prefers fair deals
+    if (fairRate >= 0.5 && trades.length >= 3) scores.STALWART = 0.5 + fairRate * 0.3;
+
+    // ACCEPTOR: loses trades, buys picks
+    if (lossRate > winRate && pickBuyer) scores.ACCEPTOR = 0.4 + lossRate * 0.3;
+
+    // DESPERATE: low volume, late-season, losing trades
+    if (lateSeason && lossRate > 0.3) scores.DESPERATE = 0.4 + lossRate * 0.2;
+    if (pickBuyer && lateSeason) scores.DESPERATE += 0.15;
+
+    // Find highest
+    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    if (sorted[0][1] === 0) return null;
+
+    const confidence = Math.min(0.99, sorted[0][1]);
+    return {
+        key: sorted[0][0],
+        confidence: Math.round(confidence * 100),
+        reasoning: buildDNAReasoning(sorted[0][0], { winRate, lossRate, fairRate, pickBuyer, pickSeller, highVolume, lateSeason, totalTrades: trades.length, weightedWins, weightedLosses }),
+    };
+}
+
+function buildDNAReasoning(key, stats) {
+    const reasons = [];
+    switch(key) {
+        case 'FLEECER':
+            reasons.push('Wins ' + Math.round(stats.winRate * 100) + '% of trades (weighted by recency)');
+            if (stats.pickSeller) reasons.push('Sells picks for proven players');
+            break;
+        case 'DOMINATOR':
+            reasons.push('High volume trader who wins ' + Math.round(stats.winRate * 100) + '% of deals');
+            if (stats.pickSeller) reasons.push('Moves picks aggressively');
+            break;
+        case 'STALWART':
+            reasons.push(Math.round(stats.fairRate * 100) + '% of trades are balanced/fair');
+            reasons.push('Prefers even value swaps');
+            break;
+        case 'ACCEPTOR':
+            reasons.push('Loses ' + Math.round(stats.lossRate * 100) + '% of trades by value');
+            if (stats.pickBuyer) reasons.push('Accumulates future picks');
+            break;
+        case 'DESPERATE':
+            reasons.push('Trades late in the season at a disadvantage');
+            if (stats.lossRate > 0.3) reasons.push(Math.round(stats.lossRate * 100) + '% of trades are losses');
+            break;
+    }
+    return reasons.join('. ') + '.';
+}
+
 // ── Exports ──────────────────────────────────────────────────────
 
 Object.assign(window.App, {
@@ -891,5 +1014,7 @@ Object.assign(window.App, {
   generateGapAnalysis,
   detectRivalries,
   buildOwnerHistory,
+  computeWeightedDNA,
+  buildDNAReasoning,
 });
-Object.assign(window, { runLeagueAnalytics, detectRivalries, buildOwnerHistory });
+Object.assign(window, { runLeagueAnalytics, detectRivalries, buildOwnerHistory, computeWeightedDNA });
