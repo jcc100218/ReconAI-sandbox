@@ -486,11 +486,11 @@ async function loadLeagueIntel(){
     const industryWeight = 1 - leagueWeight;
     console.log(`DHQ Pick Blend: ${leagueSeasons} seasons → ${Math.round(leagueWeight*100)}% league / ${Math.round(industryWeight*100)}% industry`);
 
-    // Industry consensus pick values (SF dynasty, normalized to 0-10000 DHQ scale)
-    // Derived from KTC, theScore/Justin Boone, FantasyCalc, DLF — March 2026
-    // These represent the market's collective wisdom on pick values
-    const INDUSTRY_PICK_BASE = {1:8500, 2:3800, 3:1800, 4:800, 5:350, 6:175, 7:90};
-    const INDUSTRY_PICK_END  = {1:5000, 2:2200, 3:1000, 4:400, 5:175, 6:90,  7:50};
+    // Industry consensus pick values (SF dynasty, from FantasyCalc API March 2026)
+    // Calibrated to actual market data: FC 12-team SF 1PPR pick values
+    // 1.01=7016, 1.06=3039, 1.12=2073, 2.01=1957, 2.12=1213, 3.01=1172, 3.12=857, 4.01=837
+    const INDUSTRY_PICK_BASE = {1:7016, 2:1957, 3:1172, 4:837, 5:500, 6:250, 7:125};
+    const INDUSTRY_PICK_END  = {1:2073, 2:1213, 3:857,  4:663, 5:300, 6:150, 7:75};
 
     for(let pick=1;pick<=maxPicks;pick++){
       if(!dhqPickValues[pick])continue;
@@ -498,7 +498,8 @@ async function loadLeagueIntel(){
       const posInRound=((pick-1)%totalTeams)+1;
       const pickPct=posInRound/totalTeams; // 0-1 within round
 
-      // League-derived value (from actual draft outcomes)
+      // League-derived value (from actual draft outcomes in THIS league)
+      // These start higher than industry because league-specific hit rates can justify premium
       const roundBase={1:8500,2:4000,3:2000,4:800,5:400,6:200,7:100};
       const roundEnd={1:5500,2:2500,3:1200,4:400,5:200,6:100,7:50};
       const lBase=roundBase[rd]||50;

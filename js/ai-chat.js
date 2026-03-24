@@ -287,7 +287,7 @@ async function sendTradeChat(){
 4. Only propose trades where the OTHER owner benefits too — explain what THEY gain
 5. Draft a short Sleeper DM message to copy-paste
 6. If user wants to win now, propose getting better players. If rebuilding, propose getting picks/youth.
-DHQ scale: 0-10000 (7000+=elite, 4000+=starter, 2000+=depth). Picks: 1st≈3000-5000, 2nd≈1500-2500, 3rd≈800-1200. Always say "DHQ" not "FC".
+DHQ scale: 0-10000 (7000+=elite, 4000+=starter, 2000+=depth). Picks: 1st≈2000-7000 (early1st=7000, late1st=2000), 2nd≈1200-1950, 3rd≈850-1170, 4th≈660-840. Always say "DHQ" not "FC".
 ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
       if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};
       return m;
