@@ -513,3 +513,14 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .tip-box strong{color:var(--text);font-weight:600}
 .tip-box .tip-scale{display:flex;gap:4px;margin:6px 0;font-size:10px}
 .tip-box .tip-scale span{padding:2px 6px;border-radius:4px}
+
+/* ── Loading Skeletons ──────────────────────────────── */
+@keyframes skelShimmer{0%{background-position:-300px 0}100%{background-position:300px 0}}
+.skel{background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:600px 100%;animation:skelShimmer 1.6s ease infinite;border-radius:6px}
+.skel-line{height:12px;margin-bottom:8px;border-radius:4px}
+.skel-block{height:60px;margin-bottom:10px;border-radius:var(--r)}
+.skel-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:10px}
+
+/* ── Briefing card animation ────────────────────────── */
+@keyframes briefIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.brief-card{animation:briefIn .3s ease both}

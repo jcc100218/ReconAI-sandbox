@@ -452,13 +452,19 @@ function renderAvailable(){
     const isIDP=['DL','LB','DB'].includes(mPos);
     const raw=stats?.prevRawStats;
     const ppg=isIDP&&raw?+(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)).toFixed(1):(stats.seasonAvg||stats.prevAvg||0);
-    // FAAB suggestion based on league market data + player value
+    // FAAB suggestion with confidence and bid range
     const market=faabMarket[mPos];
     let faabSug='—';
+    let faabConf='';
     if(market&&market.count>=3&&faab.budget>0){
-      const baseB=Math.round(market.avg*(val/4000)); // scale bid by value relative to starter
+      const baseB=Math.round(market.avg*(val/4000));
       const sug=Math.max(1,Math.min(Math.round(faab.remaining*0.15),baseB));
-      faabSug='$'+sug;
+      const lo=Math.max(1,Math.round(sug*0.7));
+      const hi=Math.min(faab.remaining,Math.round(sug*1.3));
+      const conf=val>=4000?'High':val>=2000?'Med':'Low';
+      const confCol=conf==='High'?'var(--green)':conf==='Med'?'var(--amber)':'var(--text3)';
+      faabSug=`$${lo}-${hi}`;
+      faabConf=`<span style="font-size:9px;color:${confCol};font-weight:700;display:block">${conf}</span>`;
     }
 
     return`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 46px 32px;gap:3px;padding:4px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
@@ -468,7 +474,7 @@ function renderAvailable(){
       <span style="font-size:11px;color:var(--text2)">${p.age||'—'}</span>
       <span style="font-size:11px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
       <span style="font-size:11px;color:${ppg>=8?'var(--green)':ppg>=4?'var(--text2)':'var(--text3)'}">${ppg?ppg.toFixed(1):'—'}</span>
-      <span style="font-size:11px;font-weight:600;color:var(--amber)">${faabSug}</span>
+      <span style="font-size:11px;font-weight:600;color:var(--amber);text-align:center">${faabSug}${faabConf}</span>
       <button class="copy-btn" style="font-size:11px;padding:1px 4px" onclick="event.stopPropagation();goAsk('Should I add ${pName(id).replace(/'/g,'')}? What FAAB bid?')">Ask</button>
     </div>`;
   }).join('');
@@ -891,6 +897,215 @@ function renderHomeSnapshot(){
     ${lastSession?`<div style="background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--text3);line-height:1.5">
       <span style="color:var(--accent);font-weight:700">Last session (${lastSession.date}):</span> ${lastSession.text}
     </div>`:''}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAILY BRIEFING — 3 actionable insights, no AI required
+// ═══════════════════════════════════════════════════════════════
+function renderDailyBriefing(){
+  const wrap=$('home-briefing');if(!wrap)return;
+  if(!LI_LOADED||!S.rosters?.length){wrap.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const items=[];
+
+  // 1. Biggest value mover on your roster
+  const myPids=my.players||[];
+  let bestMover=null,bestDelta=0;
+  myPids.forEach(pid=>{
+    const meta=LI.playerMeta?.[pid];
+    if(!meta)return;
+    const trend=meta.trend||0;
+    const val=dynastyValue(pid);
+    if(Math.abs(trend)>Math.abs(bestDelta)&&val>1500){bestMover={pid,trend,val};bestDelta=trend;}
+  });
+  if(bestMover){
+    const dir=bestMover.trend>0;
+    items.push({
+      icon:dir?'\u2191':'\u2193',
+      color:dir?'var(--green)':'var(--red)',
+      text:`${pName(bestMover.pid)} value ${dir?'up':'down'} ${Math.abs(bestMover.trend)}%. ${dir?'Hold \u2014 stock rising.':'Consider selling before further decline.'}`
+    });
+  }
+
+  // 2. Your biggest roster weakness
+  if(typeof assessTeamFromGlobal==='function'){
+    const assess=assessTeamFromGlobal(S.myRosterId);
+    if(assess?.needs?.length){
+      const top=assess.needs[0];
+      items.push({
+        icon:'\u26A0',
+        color:'var(--amber)',
+        text:`${top.pos} is your biggest gap (${top.urgency}). Target ${top.pos} in trades or waivers.`
+      });
+    }
+  }
+
+  // 3. League activity alert
+  const trending=S.trending||{};
+  const mySet=new Set(myPids);
+  const hotAdd=(trending.adds||[]).find(a=>mySet.has(a.player_id));
+  const hotDrop=(trending.drops||[]).find(d=>mySet.has(d.player_id));
+  if(hotDrop){
+    items.push({icon:'\uD83D\uDEA8',color:'var(--red)',text:`${pName(hotDrop.player_id)} is trending down across Sleeper. Monitor closely.`});
+  }else if(hotAdd){
+    items.push({icon:'\u2705',color:'var(--green)',text:`${pName(hotAdd.player_id)} is trending up league-wide. You own them \u2014 hold.`});
+  }else{
+    // Fallback: waiver opportunity
+    const avail=getAvailablePlayers?getAvailablePlayers().slice(0,5):[];
+    const bestAvail=avail.find(a=>dynastyValue(a.id)>2000);
+    if(bestAvail){
+      items.push({icon:'\uD83C\uDFAF',color:'var(--accent)',text:`${pName(bestAvail.id)} (${dynastyValue(bestAvail.id).toLocaleString()} DHQ) is available on waivers. Consider a bid.`});
+    }
+  }
+
+  if(!items.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Today's Briefing</div>
+      ${items.map(it=>`
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${it.color};border-radius:var(--r);margin-bottom:6px">
+          <span style="font-size:14px;flex-shrink:0;line-height:1.3">${it.icon}</span>
+          <span style="font-size:13px;color:var(--text2);line-height:1.5">${it.text}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// START/SIT — Optimal lineup for this week
+// ═══════════════════════════════════════════════════════════════
+function renderStartSit(){
+  const wrap=$('home-startsit');if(!wrap)return;
+  const my=myR();if(!my||!S.leagues)return;
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  if(!league)return;
+  const positions=league.roster_positions||[];
+  const starters=positions.filter(p=>p!=='BN');
+  const myPids=my.players||[];
+  if(!myPids.length){wrap.innerHTML='';return;}
+
+  // Score each player
+  const scored=myPids.map(pid=>{
+    const p=S.players?.[pid];if(!p)return null;
+    const stats=S.playerStats?.[pid]||{};
+    const proj=S.playerProj?.[pid]||0;
+    const ppg=stats.seasonAvg||stats.trail3||stats.prevAvg||0;
+    const score=proj||ppg;
+    const pos=normPos(p.position)||p.position;
+    return{pid,pos,score,name:p.full_name||pName(pid),team:p.team||'FA',injury:p.injury_status};
+  }).filter(Boolean);
+
+  // Greedy lineup optimizer
+  const used=new Set();
+  const lineup=[];
+  const flexOrder=['SUPER_FLEX','WRTQ','FLEX','REC_FLEX','IDP_FLEX'];
+  const flexMap={SUPER_FLEX:['QB','RB','WR','TE'],WRTQ:['QB','RB','WR','TE'],FLEX:['RB','WR','TE'],REC_FLEX:['WR','TE'],IDP_FLEX:['DL','LB','DB']};
+
+  // Fill fixed positions first
+  starters.filter(s=>!flexMap[s]).forEach(slot=>{
+    const pos=normPos(slot)||slot;
+    const best=scored.filter(p=>p.pos===pos&&!used.has(p.pid)).sort((a,b)=>b.score-a.score)[0];
+    if(best){used.add(best.pid);lineup.push({slot:pos,player:best,isFlex:false});}
+    else lineup.push({slot:pos,player:null,isFlex:false});
+  });
+
+  // Fill flex slots
+  starters.filter(s=>flexMap[s]).forEach(slot=>{
+    const eligible=flexMap[slot]||[];
+    const best=scored.filter(p=>eligible.includes(p.pos)&&!used.has(p.pid)).sort((a,b)=>b.score-a.score)[0];
+    if(best){used.add(best.pid);lineup.push({slot:slot==='SUPER_FLEX'?'SF':slot==='IDP_FLEX'?'IDP_FLX':'FLX',player:best,isFlex:true});}
+    else lineup.push({slot:'FLX',player:null,isFlex:true});
+  });
+
+  const totalProj=lineup.reduce((s,l)=>s+(l.player?.score||0),0);
+  const bench=scored.filter(p=>!used.has(p.pid)).sort((a,b)=>b.score-a.score).slice(0,3);
+
+  wrap.innerHTML=`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Optimal Lineup</div>
+        <div style="font-size:18px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalProj.toFixed(1)} <span style="font-size:11px;color:var(--text3);font-weight:600">PROJ</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        ${lineup.map(l=>{
+          if(!l.player)return`<div style="display:grid;grid-template-columns:36px 1fr 44px;gap:4px;padding:5px 8px;background:var(--bg2);border-radius:6px;align-items:center;opacity:0.4">
+            <span style="font-size:11px;font-weight:700;color:var(--text3)">${l.slot}</span><span style="font-size:12px;color:var(--text3)">Empty</span><span></span></div>`;
+          const col=l.player.score>=15?'var(--green)':l.player.score>=8?'var(--text)':'var(--text3)';
+          const injBadge=l.player.injury?`<span style="font-size:9px;color:var(--red);font-weight:700;margin-left:4px">${l.player.injury}</span>`:'';
+          return`<div style="display:grid;grid-template-columns:36px 1fr 44px;gap:4px;padding:5px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;align-items:center;cursor:pointer" onclick="openPlayerModal('${l.player.pid}')">
+            <span style="font-size:11px;font-weight:700;color:${l.isFlex?'var(--accent)':'var(--text3)'}">${l.slot}</span>
+            <div style="overflow:hidden"><span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.player.name}</span>${injBadge}<span style="font-size:11px;color:var(--text3);margin-left:4px">${l.player.team}</span></div>
+            <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace;text-align:right">${l.player.score.toFixed(1)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      ${bench.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Best Bench</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${bench.map(b=>`<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--text2)">${b.name} <span style="color:var(--text3)">${b.score.toFixed(1)}</span></span>`).join('')}
+        </div>
+      </div>`:''}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROACTIVE INSIGHT CARDS — data-driven, no AI
+// ═══════════════════════════════════════════════════════════════
+function renderInsightCards(){
+  const wrap=$('home-insights');if(!wrap)return;
+  if(!LI_LOADED){wrap.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const cards=[];
+
+  // Card 1: Aging risk
+  const myPids=my.players||[];
+  const agingStars=myPids.map(pid=>{
+    const meta=LI.playerMeta?.[pid];const val=dynastyValue(pid);
+    if(!meta||val<2000)return null;
+    const peaks=window.App?.peakWindows||{};
+    const [,pHi]=peaks[meta.pos]||[24,29];
+    if(meta.age>pHi+1)return{pid,age:meta.age,val,pos:meta.pos,yrs:meta.age-pHi};
+    return null;
+  }).filter(Boolean).sort((a,b)=>b.val-a.val);
+  if(agingStars.length>=2){
+    cards.push({
+      title:'Aging Risk',
+      color:'var(--red)',
+      text:`${agingStars.length} players past peak: ${agingStars.slice(0,3).map(a=>pName(a.pid)+' ('+a.age+')').join(', ')}. Combined ${agingStars.reduce((s,a)=>s+a.val,0).toLocaleString()} DHQ at risk.`
+    });
+  }
+
+  // Card 2: Youth core strength
+  const youngElite=myPids.filter(pid=>{
+    const meta=LI.playerMeta?.[pid];const val=dynastyValue(pid);
+    return meta&&val>=4000&&meta.age<=25;
+  });
+  if(youngElite.length>=2){
+    cards.push({
+      title:'Dynasty Core',
+      color:'var(--green)',
+      text:`${youngElite.length} elite assets under 26: ${youngElite.slice(0,3).map(pid=>pName(pid)).join(', ')}. Your foundation is strong.`
+    });
+  }
+
+  // Card 3: Trade opportunity
+  const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  if(assess?.strengths?.length&&assess?.needs?.length){
+    cards.push({
+      title:'Trade Opportunity',
+      color:'var(--accent)',
+      text:`Surplus at ${assess.strengths.join(', ')} \u2014 use to fill ${assess.needs[0].pos} gap. Check the Trade Finder for specific offers.`
+    });
+  }
+
+  if(!cards.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=`
+    <div style="display:grid;gap:8px;margin-bottom:14px">
+      ${cards.map(c=>`
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;border-left:3px solid ${c.color}">
+          <div style="font-size:11px;font-weight:700;color:${c.color};text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">${c.title}</div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.5">${c.text}</div>
+        </div>`).join('')}
+    </div>`;
 }
 
 function renderTeamOverview(){

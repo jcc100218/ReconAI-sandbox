@@ -124,6 +124,12 @@
         </div>
         <!-- Snapshot pills -->
         <div id="home-snapshot" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
+        <!-- Daily Briefing -->
+        <div id="home-briefing"></div>
+        <!-- Start/Sit Optimal Lineup -->
+        <div id="home-startsit"></div>
+        <!-- Proactive Insight Cards -->
+        <div id="home-insights"></div>
         <!-- Persistent chat -->
         <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);margin-bottom:18px;box-shadow:0 2px 12px rgba(0,0,0,.2)">
           <div id="home-chat-msgs" style="max-height:0;overflow:hidden;padding:0 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
@@ -141,7 +147,9 @@
           </div>
         </div>
         <!-- Team overview — replaces AI recommendations (saves API call) -->
-        <div id="home-team-overview"></div>
+        <div id="home-team-overview">
+          <div class="skel-card"><div class="skel skel-line" style="width:40%"></div><div class="skel skel-block"></div><div class="skel skel-line" style="width:70%"></div><div class="skel skel-line" style="width:55%"></div></div>
+        </div>
         <!-- League Pulse — trending adds/drops from Sleeper -->
         <div id="league-pulse"></div>
       </div>

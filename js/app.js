@@ -240,6 +240,9 @@ async function loadAllData(){
     try{if(typeof renderAvailable==='function')renderAvailable();}catch(e){console.warn('renderAvailable:',e);}
     try{if(typeof renderDraftNeeds==='function')renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
     try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
+    try{if(typeof renderDailyBriefing==='function')renderDailyBriefing();}catch(e){console.warn('renderDailyBriefing:',e);}
+    try{if(typeof renderStartSit==='function')renderStartSit();}catch(e){console.warn('renderStartSit:',e);}
+    try{if(typeof renderInsightCards==='function')renderInsightCards();}catch(e){console.warn('renderInsightCards:',e);}
     try{if(typeof renderTeamOverview==='function')renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
     try{if(typeof renderHealthTimeline==='function')renderHealthTimeline();}catch(e){console.warn('renderHealthTimeline:',e);}
     try{if(typeof renderLeaguePulse==='function')renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
