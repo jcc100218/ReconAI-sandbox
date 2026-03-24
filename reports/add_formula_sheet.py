@@ -129,3 +129,164 @@ for comp in components:
     ws.row_dimensions[r].height = 45 if len(comp[2]) > 80 else 20
     r += 1
 r += 1
+# ── WORKED EXAMPLE ──
+ws.merge_cells(f'B{r}:D{r}')
+ws[f'B{r}'] = 'WORKED EXAMPLE: Josh Allen (DHQ 9,350)'
+ws[f'B{r}'].font = section_font
+ws[f'B{r}'].fill = gold_fill
+r += 1
+
+example = [
+    ['Input', 'Value', 'Explanation'],
+    ['wPPG', '25.6', 'Weighted PPG across 5 seasons — elite production'],
+    ['AgeFactor', '1.000', 'Age 29, QB peak window extends to 34 — still in prime'],
+    ['SitMult', '1.558', 'Top 3 QB in this leagues scoring — elite situation bonus'],
+    ['Core Score', '~7,500', '(25.6 × 1.0 × 1.558) / topComposite × 7500 = ~7,500'],
+    ['Scarcity', '+750', 'Top 12 QB in Superflex — full QB scarcity premium'],
+    ['Peak Bonus', '+600', '5 peak years remaining × 120 = 600'],
+    ['Consistency', '+400', '4 starter seasons — maximum consistency bonus'],
+    ['Durability', '+100', '17 games played — full durability bonus'],
+    ['TOTAL', '9,350', '7,500 + 750 + 600 + 400 + 100 = 9,350'],
+]
+
+for i, row in enumerate(example):
+    for j, val in enumerate(row):
+        c = ws.cell(row=r, column=j+2, value=val)
+        c.border = thin
+        if i == 0:
+            c.font = header_font; c.fill = header_fill
+        elif i == len(example)-1:
+            c.font = Font(name='Arial', bold=True, size=11, color='D4AF37')
+            c.fill = gold_fill
+        else:
+            c.font = normal_font
+    r += 1
+r += 1
+# ── AGE CURVES ──
+ws.merge_cells(f'B{r}:D{r}')
+ws[f'B{r}'] = 'POSITION PEAK WINDOWS & AGE DECAY'
+ws[f'B{r}'].font = section_font
+ws[f'B{r}'].fill = gold_fill
+r += 1
+
+for col, val in [('B','Position'), ('C','Peak Until'), ('D','Notes')]:
+    c = ws[f'{col}{r}']
+    c.value = val; c.font = header_font; c.fill = header_fill; c.border = thin
+r += 1
+
+age_data = [
+    ['QB', 'Age 34', 'Longest peak window. QBs hold value deep into their 30s. 6% annual decay after 34.'],
+    ['RB', 'Age 27', 'Shortest peak. RBs decline fastest. A 28-year-old RB is already decaying at 6%/year.'],
+    ['WR', 'Age 30', 'Middle ground. WRs can produce into early 30s but decline accelerates after 30.'],
+    ['TE', 'Age 30', 'Similar to WR. Late bloomers common at TE so the engine accounts for this.'],
+    ['DL/LB/DB', 'Age 30', 'IDP players follow a similar curve to offensive skill positions.'],
+    ['K', 'Age 30', 'Kickers have long careers but limited dynasty value regardless of age.'],
+]
+
+for row in age_data:
+    ws[f'B{r}'] = row[0]; ws[f'B{r}'].font = bold_font; ws[f'B{r}'].border = thin
+    ws[f'C{r}'] = row[1]; ws[f'C{r}'].font = accent_font; ws[f'C{r}'].alignment = Alignment(horizontal='center'); ws[f'C{r}'].border = thin
+    ws[f'D{r}'] = row[2]; ws[f'D{r}'].font = normal_font; ws[f'D{r}'].alignment = Alignment(wrap_text=True); ws[f'D{r}'].border = thin
+    ws.row_dimensions[r].height = 30
+    r += 1
+r += 1
+# ── DRAFT PICK METHODOLOGY ──
+ws.merge_cells(f'B{r}:D{r}')
+ws[f'B{r}'] = 'DRAFT PICK VALUATION METHODOLOGY'
+ws[f'B{r}'].font = section_font
+ws[f'B{r}'].fill = gold_fill
+r += 1
+
+pick_explain = [
+    'Draft pick values are NOT static numbers — they are calculated from YOUR leagues actual draft history.',
+    '',
+    'For each draft slot (1-112), the engine looks at every player drafted at that slot across 4 seasons and asks:',
+    '  1. HIT RATE — What % of picks at this slot became top-15% players at their position?',
+    '  2. STARTER RATE — What % became starter-level producers (above the starter line)?',
+    '  3. AVG NORMALIZED PPG — Average production relative to the position starter threshold.',
+    '',
+    'These three metrics are combined into a single DHQ value for each pick slot.',
+    '',
+    'Key insight: An early 1st (slot 1-4) is worth 9,000-9,975 DHQ in your league.',
+    'A late 1st (slot 13-16) is worth 5,688-6,600 — a massive difference.',
+    'This is why "a 1st round pick" is not a single value — position within the round matters.',
+    '',
+    'War Room uses flat values (1st = 5,500 for all). DHQ uses slot-specific values derived from your leagues history.',
+    'This means ReconAI and War Room will value the same pick differently until the engines are unified.',
+]
+
+for line in pick_explain:
+    ws[f'B{r}'] = line
+    ws[f'B{r}'].font = normal_font if line else small_font
+    ws.merge_cells(f'B{r}:D{r}')
+    r += 1
+r += 1
+# ── VALUE SCALE REFERENCE ──
+ws.merge_cells(f'B{r}:D{r}')
+ws[f'B{r}'] = 'VALUE SCALE REFERENCE'
+ws[f'B{r}'].font = section_font
+ws[f'B{r}'].fill = gold_fill
+r += 1
+
+scale_data = [
+    ['DHQ Range', 'Tier', 'Examples'],
+    ['8,000 - 10,000', 'ELITE — Franchise cornerstone', 'Josh Allen (9,350), Bijan Robinson (7,673)'],
+    ['6,000 - 8,000', 'STAR — Top 20 dynasty asset', 'Ja\'Marr Chase (7,065), Trevor Lawrence (6,528)'],
+    ['4,000 - 6,000', 'STARTER — Reliable weekly starter', 'CeeDee Lamb range, emerging young players'],
+    ['2,000 - 4,000', 'DEPTH — Flex play / upside stash', 'Veteran starters, young backups with upside'],
+    ['500 - 2,000', 'ROSTER FILLER — Bench depth', 'Backup QBs, aging veterans, IDP starters'],
+    ['0 - 500', 'WAIVER LEVEL — Minimal value', 'Practice squad, late-round IDP, kickers'],
+]
+
+for i, row in enumerate(scale_data):
+    for j, val in enumerate(row):
+        c = ws.cell(row=r, column=j+2, value=val)
+        c.border = thin
+        if i == 0:
+            c.font = header_font; c.fill = header_fill
+        else:
+            c.font = bold_font if j == 0 else normal_font
+            c.alignment = Alignment(wrap_text=True)
+    ws.row_dimensions[r].height = 25
+    r += 1
+r += 1
+
+# ── COLUMN DEFINITIONS ──
+ws.merge_cells(f'B{r}:D{r}')
+ws[f'B{r}'] = 'COLUMN DEFINITIONS (All Players Sheet)'
+ws[f'B{r}'].font = section_font
+ws[f'B{r}'].fill = gold_fill
+r += 1
+col_defs = [
+    ['Column', 'Type', 'Definition'],
+    ['Rank', 'Number', 'Overall DHQ rank among all 1,977 scored players'],
+    ['Player', 'Text', 'Player full name'],
+    ['Pos', 'Text', 'Position: QB, RB, WR, TE, DL, LB, DB, K'],
+    ['Team', 'Text', 'Current NFL team (FA = free agent)'],
+    ['Age', 'Number', 'Current age'],
+    ['DHQ Value', 'Number', 'Final dynasty value on 0-10,000 scale'],
+    ['wPPG', 'Decimal', 'Weighted points per game — production input to the formula'],
+    ['AgeFactor', 'Decimal', '1.0 = in peak. <1.0 = declining. Decays 6%/year after peak age.'],
+    ['SitMult', 'Decimal', 'Situation multiplier. >1.0 = elite rank. <1.0 = below average rank.'],
+    ['Peak Yrs Left', 'Number', 'Years remaining in position-specific peak window'],
+    ['Starter Seasons', 'Number', 'Number of seasons player produced starter-level output'],
+    ['Recent GP', 'Number', 'Games played in most recent season (durability indicator)'],
+    ['Trend %', 'Number', 'Year-over-year PPG change. +15 = 15% improvement. -20 = 20% decline.'],
+]
+
+for i, row in enumerate(col_defs):
+    for j, val in enumerate(row):
+        c = ws.cell(row=r, column=j+2, value=val)
+        c.border = thin
+        if i == 0:
+            c.font = header_font; c.fill = header_fill
+        else:
+            c.font = bold_font if j == 0 else normal_font
+            c.alignment = Alignment(wrap_text=True)
+    ws.row_dimensions[r].height = 22
+    r += 1
+
+# ── Save ──
+outpath = '/Users/jacobc/Projects/reconai/reports/DHQ_Engine_Report.xlsx'
+wb.save(outpath)
+print(f'Saved with Formula Reference to {outpath} — {r} rows total on reference sheet')

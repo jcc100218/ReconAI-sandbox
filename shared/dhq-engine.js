@@ -467,21 +467,59 @@ async function loadLeagueIntel(){
     // R3 picks: 1500-2500 (decent)
     // R4 picks: 500-1200 (speculative)
     // R5+ picks: 100-500 (lottery tickets)
+    //
+    // ── BLENDED PICK VALUES ──
+    // With small sample sizes (young leagues), league-specific hit rates are noisy.
+    // We blend league-derived values with industry consensus, shifting weight
+    // toward league data as the league ages and sample size grows.
+    //
+    // League Age Weighting:
+    //   1-3 seasons:  80% industry / 20% league
+    //   4-5 seasons:  60% industry / 40% league
+    //   6-8 seasons:  40% industry / 60% league
+    //   9+ seasons:   20% industry / 80% league
+    //
+    const leagueSeasons = chain.length || 1;
+    const leagueWeight = leagueSeasons >= 9 ? 0.80 :
+                         leagueSeasons >= 6 ? 0.60 :
+                         leagueSeasons >= 4 ? 0.40 : 0.20;
+    const industryWeight = 1 - leagueWeight;
+    console.log(`DHQ Pick Blend: ${leagueSeasons} seasons → ${Math.round(leagueWeight*100)}% league / ${Math.round(industryWeight*100)}% industry`);
+
+    // Industry consensus pick values (SF dynasty, normalized to 0-10000 DHQ scale)
+    // Derived from KTC, theScore/Justin Boone, FantasyCalc, DLF — March 2026
+    // These represent the market's collective wisdom on pick values
+    const INDUSTRY_PICK_BASE = {1:8500, 2:3800, 3:1800, 4:800, 5:350, 6:175, 7:90};
+    const INDUSTRY_PICK_END  = {1:5000, 2:2200, 3:1000, 4:400, 5:175, 6:90,  7:50};
+
     for(let pick=1;pick<=maxPicks;pick++){
       if(!dhqPickValues[pick])continue;
       const rd=Math.ceil(pick/totalTeams);
       const posInRound=((pick-1)%totalTeams)+1;
       const pickPct=posInRound/totalTeams; // 0-1 within round
-      // Base value by round (sharp decay)
+
+      // League-derived value (from actual draft outcomes)
       const roundBase={1:8500,2:4000,3:2000,4:800,5:400,6:200,7:100};
       const roundEnd={1:5500,2:2500,3:1200,4:400,5:200,6:100,7:50};
-      const base=roundBase[rd]||50;
-      const end=roundEnd[rd]||25;
-      const baseVal=base-(base-end)*pickPct;
-      // Adjust slightly by actual hit rate (+/- 20% max)
+      const lBase=roundBase[rd]||50;
+      const lEnd=roundEnd[rd]||25;
+      const leagueVal=lBase-(lBase-lEnd)*pickPct;
+      // Adjust by actual hit rate (+/- 20% max)
       const hitBonus=dhqPickValues[pick].starterRate>0?
         Math.min(0.2,Math.max(-0.2,(dhqPickValues[pick].starterRate-50)/250)):0;
-      dhqPickValues[pick].value=Math.round(baseVal*(1+hitBonus));
+      const leagueFinal=leagueVal*(1+hitBonus);
+
+      // Industry consensus value (smooth curve, no noise)
+      const iBase=INDUSTRY_PICK_BASE[rd]||50;
+      const iEnd=INDUSTRY_PICK_END[rd]||25;
+      const industryVal=iBase-(iBase-iEnd)*pickPct;
+
+      // Blend: weighted average
+      const blended = (leagueFinal * leagueWeight) + (industryVal * industryWeight);
+      dhqPickValues[pick].value=Math.round(blended);
+      dhqPickValues[pick].leagueRaw=Math.round(leagueFinal);
+      dhqPickValues[pick].industryVal=Math.round(industryVal);
+      dhqPickValues[pick].blendWeights={league:Math.round(leagueWeight*100),industry:Math.round(industryWeight*100)};
     }
 
     // Round-level summary
