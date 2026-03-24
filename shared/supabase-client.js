@@ -130,7 +130,12 @@ window.OD.callAI = async function({ type, context }) {
     });
     if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || `AI call failed (${response.status})`);
+        const error = new Error(err.error || `AI call failed (${response.status})`);
+        error.status = response.status;
+        if (err.usage) error.usage = err.usage;
+        if (err.limit) error.limit = err.limit;
+        if (err.used) error.used = err.used;
+        throw error;
     }
     return response.json();
 };

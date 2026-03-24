@@ -116,12 +116,13 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600, 
       // Build a single context string from the messages array
       const lastUserMsg = [...messages].reverse().find(m=>m.role==='user');
       const contextParts = messages.map(m => m.role.toUpperCase()+': '+m.content).join('\n');
+      const effectiveType = callType || 'recon-chat';
       const result = await window.OD.callAI({
-        type: 'recon-chat',
+        type: effectiveType,
         context: JSON.stringify({
           system: sys,
           messages: messages,
-          callType: callType || 'recon-chat',
+          callType: effectiveType,
           userMessage: lastUserMsg?.content || '',
           maxTokens: maxTok,
           useWebSearch: useWebSearch,
@@ -129,17 +130,28 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600, 
       });
       const reply = result?.analysis || result?.response || result?.text ||
         (typeof result === 'string' ? result : JSON.stringify(result));
+      // Expose usage for UI (rate limit indicator)
+      if(result?.usage){
+        window.App.aiUsage = result.usage;
+        window.dispatchEvent(new CustomEvent('ai-usage-updated', { detail: result.usage }));
+      }
       // Cache the response in Supabase
       if(window.OD.saveAIAnalysis && S.currentLeagueId){
         window.OD.saveAIAnalysis(
           S.currentLeagueId,
-          'recon-chat',
+          effectiveType,
           (lastUserMsg?.content||'').substring(0,200),
           reply
         ).catch(()=>{}); // fire and forget
       }
       return reply || 'No response.';
     }catch(serverErr){
+      // Rate limit — show clear message, don't fall back to BYOK
+      if(serverErr.message && serverErr.message.includes('Daily limit reached')){
+        // Expose usage from error if available
+        if(serverErr.usage) window.App.aiUsage = serverErr.usage;
+        throw new Error(serverErr.message);
+      }
       console.warn('[ai-dispatch] Server AI failed, falling back to client:', serverErr.message);
       // Fall through to client-side if user has an API key
       if(!S.apiKey) throw serverErr;
