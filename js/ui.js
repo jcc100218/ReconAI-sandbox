@@ -228,7 +228,12 @@ function buildRosterTable(){
       <td><span class="pos ${pc}" style="font-size:12px">${pos}</span></td>
       <td class="rt-num-cell rt-val">${age||'—'}</td>
       <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:13px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:9px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:12px;color:var(--text3)">—</span>':'...'}</td>
-      <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}</td>
+      <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}${(()=>{
+        const wk=stats.weeklyPts||[];if(wk.length<3)return'';
+        const max=Math.max(...wk,1);const w=48;const h=14;
+        const pts=wk.map((v,i)=>{const x=Math.round(i/(wk.length-1)*w);const y=Math.round(h-v/max*h);return x+','+y;}).join(' ');
+        return'<svg width="'+w+'" height="'+h+'" style="display:block;margin-top:2px;opacity:0.6"><polyline points="'+pts+'" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/></svg>';
+      })()}</td>
       <td class="rt-num-cell rt-val dim">${prev?prev.toFixed(1):'—'}</td>
       <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:12px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
       <td>${inj?`<span class="rt-inj">${inj}</span>`:''}</td>
