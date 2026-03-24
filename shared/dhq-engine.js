@@ -1229,4 +1229,4 @@ window.dynastyValue = dynastyValue;
 window.getPlayerRank = getPlayerRank;
 window.isNoValue = isNoValue;
 window.App.faabBidStr = faabBidStr;
-x
+
