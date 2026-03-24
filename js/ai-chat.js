@@ -514,7 +514,7 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
       });
     }
     $('wq-list').innerHTML=`
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap">
+      <div style="font-size:13px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap">
         <span>${mentLabel}</span><span>${avail.length} available</span>
         <span style="color:${slots.openBench>0?'var(--green)':'var(--red)'}">${slots.openBench} open slot${slots.openBench!==1?'s':''}</span>
         ${isFAAB?`<span style="color:var(--green)">$${faab.remaining} FAAB remaining</span>`:''}
@@ -524,17 +524,17 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
           <div class="action-body" style="width:100%">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
               <span style="font-size:14px;font-weight:700;color:var(--accent)">#${r.rank}</span>
-              <span class="pos ${posClass(r.position)}" style="font-size:12px">${r.position||'?'}</span>
+              <span class="pos ${posClass(r.position)}" style="font-size:13px">${r.position||'?'}</span>
               <span style="font-size:14px;font-weight:500">${r.name}</span>
-              ${r.age?`<span style="font-size:12px;color:var(--text3)">age ${r.age}</span>`:''}
-              ${r.dynastyValue?`<span style="font-size:12px;color:var(--accent);font-weight:600">${r.dynastyValue.toLocaleString()}</span>`:''}
+              ${r.age?`<span style="font-size:13px;color:var(--text3)">age ${r.age}</span>`:''}
+              ${r.dynastyValue?`<span style="font-size:13px;color:var(--accent);font-weight:600">${r.dynastyValue.toLocaleString()}</span>`:''}
             </div>
-            <div style="font-size:12px;color:var(--text3);margin-bottom:5px">${fullTeam(r.team)||''}${r.drop?` · Drop: <span style="color:var(--red);font-weight:500">${r.drop}</span>${r.drop_reason?' ('+r.drop_reason+')':''}`:''}</div>
+            <div style="font-size:13px;color:var(--text3);margin-bottom:5px">${fullTeam(r.team)||''}${r.drop?` · Drop: <span style="color:var(--red);font-weight:500">${r.drop}</span>${r.drop_reason?' ('+r.drop_reason+')':''}`:''}</div>
             <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:7px">${r.reason}</div>
             ${isFAAB&&r.faab_low!=null?`<div style="background:var(--bg3);border-radius:6px;padding:7px 10px;margin-bottom:7px;display:inline-flex;align-items:center;gap:10px">
-              <span style="font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">FAAB bid</span>
+              <span style="font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">FAAB bid</span>
               <span style="font-size:17px;font-weight:700;color:var(--green)">$${r.faab_low}–$${r.faab_high}</span>
-              ${r.faab_rationale?`<span style="font-size:12px;color:var(--text2)">${r.faab_rationale}</span>`:''}
+              ${r.faab_rationale?`<span style="font-size:13px;color:var(--text2)">${r.faab_rationale}</span>`:''}
             </div>`:''}
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               ${r.copyText?`<button class="copy-btn" onclick="copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}

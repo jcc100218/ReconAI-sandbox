@@ -79,17 +79,17 @@ function _ensureModalDOM() {
         .fwpm-stat-box{padding:10px 6px;text-align:center;border-right:1px solid ${_wr.borderDim}}
         .fwpm-stat-box:last-child{border-right:none}
         .fwpm-stat-val{font-size:17px;font-weight:800;letter-spacing:-.03em;line-height:1;font-family:'Bebas Neue',Oswald,monospace}
-        .fwpm-stat-lbl{font-size:9px;color:${_wr.text2};text-transform:uppercase;letter-spacing:.06em;margin-top:5px;font-weight:600}
+        .fwpm-stat-lbl{font-size:13px;color:${_wr.text2};text-transform:uppercase;letter-spacing:.06em;margin-top:5px;font-weight:600}
         .fwpm-section{margin-bottom:14px}
-        .fwpm-section-title{font-family:'Bebas Neue',Oswald,sans-serif;font-size:12px;font-weight:600;color:${_wr.text2};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+        .fwpm-section-title{font-family:'Bebas Neue',Oswald,sans-serif;font-size:13px;font-weight:600;color:${_wr.text2};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
         .fwpm-card-box{background:${_wr.panel};border:1px solid ${_wr.border};border-radius:10px;padding:12px}
-        .fwpm-btn{font-size:12px;padding:7px 16px;background:${_wr.panel};border:1px solid ${_wr.border};border-radius:8px;color:${_wr.text2};text-decoration:none;cursor:pointer;font-family:Oswald,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.04em;transition:all .15s;display:inline-block}
+        .fwpm-btn{font-size:13px;padding:7px 16px;background:${_wr.panel};border:1px solid ${_wr.border};border-radius:8px;color:${_wr.text2};text-decoration:none;cursor:pointer;font-family:Oswald,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.04em;transition:all .15s;display:inline-block}
         .fwpm-btn:hover{background:${_wr.goldBg};color:${_wr.gold};border-color:${_wr.gold}}
         .fwpm-btn-gold{background:${_wr.gold};color:${_wr.black};border-color:${_wr.gold}}
         .fwpm-btn-gold:hover{background:#c9a42e}
-        .fwpm-career-row{display:grid;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:3px;font-size:12px}
+        .fwpm-career-row{display:grid;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);gap:3px;font-size:13px}
         .fwpm-career-row:last-child{border-bottom:none}
-        .fwpm-career-hdr{font-size:11px;font-weight:700;color:${_wr.text3};text-transform:uppercase}
+        .fwpm-career-hdr{font-size:13px;font-weight:700;color:${_wr.text3};text-transform:uppercase}
       </style>
       <!-- Banner -->
       <div id="fwpm-banner" style="border-radius:14px 14px 0 0;padding:20px 22px;position:relative;overflow:hidden;background:linear-gradient(135deg,${_wr.panel} 0%,rgba(212,175,55,.04) 100%)">
@@ -99,13 +99,13 @@ function _ensureModalDOM() {
           <div style="position:relative;flex-shrink:0">
             <img id="fwpm-photo" src="" style="width:90px;height:90px;border-radius:12px;object-fit:cover;object-position:top;border:2px solid ${_wr.border}" onerror="this.style.display='none';document.getElementById('fwpm-initials').style.display='flex'"/>
             <div id="fwpm-initials" style="display:none;width:90px;height:90px;border-radius:12px;background:${_wr.panel};align-items:center;justify-content:center;font-size:26px;font-weight:700;color:${_wr.text3};border:2px solid ${_wr.border}"></div>
-            <div id="fwpm-pos" style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap"></div>
+            <div id="fwpm-pos" style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap"></div>
           </div>
           <div style="flex:1;min-width:0;padding-top:2px">
             <div id="fwpm-name" style="font-family:'Bebas Neue',Oswald,sans-serif;font-size:22px;font-weight:700;letter-spacing:.02em;color:${_wr.text};line-height:1.1;margin-bottom:4px"></div>
             <!-- Insight blurb -->
             <div id="fwpm-insight" style="margin-bottom:6px"></div>
-            <div id="fwpm-bio" style="font-size:12px;color:${_wr.text2};margin-bottom:6px"></div>
+            <div id="fwpm-bio" style="font-size:13px;color:${_wr.text2};margin-bottom:6px"></div>
             <div id="fwpm-tags" style="display:flex;gap:6px;flex-wrap:wrap"></div>
           </div>
         </div>
@@ -118,17 +118,17 @@ function _ensureModalDOM() {
         <div class="fwpm-section">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <div class="fwpm-section-title" style="margin-bottom:0">Age Curve</div>
-            <div id="fwpm-peak-tag" style="font-size:11px;color:${_wr.text2}"></div>
+            <div id="fwpm-peak-tag" style="font-size:13px;color:${_wr.text2}"></div>
           </div>
           <div id="fwpm-curve" style="display:flex;height:22px;border-radius:5px;overflow:hidden;gap:1px"></div>
-          <div id="fwpm-curve-lbl" style="display:flex;justify-content:space-between;font-size:10px;color:${_wr.text3};margin-top:3px"></div>
+          <div id="fwpm-curve-lbl" style="display:flex;justify-content:space-between;font-size:13px;color:${_wr.text3};margin-top:3px"></div>
         </div>
         <!-- Value + Trade Profile -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div class="fwpm-card-box">
-            <div style="font-size:10px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dynasty Trade Value</div>
+            <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dynasty Trade Value</div>
             <div id="fwpm-val" style="font-size:24px;font-weight:800;letter-spacing:-.02em;color:${_wr.gold};font-family:'Bebas Neue',Oswald,monospace"></div>
-            <div id="fwpm-tier" style="font-size:11px;color:${_wr.text2};margin-top:2px"></div>
+            <div id="fwpm-tier" style="font-size:13px;color:${_wr.text2};margin-top:2px"></div>
           </div>
           <div id="fwpm-right" class="fwpm-card-box"></div>
         </div>
@@ -208,7 +208,7 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
   const gridCols = `38px 30px ${cols.map(() => '1fr').join(' ')}`;
 
   const years = Object.keys(careerData).sort((a,b) => b-a);
-  if (!years.length) return `<div style="color:${_wr.text3};font-size:12px;padding:4px 0">No career stats available.</div>`;
+  if (!years.length) return `<div style="color:${_wr.text3};font-size:13px;padding:4px 0">No career stats available.</div>`;
 
   const parseRow = (raw, yr) => {
     if (!raw) return null;
@@ -233,7 +233,7 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
   };
 
   const rows = years.map(yr => parseRow(careerData[yr], yr)).filter(Boolean);
-  if (!rows.length) return `<div style="color:${_wr.text3};font-size:12px;padding:4px 0">No career stats available.</div>`;
+  if (!rows.length) return `<div style="color:${_wr.text3};font-size:13px;padding:4px 0">No career stats available.</div>`;
 
   const fmt = (v, k) => {
     if (v == null || (v === 0 && k !== 'pass_int')) return `<span style="color:${_wr.text3}">\u2014</span>`;
@@ -257,7 +257,7 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
     totals.fpts = +totals.fpts.toFixed(1);
     totalsRow = `
       <div class="fwpm-career-row" style="grid-template-columns:${gridCols};border-top:2px solid ${_wr.border};padding-top:6px;font-weight:700">
-        <div style="font-size:11px;font-weight:800;color:${_wr.gold}">TOT</div>
+        <div style="font-size:13px;font-weight:800;color:${_wr.gold}">TOT</div>
         <div></div>
         ${cols.map(c => `<div style="text-align:right;color:${_wr.text}">${fmt(totals[c.k], c.k)}</div>`).join('')}
       </div>`;
@@ -272,7 +272,7 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
     ${rows.map(r => `
       <div class="fwpm-career-row" style="grid-template-columns:${gridCols}">
         <div style="font-weight:700;color:${_wr.text3}">${r.yr}</div>
-        <div style="font-weight:700;padding:1px 3px;border-radius:3px;background:${_wr.goldBg};color:${_wr.text3};text-align:center;font-size:11px">${playerObj.team||'FA'}</div>
+        <div style="font-weight:700;padding:1px 3px;border-radius:3px;background:${_wr.goldBg};color:${_wr.text3};text-align:center;font-size:13px">${playerObj.team||'FA'}</div>
         ${cols.map(c => `<div style="font-weight:600;text-align:right;color:${_wr.text}">${fmt(r[c.k], c.k)}</div>`).join('')}
       </div>`).join('')}
     ${totalsRow}`;
@@ -411,19 +411,19 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
 
   // ── Tags ──
   const tags = [];
-  if (p.injury_status) tags.push(`<span style="background:rgba(231,76,60,.1);color:${_wr.red};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">${p.injury_status}</span>`);
-  if (fcRankData && fcRankData.pos) tags.push(`<span style="background:rgba(212,175,55,.1);color:${_wr.gold};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">#${fcRankData.pos} ${pos}</span>`);
+  if (p.injury_status) tags.push(`<span style="background:rgba(231,76,60,.1);color:${_wr.red};font-size:13px;font-weight:700;padding:2px 8px;border-radius:20px">${p.injury_status}</span>`);
+  if (fcRankData && fcRankData.pos) tags.push(`<span style="background:rgba(212,175,55,.1);color:${_wr.gold};font-size:13px;font-weight:700;padding:2px 8px;border-radius:20px">#${fcRankData.pos} ${pos}</span>`);
   // League position rank
   const S = window.App.S || window.S || {};
   if (S.rosters) {
     const myRoster = S.rosters?.find(r => r.owner_id === S.myUserId || (r.co_owners||[]).includes(S.myUserId));
     const posRank = _fwLeaguePosRank(pid, pos, S);
-    if (posRank) tags.push(`<span style="background:rgba(46,204,113,.1);color:${_wr.green};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">${pos}${posRank} in league</span>`);
+    if (posRank) tags.push(`<span style="background:rgba(46,204,113,.1);color:${_wr.green};font-size:13px;font-weight:700;padding:2px 8px;border-radius:20px">${pos}${posRank} in league</span>`);
   }
   if (p.height || p.weight) {
     const ht = p.height ? Math.floor(p.height/12)+"'"+(p.height%12)+'"' : '';
     const wt = p.weight ? p.weight+'lbs' : '';
-    tags.push(`<span style="background:rgba(255,255,255,.04);color:${_wr.text3};font-size:11px;padding:2px 8px;border-radius:20px">${[ht,wt].filter(Boolean).join(' \u00B7 ')}</span>`);
+    tags.push(`<span style="background:rgba(255,255,255,.04);color:${_wr.text3};font-size:13px;padding:2px 8px;border-radius:20px">${[ht,wt].filter(Boolean).join(' \u00B7 ')}</span>`);
   }
   document.getElementById('fwpm-tags').innerHTML = tags.join('');
 
@@ -471,7 +471,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
   document.getElementById('fwpm-curve').innerHTML = ages.map(a => {
     const col = a < pk.lo-3 ? 'rgba(96,165,250,.3)' : a < pk.lo ? 'rgba(46,204,113,.45)' :
       (a >= pk.lo && a <= pk.hi) ? 'rgba(46,204,113,.75)' : a <= pk.hi+2 ? 'rgba(212,175,55,.45)' : 'rgba(231,76,60,.35)';
-    return `<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;cursor:default;background:${col};opacity:${a===age?1:0.55};outline:${a===age?'2px solid '+_wr.gold:'none'};outline-offset:-1px;color:${a===age?_wr.text:'transparent'}">${a===age?age:''}</div>`;
+    return `<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:default;background:${col};opacity:${a===age?1:0.55};outline:${a===age?'2px solid '+_wr.gold:'none'};outline-offset:-1px;color:${a===age?_wr.text:'transparent'}">${a===age?age:''}</div>`;
   }).join('');
   document.getElementById('fwpm-peak-tag').textContent = `Currently age ${age || '?'} \u00B7 ${pk.label} \u00B7 ${pk.desc}`;
   document.getElementById('fwpm-curve-lbl').innerHTML = `<span>20</span><span>Peak ${pk.lo}\u2013${pk.hi}</span><span>36</span>`;
@@ -496,16 +496,16 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     const qbhits = rawStats.idp_qb_hit || 0;
     const tklLoss = rawStats.idp_tkl_loss || 0;
     rightPanel.innerHTML = `
-      <div style="font-size:10px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">IDP Stats <span style="font-weight:400;text-transform:none">\u00B7 ${gp}gp</span></div>
-      <div style="font-size:20px;font-weight:800;color:${_wr.green};margin-bottom:6px;font-family:'Bebas Neue',Oswald,monospace">${idpPPG2||'\u2014'} <span style="font-size:12px;font-weight:600;color:${_wr.text2}">PPG</span></div>
+      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">IDP Stats <span style="font-weight:400;text-transform:none">\u00B7 ${gp}gp</span></div>
+      <div style="font-size:20px;font-weight:800;color:${_wr.green};margin-bottom:6px;font-family:'Bebas Neue',Oswald,monospace">${idpPPG2||'\u2014'} <span style="font-size:13px;font-weight:600;color:${_wr.text2}">PPG</span></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
-        ${tkl?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tkl}</strong> tackles</div>`:''}
-        ${sacks?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${sacks}</strong> sacks</div>`:''}
-        ${ints?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${ints}</strong> INT</div>`:''}
-        ${pds?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${pds}</strong> PD</div>`:''}
-        ${ff?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${ff}</strong> FF</div>`:''}
-        ${qbhits?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${qbhits}</strong> QB hits</div>`:''}
-        ${tklLoss?`<div style="font-size:11px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tklLoss}</strong> TFL</div>`:''}
+        ${tkl?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tkl}</strong> tackles</div>`:''}
+        ${sacks?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${sacks}</strong> sacks</div>`:''}
+        ${ints?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${ints}</strong> INT</div>`:''}
+        ${pds?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${pds}</strong> PD</div>`:''}
+        ${ff?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${ff}</strong> FF</div>`:''}
+        ${qbhits?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${qbhits}</strong> QB hits</div>`:''}
+        ${tklLoss?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tklLoss}</strong> TFL</div>`:''}
       </div>`;
   } else {
     // Trade Profile: BUY / HOLD / SELL
@@ -515,9 +515,9 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     const tpTrendCol = trend >= 15 ? _wr.green : trend <= -15 ? _wr.red : _wr.text3;
 
     rightPanel.innerHTML = `
-      <div style="font-size:10px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile</div>
+      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile</div>
       <div style="font-size:22px;font-weight:800;color:${recCol};font-family:'Bebas Neue',Oswald,monospace;letter-spacing:.02em">${rec}</div>
-      <div style="font-size:11px;color:${_wr.text2};margin-top:4px;line-height:1.4">
+      <div style="font-size:13px;color:${_wr.text2};margin-top:4px;line-height:1.4">
         <span style="color:${tpTrendCol}">${tpTrend}</span> \u00B7 ${peakYrsLeft > 0 ? peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left' : 'Past peak'}
       </div>`;
   }
@@ -534,7 +534,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     titleEl.textContent = 'Career Stats';
     careerEl.innerHTML = _fwBuildCareerTable(pid, quickData, pos, sc, p);
   } else {
-    careerEl.innerHTML = `<div style="color:${_wr.text3};font-size:12px;padding:4px 0">Loading career stats...</div>`;
+    careerEl.innerHTML = `<div style="color:${_wr.text3};font-size:13px;padding:4px 0">Loading career stats...</div>`;
   }
 
   // Fetch full career in background

@@ -861,7 +861,7 @@ async function renderTradeCalc() {
   // Show loading
   el.innerHTML = `<div style="text-align:center;padding:24px">
     <div class="ld"><span>.</span><span>.</span><span>.</span></div>
-    <div style="font-size:12px;color:var(--text3);margin-top:8px">Analyzing all teams...</div>
+    <div style="font-size:13px;color:var(--text3);margin-top:8px">Analyzing all teams...</div>
   </div>`;
 
   // Compute assessments
@@ -964,33 +964,33 @@ function renderLeagueOverview(assessments, container) {
     const posture = calcOwnerPosture(a, dnaKey);
     const avatarHtml = a.avatar
       ? `<img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`
-      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text3)">${(a.ownerName || '?')[0].toUpperCase()}</div>`;
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3)">${(a.ownerName || '?')[0].toUpperCase()}</div>`;
 
     html += `
       <div class="card" style="cursor:pointer;${isMe ? 'border-color:rgba(124,107,248,.35);box-shadow:0 0 12px rgba(124,107,248,.1)' : ''}" onclick="_tcScoutTeam(${a.rosterId})">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           ${avatarHtml}
           <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.ownerName}${isMe ? ' <span style="font-size:11px;color:var(--accent)">(You)</span>' : ''}</div>
-            <div style="font-size:12px;color:var(--text3)">${a.teamName}</div>
+            <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.ownerName}${isMe ? ' <span style="font-size:13px;color:var(--accent)">(You)</span>' : ''}</div>
+            <div style="font-size:13px;color:var(--text3)">${a.teamName}</div>
           </div>
           <div style="text-align:right">
-            <div style="font-size:11px;font-weight:700;color:${a.tierColor};text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:5px;background:${a.tierBg}">${a.tier}</div>
+            <div style="font-size:13px;font-weight:700;color:${a.tierColor};text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:5px;background:${a.tierBg}">${a.tier}</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-          <div style="font-size:12px;color:var(--text2)"><span style="font-weight:600">${a.wins}-${a.losses}${a.ties ? '-' + a.ties : ''}</span></div>
-          <div style="font-size:12px;color:var(--text3)">${a.weeklyPts > 0 ? a.weeklyPts.toFixed(1) + ' ppg' : '--'}</div>
-          ${dnaKey !== 'NONE' ? `<span style="font-size:11px;padding:1px 7px;border-radius:10px;background:${dna.color}22;color:${dna.color};font-weight:600">${dna.label}</span>` : ''}
+          <div style="font-size:13px;color:var(--text2)"><span style="font-weight:600">${a.wins}-${a.losses}${a.ties ? '-' + a.ties : ''}</span></div>
+          <div style="font-size:13px;color:var(--text3)">${a.weeklyPts > 0 ? a.weeklyPts.toFixed(1) + ' ppg' : '--'}</div>
+          ${dnaKey !== 'NONE' ? `<span style="font-size:13px;padding:1px 7px;border-radius:10px;background:${dna.color}22;color:${dna.color};font-weight:600">${dna.label}</span>` : ''}
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-          <div style="font-size:11px;color:var(--text3);min-width:52px">Health</div>
+          <div style="font-size:13px;color:var(--text3);min-width:52px">Health</div>
           <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
             <div style="height:100%;width:${a.healthScore}%;background:${a.healthScore >= 70 ? 'var(--green)' : a.healthScore >= 45 ? 'var(--amber)' : 'var(--red)'};border-radius:3px;transition:width .4s"></div>
           </div>
-          <div style="font-size:12px;font-weight:700;font-family:'JetBrains Mono',monospace;min-width:28px;text-align:right;color:${a.healthScore >= 70 ? 'var(--green)' : a.healthScore >= 45 ? 'var(--amber)' : 'var(--red)'}">${a.healthScore}</div>
+          <div style="font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;min-width:28px;text-align:right;color:${a.healthScore >= 70 ? 'var(--green)' : a.healthScore >= 45 ? 'var(--amber)' : 'var(--red)'}">${a.healthScore}</div>
         </div>
-        <div style="display:flex;gap:12px;font-size:11px">
+        <div style="display:flex;gap:12px;font-size:13px">
           <div><span style="color:var(--text3)">Need:</span> <span style="color:var(--red);font-weight:600">${topNeed}</span></div>
           <div><span style="color:var(--text3)">Surplus:</span> <span style="color:var(--green);font-weight:600">${topStrength}</span></div>
           <div><span style="color:var(--text3)">Panic:</span> <span style="color:${a.panic >= 3 ? 'var(--red)' : a.panic >= 2 ? 'var(--amber)' : 'var(--green)'};font-weight:600">${a.panic}/5</span></div>
@@ -1025,25 +1025,25 @@ function renderTeamScout(assessment, container) {
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         ${avatarHtml}
         <div style="flex:1;min-width:0">
-          <div style="font-size:16px;font-weight:800;letter-spacing:-.02em">${a.ownerName}${isMe ? ' <span style="color:var(--accent);font-size:12px">(You)</span>' : ''}</div>
-          <div style="font-size:12px;color:var(--text3)">${a.teamName} &middot; ${a.wins}-${a.losses}${a.ties ? '-' + a.ties : ''} &middot; ${a.weeklyPts > 0 ? a.weeklyPts.toFixed(1) + ' ppg' : '--'}</div>
+          <div style="font-size:16px;font-weight:800;letter-spacing:-.02em">${a.ownerName}${isMe ? ' <span style="color:var(--accent);font-size:13px">(You)</span>' : ''}</div>
+          <div style="font-size:13px;color:var(--text3)">${a.teamName} &middot; ${a.wins}-${a.losses}${a.ties ? '-' + a.ties : ''} &middot; ${a.weeklyPts > 0 ? a.weeklyPts.toFixed(1) + ' ppg' : '--'}</div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:12px;font-weight:700;color:${a.tierColor};text-transform:uppercase;padding:3px 10px;border-radius:6px;background:${a.tierBg}">${a.tier}</div>
+          <div style="font-size:13px;font-weight:700;color:${a.tierColor};text-transform:uppercase;padding:3px 10px;border-radius:6px;background:${a.tierBg}">${a.tier}</div>
         </div>
       </div>
 
       <!-- Health + Panic meters -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
         <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Health Score</div>
+          <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Health Score</div>
           <div style="font-size:28px;font-weight:800;color:${a.healthScore >= 70 ? 'var(--green)' : a.healthScore >= 45 ? 'var(--amber)' : 'var(--red)'};font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${a.healthScore}</div>
           <div style="height:5px;background:var(--bg);border-radius:3px;margin-top:6px;overflow:hidden">
             <div style="height:100%;width:${a.healthScore}%;background:${a.healthScore >= 70 ? 'var(--green)' : a.healthScore >= 45 ? 'var(--amber)' : 'var(--red)'};border-radius:3px"></div>
           </div>
         </div>
         <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Panic Meter</div>
+          <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;font-weight:600">Panic Meter</div>
           <div style="font-size:28px;font-weight:800;color:${a.panic >= 4 ? 'var(--red)' : a.panic >= 2 ? 'var(--amber)' : 'var(--green)'};font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${a.panic}<span style="font-size:14px;color:var(--text3)">/5</span></div>
           <div style="display:flex;gap:3px;margin-top:6px">
             ${[1, 2, 3, 4, 5].map(i => `<div style="flex:1;height:5px;border-radius:3px;background:${i <= a.panic ? (a.panic >= 4 ? 'var(--red)' : a.panic >= 2 ? 'var(--amber)' : 'var(--green)') : 'var(--bg)'}"></div>`).join('')}
@@ -1053,9 +1053,9 @@ function renderTeamScout(assessment, container) {
 
       <!-- DNA + Posture + Window -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-        ${dnaKey !== 'NONE' ? `<span class="pill" style="background:${dna.color}18;color:${dna.color};border-color:${dna.color}40;font-size:12px">DNA: ${dna.label}</span>` : '<span class="pill pd" style="font-size:12px">DNA: Not Set</span>'}
-        <span class="pill" style="background:${posture.color}18;color:${posture.color};border-color:${posture.color}40;font-size:12px">${posture.label}</span>
-        <span class="pill pd" style="font-size:12px">Window: ${a.window}</span>
+        ${dnaKey !== 'NONE' ? `<span class="pill" style="background:${dna.color}18;color:${dna.color};border-color:${dna.color}40;font-size:13px">DNA: ${dna.label}</span>` : '<span class="pill pd" style="font-size:13px">DNA: Not Set</span>'}
+        <span class="pill" style="background:${posture.color}18;color:${posture.color};border-color:${posture.color}40;font-size:13px">${posture.label}</span>
+        <span class="pill pd" style="font-size:13px">Window: ${a.window}</span>
       </div>
     </div>`;
 
@@ -1074,10 +1074,10 @@ function renderTeamScout(assessment, container) {
     const topPlayers = (pa.sortedIds || []).slice(0, 3).map(pid => {
       const val = dynastyValue(pid);
       const isStarter = pa.nflStarterIds?.includes(pid);
-      return `<div style="display:flex;align-items:center;gap:4px;font-size:11px;padding:1px 0">
+      return `<div style="display:flex;align-items:center;gap:4px;font-size:13px;padding:1px 0">
         <span style="color:${isStarter ? 'var(--green)' : 'var(--text3)'};font-size:9px">${isStarter ? '●' : '○'}</span>
         <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--text2)" onclick="openPlayerModal('${pid}')">${pNameShort(pid)}</span>
-        ${val > 0 ? `<span style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>` : ''}
+        ${val > 0 ? `<span style="font-size:13px;color:var(--text3);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>` : ''}
       </div>`;
     }).join('');
 
@@ -1085,9 +1085,9 @@ function renderTeamScout(assessment, container) {
       <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px;border-top:3px solid ${statusColor}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <span style="font-size:13px;font-weight:700">${pos}</span>
-          <span style="font-size:10px;font-weight:700;color:${statusColor};text-transform:uppercase;padding:1px 6px;border-radius:4px;background:${statusBg}">${statusLabel}</span>
+          <span style="font-size:13px;font-weight:700;color:${statusColor};text-transform:uppercase;padding:1px 6px;border-radius:4px;background:${statusBg}">${statusLabel}</span>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">
+        <div style="font-size:13px;color:var(--text3);margin-bottom:6px">
           ${pa.nflStarters}/${pa.minQuality} starters &middot; ${pa.actual} total
         </div>
         ${topPlayers}
@@ -1098,15 +1098,15 @@ function renderTeamScout(assessment, container) {
   // Needs and Strengths
   html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">`;
   html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px">
-    <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Needs</div>
-    ${a.needs.length ? a.needs.map(n => `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Needs</div>
+    ${a.needs.length ? a.needs.map(n => `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;font-size:13px">
       <span style="font-weight:600">${n.pos}</span>
-      <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:${n.urgency === 'deficit' ? 'var(--redL)' : 'var(--amberL)'};color:${n.urgency === 'deficit' ? 'var(--red)' : 'var(--amber)'};font-weight:600;text-transform:uppercase">${n.urgency}</span>
-    </div>`).join('') : '<div style="font-size:12px;color:var(--text3)">None</div>'}
+      <span style="font-size:13px;padding:1px 5px;border-radius:3px;background:${n.urgency === 'deficit' ? 'var(--redL)' : 'var(--amberL)'};color:${n.urgency === 'deficit' ? 'var(--red)' : 'var(--amber)'};font-weight:600;text-transform:uppercase">${n.urgency}</span>
+    </div>`).join('') : '<div style="font-size:13px;color:var(--text3)">None</div>'}
   </div>`;
   html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px">
-    <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Strengths</div>
-    ${a.strengths.length ? a.strengths.map(pos => `<div style="font-size:12px;font-weight:600;padding:2px 0">${pos} <span style="font-size:10px;color:var(--green)">surplus</span></div>`).join('') : '<div style="font-size:12px;color:var(--text3)">None</div>'}
+    <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Strengths</div>
+    ${a.strengths.length ? a.strengths.map(pos => `<div style="font-size:13px;font-weight:600;padding:2px 0">${pos} <span style="font-size:13px;color:var(--green)">surplus</span></div>`).join('') : '<div style="font-size:13px;color:var(--text3)">None</div>'}
   </div>`;
   html += `</div>`;
 
@@ -1116,16 +1116,16 @@ function renderTeamScout(assessment, container) {
   html += `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <span style="font-size:13px;font-weight:700">Picks</span>
-      <span style="font-size:11px;padding:2px 7px;border-radius:4px;font-weight:600;background:${pa.status === 'surplus' ? 'var(--greenL)' : pa.status === 'ok' ? 'var(--accentL)' : pa.status === 'thin' ? 'var(--amberL)' : 'var(--redL)'};color:${pa.status === 'surplus' ? 'var(--green)' : pa.status === 'ok' ? 'var(--accent)' : pa.status === 'thin' ? 'var(--amber)' : 'var(--red)'};text-transform:uppercase">${pa.status}</span>
-      <span style="font-size:11px;color:var(--text3)">${pa.totalPicks}/${pa.idealTotal} total</span>
+      <span style="font-size:13px;padding:2px 7px;border-radius:4px;font-weight:600;background:${pa.status === 'surplus' ? 'var(--greenL)' : pa.status === 'ok' ? 'var(--accentL)' : pa.status === 'thin' ? 'var(--amberL)' : 'var(--redL)'};color:${pa.status === 'surplus' ? 'var(--green)' : pa.status === 'ok' ? 'var(--accent)' : pa.status === 'thin' ? 'var(--amber)' : 'var(--red)'};text-transform:uppercase">${pa.status}</span>
+      <span style="font-size:13px;color:var(--text3)">${pa.totalPicks}/${pa.idealTotal} total</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px">
       ${(pa.pickYears || []).map(yr => {
         const count = pa.pickCountByYear[yr] || 0;
         return `<div style="background:var(--bg3);border-radius:6px;padding:8px;text-align:center">
-          <div style="font-size:11px;color:var(--text3);font-weight:600">${yr}</div>
+          <div style="font-size:13px;color:var(--text3);font-weight:600">${yr}</div>
           <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${count >= pa.draftRounds ? 'var(--green)' : count > 0 ? 'var(--text)' : 'var(--red)'}">${count}</div>
-          <div style="font-size:10px;color:var(--text3)">picks</div>
+          <div style="font-size:13px;color:var(--text3)">picks</div>
         </div>`;
       }).join('')}
     </div>
@@ -1169,21 +1169,21 @@ function renderPartnerFinder(myAssessment, allAssessments, container) {
 
   // My needs
   html += `<div class="card">
-    <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">My Needs</div>
+    <div style="font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">My Needs</div>
     ${myAssessment.needs.length ? myAssessment.needs.map(n => `
       <div style="display:flex;align-items:center;gap:6px;padding:3px 0">
         <span style="font-size:13px;font-weight:700">${n.pos}</span>
-        <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:${n.urgency === 'deficit' ? 'var(--redL)' : 'var(--amberL)'};color:${n.urgency === 'deficit' ? 'var(--red)' : 'var(--amber)'};font-weight:600;text-transform:uppercase">${n.urgency}</span>
+        <span style="font-size:13px;padding:1px 5px;border-radius:3px;background:${n.urgency === 'deficit' ? 'var(--redL)' : 'var(--amberL)'};color:${n.urgency === 'deficit' ? 'var(--red)' : 'var(--amber)'};font-weight:600;text-transform:uppercase">${n.urgency}</span>
       </div>
-    `).join('') : '<div style="font-size:12px;color:var(--text3)">No critical needs</div>'}
+    `).join('') : '<div style="font-size:13px;color:var(--text3)">No critical needs</div>'}
   </div>`;
 
   // My strengths
   html += `<div class="card">
-    <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">My Strengths</div>
+    <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">My Strengths</div>
     ${myAssessment.strengths.length ? myAssessment.strengths.map(pos => `
-      <div style="font-size:13px;font-weight:600;padding:3px 0">${pos} <span style="font-size:10px;color:var(--green);text-transform:uppercase">surplus</span></div>
-    `).join('') : '<div style="font-size:12px;color:var(--text3)">No surplus positions</div>'}
+      <div style="font-size:13px;font-weight:600;padding:3px 0">${pos} <span style="font-size:13px;color:var(--green);text-transform:uppercase">surplus</span></div>
+    `).join('') : '<div style="font-size:13px;color:var(--text3)">No surplus positions</div>'}
   </div>`;
   html += `</div>`;
 
@@ -1206,17 +1206,17 @@ function renderPartnerFinder(myAssessment, allAssessments, container) {
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                 <span style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.ownerName}</span>
-                <span style="font-size:11px;color:${a.tierColor};font-weight:600">${a.tier}</span>
-                ${dnaKey !== 'NONE' ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:${dna.color}22;color:${dna.color};font-weight:600">${dna.label}</span>` : ''}
+                <span style="font-size:13px;color:${a.tierColor};font-weight:600">${a.tier}</span>
+                ${dnaKey !== 'NONE' ? `<span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${dna.color}22;color:${dna.color};font-weight:600">${dna.label}</span>` : ''}
               </div>
-              <div style="display:flex;gap:8px;font-size:11px;color:var(--text3);flex-wrap:wrap">
+              <div style="display:flex;gap:8px;font-size:13px;color:var(--text3);flex-wrap:wrap">
                 ${p.theyProvide.length ? `<span>They give: <span style="color:var(--green);font-weight:600">${p.theyProvide.join(', ')}</span></span>` : ''}
                 ${p.iProvide.length ? `<span>I give: <span style="color:var(--blue);font-weight:600">${p.iProvide.join(', ')}</span></span>` : ''}
               </div>
             </div>
             <div style="text-align:right;min-width:50px">
               <div style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${compatColor}">${p.compatibility}</div>
-              <div style="font-size:10px;color:var(--text3)">compat</div>
+              <div style="font-size:13px;color:var(--text3)">compat</div>
             </div>
           </div>
           <div style="height:4px;background:var(--bg3);border-radius:2px;margin-top:8px;overflow:hidden">
@@ -1255,8 +1255,8 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
         ${_tcAssessments.filter(a => a.rosterId !== myRosterId).map(a => `
           <button class="btn btn-sm btn-ghost" onclick="_tcStartTrade(${a.rosterId})" style="text-align:left;padding:8px 10px">
-            <div style="font-size:12px;font-weight:600">${a.ownerName}</div>
-            <div style="font-size:10px;color:var(--text3)">${a.tier} &middot; ${a.wins}-${a.losses}</div>
+            <div style="font-size:13px;font-weight:600">${a.ownerName}</div>
+            <div style="font-size:13px;color:var(--text3)">${a.tier} &middot; ${a.wins}-${a.losses}</div>
           </button>
         `).join('')}
       </div>
@@ -1273,12 +1273,12 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   // Header with opponent info
   html += `<div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
     <div style="flex:1">
-      <div style="font-size:12px;color:var(--text3)">Trading with</div>
+      <div style="font-size:13px;color:var(--text3)">Trading with</div>
       <div style="font-size:15px;font-weight:700">${theirAssessment.ownerName}</div>
       <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
-        <span style="font-size:11px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
-        ${theirDnaKey !== 'NONE' ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
-        <span style="font-size:10px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
+        <span style="font-size:13px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
+        ${theirDnaKey !== 'NONE' ? `<span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
+        <span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
       </div>
     </div>
     <button class="btn btn-sm btn-ghost" onclick="_tcScoutTeam(${theirAssessment.rosterId})">Scout</button>
@@ -1313,18 +1313,18 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   const grade = fairnessGrade(myVal, theirVal);
 
   html += `<div class="card" style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Trade Summary</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Trade Summary</div>
     <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:12px">
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:2px">You Give</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:2px">You Give</div>
         <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${myVal.toLocaleString()}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Diff</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:2px">Diff</div>
         <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--text3)'}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--text3);margin-bottom:2px">They Give</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:2px">They Give</div>
         <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${theirVal.toLocaleString()}</div>
       </div>
     </div>`;
@@ -1332,31 +1332,31 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   // Acceptance likelihood meter
   const acceptColor = acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)';
   html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div style="font-size:11px;color:var(--text3);min-width:72px">Acceptance</div>
+      <div style="font-size:13px;color:var(--text3);min-width:72px">Acceptance</div>
       <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative">
         <div style="height:100%;width:${acceptance}%;background:${acceptColor};border-radius:4px;transition:width .4s"></div>
       </div>
       <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${acceptColor};min-width:40px;text-align:right">${acceptance}%</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div style="font-size:11px;color:var(--text3);min-width:72px">Fairness</div>
+      <div style="font-size:13px;color:var(--text3);min-width:72px">Fairness</div>
       <div style="font-size:18px;font-weight:800;color:${grade.color}">${grade.grade}</div>
-      ${theirDnaKey !== 'NONE' ? `<div style="font-size:11px;color:var(--text3);margin-left:auto">DNA mult: ${theirDna.mult}x</div>` : ''}
+      ${theirDnaKey !== 'NONE' ? `<div style="font-size:13px;color:var(--text3);margin-left:auto">DNA mult: ${theirDna.mult}x</div>` : ''}
     </div>`;
 
   // Psych taxes breakdown
   if (psychTaxes.length) {
     html += `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Psychological Factors</div>`;
+      <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Psychological Factors</div>`;
     psychTaxes.forEach(t => {
       const isBonus = t.type === 'BONUS';
-      html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:12px">
-        <span style="font-size:11px;font-weight:700;min-width:40px;text-align:right;color:${isBonus ? 'var(--green)' : 'var(--red)'}">
+      html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:13px">
+        <span style="font-size:13px;font-weight:700;min-width:40px;text-align:right;color:${isBonus ? 'var(--green)' : 'var(--red)'}">
           ${t.impact > 0 ? '+' : ''}${t.impact}%
         </span>
         <div>
           <div style="font-weight:600;color:var(--text)">${t.name}</div>
-          <div style="color:var(--text3);font-size:11px;margin-top:1px">${t.desc}</div>
+          <div style="color:var(--text3);font-size:13px;margin-top:1px">${t.desc}</div>
         </div>
       </div>`;
     });
@@ -1415,18 +1415,18 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
     const val = dynastyValue(pid);
     const { col } = tradeValueTier(val);
     return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pNameShort(pid)}</span>
-      <span style="font-size:11px;font-weight:600;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
-      <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:10px;font-family:inherit" onclick="_tcRemoveAsset('${side}','player','${pid}')">&times;</button>
+      <span style="font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pNameShort(pid)}</span>
+      <span style="font-size:13px;font-weight:600;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
+      <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','player','${pid}')">&times;</button>
     </div>`;
   }).join('');
 
   const selectedPickHtml = assets.picks.map((pk, idx) => {
     const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
     return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:12px;flex:1">${pk.year} Round ${pk.round}</span>
-      <span style="font-size:11px;font-weight:600;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
-      <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:10px;font-family:inherit" onclick="_tcRemoveAsset('${side}','pick',${idx})">&times;</button>
+      <span style="font-size:13px;flex:1">${pk.year} Round ${pk.round}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
+      <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','pick',${idx})">&times;</button>
     </div>`;
   }).join('');
 
@@ -1454,35 +1454,35 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
   });
 
   return `<div style="background:var(--bg2);border:1px solid ${isMySide ? 'rgba(124,107,248,.2)' : 'var(--border)'};border-radius:var(--rl);padding:12px">
-    <div style="font-size:12px;font-weight:700;color:${isMySide ? 'var(--accent)' : 'var(--text2)'};text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${isMySide ? 'You Give' : assessment.ownerName + ' Gives'}</div>
+    <div style="font-size:13px;font-weight:700;color:${isMySide ? 'var(--accent)' : 'var(--text2)'};text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${isMySide ? 'You Give' : assessment.ownerName + ' Gives'}</div>
 
     <!-- Selected assets -->
     <div style="min-height:24px;margin-bottom:8px">
       ${selectedPlayerHtml}
       ${selectedPickHtml}
       ${assets.faab > 0 ? `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:12px;flex:1">$${assets.faab} FAAB</span>
-        <span style="font-size:11px;font-weight:600;color:var(--amber);font-family:'JetBrains Mono',monospace">${Math.round(assets.faab * FAAB_RATE).toLocaleString()}</span>
-        <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:10px;font-family:inherit" onclick="_tcRemoveAsset('${side}','faab',0)">&times;</button>
+        <span style="font-size:13px;flex:1">$${assets.faab} FAAB</span>
+        <span style="font-size:13px;font-weight:600;color:var(--amber);font-family:'JetBrains Mono',monospace">${Math.round(assets.faab * FAAB_RATE).toLocaleString()}</span>
+        <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','faab',0)">&times;</button>
       </div>` : ''}
-      ${!selectedPlayerHtml && !selectedPickHtml && assets.faab <= 0 ? '<div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">No assets selected</div>' : ''}
+      ${!selectedPlayerHtml && !selectedPickHtml && assets.faab <= 0 ? '<div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">No assets selected</div>' : ''}
     </div>
 
     <!-- Add player -->
-    <select style="font-size:12px;padding:6px 8px;margin-bottom:6px" onchange="_tcAddPlayer('${side}',this.value);this.value=''">
+    <select style="font-size:13px;padding:6px 8px;margin-bottom:6px" onchange="_tcAddPlayer('${side}',this.value);this.value=''">
       ${playerOptions}
     </select>
 
     <!-- Add pick -->
-    <select style="font-size:12px;padding:6px 8px;margin-bottom:6px" onchange="_tcAddPick('${side}',this.value);this.value=''">
+    <select style="font-size:13px;padding:6px 8px;margin-bottom:6px" onchange="_tcAddPick('${side}',this.value);this.value=''">
       ${pickOptions}
     </select>
 
     <!-- FAAB input -->
     ${isMySide ? `<div style="display:flex;gap:6px;align-items:center;margin-top:4px">
-      <span style="font-size:11px;color:var(--text3)">FAAB $</span>
-      <input type="number" min="0" max="${assessment.faabRemaining || 0}" value="${assets.faab || ''}" style="width:70px;font-size:12px;padding:4px 6px" placeholder="0" onchange="_tcSetFaab('${side}',parseInt(this.value)||0)">
-      <span style="font-size:10px;color:var(--text3)">/${assessment.faabRemaining || 0}</span>
+      <span style="font-size:13px;color:var(--text3)">FAAB $</span>
+      <input type="number" min="0" max="${assessment.faabRemaining || 0}" value="${assets.faab || ''}" style="width:70px;font-size:13px;padding:4px 6px" placeholder="0" onchange="_tcSetFaab('${side}',parseInt(this.value)||0)">
+      <span style="font-size:13px;color:var(--text3)">/${assessment.faabRemaining || 0}</span>
     </div>` : ''}
   </div>`;
 }
@@ -1543,7 +1543,7 @@ function renderDNAPanel(assessments, container) {
   if (!container) return;
 
   let html = `<div class="sec">Owner DNA Profiles <span class="sec-line"></span></div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">
+    <div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">
       DNA profiles model each owner's trade psychology. Auto-derived from league trade history, or set manually via Override.
     </div>`;
 
@@ -1582,44 +1582,44 @@ function renderDNAPanel(assessments, container) {
         <div style="display:flex;align-items:flex-start;gap:10px">
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-              <span style="font-size:14px;font-weight:700">${a.ownerName}${isMe ? ' <span style="font-size:11px;color:var(--accent)">(You)</span>' : ''}</span>
-              <span style="font-size:11px;color:${a.tierColor};font-weight:600">${a.tier}</span>
+              <span style="font-size:14px;font-weight:700">${a.ownerName}${isMe ? ' <span style="font-size:13px;color:var(--accent)">(You)</span>' : ''}</span>
+              <span style="font-size:13px;color:${a.tierColor};font-weight:600">${a.tier}</span>
             </div>
 
             <!-- Current DNA badge + posture -->
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-              <span style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:700;background:${dna.color}22;color:${dna.color};border:1px solid ${dna.color}40">${dna.label || 'Not Set'}</span>
-              <span style="font-size:10px;padding:2px 6px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
+              <span style="font-size:13px;padding:3px 10px;border-radius:12px;font-weight:700;background:${dna.color}22;color:${dna.color};border:1px solid ${dna.color}40">${dna.label || 'Not Set'}</span>
+              <span style="font-size:13px;padding:2px 6px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
             </div>
-            ${dna.desc ? `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">${dna.desc}</div>` : ''}
+            ${dna.desc ? `<div style="font-size:13px;color:var(--text3);margin-bottom:6px">${dna.desc}</div>` : ''}
 
             <!-- Auto-derived DNA with confidence -->
-            ${derivedKey ? `<div style="font-size:11px;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${derivedKey ? `<div style="font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
               <span style="color:var(--text3)">Auto:</span>
               <span style="font-weight:700;color:${derivedDna.color}">${derivedDna.label}</span>
               <span style="color:${confColor};font-weight:600">(${confPct}% confidence)</span>
               <span style="width:40px;height:4px;border-radius:2px;background:var(--bg3);display:inline-block;vertical-align:middle;overflow:hidden"><span style="display:block;width:${confPct}%;height:100%;background:${confColor};border-radius:2px"></span></span>
-              ${derivedKey !== dnaKey ? `<button class="btn btn-sm" style="font-size:10px;padding:2px 8px" onclick="_tcSetDNA(${a.rosterId},'${derivedKey}')">Apply</button>` : ''}
-            </div>` : profile && profile.trades < 3 ? `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Auto: Insufficient data (${profile.trades} trade${profile.trades !== 1 ? 's' : ''}, need 3+)</div>` : ''}
+              ${derivedKey !== dnaKey ? `<button class="btn btn-sm" style="font-size:13px;padding:2px 8px" onclick="_tcSetDNA(${a.rosterId},'${derivedKey}')">Apply</button>` : ''}
+            </div>` : profile && profile.trades < 3 ? `<div style="font-size:13px;color:var(--text3);margin-bottom:6px">Auto: Insufficient data (${profile.trades} trade${profile.trades !== 1 ? 's' : ''}, need 3+)</div>` : ''}
 
             <!-- Trade history stats: wins/losses/fair, avg value diff, most traded with -->
-            ${profile ? `<div style="display:flex;gap:10px;font-size:11px;color:var(--text3);flex-wrap:wrap;margin-bottom:4px">
+            ${profile ? `<div style="display:flex;gap:10px;font-size:13px;color:var(--text3);flex-wrap:wrap;margin-bottom:4px">
               <span><span style="font-weight:600;color:var(--green)">${profile.tradesWon || 0}W</span> / <span style="font-weight:600;color:var(--red)">${profile.tradesLost || 0}L</span> / <span style="font-weight:600;color:var(--text2)">${profile.tradesFair || 0}F</span></span>
               <span>Avg diff: <span style="font-weight:600;color:${(profile.avgValueDiff || 0) >= 0 ? 'var(--green)' : 'var(--red)'}">${(profile.avgValueDiff || 0) >= 0 ? '+' : ''}${profile.avgValueDiff || 0}</span></span>
               ${topPartnerStr ? `<span>Most traded with: <span style="font-weight:600;color:var(--accent)">${topPartnerStr}</span></span>` : ''}
             </div>
-            <div style="display:flex;gap:10px;font-size:11px;color:var(--text3);flex-wrap:wrap">
+            <div style="display:flex;gap:10px;font-size:13px;color:var(--text3);flex-wrap:wrap">
               <span>Trades: <span style="font-weight:600;color:var(--text2)">${profile.trades}</span></span>
               <span>Picks In: <span style="font-weight:600;color:var(--green)">${profile.picksAcquired || 0}</span></span>
               <span>Picks Out: <span style="font-weight:600;color:var(--red)">${profile.picksSold || 0}</span></span>
               ${profile.targetPos ? `<span>Targets: <span style="font-weight:600;color:var(--accent)">${profile.targetPos}</span></span>` : ''}
-            </div>` : '<div style="font-size:11px;color:var(--text3)">No trade history data</div>'}
+            </div>` : '<div style="font-size:13px;color:var(--text3)">No trade history data</div>'}
           </div>
 
           <!-- Override dropdown -->
           <div style="flex-shrink:0;text-align:right">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:2px">Override</div>
-            <select style="font-size:11px;padding:4px 6px;width:110px" onchange="_tcSetDNA(${a.rosterId},this.value)">
+            <div style="font-size:13px;color:var(--text3);margin-bottom:2px">Override</div>
+            <select style="font-size:13px;padding:4px 6px;width:110px" onchange="_tcSetDNA(${a.rosterId},this.value)">
               ${Object.entries(DNA_TYPES).map(([key, d]) => `<option value="${key}" ${key === dnaKey ? 'selected' : ''}>${d.label}</option>`).join('')}
             </select>
           </div>
@@ -1752,10 +1752,10 @@ function renderValueChart(container) {
   html += `</div>`;
 
   // Count
-  html += `<div style="font-size:12px;color:var(--text3);margin-bottom:8px">${total} player${total !== 1 ? 's' : ''} valued</div>`;
+  html += `<div style="font-size:13px;color:var(--text3);margin-bottom:8px">${total} player${total !== 1 ? 's' : ''} valued</div>`;
 
   // Header row
-  html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:4px 8px;font-size:11px;font-weight:700;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.03em">`;
+  html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:4px 8px;font-size:13px;font-weight:700;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.03em">`;
   html += `<span>#</span><span></span><span>Player</span><span>Pos</span><span>Age</span><span>Value</span><span>Phase</span><span></span>`;
   html += `</div>`;
 
@@ -1774,33 +1774,33 @@ function renderValueChart(container) {
     const clickAction = p.isPick ? '' : `onclick="openPlayerModal('${p.pid}')"`;
     html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:5px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:${p.isPick?'default':'pointer'};transition:background .12s" ${clickAction} onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">`;
     // Rank
-    html += `<span style="font-size:12px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${rank}</span>`;
+    html += `<span style="font-size:13px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${rank}</span>`;
     if (p.isPick) {
       // Pick icon
       const rdNum = parseInt(p.pid.split('-')[2]) || 1;
       const pickCol = {1:'#D4AF37',2:'#5DADE2',3:'#2ECC71',4:'#BB8FCE',5:'#95A5A6',6:'#7F8C8D',7:'#6C7A7D'}[rdNum] || 'var(--text3)';
-      html += `<div style="width:24px;height:24px;border-radius:50%;background:${pickCol}22;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:${pickCol};flex-shrink:0">R${rdNum}</div>`;
-      html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">Mid-round estimate</div></div>`;
-      html += `<span style="font-size:11px;padding:1px 5px;background:${pickCol}18;color:${pickCol};border-radius:4px;font-weight:700">PICK</span>`;
-      html += `<span style="font-size:12px;color:var(--text3)">—</span>`;
+      html += `<div style="width:24px;height:24px;border-radius:50%;background:${pickCol}22;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:${pickCol};flex-shrink:0">R${rdNum}</div>`;
+      html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:13px;color:var(--text3)">Mid-round estimate</div></div>`;
+      html += `<span style="font-size:13px;padding:1px 5px;background:${pickCol}18;color:${pickCol};border-radius:4px;font-weight:700">PICK</span>`;
+      html += `<span style="font-size:13px;color:var(--text3)">—</span>`;
       html += `<span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>`;
-      html += `<span style="font-size:11px;color:var(--text3)">—</span>`;
+      html += `<span style="font-size:13px;color:var(--text3)">—</span>`;
       html += `<span></span>`;
     } else {
       // Photo
-      html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:700;color:var(--text3)\\'>${initials}</span>'" loading="lazy"/></div>`;
+      html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,var(--bg4),var(--bg3))';this.parentElement.style.border='1px solid var(--border2)';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:800;color:var(--text2);letter-spacing:.02em\\'>${initials}</span>'" loading="lazy"/></div>`;
       // Name + Team
-      html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.team}</div></div>`;
+      html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:13px;color:var(--text3)">${p.team}</div></div>`;
       // Pos badge
-      html += `<span class="pos ${posClass(p.pos)}" style="font-size:11px;padding:1px 5px">${p.pos}</span>`;
+      html += `<span class="pos ${posClass(p.pos)}" style="font-size:13px;padding:1px 5px">${p.pos}</span>`;
       // Age
-      html += `<span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace">${p.age || '—'}</span>`;
+      html += `<span style="font-size:13px;color:var(--text2);font-family:'JetBrains Mono',monospace">${p.age || '—'}</span>`;
       // Value
       html += `<span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>`;
       // Peak phase
-      html += `<span style="font-size:11px;color:${pk.color};font-weight:600">${pk.label}</span>`;
+      html += `<span style="font-size:13px;color:${pk.color};font-weight:600">${pk.label}</span>`;
       // Trend arrow
-      html += `<span style="font-size:11px;text-align:center">${arrow}</span>`;
+      html += `<span style="font-size:13px;text-align:center">${arrow}</span>`;
     }
     html += `</div>`;
   });
@@ -1871,7 +1871,7 @@ function renderTradeHistory(container) {
   // ── 1. Trade Activity Heatmap ──
   html += `<div class="sec">Trade Activity Heatmap <span class="sec-line"></span></div>`;
   html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;overflow-x:auto;margin-bottom:16px">`;
-  html += `<div style="display:grid;grid-template-columns:140px repeat(${seasons.length},1fr);gap:2px;font-size:12px">`;
+  html += `<div style="display:grid;grid-template-columns:140px repeat(${seasons.length},1fr);gap:2px;font-size:13px">`;
   html += `<div style="font-weight:700;color:var(--text3)"></div>`;
   seasons.forEach(s => { html += `<div style="text-align:center;font-weight:700;color:var(--text3)">${s}</div>`; });
   allRids.forEach(rid => {
@@ -1910,10 +1910,10 @@ function renderTradeHistory(container) {
     const col = myInvolved ? (myWins > myLoss ? 'var(--green)' : myLoss > myWins ? 'var(--red)' : 'var(--text2)') : 'var(--text2)';
     html += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;color:${col}">`;
     html += `${_thAvatar(p.a)} <span style="font-weight:600">${_thOwner(p.a)}</span>`;
-    html += `<span style="color:var(--text3);font-size:11px">\u21C4</span>`;
+    html += `<span style="color:var(--text3);font-size:13px">\u21C4</span>`;
     html += `${_thAvatar(p.b)} <span style="font-weight:600">${_thOwner(p.b)}</span>`;
-    html += `<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:12px">${p.total} trade${p.total > 1 ? 's' : ''}</span>`;
-    html += `<span style="font-size:11px;color:var(--text3)">(${_thOwner(p.a).split(' ')[0]} ${p.aWon}W, ${_thOwner(p.b).split(' ')[0]} ${p.bWon}W)</span>`;
+    html += `<span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:13px">${p.total} trade${p.total > 1 ? 's' : ''}</span>`;
+    html += `<span style="font-size:13px;color:var(--text3)">(${_thOwner(p.a).split(' ')[0]} ${p.aWon}W, ${_thOwner(p.b).split(' ')[0]} ${p.bWon}W)</span>`;
     html += `</div>`;
   });
   html += `</div>`;
@@ -1921,7 +1921,7 @@ function renderTradeHistory(container) {
   // ── 3. Trade Leaderboard ──
   html += `<div class="sec">Trade Leaderboard <span class="sec-line"></span></div>`;
   html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:16px">`;
-  html += `<div style="display:grid;grid-template-columns:32px 22px 1fr 80px 60px 60px 60px 80px 90px;gap:4px;padding:4px 6px;font-size:11px;font-weight:700;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.03em">`;
+  html += `<div style="display:grid;grid-template-columns:32px 22px 1fr 80px 60px 60px 60px 80px 90px;gap:4px;padding:4px 6px;font-size:13px;font-weight:700;color:var(--text3);border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.03em">`;
   html += `<span>#</span><span></span><span>Owner</span><span>Record</span><span>Won</span><span>Lost</span><span>Fair</span><span>Avg Val</span><span>Badge</span></div>`;
   const ranked = allRids.map(rid => {
     const p = profiles[rid] || {};
@@ -1938,15 +1938,15 @@ function renderTradeHistory(container) {
       : r.rid === worstRid && ranked.length > 1 ? '<span style="color:var(--red);font-weight:700" title="Most Fleeced">Most Fleeced</span>' : '';
     const avgCol = (r.avgValueDiff || 0) >= 0 ? 'var(--green)' : 'var(--red)';
     html += `<div style="display:grid;grid-template-columns:32px 22px 1fr 80px 60px 60px 60px 80px 90px;gap:4px;padding:5px 6px;align-items:center;border-bottom:1px solid var(--border);${isMe ? 'background:rgba(69,183,209,0.08);border-radius:6px' : ''}">`;
-    html += `<span style="font-size:12px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${i + 1}</span>`;
+    html += `<span style="font-size:13px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${i + 1}</span>`;
     html += _thAvatar(r.rid);
     html += `<span style="font-weight:${isMe ? '700' : '500'};color:${isMe ? 'var(--accent)' : 'var(--text1)'};font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_thOwner(r.rid)}</span>`;
-    html += `<span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${r.tradesWon || 0}-${r.tradesLost || 0}-${r.tradesFair || 0}</span>`;
-    html += `<span style="font-size:12px;color:var(--green);font-weight:600">${r.tradesWon || 0}</span>`;
-    html += `<span style="font-size:12px;color:var(--red);font-weight:600">${r.tradesLost || 0}</span>`;
-    html += `<span style="font-size:12px;color:var(--text3)">${r.tradesFair || 0}</span>`;
-    html += `<span style="font-size:12px;font-family:'JetBrains Mono',monospace;color:${avgCol}">${(r.avgValueDiff || 0) >= 0 ? '+' : ''}${(r.avgValueDiff || 0).toLocaleString()}</span>`;
-    html += `<span style="font-size:11px">${badge}</span>`;
+    html += `<span style="font-size:13px;font-family:'JetBrains Mono',monospace;color:var(--text2)">${r.tradesWon || 0}-${r.tradesLost || 0}-${r.tradesFair || 0}</span>`;
+    html += `<span style="font-size:13px;color:var(--green);font-weight:600">${r.tradesWon || 0}</span>`;
+    html += `<span style="font-size:13px;color:var(--red);font-weight:600">${r.tradesLost || 0}</span>`;
+    html += `<span style="font-size:13px;color:var(--text3)">${r.tradesFair || 0}</span>`;
+    html += `<span style="font-size:13px;font-family:'JetBrains Mono',monospace;color:${avgCol}">${(r.avgValueDiff || 0) >= 0 ? '+' : ''}${(r.avgValueDiff || 0).toLocaleString()}</span>`;
+    html += `<span style="font-size:13px">${badge}</span>`;
     html += `</div>`;
   });
   html += `</div>`;
@@ -1957,7 +1957,7 @@ function renderTradeHistory(container) {
     : null;
   const feedTrades = (filteredTrades || trades.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0))).slice(0, 10);
   const feedTitle = filteredTrades ? `Trades: ${_thOwner(_thOwnerFilter)} in ${_thSeasonFilter}` : 'Recent Trades';
-  html += `<div class="sec">${feedTitle} ${filteredTrades ? `<span style="font-size:11px;cursor:pointer;color:var(--accent);margin-left:8px" onclick="_thClearFilter()">[clear filter]</span>` : ''}<span class="sec-line"></span></div>`;
+  html += `<div class="sec">${feedTitle} ${filteredTrades ? `<span style="font-size:13px;cursor:pointer;color:var(--accent);margin-left:8px" onclick="_thClearFilter()">[clear filter]</span>` : ''}<span class="sec-line"></span></div>`;
   html += `<div class="card" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">`;
   if (!feedTrades.length) html += `<div style="color:var(--text3);text-align:center;padding:8px">No trades found</div>`;
   feedTrades.forEach(t => {
@@ -1977,7 +1977,7 @@ function renderTradeHistory(container) {
     })();
     html += `<div style="border-bottom:1px solid var(--border);padding:10px 0">`;
     html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">`;
-    html += `<span style="font-size:11px;color:var(--text3)">${date}</span>`;
+    html += `<span style="font-size:13px;color:var(--text3)">${date}</span>`;
     html += `<span style="font-size:13px;font-weight:700;color:${fg.color}">${fg.grade}</span>`;
     html += `</div>`;
     rids.forEach(rid => {
@@ -1986,10 +1986,10 @@ function renderTradeHistory(container) {
       const players = (side.players || []).map(pid => pNameShort(pid)).join(', ') || 'none';
       const picks = (side.picks || []).map(pk => `${pk.season} Rd${pk.round}`).join(', ');
       const assets = [players, picks].filter(Boolean).join(' + ');
-      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">`;
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px">`;
       html += `${_thAvatar(rid)} <span style="font-weight:600;color:${isWinner ? 'var(--green)' : 'var(--text2)'}${rid === myRid ? ';text-decoration:underline' : ''}">${_thOwner(rid)}${isWinner ? ' ✓' : ''}</span>`;
       html += `<span style="color:var(--text3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${assets}">${assets}</span>`;
-      html += `<span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)">${(side.totalValue || 0).toLocaleString()}</span>`;
+      html += `<span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text2)">${(side.totalValue || 0).toLocaleString()}</span>`;
       html += `</div>`;
     });
     html += `</div>`;
@@ -2219,7 +2219,7 @@ function renderTradeFinder(container) {
   const playerList = _finderMode === 'my' ? myPlayers : allOtherPlayers.slice(0, 50);
 
   let html = `<div class="sec">Trade Finder <span class="sec-line"></span></div>`;
-  html += `<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Select a player to auto-generate trade proposals. Shows the <strong style="color:var(--text)">3 best trade partners</strong> with acceptance likelihood.</div>`;
+  html += `<div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">Select a player to auto-generate trade proposals. Shows the <strong style="color:var(--text)">3 best trade partners</strong> with acceptance likelihood.</div>`;
 
   // Mode toggle
   html += `<div style="display:flex;gap:6px;margin-bottom:14px">`;
@@ -2228,11 +2228,11 @@ function renderTradeFinder(container) {
   html += `</div>`;
 
   // Player selector
-  html += `<div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">${_finderMode==='my'?'Select your player to shop':'Select a player to acquire'}</div>`;
+  html += `<div style="font-size:13px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">${_finderMode==='my'?'Select your player to shop':'Select a player to acquire'}</div>`;
   html += `<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto;margin-bottom:16px;padding:8px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">`;
   playerList.forEach(p => {
     const sel = _finderSelectedPid === p.pid;
-    html += `<button class="btn btn-sm ${sel?'':'btn-ghost'}" onclick="_finderSelect('${p.pid}')" style="font-size:11px;padding:3px 8px;${sel?'':'opacity:0.7'}">${p.name} <span style="opacity:0.5">${p.val.toLocaleString()}</span></button>`;
+    html += `<button class="btn btn-sm ${sel?'':'btn-ghost'}" onclick="_finderSelect('${p.pid}')" style="font-size:13px;padding:3px 8px;${sel?'':'opacity:0.7'}">${p.name} <span style="opacity:0.5">${p.val.toLocaleString()}</span></button>`;
   });
   html += `</div>`;
 
@@ -2247,9 +2247,9 @@ function renderTradeFinder(container) {
       html += `<div style="margin-bottom:16px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">`;
       html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">`;
       html += `<span style="font-size:14px;font-weight:700;color:var(--text)">${r.assessment.ownerName}</span>`;
-      html += `<span style="font-size:11px;color:var(--text3)">${r.assessment.teamName}</span>`;
-      html += `<span style="font-size:10px;font-weight:700;color:${r.assessment.tierColor};background:${r.assessment.tierBg};padding:1px 6px;border-radius:3px">${r.assessment.tier}</span>`;
-      if (r.dnaKey !== 'NONE') html += `<span style="font-size:10px;color:${dna.color};font-weight:700">${dna.label}</span>`;
+      html += `<span style="font-size:13px;color:var(--text3)">${r.assessment.teamName}</span>`;
+      html += `<span style="font-size:13px;font-weight:700;color:${r.assessment.tierColor};background:${r.assessment.tierBg};padding:1px 6px;border-radius:3px">${r.assessment.tier}</span>`;
+      if (r.dnaKey !== 'NONE') html += `<span style="font-size:13px;color:${dna.color};font-weight:700">${dna.label}</span>`;
       html += `</div>`;
 
       r.trades.forEach(t => {
@@ -2261,24 +2261,24 @@ function renderTradeFinder(container) {
 
         html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:6px">`;
         html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
-        html += `<span style="font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase">${t.type}</span>`;
+        html += `<span style="font-size:13px;color:var(--accent);font-weight:700;text-transform:uppercase">${t.type}</span>`;
         html += `<div style="display:flex;gap:8px;align-items:center">`;
-        html += `<span style="font-size:11px;color:${diffCol}">${diffLabel} DHQ</span>`;
-        html += `<span style="font-size:12px;font-weight:800;color:${lklCol};background:${lklCol}15;padding:2px 8px;border-radius:4px">${Math.round(t.likelihood)}%</span>`;
+        html += `<span style="font-size:13px;color:${diffCol}">${diffLabel} DHQ</span>`;
+        html += `<span style="font-size:13px;font-weight:800;color:${lklCol};background:${lklCol}15;padding:2px 8px;border-radius:4px">${Math.round(t.likelihood)}%</span>`;
         html += `</div></div>`;
 
         html += `<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start">`;
         // Give side
-        html += `<div><div style="font-size:10px;color:var(--red);text-transform:uppercase;font-weight:700;margin-bottom:3px">SEND (${giveTotal.toLocaleString()})</div>`;
-        t.give.forEach(p => html += `<div style="font-size:12px;font-weight:600">${pName(p.pid)} <span style="color:var(--text3);font-size:11px">${pPos(p.pid)} ${p.val.toLocaleString()}</span></div>`);
-        t.givePicks.forEach(pk => html += `<div style="font-size:12px;color:var(--accent);font-weight:600">${pk.year} R${pk.round} <span style="color:var(--text3);font-size:11px">${(pk.val||0).toLocaleString()}</span></div>`);
+        html += `<div><div style="font-size:13px;color:var(--red);text-transform:uppercase;font-weight:700;margin-bottom:3px">SEND (${giveTotal.toLocaleString()})</div>`;
+        t.give.forEach(p => html += `<div style="font-size:13px;font-weight:600">${pName(p.pid)} <span style="color:var(--text3);font-size:13px">${pPos(p.pid)} ${p.val.toLocaleString()}</span></div>`);
+        t.givePicks.forEach(pk => html += `<div style="font-size:13px;color:var(--accent);font-weight:600">${pk.year} R${pk.round} <span style="color:var(--text3);font-size:13px">${(pk.val||0).toLocaleString()}</span></div>`);
         html += `</div>`;
         // Arrow
         html += `<div style="font-size:16px;color:var(--accent);align-self:center;font-weight:700">&#8644;</div>`;
         // Receive side
-        html += `<div><div style="font-size:10px;color:var(--green);text-transform:uppercase;font-weight:700;margin-bottom:3px">GET (${getTotal.toLocaleString()})</div>`;
-        t.receive.forEach(p => html += `<div style="font-size:12px;font-weight:600">${pName(p.pid)} <span style="color:var(--text3);font-size:11px">${pPos(p.pid)} ${p.val.toLocaleString()}</span></div>`);
-        t.receivePicks.forEach(pk => html += `<div style="font-size:12px;color:var(--accent);font-weight:600">${pk.year} R${pk.round} <span style="color:var(--text3);font-size:11px">${(pk.val||0).toLocaleString()}</span></div>`);
+        html += `<div><div style="font-size:13px;color:var(--green);text-transform:uppercase;font-weight:700;margin-bottom:3px">GET (${getTotal.toLocaleString()})</div>`;
+        t.receive.forEach(p => html += `<div style="font-size:13px;font-weight:600">${pName(p.pid)} <span style="color:var(--text3);font-size:13px">${pPos(p.pid)} ${p.val.toLocaleString()}</span></div>`);
+        t.receivePicks.forEach(pk => html += `<div style="font-size:13px;color:var(--accent);font-weight:600">${pk.year} R${pk.round} <span style="color:var(--text3);font-size:13px">${(pk.val||0).toLocaleString()}</span></div>`);
         html += `</div></div></div>`;
       });
 

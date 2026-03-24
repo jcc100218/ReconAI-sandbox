@@ -14,7 +14,7 @@ if(DEV_MODE){
   // Inject dev banner
   document.addEventListener('DOMContentLoaded',()=>{
     const b=document.createElement('div');
-    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;font-size:11px;font-weight:700;text-align:center;padding:3px;letter-spacing:.05em;font-family:monospace';
+    b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;font-size:13px;font-weight:700;text-align:center;padding:3px;letter-spacing:.05em;font-family:monospace';
     b.textContent='⚡ SANDBOX — changes here do not affect production';
     document.body.prepend(b);
   });
@@ -174,9 +174,9 @@ function showLeaguePicker(leagues,userId){
           ${l.avatar?`<img src="https://sleepercdn.com/avatars/thumbs/${l.avatar}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`:`<div style="width:40px;height:40px;border-radius:10px;background:var(--accentL);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏈</div>`}
           <div style="flex:1;min-width:0">
             <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em">${l.name||'Unnamed League'}</div>
-            <div style="font-size:12px;color:var(--text3);margin-top:3px">${l.total_rosters} teams · ${typeLabel(l.settings?.type)} · ${statusLabel(l.status)}</div>
+            <div style="font-size:13px;color:var(--text3);margin-top:3px">${l.total_rosters} teams · ${typeLabel(l.settings?.type)} · ${statusLabel(l.status)}</div>
           </div>
-          <div style="font-size:12px;color:var(--text3);text-align:right;flex-shrink:0">
+          <div style="font-size:13px;color:var(--text3);text-align:right;flex-shrink:0">
             <div style="color:var(--accent);font-weight:600">${l.season}</div>
             <div style="margin-top:2px;font-weight:500">${l.settings?.type===2?'Dynasty':'Redraft'}</div>
           </div>
@@ -199,7 +199,7 @@ async function selectLeague(leagueId,userId){
   const league=S.leagues.find(l=>l.league_id===leagueId);
   const leagueName=(league?.name||'League').substring(0,20);
   const isDynasty=league?.settings?.type===2;
-  $('league-pill').innerHTML=leagueName+(isDynasty?'':'<span style="font-size:10px;font-weight:500;color:var(--amber);background:rgba(255,180,0,.12);padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle">(Redraft — dynasty features limited)</span>');
+  $('league-pill').innerHTML=leagueName+(isDynasty?'':'<span style="font-size:13px;font-weight:500;color:var(--amber);background:rgba(255,180,0,.12);padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle">(Redraft — dynasty features limited)</span>');
   $('setup-block').innerHTML=`<div style="font-size:14px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
   try{
     await loadLeague(leagueId,userId);
