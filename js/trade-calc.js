@@ -1692,7 +1692,7 @@ function renderValueChart(container) {
   if (!container) return;
 
   const scores = (LI_LOADED && LI.playerScores) ? LI.playerScores : {};
-  const positions = ['All', 'QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB'];
+  const positions = ['All', 'QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB', 'Picks'];
 
   // Build player list: id, name, team, pos, age, value, peak info
   let players = [];
@@ -1706,8 +1706,24 @@ function renderValueChart(container) {
     players.push({ pid, name, team: p.team || 'FA', pos, age: p.age || 0, val });
   });
 
+  // Add draft picks as entries
+  if (_vcFilter === 'All' || _vcFilter === 'Picks') {
+    const teams = S.rosters?.length || 12;
+    const curSeason = parseInt(S.season) || new Date().getFullYear();
+    for (let yr = curSeason; yr <= curSeason + 2; yr++) {
+      for (let rd = 1; rd <= (S.leagues?.find(l=>l.league_id===S.currentLeagueId)?.settings?.draft_rounds || 5); rd++) {
+        const val = (typeof pickValue === 'function') ? pickValue(yr, rd, teams, Math.ceil(teams/2)) : (TRADE_PICK_VALUES[rd] || 100);
+        if (val > 0) {
+          const ordinal = ['','1st','2nd','3rd','4th','5th','6th','7th'][rd] || rd+'th';
+          players.push({ pid: `PICK-${yr}-${rd}`, name: `${yr} ${ordinal} Round Pick`, team: 'Mid', pos: 'PICK', age: 0, val, isPick: true });
+        }
+      }
+    }
+  }
+
   // Apply position filter
-  if (_vcFilter !== 'All') players = players.filter(p => p.pos === _vcFilter);
+  if (_vcFilter !== 'All' && _vcFilter !== 'Picks') players = players.filter(p => p.pos === _vcFilter);
+  if (_vcFilter === 'Picks') players = players.filter(p => p.isPick);
 
   // Apply search filter
   if (_vcSearch) {
@@ -1753,23 +1769,37 @@ function renderValueChart(container) {
       : pk.cls === 'peak' ? '<span style="color:var(--text3)">&#9654;</span>'
       : pk.cls === 'veteran' || pk.cls === 'declining' ? '<span style="color:var(--red)">&#9660;</span>' : '';
 
-    html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:5px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${p.pid}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">`;
+    const clickAction = p.isPick ? '' : `onclick="openPlayerModal('${p.pid}')"`;
+    html += `<div style="display:grid;grid-template-columns:36px 28px 1fr 42px 32px 72px 64px 32px;gap:4px;padding:5px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:${p.isPick?'default':'pointer'};transition:background .12s" ${clickAction} onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">`;
     // Rank
     html += `<span style="font-size:12px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace">${rank}</span>`;
-    // Photo
-    html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:700;color:var(--text3)\\'>${initials}</span>'" loading="lazy"/></div>`;
-    // Name + Team
-    html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.team}</div></div>`;
-    // Pos badge
-    html += `<span class="pos ${posClass(p.pos)}" style="font-size:11px;padding:1px 5px">${p.pos}</span>`;
-    // Age
-    html += `<span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace">${p.age || '—'}</span>`;
-    // Value
-    html += `<span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>`;
-    // Peak phase
-    html += `<span style="font-size:11px;color:${pk.color};font-weight:600">${pk.label}</span>`;
-    // Trend arrow
-    html += `<span style="font-size:11px;text-align:center">${arrow}</span>`;
+    if (p.isPick) {
+      // Pick icon
+      const rdNum = parseInt(p.pid.split('-')[2]) || 1;
+      const pickCol = {1:'#D4AF37',2:'#5DADE2',3:'#2ECC71',4:'#BB8FCE',5:'#95A5A6',6:'#7F8C8D',7:'#6C7A7D'}[rdNum] || 'var(--text3)';
+      html += `<div style="width:24px;height:24px;border-radius:50%;background:${pickCol}22;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:${pickCol};flex-shrink:0">R${rdNum}</div>`;
+      html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">Mid-round estimate</div></div>`;
+      html += `<span style="font-size:11px;padding:1px 5px;background:${pickCol}18;color:${pickCol};border-radius:4px;font-weight:700">PICK</span>`;
+      html += `<span style="font-size:12px;color:var(--text3)">—</span>`;
+      html += `<span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>`;
+      html += `<span style="font-size:11px;color:var(--text3)">—</span>`;
+      html += `<span></span>`;
+    } else {
+      // Photo
+      html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:700;color:var(--text3)\\'>${initials}</span>'" loading="lazy"/></div>`;
+      // Name + Team
+      html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.team}</div></div>`;
+      // Pos badge
+      html += `<span class="pos ${posClass(p.pos)}" style="font-size:11px;padding:1px 5px">${p.pos}</span>`;
+      // Age
+      html += `<span style="font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace">${p.age || '—'}</span>`;
+      // Value
+      html += `<span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>`;
+      // Peak phase
+      html += `<span style="font-size:11px;color:${pk.color};font-weight:600">${pk.label}</span>`;
+      // Trend arrow
+      html += `<span style="font-size:11px;text-align:center">${arrow}</span>`;
+    }
     html += `</div>`;
   });
   html += `</div>`;
