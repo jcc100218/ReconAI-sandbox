@@ -979,7 +979,7 @@ function renderDailyBriefing(){
 // START/SIT — Optimal lineup for this week
 // ═══════════════════════════════════════════════════════════════
 function renderStartSit(){
-  const wrap=$('home-startsit');if(!wrap)return;
+  const wrap=$('startsit-content');if(!wrap)return;
   const my=myR();if(!my||!S.leagues)return;
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
   if(!league)return;
@@ -1024,29 +1024,65 @@ function renderStartSit(){
   const totalProj=lineup.reduce((s,l)=>s+(l.player?.score||0),0);
   const bench=scored.filter(p=>!used.has(p.pid)).sort((a,b)=>b.score-a.score).slice(0,3);
 
+  // Bench alternatives by position
+  const benchByPos={};
+  scored.filter(p=>!used.has(p.pid)).forEach(p=>{
+    if(!benchByPos[p.pos])benchByPos[p.pos]=[];
+    benchByPos[p.pos].push(p);
+  });
+  Object.values(benchByPos).forEach(arr=>arr.sort((a,b)=>b.score-a.score));
+
   wrap.innerHTML=`
-    <div style="margin-bottom:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Optimal Lineup</div>
-        <div style="font-size:18px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${totalProj.toFixed(1)} <span style="font-size:11px;color:var(--text3);font-weight:600">PROJ</span></div>
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.02em">Week ${S.currentWeek||'?'} Lineup</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">Optimal starters based on PPG and projections</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${totalProj.toFixed(1)}</div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Projected</div>
+        </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:3px">
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px">
         ${lineup.map(l=>{
-          if(!l.player)return`<div style="display:grid;grid-template-columns:36px 1fr 44px;gap:4px;padding:5px 8px;background:var(--bg2);border-radius:6px;align-items:center;opacity:0.4">
-            <span style="font-size:11px;font-weight:700;color:var(--text3)">${l.slot}</span><span style="font-size:12px;color:var(--text3)">Empty</span><span></span></div>`;
+          if(!l.player)return`<div style="display:grid;grid-template-columns:40px 1fr 50px;gap:6px;padding:8px 10px;background:var(--bg2);border-radius:var(--r);align-items:center;opacity:0.35">
+            <span style="font-size:12px;font-weight:700;color:var(--text3)">${l.slot}</span><span style="font-size:13px;color:var(--text3)">Empty slot</span><span></span></div>`;
           const col=l.player.score>=15?'var(--green)':l.player.score>=8?'var(--text)':'var(--text3)';
-          const injBadge=l.player.injury?`<span style="font-size:9px;color:var(--red);font-weight:700;margin-left:4px">${l.player.injury}</span>`:'';
-          return`<div style="display:grid;grid-template-columns:36px 1fr 44px;gap:4px;padding:5px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;align-items:center;cursor:pointer" onclick="openPlayerModal('${l.player.pid}')">
-            <span style="font-size:11px;font-weight:700;color:${l.isFlex?'var(--accent)':'var(--text3)'}">${l.slot}</span>
-            <div style="overflow:hidden"><span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.player.name}</span>${injBadge}<span style="font-size:11px;color:var(--text3);margin-left:4px">${l.player.team}</span></div>
-            <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace;text-align:right">${l.player.score.toFixed(1)}</span>
+          const injBadge=l.player.injury?`<span style="font-size:10px;color:var(--red);font-weight:700;background:var(--redL);padding:1px 5px;border-radius:3px;margin-left:4px">${l.player.injury}</span>`:'';
+          const dhq=dynastyValue(l.player.pid);
+          const dhqCol=dhq>=7000?'var(--green)':dhq>=4000?'var(--accent)':dhq>=2000?'var(--text2)':'var(--text3)';
+          // Check if a bench player at this position scores higher
+          const benchAlt=(benchByPos[l.player.pos]||[])[0];
+          const hasBetterBench=benchAlt&&benchAlt.score>l.player.score+1;
+          return`<div style="display:grid;grid-template-columns:40px 1fr 50px;gap:6px;padding:8px 10px;background:var(--bg2);border:1px solid ${hasBetterBench?'var(--amber)':'var(--border)'};border-radius:var(--r);align-items:center;cursor:pointer;transition:background .12s" onclick="openPlayerModal('${l.player.pid}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">
+            <span style="font-size:12px;font-weight:700;color:${l.isFlex?'var(--accent)':'var(--text3)'}">${l.slot}</span>
+            <div style="overflow:hidden">
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.player.name}</span>
+                ${injBadge}
+              </div>
+              <div style="display:flex;gap:8px;margin-top:2px">
+                <span style="font-size:11px;color:var(--text3)">${l.player.team}</span>
+                <span style="font-size:11px;color:${dhqCol};font-weight:600">${dhq>0?dhq.toLocaleString()+' DHQ':''}</span>
+                ${hasBetterBench?`<span style="font-size:10px;color:var(--amber);font-weight:700">Consider ${benchAlt.name} (${benchAlt.score.toFixed(1)})</span>`:''}
+              </div>
+            </div>
+            <span style="font-size:14px;font-weight:800;color:${col};font-family:'JetBrains Mono',monospace;text-align:right">${l.player.score.toFixed(1)}</span>
           </div>`;
         }).join('')}
       </div>
-      ${bench.length?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
-        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Best Bench</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${bench.map(b=>`<span style="font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--text2)">${b.name} <span style="color:var(--text3)">${b.score.toFixed(1)}</span></span>`).join('')}
+      ${bench.length?`<div style="padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Bench Depth</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          ${scored.filter(p=>!used.has(p.pid)).sort((a,b)=>b.score-a.score).slice(0,8).map(b=>{
+            const dhq2=dynastyValue(b.pid);
+            return`<div style="display:grid;grid-template-columns:40px 1fr 50px;gap:6px;padding:5px 10px;background:var(--bg2);border-radius:6px;align-items:center;opacity:0.7;cursor:pointer" onclick="openPlayerModal('${b.pid}')">
+              <span style="font-size:11px;color:var(--text3);font-weight:600">${b.pos}</span>
+              <div style="overflow:hidden"><span style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</span><span style="font-size:11px;color:var(--text3);margin-left:4px">${b.team}</span></div>
+              <span style="font-size:12px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace;text-align:right">${b.score.toFixed(1)}</span>
+            </div>`;
+          }).join('')}
         </div>
       </div>`:''}
     </div>`;
@@ -2403,7 +2439,7 @@ function mobileTab(tab, btn) {
   document.querySelectorAll('.mobile-nav-item').forEach(b=>b.classList.remove('active'));
   if(btn){btn.classList.add('active');}
   else{
-    const map={digest:'mnav-home',draftroom:'mnav-draft',waivers:'mnav-waivers',trades:'mnav-trades'};
+    const map={digest:'mnav-home',startsit:'mnav-startsit',roster:'mnav-roster',draftroom:'mnav-draft',waivers:'mnav-waivers',trades:'mnav-trades'};
     const navId=map[tab];
     if(navId){const el=$(navId);if(el)el.classList.add('active');}
   }

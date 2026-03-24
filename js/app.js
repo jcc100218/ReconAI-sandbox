@@ -75,6 +75,7 @@ function switchTab(tab,btn){
   if(tab==='draftroom'&&typeof renderDraftNeeds==='function')renderDraftNeeds();
   if(tab==='digest'&&typeof renderHomeSnapshot==='function')renderHomeSnapshot();
   if(tab==='roster'&&typeof buildRosterTable==='function')buildRosterTable();
+  if(tab==='startsit'&&typeof renderStartSit==='function')renderStartSit();
   if(tab==='trades'){
     if(typeof renderTradeIntel==='function')renderTradeIntel();
     // Initialize trade calc sub-tabs if data is loaded
