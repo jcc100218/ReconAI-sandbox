@@ -835,7 +835,7 @@ let _tcBuilderMy = null;
 let _tcBuilderTheir = null;
 let _tcBuilderMyAssets = { players: [], picks: [], faab: 0 };
 let _tcBuilderTheirAssets = { players: [], picks: [], faab: 0 };
-let _tcActiveView = 'overview'; // 'overview' | 'scout' | 'partners' | 'builder' | 'dna' | 'valuechart'
+let _tcActiveView = 'overview'; // 'overview' | 'scout' | 'partners' | 'builder' | 'dna' | 'valuechart' | 'finder'
 let _vcShowCount = 50; // Value Chart: how many rows to render
 
 // ── renderTradeCalc — main entry point ───────────────────────
@@ -894,6 +894,7 @@ function _renderTradeCalcShell(el) {
         <button class="btn btn-sm ${_tcActiveView === 'dna' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('dna')">Owner DNA</button>
         <button class="btn btn-sm ${_tcActiveView === 'valuechart' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('valuechart')">Value Chart</button>
         <button class="btn btn-sm ${_tcActiveView === 'history' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('history')">History</button>
+        <button class="btn btn-sm ${_tcActiveView === 'finder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('finder')">Trade Finder</button>
       </div>
     </div>
     <div id="tc-view-content"></div>
@@ -907,6 +908,7 @@ function _renderTradeCalcShell(el) {
   else if (_tcActiveView === 'dna') renderDNAPanel(_tcAssessments, content);
   else if (_tcActiveView === 'valuechart') renderValueChart(content);
   else if (_tcActiveView === 'history') renderTradeHistory(content);
+  else if (_tcActiveView === 'finder') renderTradeFinder(content);
   else renderLeagueOverview(_tcAssessments, content);
 }
 
@@ -2020,6 +2022,273 @@ async function initTradeCalc() {
   await renderTradeCalc();
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TRADE FINDER — auto-generate trade proposals
+// Select a player, get 3 best trade offers from 3 best teams
+// ═══════════════════════════════════════════════════════════════
+
+let _finderMode = 'my'; // 'my' or 'acquire'
+let _finderSelectedPid = null;
+let _finderResults = null;
+
+function _finderSetMode(mode) {
+  _finderMode = mode;
+  _finderSelectedPid = null;
+  _finderResults = null;
+  const el = $('tc-view-content');
+  if (el) renderTradeFinder(el);
+}
+window._finderSetMode = _finderSetMode;
+
+function _finderSelect(pid) {
+  _finderSelectedPid = pid;
+  _finderResults = null;
+  _finderGenerate(pid);
+}
+window._finderSelect = _finderSelect;
+
+function _finderGenerate(pid) {
+  const val = dynastyValue(pid);
+  if (!val) { _finderResults = []; _finderRefresh(); return; }
+
+  const tolerance = 0.20;
+  const minVal = val * (1 - tolerance);
+  const maxVal = val * (1 + tolerance);
+  const myRosterId = S.myRosterId;
+  const myAssess = _tcAssessments.find(a => a.rosterId === myRosterId);
+  const teams = S.rosters?.length || 12;
+  const allPBO = buildPicksByOwner();
+  const results = [];
+
+  if (_finderMode === 'my') {
+    // Shopping my player — find offers from other teams
+    _tcAssessments.forEach(a => {
+      if (a.rosterId === myRosterId) return;
+      const roster = S.rosters.find(r => r.roster_id === a.rosterId);
+      if (!roster) return;
+      const dnaKey = _tcDnaMap[a.rosterId] || 'NONE';
+      const theirPosture = calcOwnerPosture(a, dnaKey);
+      const theirPlayers = (roster.players || [])
+        .map(p => ({ pid: p, val: dynastyValue(p) }))
+        .filter(p => p.val > 0)
+        .sort((b,c) => c.val - b.val);
+      const theirPicks = allPBO[a.rosterId] || [];
+
+      const trades = [];
+
+      // 1-for-1
+      theirPlayers.forEach(tp => {
+        if (tp.val >= minVal && tp.val <= maxVal) {
+          const taxes = calcPsychTaxes(myAssess, a, dnaKey, theirPosture);
+          const likelihood = calcAcceptanceLikelihood(val, tp.val, dnaKey, taxes, myAssess, a);
+          trades.push({ give: [{ pid, val }], receive: [{ pid: tp.pid, val: tp.val }], givePicks: [], receivePicks: [], diff: tp.val - val, likelihood, type: '1-for-1' });
+        }
+      });
+
+      // 2-for-1
+      for (let i = 0; i < Math.min(theirPlayers.length, 12); i++) {
+        for (let j = i+1; j < Math.min(theirPlayers.length, 12); j++) {
+          const combo = theirPlayers[i].val + theirPlayers[j].val;
+          if (combo >= minVal && combo <= maxVal) {
+            const taxes = calcPsychTaxes(myAssess, a, dnaKey, theirPosture);
+            const likelihood = calcAcceptanceLikelihood(val, combo, dnaKey, taxes, myAssess, a);
+            trades.push({ give: [{ pid, val }], receive: [{ pid: theirPlayers[i].pid, val: theirPlayers[i].val }, { pid: theirPlayers[j].pid, val: theirPlayers[j].val }], givePicks: [], receivePicks: [], diff: combo - val, likelihood, type: '2-for-1' });
+            break;
+          }
+        }
+      }
+
+      // Player + pick
+      theirPlayers.slice(0, 8).forEach(tp => {
+        if (tp.val >= val) return;
+        const gap = val - tp.val;
+        const bestPick = theirPicks.find(pk => {
+          const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
+          return Math.abs(pv - gap) <= val * tolerance;
+        });
+        if (bestPick) {
+          const pv = typeof pickValue === 'function' ? pickValue(bestPick.year, bestPick.round, teams) : (TRADE_PICK_VALUES[bestPick.round] || 100);
+          const total = tp.val + pv;
+          const taxes = calcPsychTaxes(myAssess, a, dnaKey, theirPosture);
+          const likelihood = calcAcceptanceLikelihood(val, total, dnaKey, taxes, myAssess, a);
+          trades.push({ give: [{ pid, val }], receive: [{ pid: tp.pid, val: tp.val }], givePicks: [], receivePicks: [{ year: bestPick.year, round: bestPick.round, val: pv }], diff: total - val, likelihood, type: 'Player + Pick' });
+        }
+      });
+
+      trades.sort((b,c) => c.likelihood - b.likelihood);
+      if (trades.length) results.push({ assessment: a, dnaKey, trades: trades.slice(0, 1) }); // 1 best per team for ReconAI
+    });
+  } else {
+    // Acquiring a player — find what I can offer
+    const ownerRoster = S.rosters.find(r => (r.players || []).includes(pid));
+    if (!ownerRoster) { _finderResults = []; _finderRefresh(); return; }
+    const theirAssess = _tcAssessments.find(a => a.rosterId === ownerRoster.roster_id);
+    if (!theirAssess) { _finderResults = []; _finderRefresh(); return; }
+    const dnaKey = _tcDnaMap[ownerRoster.roster_id] || 'NONE';
+    const theirPosture = calcOwnerPosture(theirAssess, dnaKey);
+    const myRoster = S.rosters.find(r => r.roster_id === myRosterId);
+    const myPlayers = (myRoster?.players || [])
+      .filter(p => p !== pid)
+      .map(p => ({ pid: p, val: dynastyValue(p) }))
+      .filter(p => p.val > 0)
+      .sort((b,c) => c.val - b.val);
+    const myPicks = allPBO[myRosterId] || [];
+
+    const trades = [];
+
+    // 1-for-1
+    myPlayers.forEach(mp => {
+      if (mp.val >= minVal && mp.val <= maxVal) {
+        const taxes = calcPsychTaxes(myAssess, theirAssess, dnaKey, theirPosture);
+        const likelihood = calcAcceptanceLikelihood(mp.val, val, dnaKey, taxes, myAssess, theirAssess);
+        trades.push({ give: [{ pid: mp.pid, val: mp.val }], receive: [{ pid, val }], givePicks: [], receivePicks: [], diff: val - mp.val, likelihood, type: '1-for-1' });
+      }
+    });
+
+    // 2-for-1
+    for (let i = 0; i < Math.min(myPlayers.length, 12); i++) {
+      for (let j = i+1; j < Math.min(myPlayers.length, 12); j++) {
+        const combo = myPlayers[i].val + myPlayers[j].val;
+        if (combo >= minVal && combo <= maxVal) {
+          const taxes = calcPsychTaxes(myAssess, theirAssess, dnaKey, theirPosture);
+          const likelihood = calcAcceptanceLikelihood(combo, val, dnaKey, taxes, myAssess, theirAssess);
+          trades.push({ give: [{ pid: myPlayers[i].pid, val: myPlayers[i].val }, { pid: myPlayers[j].pid, val: myPlayers[j].val }], receive: [{ pid, val }], givePicks: [], receivePicks: [], diff: val - combo, likelihood, type: '2-for-1' });
+          break;
+        }
+      }
+    }
+
+    // Player + my pick
+    myPlayers.slice(0, 8).forEach(mp => {
+      if (mp.val >= val) return;
+      const gap = val - mp.val;
+      const bestPick = myPicks.find(pk => {
+        const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
+        return Math.abs(pv - gap) <= val * tolerance;
+      });
+      if (bestPick) {
+        const pv = typeof pickValue === 'function' ? pickValue(bestPick.year, bestPick.round, teams) : (TRADE_PICK_VALUES[bestPick.round] || 100);
+        const total = mp.val + pv;
+        if (total >= minVal && total <= maxVal) {
+          const taxes = calcPsychTaxes(myAssess, theirAssess, dnaKey, theirPosture);
+          const likelihood = calcAcceptanceLikelihood(total, val, dnaKey, taxes, myAssess, theirAssess);
+          trades.push({ give: [{ pid: mp.pid, val: mp.val }], receive: [{ pid, val }], givePicks: [{ year: bestPick.year, round: bestPick.round, val: pv }], receivePicks: [], diff: val - total, likelihood, type: 'Player + Pick' });
+        }
+      }
+    });
+
+    trades.sort((b,c) => c.likelihood - b.likelihood);
+    if (trades.length) results.push({ assessment: theirAssess, dnaKey, trades: trades.slice(0, 3) }); // 3 offers for acquire mode
+  }
+
+  // Sort teams by best likelihood, take top 3
+  results.sort((a,b) => {
+    const aMax = Math.max(...a.trades.map(t => t.likelihood));
+    const bMax = Math.max(...b.trades.map(t => t.likelihood));
+    return bMax - aMax;
+  });
+  _finderResults = _finderMode === 'my' ? results.slice(0, 3) : results;
+  _finderRefresh();
+}
+
+function _finderRefresh() {
+  const el = $('tc-view-content');
+  if (el) renderTradeFinder(el);
+}
+
+function renderTradeFinder(container) {
+  if (!container) container = $('tc-view-content');
+  if (!container) return;
+
+  const myRosterId = S.myRosterId;
+  const myPlayers = (S.rosters?.find(r => r.roster_id === myRosterId)?.players || [])
+    .map(pid => ({ pid, name: pName(pid), pos: pPos(pid), val: dynastyValue(pid) }))
+    .filter(p => p.val > 0)
+    .sort((a,b) => b.val - a.val);
+
+  const allOtherPlayers = [];
+  (S.rosters || []).forEach(r => {
+    if (r.roster_id === myRosterId) return;
+    (r.players || []).forEach(pid => {
+      const v = dynastyValue(pid);
+      if (v > 0) allOtherPlayers.push({ pid, name: pName(pid), pos: pPos(pid), val: v });
+    });
+  });
+  allOtherPlayers.sort((a,b) => b.val - a.val);
+
+  const playerList = _finderMode === 'my' ? myPlayers : allOtherPlayers.slice(0, 50);
+
+  let html = `<div class="sec">Trade Finder <span class="sec-line"></span></div>`;
+  html += `<div style="font-size:12px;color:var(--text3);margin-bottom:12px;line-height:1.5">Select a player to auto-generate trade proposals. Shows the <strong style="color:var(--text)">3 best trade partners</strong> with acceptance likelihood.</div>`;
+
+  // Mode toggle
+  html += `<div style="display:flex;gap:6px;margin-bottom:14px">`;
+  html += `<button class="btn btn-sm ${_finderMode==='my'?'':'btn-ghost'}" onclick="_finderSetMode('my')">Trade My Player</button>`;
+  html += `<button class="btn btn-sm ${_finderMode==='acquire'?'':'btn-ghost'}" onclick="_finderSetMode('acquire')">Acquire a Player</button>`;
+  html += `</div>`;
+
+  // Player selector
+  html += `<div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:600">${_finderMode==='my'?'Select your player to shop':'Select a player to acquire'}</div>`;
+  html += `<div style="display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto;margin-bottom:16px;padding:8px;background:var(--bg2);border-radius:var(--r);border:1px solid var(--border)">`;
+  playerList.forEach(p => {
+    const sel = _finderSelectedPid === p.pid;
+    html += `<button class="btn btn-sm ${sel?'':'btn-ghost'}" onclick="_finderSelect('${p.pid}')" style="font-size:11px;padding:3px 8px;${sel?'':'opacity:0.7'}">${p.name} <span style="opacity:0.5">${p.val.toLocaleString()}</span></button>`;
+  });
+  html += `</div>`;
+
+  // Results
+  if (_finderSelectedPid && !_finderResults) {
+    html += `<div style="text-align:center;padding:20px;color:var(--accent)">Generating trades...</div>`;
+  } else if (_finderResults && !_finderResults.length) {
+    html += `<div style="text-align:center;padding:20px;color:var(--text3)">No viable trades found within 20% value variance.</div>`;
+  } else if (_finderResults) {
+    _finderResults.forEach(r => {
+      const dna = DNA_TYPES[r.dnaKey] || DNA_TYPES.NONE;
+      html += `<div style="margin-bottom:16px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">`;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">`;
+      html += `<span style="font-size:14px;font-weight:700;color:var(--text)">${r.assessment.ownerName}</span>`;
+      html += `<span style="font-size:11px;color:var(--text3)">${r.assessment.teamName}</span>`;
+      html += `<span style="font-size:10px;font-weight:700;color:${r.assessment.tierColor};background:${r.assessment.tierBg};padding:1px 6px;border-radius:3px">${r.assessment.tier}</span>`;
+      if (r.dnaKey !== 'NONE') html += `<span style="font-size:10px;color:${dna.color};font-weight:700">${dna.label}</span>`;
+      html += `</div>`;
+
+      r.trades.forEach(t => {
+        const giveTotal = t.give.reduce((s,p) => s + p.val, 0) + t.givePicks.reduce((s,p) => s + (p.val||0), 0);
+        const getTotal = t.receive.reduce((s,p) => s + p.val, 0) + t.receivePicks.reduce((s,p) => s + (p.val||0), 0);
+        const diffLabel = t.diff >= 0 ? `+${Math.round(t.diff).toLocaleString()}` : Math.round(t.diff).toLocaleString();
+        const diffCol = t.diff >= 0 ? 'var(--green)' : 'var(--red)';
+        const lklCol = t.likelihood >= 60 ? 'var(--green)' : t.likelihood >= 40 ? 'var(--amber,#fbbf24)' : 'var(--red)';
+
+        html += `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px;margin-bottom:6px">`;
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">`;
+        html += `<span style="font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase">${t.type}</span>`;
+        html += `<div style="display:flex;gap:8px;align-items:center">`;
+        html += `<span style="font-size:11px;color:${diffCol}">${diffLabel} DHQ</span>`;
+        html += `<span style="font-size:12px;font-weight:800;color:${lklCol};background:${lklCol}15;padding:2px 8px;border-radius:4px">${Math.round(t.likelihood)}%</span>`;
+        html += `</div></div>`;
+
+        html += `<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:start">`;
+        // Give side
+        html += `<div><div style="font-size:10px;color:var(--red);text-transform:uppercase;font-weight:700;margin-bottom:3px">SEND (${giveTotal.toLocaleString()})</div>`;
+        t.give.forEach(p => html += `<div style="font-size:12px;font-weight:600">${pName(p.pid)} <span style="color:var(--text3);font-size:11px">${pPos(p.pid)} ${p.val.toLocaleString()}</span></div>`);
+        t.givePicks.forEach(pk => html += `<div style="font-size:12px;color:var(--accent);font-weight:600">${pk.year} R${pk.round} <span style="color:var(--text3);font-size:11px">${(pk.val||0).toLocaleString()}</span></div>`);
+        html += `</div>`;
+        // Arrow
+        html += `<div style="font-size:16px;color:var(--accent);align-self:center;font-weight:700">&#8644;</div>`;
+        // Receive side
+        html += `<div><div style="font-size:10px;color:var(--green);text-transform:uppercase;font-weight:700;margin-bottom:3px">GET (${getTotal.toLocaleString()})</div>`;
+        t.receive.forEach(p => html += `<div style="font-size:12px;font-weight:600">${pName(p.pid)} <span style="color:var(--text3);font-size:11px">${pPos(p.pid)} ${p.val.toLocaleString()}</span></div>`);
+        t.receivePicks.forEach(pk => html += `<div style="font-size:12px;color:var(--accent);font-weight:600">${pk.year} R${pk.round} <span style="color:var(--text3);font-size:11px">${(pk.val||0).toLocaleString()}</span></div>`);
+        html += `</div></div></div>`;
+      });
+
+      html += `</div>`;
+    });
+  }
+
+  container.innerHTML = html;
+}
+
 // Rendering functions on window (called from onclick handlers)
 Object.assign(window, {
   renderTradeCalc,
@@ -2031,4 +2300,5 @@ Object.assign(window, {
   renderDNAPanel,
   renderValueChart,
   renderTradeHistory,
+  renderTradeFinder,
 });
