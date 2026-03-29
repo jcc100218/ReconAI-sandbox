@@ -1002,3 +1002,12 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .wv-avail-card .rr-photo{width:32px;height:32px}
 .wv-avail-card .rr-initials{width:32px;height:32px;font-size:11px}
 .wv-priority-tag{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
+
+/* ═══════════════════════════════════════════════════════
+   TRADE BUILDER REFINEMENTS
+   ═══════════════════════════════════════════════════════ */
+
+/* Make trade side panels better on mobile */
+@media(max-width:560px){
+  #tc-view-content .card{padding:10px 12px}
+}

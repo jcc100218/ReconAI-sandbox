@@ -1270,18 +1270,24 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   const theirDna = DNA_TYPES[theirDnaKey] || DNA_TYPES.NONE;
   const posture = calcOwnerPosture(theirAssessment, theirDnaKey);
 
-  // Header with opponent info
-  html += `<div class="card" style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
-    <div style="flex:1">
-      <div style="font-size:13px;color:var(--text3)">Trading with</div>
-      <div style="font-size:15px;font-weight:700">${theirAssessment.ownerName}</div>
-      <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
-        <span style="font-size:13px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
-        ${theirDnaKey !== 'NONE' ? `<span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
-        <span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
+  // Enhanced partner context header
+  const theirNeeds = theirAssessment.needs?.slice(0, 2).map(n => n.pos).join(', ') || '';
+  const theirSurplus = theirAssessment.strengths?.slice(0, 2).join(', ') || '';
+  const tradeAngle = theirNeeds && theirSurplus ? `Needs ${theirNeeds} · Surplus ${theirSurplus}` : theirNeeds ? `Needs ${theirNeeds}` : '';
+
+  html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:16px;font-weight:700">${theirAssessment.ownerName}</div>
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
+          <span style="font-size:12px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
+          ${theirDnaKey !== 'NONE' ? `<span style="font-size:11px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
+          <span style="font-size:11px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
+        </div>
+        ${tradeAngle ? `<div style="font-size:12px;color:var(--green);margin-top:4px;font-weight:600">${tradeAngle}</div>` : ''}
       </div>
+      <button class="btn btn-sm btn-ghost" onclick="_tcScoutTeam(${theirAssessment.rosterId})">Scout</button>
     </div>
-    <button class="btn btn-sm btn-ghost" onclick="_tcScoutTeam(${theirAssessment.rosterId})">Scout</button>
   </div>`;
 
   // Two-column trade layout
@@ -1312,58 +1318,130 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   const acceptance = hasTrade ? calcAcceptanceLikelihood(myVal, theirVal, theirDnaKey, psychTaxes, myAssessment, theirAssessment) : 50;
   const grade = fairnessGrade(myVal, theirVal);
 
-  html += `<div class="card" style="margin-bottom:12px">
-    <div style="font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Trade Summary</div>
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:12px">
-      <div style="text-align:center">
-        <div style="font-size:13px;color:var(--text3);margin-bottom:2px">You Give</div>
-        <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${myVal.toLocaleString()}</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:13px;color:var(--text3);margin-bottom:2px">Diff</div>
-        <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--text3)'}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</div>
-      </div>
-      <div style="text-align:center">
-        <div style="font-size:13px;color:var(--text3);margin-bottom:2px">They Give</div>
-        <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${theirVal.toLocaleString()}</div>
-      </div>
-    </div>`;
+  // ── RECON VERDICT ──────────────────────────────────────
+  if (hasTrade) {
+    const absDiff = Math.abs(diff);
+    const youWin = diff < 0;
+    const close = absDiff < 500;
+    const bigWin = absDiff > 1500;
+    let verdictLabel, verdictColor, verdictBg, verdictAction;
 
-  // Acceptance likelihood meter
-  const acceptColor = acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)';
-  html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div style="font-size:13px;color:var(--text3);min-width:72px">Acceptance</div>
-      <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative">
-        <div style="height:100%;width:${acceptance}%;background:${acceptColor};border-radius:4px;transition:width .4s"></div>
-      </div>
-      <div style="font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${acceptColor};min-width:40px;text-align:right">${acceptance}%</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <div style="font-size:13px;color:var(--text3);min-width:72px">Fairness</div>
-      <div style="font-size:18px;font-weight:800;color:${grade.color}">${grade.grade}</div>
-      ${theirDnaKey !== 'NONE' ? `<div style="font-size:13px;color:var(--text3);margin-left:auto">DNA mult: ${theirDna.mult}x</div>` : ''}
-    </div>`;
+    if (close) {
+      verdictLabel = 'CLOSE TRADE';
+      verdictColor = 'var(--amber)';
+      verdictBg = 'var(--amberL)';
+      verdictAction = youWin ? 'Slightly in your favor. Send with confidence.' : 'Nearly fair. Consider sending — they may accept.';
+    } else if (youWin) {
+      verdictLabel = bigWin ? 'STRONG WIN' : 'GOOD TRADE';
+      verdictColor = 'var(--green)';
+      verdictBg = 'var(--greenL)';
+      verdictAction = acceptance >= 50 ? 'Send now before they reconsider.' : 'Great value for you but low acceptance — consider sweetening slightly.';
+    } else {
+      verdictLabel = bigWin ? 'NOT FAVORABLE' : 'SLIGHT OVERPAY';
+      verdictColor = 'var(--red)';
+      verdictBg = 'var(--redL)';
+      verdictAction = 'You are overpaying by ~' + absDiff.toLocaleString() + ' DHQ. Add a pick or remove a player to rebalance.';
+    }
 
-  // Psych taxes breakdown
-  if (psychTaxes.length) {
-    html += `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-      <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Psychological Factors</div>`;
-    psychTaxes.forEach(t => {
-      const isBonus = t.type === 'BONUS';
-      html += `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;font-size:13px">
-        <span style="font-size:13px;font-weight:700;min-width:40px;text-align:right;color:${isBonus ? 'var(--green)' : 'var(--red)'}">
-          ${t.impact > 0 ? '+' : ''}${t.impact}%
-        </span>
-        <div>
-          <div style="font-weight:600;color:var(--text)">${t.name}</div>
-          <div style="color:var(--text3);font-size:13px;margin-top:1px">${t.desc}</div>
+    html += `<div style="background:${verdictBg};border:1px solid ${verdictColor}30;border-radius:var(--rl);padding:14px 16px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;color:${verdictColor};border:1px solid ${verdictColor}">${verdictLabel}</span>
+        <span style="font-size:13px;font-weight:700;color:${verdictColor}">${youWin ? 'You win' : close ? 'Nearly fair' : 'You lose'} by ${close ? '<500' : absDiff.toLocaleString()} DHQ</span>
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px">${verdictAction}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:11px;color:var(--text3)">Acceptance</div>
+        <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${acceptance}%;background:${acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)'};border-radius:3px"></div>
         </div>
+        <div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)'}">${acceptance}%</div>
+      </div>
+    </div>`;
+  }
+
+  // ── PSYCHOLOGICAL FACTORS (elevated) ─────────────────
+  if (psychTaxes.length && hasTrade) {
+    const topInsights = psychTaxes.slice(0, 3);
+    html += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">`;
+    topInsights.forEach(t => {
+      const isBonus = t.type === 'BONUS';
+      const col = isBonus ? 'var(--green)' : 'var(--red)';
+      const bg = isBonus ? 'var(--greenL)' : 'var(--redL)';
+      html += `<div style="flex:1;min-width:140px;background:${bg};border:1px solid ${col}20;border-radius:var(--r);padding:8px 10px">
+        <div style="font-size:12px;font-weight:700;color:${col}">${t.impact > 0 ? '+' : ''}${t.impact}% ${t.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">${t.desc}</div>
       </div>`;
     });
     html += `</div>`;
   }
 
-  html += `</div>`;
+  // ── TRADE SUMMARY ────────────────────────────────────
+  const acceptColor = acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)';
+  html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center">
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">You Give</div>
+        <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${myVal.toLocaleString()}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Net</div>
+        <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--text3)'}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">They Give</div>
+        <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${theirVal.toLocaleString()}</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── IMPROVE TRADE SUGGESTIONS ───────────────────────
+  if (hasTrade && Math.abs(diff) > 300) {
+    const suggestions = [];
+    const myRoster = S.rosters?.find(r => r.roster_id === myRosterId);
+    const theirRoster = S.rosters?.find(r => r.roster_id === theirRosterId);
+
+    if (diff > 300) {
+      // You're overpaying — suggest removing or asking for more
+      const mySmallest = _tcBuilderMyAssets.players
+        .map(pid => ({ pid, val: dynastyValue(pid) }))
+        .filter(p => p.val > 0)
+        .sort((a, b) => a.val - b.val)[0];
+      if (mySmallest && mySmallest.val <= diff * 1.2) {
+        suggestions.push({ text: 'Remove ' + pNameShort(mySmallest.pid) + ' (' + mySmallest.val.toLocaleString() + ' DHQ) to rebalance', action: "_tcRemoveAsset('my','player','" + mySmallest.pid + "')" });
+      }
+      // Suggest they add a pick
+      suggestions.push({ text: 'Ask for a mid-round pick to close the ~' + Math.abs(diff).toLocaleString() + ' gap', action: null });
+    } else if (diff < -300) {
+      // You're winning — suggest sweetening
+      const roundNeeded = Math.abs(diff) > 3000 ? '1st' : Math.abs(diff) > 1500 ? '2nd' : '3rd';
+      suggestions.push({ text: 'Add a ' + roundNeeded + ' round pick to improve acceptance', action: null });
+      if (acceptance < 50) {
+        suggestions.push({ text: 'Low acceptance — try adding a depth player they need', action: null });
+      }
+    }
+
+    if (suggestions.length) {
+      html += `<div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Improve This Trade</div>
+        ${suggestions.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:4px;cursor:${s.action ? 'pointer' : 'default'};transition:background .12s;-webkit-tap-highlight-color:transparent" ${s.action ? 'onclick="' + s.action + '"' : ''}>
+          <span style="color:var(--accent);font-weight:700;font-size:14px;flex-shrink:0">→</span>
+          <span style="font-size:13px;color:var(--text2)">${s.text}</span>
+        </div>`).join('')}
+      </div>`;
+    }
+  }
+
+  // ── SEND TRADE CTA ──────────────────────────────────
+  if (hasTrade) {
+    html += `<div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="btn" style="flex:1;padding:14px;font-size:15px;font-weight:700" onclick="goAsk('Draft a Sleeper trade message for this trade: I give ${_tcBuilderMyAssets.players.map(p=>pNameShort(p)).join(', ')||'nothing'} and receive ${_tcBuilderTheirAssets.players.map(p=>pNameShort(p)).join(', ')||'nothing'} from ${theirAssessment.ownerName}. Make it persuasive.')">
+        Send Trade Message
+      </button>
+      <button class="btn btn-ghost" style="padding:14px;font-size:13px" onclick="goAsk('Analyze this trade: I give ${_tcBuilderMyAssets.players.map(p=>pNameShort(p)+' ('+dynastyValue(p)+')').join(', ')} for ${_tcBuilderTheirAssets.players.map(p=>pNameShort(p)+' ('+dynastyValue(p)+')').join(', ')} from ${theirAssessment.ownerName}')">
+        Ask AI
+      </button>
+    </div>`;
+  }
 
   container.innerHTML = html;
 }
@@ -1410,23 +1488,26 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
     }
   }
 
-  // Selected assets value display
+  // Selected assets — card-style chips
   const selectedPlayerHtml = assets.players.map(pid => {
     const val = dynastyValue(pid);
     const { col } = tradeValueTier(val);
-    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pNameShort(pid)}</span>
-      <span style="font-size:13px;font-weight:600;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
-      <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','player','${pid}')">&times;</button>
+    const pos = pPos(pid);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="openPlayerModal('${pid}')">
+      <span class="rr-pos" style="${getPosBadgeStyle(pos)};font-size:10px;padding:1px 4px">${pos}</span>
+      <span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pNameShort(pid)}</span>
+      <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
+      <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0 4px;line-height:1" onclick="event.stopPropagation();_tcRemoveAsset('${side}','player','${pid}')">&times;</button>
     </div>`;
   }).join('');
 
   const selectedPickHtml = assets.picks.map((pk, idx) => {
     const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
-    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:13px;flex:1">${pk.year} Round ${pk.round}</span>
-      <span style="font-size:13px;font-weight:600;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
-      <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','pick',${idx})">&times;</button>
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+      <span style="font-size:10px;font-weight:800;padding:1px 4px;border-radius:4px;background:var(--amberL);color:var(--amber)">PICK</span>
+      <span style="font-size:13px;font-weight:600;flex:1">${pk.year} Rd ${pk.round}</span>
+      <span style="font-size:12px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
+      <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0 4px;line-height:1" onclick="_tcRemoveAsset('${side}','pick',${idx})">&times;</button>
     </div>`;
   }).join('');
 
@@ -1465,7 +1546,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
         <span style="font-size:13px;font-weight:600;color:var(--amber);font-family:'JetBrains Mono',monospace">${Math.round(assets.faab * FAAB_RATE).toLocaleString()}</span>
         <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','faab',0)">&times;</button>
       </div>` : ''}
-      ${!selectedPlayerHtml && !selectedPickHtml && assets.faab <= 0 ? '<div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">No assets selected</div>' : ''}
+      ${!selectedPlayerHtml && !selectedPickHtml && assets.faab <= 0 ? `<div style="font-size:12px;color:var(--text3);padding:10px 0;text-align:center;line-height:1.5">${isMySide ? 'Add players or picks you want to trade away' : 'Add what you want from ' + assessment.ownerName}</div>` : ''}
     </div>
 
     <!-- Add player -->
