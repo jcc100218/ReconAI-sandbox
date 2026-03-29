@@ -195,62 +195,39 @@
       </div>
     </div>    <!-- ROSTER -->
     <div class="panel" id="panel-roster">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-        <div style="display:flex;gap:4px;flex-wrap:wrap" id="roster-filter-btns">
-          <button class="rfbtn active" onclick="setRosterFilter('all',this)">All</button>
-          <button class="rfbtn" onclick="setRosterFilter('OFF',this)">Offense</button>
-          <button class="rfbtn" onclick="setRosterFilter('IDP',this)">IDP</button>
-          <button class="rfbtn" onclick="setRosterFilter('taxi',this)">Taxi</button>
-        </div>
-        <div style="display:flex;gap:4px">
-          <button class="rfbtn" onclick="sortRoster('pos')" style="font-size:13px">Sort: Pos</button>
-          <button class="rfbtn" onclick="resetRosterSort()" style="font-size:13px">↺ Reset</button>
-        </div>
-        <div class="spacer"></div>
-        <div style="font-size:13px;color:var(--text3)" id="roster-sort-hint">Click column header to sort</div>
+      <!-- Mobile filter bar -->
+      <div style="display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:2px" id="roster-filter-btns">
+        <button class="rfbtn active" onclick="setRosterFilter('all',this)">All</button>
+        <button class="rfbtn" onclick="setRosterFilter('OFF',this)">Offense</button>
+        <button class="rfbtn" onclick="setRosterFilter('IDP',this)">IDP</button>
+        <button class="rfbtn" onclick="setRosterFilter('taxi',this)">Taxi</button>
+        <div style="flex:1"></div>
+        <button class="rfbtn" onclick="cycleRosterSort()" id="roster-sort-btn" style="font-size:12px;white-space:nowrap">Sort: Value ↓</button>
       </div>
-      <div class="tip-box" id="tip-dhq" style="margin-bottom:10px">
-        <strong>DHQ Value (0-10,000)</strong> is a dynasty trade value computed from YOUR league's actual data.<br><br>
-        <strong>How it's calculated:</strong><br>
-        &bull; <strong>40% Production</strong> — weighted PPG from the last 5 seasons of your league's scoring settings<br>
-        &bull; <strong>25% Age curve</strong> — position-specific peak windows (RBs peak 22-27, QBs 24-34, etc.)<br>
-        &bull; <strong>20% Situation</strong> — roster status, role, trajectory, durability<br>
-        &bull; <strong>10% Scarcity</strong> — supply vs demand at the position in your league<br>
-        &bull; <strong>5% Peak bonus</strong> — years of prime production remaining<br><br>
-        Then blended <strong>75% DHQ engine + 25% FantasyCalc market consensus</strong> to anchor against the broader dynasty market.<br><br>
-        <div class="tip-scale">
-          <span style="background:var(--greenL);color:var(--green)">7000+ Elite</span>
-          <span style="background:var(--accentL);color:var(--accent)">4000+ Starter</span>
-          <span style="background:rgba(255,255,255,.05);color:var(--text2)">2000+ Depth</span>
-          <span style="background:rgba(255,255,255,.03);color:var(--text3)">&lt;2000 Stash</span>
-        </div>
+      <!-- Roster count + sort hint (compact) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;color:var(--text3)" id="roster-count"></div>
       </div>
-      <div style="overflow-x:auto">
-        <table class="roster-table" id="roster-table">
-          <thead>
-            <tr>
-              <th class="rt-th" style="width:32px"></th>
-              <th class="rt-th rt-sortable" onclick="sortRoster('name')" style="min-width:140px">Player</th>
-              <th class="rt-th rt-sortable" onclick="sortRoster('pos')" style="width:36px">Pos</th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('age')">Age</th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('value')" style="min-width:64px">DHQ Value <span class="tip-icon" onclick="event.stopPropagation();toggleTip('tip-dhq')" style="font-size:9px">?</span></th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('avg')">PPG</th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('prev')" id="th-prev">'24avg</th>
-              <th class="rt-th rt-sortable rt-num" onclick="sortRoster('peak')">Peak</th>
-              <th class="rt-th" style="width:36px">Inj</th>
-            </tr>
-          </thead>
-          <tbody id="roster-tbody">
-            <tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text3);font-size:14px">Connect to load roster.</td></tr>
-          </tbody>
-        </table>
+      <!-- Mobile roster list -->
+      <div id="roster-tbody" style="display:flex;flex-direction:column;gap:4px">
+        <div style="padding:20px;text-align:center;color:var(--text3);font-size:14px">Connect to load roster.</div>
       </div>
-      <!-- Pick assets embedded in roster -->
+      <!-- Pick assets -->
       <div class="sec" style="margin-top:16px">My draft picks (next 3 years) <div class="sec-line"></div>
         <button class="btn btn-ghost btn-sm" onclick="runPicksAI()" id="picks-ai-btn">AI analysis ↗</button>
       </div>
       <div id="picks-mine"><div class="empty">Connect to see picks.</div></div>
       <div id="picks-ai-content" style="margin-top:10px"></div>
+      <!-- DHQ tip (hidden, shown on demand) -->
+      <div class="tip-box" id="tip-dhq" style="margin-top:10px">
+        <strong>DHQ Value (0-10,000)</strong> is a dynasty trade value computed from YOUR league's actual data.<br><br>
+        <strong>How it's calculated:</strong><br>
+        &bull; <strong>40% Production</strong> — weighted PPG from the last 5 seasons<br>
+        &bull; <strong>25% Age curve</strong> — position-specific peak windows<br>
+        &bull; <strong>20% Situation</strong> — roster status, role, trajectory<br>
+        &bull; <strong>10% Scarcity</strong> — supply vs demand at position<br>
+        &bull; <strong>5% Peak bonus</strong> — years of prime remaining<br>
+      </div>
     </div>
 
     <!-- START/SIT -->
@@ -340,83 +317,91 @@
       </div>
     </div>
 
-    <!-- PLAYER PROFILE MODAL -->
-    <div id="player-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:1000;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto">
-      <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);width:100%;max-width:620px;margin:auto;position:relative;box-shadow:0 16px 64px rgba(0,0,0,.6);animation:modalIn .3s ease">
-        <!-- Header banner -->
-        <div id="pm-banner" style="border-radius:var(--rxl) var(--rxl) 0 0;padding:22px 22px 18px;position:relative;overflow:hidden;background:var(--bg3)">
-          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(124,107,248,.1),transparent 60%);pointer-events:none"></div>
-          <button onclick="closePlayerModal()" style="position:absolute;top:14px;right:14px;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);border:1px solid var(--glass-border);color:var(--text2);cursor:pointer;font-size:16px;line-height:1;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:1" onmouseover="this.style.background='rgba(248,113,113,.2)';this.style.color='var(--red)'" onmouseout="this.style.background='rgba(0,0,0,.4)';this.style.color='var(--text2)'">✕</button>
-          <div style="display:flex;gap:16px;align-items:flex-end">
+    <!-- PLAYER PROFILE — Mobile bottom sheet -->
+    <div id="player-modal" class="pm-overlay" style="display:none">
+      <div class="pm-sheet">
+        <!-- Drag handle -->
+        <div class="pm-handle"><div class="pm-handle-bar"></div></div>
+        <!-- Sticky header -->
+        <div class="pm-header" id="pm-banner">
+          <button onclick="closePlayerModal()" class="pm-close">&times;</button>
+          <div style="display:flex;gap:14px;align-items:center">
             <div style="position:relative;flex-shrink:0">
-              <img id="pm-photo" src="" style="width:88px;height:88px;border-radius:12px;object-fit:cover;object-position:top;border:2px solid var(--border2)" onerror="this.style.display='none';document.getElementById('pm-initials').style.display='flex'"/>
-              <div id="pm-initials" style="display:none;width:88px;height:88px;border-radius:12px;background:var(--bg4);align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--text3);border:2px solid var(--border2)"></div>
-              <div id="pm-pos-badge" style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap"></div>
+              <img id="pm-photo" src="" class="pm-avatar" onerror="this.style.display='none';document.getElementById('pm-initials').style.display='flex'"/>
+              <div id="pm-initials" class="pm-avatar-fallback"></div>
+              <div id="pm-pos-badge" class="pm-pos-badge"></div>
             </div>
-            <div style="flex:1;min-width:0;padding-bottom:6px">
-              <div id="pm-name" style="font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1.1;margin-bottom:3px"></div>
-              <div id="pm-idp-badge" style="margin:4px 0"></div>
-              <div id="pm-insight" style="margin:6px 0"></div>
-      <div id="pm-bio" style="font-size:13px;color:var(--text2);margin-bottom:8px"></div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap" id="pm-tags"></div>
+            <div style="flex:1;min-width:0">
+              <div id="pm-name" style="font-size:18px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1.15;margin-bottom:2px"></div>
+              <div id="pm-bio" style="font-size:12px;color:var(--text3);margin-bottom:4px"></div>
+              <div style="display:flex;gap:5px;flex-wrap:wrap" id="pm-tags"></div>
             </div>
           </div>
+          <!-- Recon Verdict banner -->
+          <div id="pm-verdict" style="margin-top:10px"></div>
+          <div id="pm-idp-badge" style="display:none"></div>
         </div>
-        <!-- Key stats bar -->
-        <div id="pm-stats-bar" style="display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--border)"></div>
-        <!-- Body -->
-        <div style="padding:16px 18px">
-          <!-- Age curve + peak projection -->
+
+        <!-- Scrollable body -->
+        <div class="pm-body">
+          <!-- Dynasty insight -->
+          <div id="pm-insight" style="margin-bottom:12px"></div>
+
+          <!-- Stats bar -->
+          <div id="pm-stats-bar" class="pm-stats-grid"></div>
+
+          <!-- Age curve -->
           <div style="margin-bottom:14px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em">Age curve</div>
-              <div id="pm-peak-tag" style="font-size:13px;color:var(--text2)"></div>
+              <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Age Curve</div>
+              <div id="pm-peak-tag" style="font-size:12px;color:var(--text2)"></div>
             </div>
             <div class="age-curve-bar" id="pm-curve"></div>
             <div class="acb-label" id="pm-curve-lbl"></div>
           </div>
+
           <!-- Season sparkline -->
           <div id="pm-spark-wrap" style="margin-bottom:14px;display:none">
-            <div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Points this season</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Points this season</div>
             <div class="pts-sparkline" id="pm-spark"></div>
-            <div id="pm-spark-lbl" style="font-size:13px;color:var(--text3);margin-top:3px;display:flex;gap:0"></div>
+            <div id="pm-spark-lbl" style="font-size:11px;color:var(--text3);margin-top:3px;display:flex;gap:0"></div>
           </div>
-          <!-- Trade value + peak projection -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-            <div style="background:var(--bg3);border-radius:var(--r);padding:12px">
-              <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dynasty trade value <span class="tip-icon" onclick="toggleTip('tip-dhq-modal')" style="font-size:9px">?</span></div>
+
+          <!-- Trade value + Trade Profile / IDP stats -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+            <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
+              <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Dynasty Value</div>
               <div id="pm-trade-val" style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--accent)"></div>
-              <div id="pm-trade-tier" style="font-size:13px;color:var(--text2);margin-top:2px"></div>
-              <div class="tip-box" id="tip-dhq-modal">
-                This player's DHQ value is derived from 5 years of production in your league's scoring system, adjusted for age, situation, scarcity, and market consensus. It represents what this player is worth in a dynasty trade within YOUR specific league context.
-              </div>
+              <div id="pm-trade-tier" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
             </div>
-            <div id="pm-right-panel" style="background:var(--bg3);border-radius:var(--r);padding:12px">
-              <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Peak years projection</div>
-              <div id="pm-peak-years" style="font-size:16px;font-weight:700;color:var(--green)"></div>
-              <div id="pm-peak-desc" style="font-size:13px;color:var(--text2);margin-top:2px;line-height:1.4"></div>
-            </div>
+            <div id="pm-right-panel" style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"></div>
           </div>
-          <!-- Physical + depth -->
+
+          <!-- Hidden legacy elements -->
           <div id="pm-details" style="display:none"></div>
-          <!-- Trading card stats -->
-          <div id="pm-card-stats" style="display:none;margin-bottom:14px">
-            <div id="pm-card-stats-label" style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Season Stats</div>
-            <div id="pm-card-stats-inner"></div>
-          </div>
+          <div id="pm-card-stats" style="display:none"></div>
+          <div id="pm-card-stats-label" style="display:none"></div>
+          <div id="pm-card-stats-inner" style="display:none"></div>
+          <div id="pm-peak-years" style="display:none"></div>
+          <div id="pm-peak-desc" style="display:none"></div>
+
           <!-- News -->
-          <div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Latest news</div>
-          <div id="pm-news" style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;min-height:40px">
-            <div style="color:var(--text3);font-size:13px">Loading...</div>
+          <div style="margin-bottom:14px">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Latest News</div>
+            <div id="pm-news" style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;min-height:36px">
+              <div style="color:var(--text3);font-size:13px">Loading...</div>
+            </div>
           </div>
-          <!-- X post -->
-          <div id="pm-tweet" style="display:none;margin-top:10px"></div>
-          <!-- Actions -->
-          <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick="getPlayerFullCard(window._pmPid)">Refresh news ↺</button>
-            <button class="btn btn-ghost btn-sm" id="pm-ask-btn">Ask Agent</button>
-            <button class="btn btn-ghost btn-sm" id="pm-trade-btn"></button>
-          </div>
+          <div id="pm-tweet" style="display:none"></div>
+          <div class="tip-box" id="tip-dhq-modal" style="display:none"></div>
+          <div class="tip-box" id="tip-trade-profile" style="display:none"></div>
+        </div>
+
+        <!-- Sticky action bar -->
+        <div class="pm-action-bar">
+          <button class="pm-action-btn pm-action-primary" id="pm-ask-btn">Scout Report</button>
+          <button class="pm-action-btn" id="pm-trade-btn">Trade Finder</button>
+          <button class="pm-action-btn" onclick="getPlayerFullCard(window._pmPid)">News ↺</button>
         </div>
       </div>
     </div>

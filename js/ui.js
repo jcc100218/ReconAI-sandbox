@@ -119,8 +119,25 @@ function peakYears(pid){
   return{label:'Declining',desc:yrsPast+'yr past peak',cls:'declining',color:'rgba(248,113,113,.8)'}; // red - sell window
 }
 
-// Roster sort/filter stubs
-let rosterSortKey='val', rosterSortDir=-1, rosterFilter='all';
+// Roster sort/filter
+let rosterSortKey='value', rosterSortDir=-1, rosterFilter='all';
+const _rosterSortCycle=[
+  {key:'value',dir:-1,label:'Value ↓'},
+  {key:'pos',dir:1,label:'Position'},
+  {key:'age',dir:1,label:'Age ↑'},
+  {key:'age',dir:-1,label:'Age ↓'},
+  {key:'name',dir:1,label:'Name A-Z'},
+];
+let _rosterSortIdx=0;
+
+function cycleRosterSort(){
+  _rosterSortIdx=(_rosterSortIdx+1)%_rosterSortCycle.length;
+  const s=_rosterSortCycle[_rosterSortIdx];
+  rosterSortKey=s.key;rosterSortDir=s.dir;
+  const btn=$('roster-sort-btn');
+  if(btn)btn.textContent='Sort: '+s.label;
+  buildRosterTable();
+}
 function sortRoster(key){
   if(rosterSortKey===key)rosterSortDir*=-1;else{rosterSortKey=key;rosterSortDir=-1;}
   buildRosterTable();
@@ -131,11 +148,27 @@ function setRosterFilter(f, btn){
   if(btn) btn.classList.add('active');
   buildRosterTable();
 }
-function resetRosterSort(){rosterSortKey='val';rosterSortDir=-1;rosterFilter='all';buildRosterTable();}
+function resetRosterSort(){rosterSortKey='value';rosterSortDir=-1;rosterFilter='all';_rosterSortIdx=0;buildRosterTable();}
+
+// Recon verdict helper
+function _reconVerdict(pid,val,pos,age,meta){
+  if(!meta||val<=0)return null;
+  const peakYrsLeft=meta.peakYrsLeft||0;
+  const trend=meta.trend||0;
+  if(meta.source==='FC_ROOKIE')return{label:'Stash',col:'var(--blue)',bg:'var(--blueL)'};
+  if(val>=7000&&peakYrsLeft>=3)return{label:'Build Around',col:'var(--green)',bg:'var(--greenL)'};
+  if(peakYrsLeft>=4&&trend>=10)return{label:'Buy',col:'var(--green)',bg:'var(--greenL)'};
+  if(peakYrsLeft>=2&&val>=4000)return{label:'Hold',col:'var(--accent)',bg:'var(--accentL)'};
+  if(peakYrsLeft<=1&&val>=3000)return{label:'Sell High',col:'var(--amber)',bg:'var(--amberL)'};
+  if(peakYrsLeft<=0&&trend<=-10)return{label:'Sell',col:'var(--red)',bg:'var(--redL)'};
+  if(val<2000&&peakYrsLeft>=3)return{label:'Stash',col:'var(--blue)',bg:'var(--blueL)'};
+  if(peakYrsLeft>=1)return{label:'Hold',col:'var(--accent)',bg:'var(--accentL)'};
+  return{label:'Sell',col:'var(--red)',bg:'var(--redL)'};
+}
 
 function buildRosterTable(){
   const my=myR();if(!my){
-    $('roster-tbody').innerHTML='<tr><td colspan="14" style="padding:20px;text-align:center;color:var(--text3);font-size:14px">Connect to load roster.</td></tr>';
+    $('roster-tbody').innerHTML='<div style="padding:20px;text-align:center;color:var(--text3);font-size:14px">Connect to load roster.</div>';
     return;
   }
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
@@ -144,11 +177,9 @@ function buildRosterTable(){
   const reserve=new Set(my.reserve||[]);
   const taxi=new Set(my.taxi||[]);
   const allPlayers=my.players||[];
-
   const offPos=new Set(['QB','RB','WR','TE','K']);
   const idpPos=new Set(['DL','LB','DB']);
 
-  // Build data rows
   let rows=allPlayers.map(pid=>{
     const p=S.players[pid]||{};
     const stats=S.playerStats?.[pid]||{};
@@ -160,32 +191,19 @@ function buildRosterTable(){
     const slot=slotIdx>=0?(positions[slotIdx]||'FLEX'):isRes?'IR':isTaxi?'Taxi':pPos(pid)||'BN';
     return{
       pid,p,stats,val,pk,slot,
-      isStarter:starters.has(pid),
-      isReserve:isRes,
-      isTaxi,
-      pos:pPos(pid)||'?',
-      name:pName(pid),
-      age:p.age||99,
-      rank:S.posRanks?.[pid]||999,
-      avg:stats.seasonAvg||0,
-      l3:stats.trail3||0,
-      prev:stats.prevAvg||0,
-      prevtot:stats.prevTotal||0,
-      proj:S.playerProj?.[pid]||0,
-      value:val,
-      peak:pk.cls==='hi'?3:pk.cls==='near'?2:1,
+      isStarter:starters.has(pid),isReserve:isRes,isTaxi,
+      pos:pPos(pid)||'?',name:pName(pid),
+      age:p.age||99,value:val,
+      avg:stats.seasonAvg||0,prev:stats.prevAvg||0,
     };
   });
 
-  // Filter
   if(rosterFilter==='OFF')rows=rows.filter(r=>offPos.has(r.pos));
   if(rosterFilter==='IDP')rows=rows.filter(r=>idpPos.has(r.pos));
   if(rosterFilter==='taxi')rows=rows.filter(r=>r.isTaxi);
 
-  // Sort
-  const posOrder2=['QB','RB','WR','TE','DL','LB','DB','K','DEF','IDP','FLEX','SF'];
+  const posOrder2=['QB','RB','WR','TE','DL','LB','DB','K','DEF'];
   rows.sort((a,b)=>{
-    // Taxi and IR always at bottom
     if(rosterFilter!=='taxi'){
       const sec=r=>r.isReserve?2:r.isTaxi?2:0;
       const sd=sec(a)-sec(b);if(sd!==0)return sd;
@@ -198,49 +216,63 @@ function buildRosterTable(){
     return 0;
   });
 
-  const tbody=$('roster-tbody');
+  // Count display
+  const countEl=$('roster-count');
+  if(countEl)countEl.textContent=rows.length+' player'+(rows.length!==1?'s':'');
+
+  const wrap=$('roster-tbody');
   let html='';
   let lastSection='';
 
   rows.forEach(r=>{
-    const {pid,p,stats,val,pk,slot,isStarter,isReserve,isTaxi,pos,age,rank}=r;
-    // Only show section headers for Taxi and IR — main roster is one continuous list
+    const {pid,p,stats,val,pk,isStarter,isReserve,isTaxi,pos,age}=r;
+
+    // Section headers
     const section=(r.isReserve||r.isTaxi)?(r.isReserve?'IR / Reserve':'Taxi Squad'):'';
     if(section&&section!==lastSection){
-      html+=`<tr class="rt-section-row"><td colspan="9">${section}</td></tr>`;
+      html+=`<div class="rr-section-hdr">${section}</div>`;
       lastSection=section;
     }
-    const rowCls=r.isStarter?'rt-row rt-starter':(r.isReserve||r.isTaxi)?'rt-row rt-reserve':'rt-row';
-    const pc=posClass(pos);
-    const inj=p.injury_status;
-    const avg=stats.seasonAvg;
-    const prev=stats.prevAvg;
-    const {tier,col}=tradeValueTier(val);
+
+    const {col}=tradeValueTier(val);
     const initials=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
+    const inj=p.injury_status;
+    const meta=LI_LOADED?LI.playerMeta?.[pid]:null;
+    const dhqTrend=meta?.trend||0;
+    const trendHtml=dhqTrend>=15?'<span class="rr-trend" style="color:var(--green)">▲</span>':dhqTrend<=-15?'<span class="rr-trend" style="color:var(--red)">▼</span>':'';
+    const ppg=stats.prevAvg||stats.seasonAvg||0;
+    const verdict=_reconVerdict(pid,val,pos,age,meta);
+    const isRookie=meta?.source==='FC_ROOKIE';
 
-    // DHQ trend arrow (year-over-year PPG change)
-    const dhqTrend=LI_LOADED&&LI.playerMeta?.[pid]?.trend||0;
-    const trendHtml=dhqTrend>=15?'<span style="color:var(--green);font-size:13px;margin-left:2px" title="PPG up '+dhqTrend+'% YoY">▲</span>':dhqTrend<=-15?'<span style="color:var(--red);font-size:13px;margin-left:2px" title="PPG down '+Math.abs(dhqTrend)+'% YoY">▼</span>':'';
+    // Phase color
+    const phaseCol=pk.cls==='peak'?'var(--green)':pk.cls==='rising'?'var(--green)':pk.cls==='seedling'?'var(--blue)':pk.cls==='veteran'?'var(--amber)':'var(--red)';
+    const cardCls='rr-card'+(isStarter?' rr-starter':'')+(isReserve||isTaxi?' rr-reserve':'');
 
-    html+=`<tr class="${rowCls}" onclick="openPlayerModal('${pid}')">
-      <td><img class="rt-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rt-initials>${initials}</span>')" loading="lazy"/></td>
-      <td><div class="rt-name">${pName(pid)}${isStarter?'<span class="rt-slot">'+posLabel(slot,pid)+'</span>':''}</div><div class="rt-team">${fullTeam(pTeam(pid))}</div></td>
-      <td><span class="pos ${pc}" style="font-size:13px">${pos}</span></td>
-      <td class="rt-num-cell rt-val">${age||'—'}</td>
-      <td class="rt-num-cell" style="color:${col};font-weight:700;font-size:13px;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString()+(LI_LOADED&&LI.playerMeta?.[pid]?.source==='FC_ROOKIE'?'<span style="font-size:9px;color:var(--blue);margin-left:3px;font-weight:600;vertical-align:super">R</span>':'')+trendHtml:LI_LOADED?'<span style="font-size:13px;color:var(--text3)">—</span>':'...'}</td>
-      <td class="rt-num-cell rt-val ${avg&&avg>15?'hi':avg&&avg<8?'lo':''}">${avg?avg.toFixed(1):'—'}${(()=>{
-        const wk=stats.weeklyPts||[];if(wk.length<3)return'';
-        const max=Math.max(...wk,1);const w=48;const h=14;
-        const pts=wk.map((v,i)=>{const x=Math.round(i/(wk.length-1)*w);const y=Math.round(h-v/max*h);return x+','+y;}).join(' ');
-        return'<svg width="'+w+'" height="'+h+'" style="display:block;margin-top:2px;opacity:0.6"><polyline points="'+pts+'" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/></svg>';
-      })()}</td>
-      <td class="rt-num-cell rt-val dim">${prev?prev.toFixed(1):'—'}</td>
-      <td class="rt-peak ${pk.cls}"><div>${pk.label}</div><div style="font-size:13px;font-weight:400;color:var(--text3)">${pk.desc}</div></td>
-      <td>${inj?`<span class="rt-inj">${inj}</span>`:''}</td>
-    </tr>`;
+    html+=`<div class="${cardCls}" onclick="openPlayerModal('${pid}')">
+      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials>${initials}</span>')" loading="lazy"/>
+      <div class="rr-info">
+        <div class="rr-top">
+          <span class="rr-name">${pName(pid)}</span>
+          <span class="rr-pos" style="${getPosBadgeStyle(pos)}">${pos}</span>
+          ${inj?'<span class="rr-inj">'+inj+'</span>':''}
+          ${isRookie?'<span style="font-size:10px;color:var(--blue);font-weight:700">R</span>':''}
+        </div>
+        <div class="rr-bottom">
+          <span>Age ${age||'?'}</span>
+          <span class="rr-val" style="color:${col}">${val>0?val.toLocaleString():'—'}${trendHtml}</span>
+          ${ppg?'<span>'+ppg.toFixed(1)+' PPG</span>':''}
+          ${verdict?'<span class="rr-verdict-chip" style="color:'+verdict.col+';background:'+verdict.bg+'">'+verdict.label+'</span>':''}
+        </div>
+      </div>
+      <div class="rr-right">
+        <div class="rr-phase" style="color:${phaseCol}">${pk.label}</div>
+        <div class="rr-phase-desc">${pk.desc}</div>
+      </div>
+      <div class="rr-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>`;
   });
 
-  tbody.innerHTML=html||'<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--text3)">No players found.</td></tr>';
+  wrap.innerHTML=html||'<div style="padding:20px;text-align:center;color:var(--text3)">No players found.</div>';
 }
 
 // ── Draft pick values ──────────────────────────────────────────
@@ -2274,8 +2306,31 @@ function openPlayerModal(playerId){
   $('pm-pos-badge').textContent=pos;
   $('pm-pos-badge').className='';
   $('pm-pos-badge').style.cssText=`position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;${getPosBadgeStyle(pos)}`;
-  $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:13px;color:var(--green);font-weight:400">✓ on roster</span>':''}`;
+  $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:11px;color:var(--green);font-weight:600">✓ roster</span>':''}`;
   $('pm-bio').innerHTML=`${pos} · ${fullTeam(p.team)} · Age ${age} · ${exp}yr exp${p.college?' · '+p.college:''}`;
+
+  // Recon Verdict
+  const verdictEl=$('pm-verdict');
+  if(verdictEl){
+    const meta2=LI_LOADED?LI.playerMeta?.[playerId]:null;
+    const vd=_reconVerdict(playerId,val,pos,age,meta2);
+    if(vd){
+      // Generate explanation
+      const peakYrsLeft2=meta2?.peakYrsLeft||0;
+      const trend2=meta2?.trend||0;
+      let vdText='';
+      if(vd.label==='Build Around')vdText='Core dynasty asset. Long runway, elite production.';
+      else if(vd.label==='Buy')vdText='Ascending value with peak years ahead. Acquire now.';
+      else if(vd.label==='Hold')vdText=peakYrsLeft2>=3?'In prime with '+peakYrsLeft2+' peak years left. Reliable starter.':'Producing well. Hold unless you get an overpay.';
+      else if(vd.label==='Sell High')vdText='Still productive but window closing. Maximize return now.';
+      else if(vd.label==='Sell')vdText='Past peak with declining trajectory. Move while value remains.';
+      else if(vd.label==='Stash')vdText=meta2?.source==='FC_ROOKIE'?'Incoming rookie. Monitor landing spot and opportunity.':'Low cost with upside. Worth a roster spot to develop.';
+      verdictEl.innerHTML=`<div class="pm-verdict-banner" style="background:${vd.bg}">
+        <span class="pm-verdict-label" style="color:${vd.col};background:${vd.bg};border:1px solid ${vd.col}">${vd.label}</span>
+        <span style="color:${vd.col};font-weight:500">${vdText}</span>
+      </div>`;
+    } else verdictEl.innerHTML='';
+  }
   // IDP data
   const isIDPModal=['DL','LB','DB'].includes(pos);
   const scModal=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
@@ -2480,10 +2535,13 @@ function openPlayerModal(playerId){
     }
   };
 
-  // Show modal
+  // Show modal (bottom sheet)
   const modal=$('player-modal');
   modal.style.display='flex';
   modal.onclick=e=>{if(e.target===modal)closePlayerModal();};
+  // Scroll body to top
+  const pmBody=modal.querySelector('.pm-body');
+  if(pmBody)pmBody.scrollTop=0;
 
   // News
   const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
@@ -2495,7 +2553,7 @@ function openPlayerModal(playerId){
       <span style="font-size:13px;color:var(--text3)">Powered by Grok</span>
     </div>`;
   }else{
-    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:13px;padding:4px 0">Add an xAI key in Settings for live X/Twitter news.</div>';
+    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:13px;padding:4px 0;line-height:1.5">Live player news available once social integrations are enabled in <a onclick="closePlayerModal();switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.</div>';
   }
   // Load career stats
   const cardWrap=$('pm-card-stats');if(cardWrap)cardWrap.style.display='none';
