@@ -208,7 +208,11 @@ function goAsk(text){
 
 // ── Home Chat ─────────────────────────────────────────────────
 async function sendHomeChat(){
-  if(!hasAnyAI(true)){return;}
+  if(!hasAnyAI(false)){
+    const msgs=$('home-chat-msgs');
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='ReconAI chat requires AI. Enable a free Gemini key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    return;
+  }
   const input=$('home-chat-in');const text=(input?.value||'').trim();if(!text)return;
   if(input)input.value='';
 
@@ -256,14 +260,18 @@ function sendTradeChatMsg(text){
 }
 
 async function sendTradeChat(){
-  if(!hasAnyAI(true)){return;}
+  if(!hasAnyAI(false)){
+    const msgs=$('trade-chat-msgs');
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='Trade advisor requires AI. Enable an API key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    return;
+  }
   const input=$('trade-chat-in');const text=(input&&input.value||'').trim();if(!text)return;
   if(input)input.value='';
   const msgsEl=$('trade-chat-msgs');
   expandChat(msgsEl);
-  const um=document.createElement('div');um.className='hc-msg-u';um.style.fontSize='12px';um.textContent=text;
+  const um=document.createElement('div');um.className='hc-msg-u';um.style.fontSize='13px';um.textContent=text;
   msgsEl.appendChild(um);
-  const lm=document.createElement('div');lm.className='hc-msg-a';lm.style.fontSize='12px';
+  const lm=document.createElement('div');lm.className='hc-msg-a';lm.style.fontSize='13px';
   lm.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
   msgsEl.appendChild(lm);msgsEl.scrollTop=99999;
   try{
@@ -328,12 +336,12 @@ async function sendWaiverChat(){
   const msgs=$('wq-chat-msgs');
   expandChat(msgs);
   const um=document.createElement('div');
-  um.className='msg msg-u';um.style.fontSize='12px';um.textContent=text;
+  um.className='hc-msg-u';um.style.fontSize='13px';um.textContent=text;
   msgs.appendChild(um);msgs.scrollTop=99999;
 
   // Loading
   const lm=document.createElement('div');
-  lm.className='msg msg-a';lm.style.fontSize='12px';
+  lm.className='hc-msg-a';lm.style.fontSize='13px';
   lm.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
   msgs.appendChild(lm);msgs.scrollTop=99999;
 
@@ -361,13 +369,17 @@ async function sendWaiverChat(){
 function sendDraftChatMsg(text){const inp=$('draft-chat-in');if(inp)inp.value=text;sendDraftChat();}
 
 async function sendDraftChat(){
-  if(!hasAnyAI(true)){return;}
+  if(!hasAnyAI(false)){
+    const msgs=$('draft-msgs');
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='Draft advisor requires AI. Enable an API key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    return;
+  }
   const input=$('draft-chat-in');const text=input.value.trim();if(!text)return;
   input.value='';
   expandChat($('draft-msgs'));
   addDraftMsg(text,'u');
   const year=$('draft-year-sel')?.value||'2026';
-  const loading=document.createElement('div');loading.className='msg msg-a';loading.style.fontSize='12px';
+  const loading=document.createElement('div');loading.className='hc-msg-a';loading.style.fontSize='13px';
   loading.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
   $('draft-msgs').appendChild(loading);$('draft-msgs').scrollTop=99999;
   try{
@@ -403,7 +415,7 @@ NOTE: Sleeper's rookie data improves as the NFL draft approaches. Pre-NFL draft 
 }
 
 function addDraftMsg(text,role){
-  const d=document.createElement('div');d.className=`msg msg-${role}`;d.style.fontSize='12px';
+  const d=document.createElement('div');d.className=`hc-msg-${role==='user'?'u':'a'}`;d.style.fontSize='13px';
   d.innerHTML=text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
   $('draft-msgs').appendChild(d);$('draft-msgs').scrollTop=99999;
 }

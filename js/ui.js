@@ -321,7 +321,7 @@ function buildRosterTable(){
           <span>Age ${age||'?'}</span>
           <span class="rr-val" style="color:${col}">${val>0?val.toLocaleString():'—'}${trendHtml}</span>
           ${ppg?'<span>'+ppg.toFixed(1)+' PPG</span>':''}
-          ${verdict?'<span class="rr-verdict-chip" style="color:'+verdict.col+';background:'+verdict.bg+'">'+verdict.label+'</span>':''}
+          ${verdict?`<span class="rr-verdict-chip" style="color:${verdict.col};background:${verdict.bg}"${verdict.label==='Sell'||verdict.label==='Sell High'?' onclick="event.stopPropagation();mobileTab(\'trades\')"':''}">${verdict.label}</span>`:''}
         </div>
       </div>
       <div class="rr-right">
@@ -642,8 +642,9 @@ function renderTopPickupHero(){
 
   el.innerHTML=`
     <div class="wv-hero" onclick="openPlayerModal('${pid}')">
-      <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Top Pickup</span>
+        ${_strategyContextLine()||''}
       </div>
       <div class="wv-hero-title">${pName(pid)}</div>
       <div class="wv-hero-sub">${pos} · ${fullTeam(p.team)||p.team||'FA'} · Age ${p.age||'?'} · ${pk.label}</div>
@@ -1966,6 +1967,17 @@ function renderHealthTimeline(){
 // expandChat: defined in ai-chat.js
 
 // ═══════════════════════════════════════════════════════════════
+// SHARED: Strategy context helper
+// ═══════════════════════════════════════════════════════════════
+function _strategyContextLine(){
+  const strat=typeof getMemory==='function'?getMemory('mentality',{}):{};
+  const labels={balanced:'Balanced',winnow:'Win Now',rebuild:'Rebuild',prime:'Dynasty Prime'};
+  const m=strat.mentality;
+  if(!m)return'';
+  return`<span style="font-size:11px;color:var(--text3);font-weight:500">Based on your <strong style="color:var(--accent)">${labels[m]||m}</strong> strategy</span>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // MOBILE-FIRST HOME SCREEN — New rendering layer
 // These functions consume the same data as the original briefing/
 // overview but render into the new mobile-optimized containers.
@@ -2033,6 +2045,7 @@ function renderHeroAction(){
   el.innerHTML=`
     <div class="hero-action-card" onclick="openPlayerModal('${hero.pid}')">
       <div class="hero-chevron"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+      ${_strategyContextLine()?'<div style="margin-bottom:6px">'+_strategyContextLine()+'</div>':''}
       <div class="hero-title">${hero.title}</div>
       <div class="hero-subtitle">${hero.subtitle}</div>
       <div class="hero-reason"><ul>${reasonsHtml}</ul></div>
@@ -2958,8 +2971,9 @@ function renderDraftNeeds(){
       bestBetEl.innerHTML=`
         <div class="hero-action-card" style="margin-bottom:14px;border-color:rgba(124,107,248,.2)">
           <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#9b8afb,var(--accent));background-size:200% 100%;animation:progGlow 3s ease-in-out infinite"></div>
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
             <span style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
+            ${_strategyContextLine()||''}
             <span style="font-size:13px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${pickLabel2}</span>
             <span style="font-size:12px;color:var(--text3)">~${val2.toLocaleString()} DHQ</span>
           </div>
