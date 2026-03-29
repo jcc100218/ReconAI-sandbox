@@ -57,8 +57,8 @@ const pAge=id=>{
 const pExp=id=>S.players[id]?.years_exp??'';
 const getUser=oid=>{const u=S.leagueUsers.find(u=>u.user_id===oid);return u?(u.metadata?.team_name||u.display_name||u.username||'Team'):'Team'};
 const myR=()=>S.rosters.find(r=>r.roster_id===S.myRosterId);
-const prog=pct=>{$('prog-bar').style.width=pct+'%'};
-const setAgentStatus=(txt,active)=>{$('agent-txt').textContent=txt;$('agent-dot').className='status-dot'+(active?' thinking':active===false?' active':'')};
+const prog=pct=>{const el=$('prog-bar');if(el)el.style.width=pct+'%'};
+const setAgentStatus=(txt,active)=>{const t=$('agent-txt');const d=$('agent-dot');if(t)t.textContent=txt;if(d)d.className='status-dot'+(active?' thinking':active===false?' active':'')};
 
 // Expose utilities globally (for inline onclick handlers and other modules)
 Object.assign(window, {$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
@@ -90,7 +90,7 @@ window.switchTab = switchTab;
 window.App.switchTab = switchTab;
 
 function showToast(msg='Copied!'){
-  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  const t=$('toast');if(!t)return;t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2000);
 }
 window.showToast = showToast;
@@ -106,15 +106,15 @@ window.App.copyText = copyText;
 
 // ── Connect ────────────────────────────────────────────────────
 async function connect(){
-  const username=$('u-input').value.trim();if(!username)return;
-  const btn=$('conn-btn');btn.disabled=true;btn.textContent='Connecting...';
-  $('prog').style.display='block';prog(5);
+  const uIn=$('u-input');const username=uIn?.value?.trim();if(!username)return;
+  const btn=$('conn-btn');if(btn){btn.disabled=true;btn.textContent='Connecting...';}
+  const progEl=$('prog');if(progEl)progEl.style.display='block';prog(5);
   ss('conn-status','Looking up user...');
   try{
     const sf=window.App.sf;
     const user=await sf(`/user/${username}`);
-    if(!user?.user_id){ss('conn-status','User not found.',true);btn.disabled=false;btn.textContent='Connect';return;}
-    S.user=user;$('s-user').textContent=user.display_name||username;
+    if(!user?.user_id){ss('conn-status','User not found.',true);if(btn){btn.disabled=false;btn.textContent='Connect my league';}return;}
+    S.user=user;const sUser=$('s-user');if(sUser)sUser.textContent=user.display_name||username;
     try{localStorage.setItem('dynastyhq_username',username);}catch(e){}
     // Acquire Supabase JWT for RLS (non-blocking — don't fail connect if this fails)
     prog(10);ss('conn-status','Authenticating...');
@@ -132,24 +132,24 @@ async function connect(){
     prog(12);ss('conn-status','Loading NFL state...');
     S.nflState=await sf('/state/nfl');
     S.currentWeek=S.nflState?.display_week||S.nflState?.week||1;
-    const manualSeason=$('season-sel').value;
+    const selEl=$('season-sel');
+    const manualSeason=selEl?.value||String(new Date().getFullYear());
     const defaultSeason=String(new Date().getFullYear());
     S.season=manualSeason!==defaultSeason?manualSeason:(S.nflState?.league_create_season||S.nflState?.season||defaultSeason);
-    $('week-pill').textContent='Wk '+S.currentWeek+' · '+S.season;
-    const sel=$('season-sel');
-    if([...sel.options].some(o=>o.value===S.season))sel.value=S.season;
+    const wpEl=$('week-pill');if(wpEl)wpEl.textContent='Wk '+S.currentWeek+' · '+S.season;
+    if(selEl&&[...selEl.options].some(o=>o.value===S.season))selEl.value=S.season;
     prog(20);ss('conn-status','Loading leagues for '+S.season+'...');
     const leagues=await sf(`/user/${user.user_id}/leagues/nfl/${S.season}`);
-    if(!leagues?.length){ss('conn-status','No leagues found for '+S.season+'. Try changing the season in Settings.',true);btn.disabled=false;btn.textContent='Connect';return;}
+    if(!leagues?.length){ss('conn-status','No leagues found for '+S.season+'. Try changing the season in Settings.',true);if(btn){btn.disabled=false;btn.textContent='Connect my league';}return;}
     S.leagues=leagues;
     prog(30);ss('conn-status','Loading player database (refreshing team assignments)...');
     S.players=await sf('/players/nfl');
     prog(50);
     showLeaguePicker(leagues,user.user_id);
-    btn.textContent='Connected ✓';ss('conn-status','');prog(60);
+    if(btn)btn.textContent='Connected ✓';ss('conn-status','');prog(60);
   }catch(e){
     ss('conn-status','Error: '+e.message,true);
-    btn.disabled=false;btn.textContent='Connect';
+    if(btn){btn.disabled=false;btn.textContent='Connect my league';}
   }
 }
 window.connect = connect;
@@ -203,8 +203,8 @@ async function selectLeague(leagueId,userId){
   const league=S.leagues.find(l=>l.league_id===leagueId);
   const leagueName=(league?.name||'League').substring(0,20);
   const isDynasty=league?.settings?.type===2;
-  $('league-pill').innerHTML=leagueName+(isDynasty?'':'<span style="font-size:13px;font-weight:500;color:var(--amber);background:rgba(255,180,0,.12);padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle">(Redraft — dynasty features limited)</span>');
-  $('setup-block').innerHTML=`<div style="text-align:center;padding:20px 0">
+  const lpEl=$('league-pill');if(lpEl)lpEl.textContent=leagueName+(isDynasty?'':' (Redraft)');
+  const sbEl=$('setup-block');if(sbEl)sbEl.innerHTML=`<div style="text-align:center;padding:20px 0">
     <div style="margin:0 auto 16px;width:52px;height:52px;background:linear-gradient(135deg,#7c6bf8,#5b4cc4);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(124,107,248,0.3)">
       <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#c4b5fd;border-radius:50%;animation:spin .7s linear infinite"></span>
     </div>
@@ -399,10 +399,7 @@ function loadMemory(){try{return JSON.parse(localStorage.getItem(MEM_KEY)||'{}')
 function saveMemory(data){try{localStorage.setItem(MEM_KEY,JSON.stringify(data));}catch(e){}}
 function getMemory(key,def=[]){return loadMemory()[key]??def;}
 function setMemory(key,val){const d=loadMemory();d[key]=val;saveMemory(d);}
-function renderStatsTable(){} // stats panel removed
-let statsData={};
-
-Object.assign(window, {loadMemory,saveMemory,getMemory,setMemory,renderStatsTable,statsData});
+Object.assign(window, {loadMemory,saveMemory,getMemory,setMemory});
 Object.assign(window.App, {loadMemory,saveMemory,getMemory,setMemory});
 
 // ── Notifications ───────────────────────────────────────────

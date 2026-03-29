@@ -771,15 +771,16 @@ function calcAcceptanceLikelihood(myValue, theirValue, theirDnaKey, psychTaxes, 
   let likelihood = 50;
   const totalA = myValue;
   const totalB = theirValue;
-  if (totalA > 0 || totalB > 0) {
+  if (totalA > 0 && totalB > 0) {
     const diff = totalA - totalB; // positive = I'm offering more
     const maxSide = Math.max(totalA, totalB, 1);
     const normalizedDiff = diff / maxSide;
 
     if (theirDnaKey === 'FLEECER') {
-      likelihood = normalizedDiff < -0.05
-        ? 75 + Math.round(Math.abs(normalizedDiff) * 40)
-        : Math.max(15, 50 - Math.round(normalizedDiff * 150));
+      // Fleecers accept overpays enthusiastically, reject fair/underpays
+      likelihood = normalizedDiff > 0.05
+        ? 75 + Math.round(normalizedDiff * 60)  // I'm overpaying = they love it
+        : Math.max(10, 35 - Math.round(Math.abs(normalizedDiff) * 150));  // I'm winning = they reject
     } else if (theirDnaKey === 'DOMINATOR') {
       likelihood = normalizedDiff < -0.10
         ? 70

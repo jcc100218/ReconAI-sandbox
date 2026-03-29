@@ -334,22 +334,21 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     if (pts) { total = Math.round(pts * 10) / 10; ppg = +(pts / gamesPlayed).toFixed(1); }
   }
 
+  // ── Helper: safe DOM set ──
+  const _fwSet=(id,prop,val)=>{const el=document.getElementById(id);if(el){if(prop==='textContent')el.textContent=val;else if(prop==='innerHTML')el.innerHTML=val;else el.style[prop]=val;}return el;};
+
   // ── Photo ──
   const photo = document.getElementById('fwpm-photo');
-  photo.src = `https://sleepercdn.com/content/nfl/players/${pid}.jpg`;
-  photo.style.display = '';
+  if(photo){photo.src=`https://sleepercdn.com/content/nfl/players/${pid}.jpg`;photo.style.display='';}
   const initials = document.getElementById('fwpm-initials');
-  initials.textContent = ((p.first_name||'?')[0] + (p.last_name||'?')[0]).toUpperCase();
-  initials.style.display = 'none';
+  if(initials){initials.textContent=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();initials.style.display='none';}
 
   // ── Position badge ──
   const posBadge = document.getElementById('fwpm-pos');
-  posBadge.textContent = pos;
-  posBadge.style.background = _fwPosColor[pos] || 'rgba(212,175,55,.15)';
-  posBadge.style.color = _fwPosText[pos] || _wr.gold;
+  if(posBadge){posBadge.textContent=pos;posBadge.style.background=_fwPosColor[pos]||'rgba(212,175,55,.15)';posBadge.style.color=_fwPosText[pos]||_wr.gold;}
 
   // ── Name ──
-  document.getElementById('fwpm-name').textContent = name;
+  _fwSet('fwpm-name','textContent',name);
 
   // ── Insight blurb ──
   const insightEl = document.getElementById('fwpm-insight');
@@ -399,15 +398,15 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
 
     if (gamesPlayed <= 8 && gamesPlayed > 0 && !blurb.includes('games')) blurb += ` Only ${gamesPlayed} games last season.`;
 
-    if (blurb) {
+    if (blurb && insightEl) {
       const bg = blurbCol === _wr.red ? 'rgba(231,76,60,.08)' : blurbCol === _wr.green ? 'rgba(46,204,113,.08)' : 'rgba(212,175,55,.08)';
       insightEl.innerHTML = `<div style="font-size:11.5px;color:${blurbCol};line-height:1.45;padding:6px 10px;background:${bg};border-radius:6px;border-left:3px solid ${blurbCol}">${blurb}</div>`;
-    } else insightEl.innerHTML = '';
-  } else insightEl.innerHTML = '';
+    } else if(insightEl) insightEl.innerHTML = '';
+  } else if(insightEl) insightEl.innerHTML = '';
 
   // ── Bio ──
   const teamFull = (typeof fullTeam === 'function') ? fullTeam(team) : team;
-  document.getElementById('fwpm-bio').innerHTML = `${pos} \u00B7 ${teamFull} \u00B7 Age ${age || '?'} \u00B7 ${exp}yr exp${p.college ? ' \u00B7 '+p.college : ''}`;
+  _fwSet('fwpm-bio','innerHTML',`${pos} \u00B7 ${teamFull} \u00B7 Age ${age || '?'} \u00B7 ${exp}yr exp${p.college ? ' \u00B7 '+p.college : ''}`);
 
   // ── Tags ──
   const tags = [];
@@ -425,7 +424,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     const wt = p.weight ? p.weight+'lbs' : '';
     tags.push(`<span style="background:rgba(255,255,255,.04);color:${_wr.text3};font-size:13px;padding:2px 8px;border-radius:20px">${[ht,wt].filter(Boolean).join(' \u00B7 ')}</span>`);
   }
-  document.getElementById('fwpm-tags').innerHTML = tags.join('');
+  _fwSet('fwpm-tags','innerHTML',tags.join(''));
 
   // ── Stats bar ──
   const curYear = parseInt(S.season) || new Date().getFullYear();
@@ -459,32 +458,32 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     ];
   }
 
-  document.getElementById('fwpm-stats').innerHTML = statBoxes.map(s =>
+  _fwSet('fwpm-stats','innerHTML',statBoxes.map(s =>
     `<div class="fwpm-stat-box">
       <div class="fwpm-stat-val" style="color:${s.col}">${s.val}</div>
       <div class="fwpm-stat-lbl">${s.lbl}</div>
     </div>`
-  ).join('');
+  ).join(''));
 
   // ── Age curve ──
   const ages = Array.from({length: 17}, (_, i) => i + 20);
-  document.getElementById('fwpm-curve').innerHTML = ages.map(a => {
+  _fwSet('fwpm-curve','innerHTML',ages.map(a => {
     const col = a < pk.lo-3 ? 'rgba(96,165,250,.3)' : a < pk.lo ? 'rgba(46,204,113,.45)' :
       (a >= pk.lo && a <= pk.hi) ? 'rgba(46,204,113,.75)' : a <= pk.hi+2 ? 'rgba(212,175,55,.45)' : 'rgba(231,76,60,.35)';
     return `<div style="flex:1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:default;background:${col};opacity:${a===age?1:0.55};outline:${a===age?'2px solid '+_wr.gold:'none'};outline-offset:-1px;color:${a===age?_wr.text:'transparent'}">${a===age?age:''}</div>`;
-  }).join('');
-  document.getElementById('fwpm-peak-tag').textContent = `Currently age ${age || '?'} \u00B7 ${pk.label} \u00B7 ${pk.desc}`;
-  document.getElementById('fwpm-curve-lbl').innerHTML = `<span>20</span><span>Peak ${pk.lo}\u2013${pk.hi}</span><span>36</span>`;
+  }).join(''));
+  _fwSet('fwpm-peak-tag','textContent',`Currently age ${age || '?'} \u00B7 ${pk.label} \u00B7 ${pk.desc}`);
+  _fwSet('fwpm-curve-lbl','innerHTML',`<span>20</span><span>Peak ${pk.lo}\u2013${pk.hi}</span><span>36</span>`);
 
   // ── Trade value ──
-  document.getElementById('fwpm-val').textContent = val > 0 ? val.toLocaleString() : LI_LOADED ? '\u2014' : 'Loading...';
-  document.getElementById('fwpm-tier').innerHTML = val > 0
+  _fwSet('fwpm-val','textContent',val > 0 ? val.toLocaleString() : LI_LOADED ? '\u2014' : 'Loading...');
+  _fwSet('fwpm-tier','innerHTML',val > 0
     ? `<span style="color:${tierCol}">${tier}</span>${fcRankData ? ' \u00B7 Overall #'+fcRankData.overall : ''}`
-    : LI_LOADED ? `<span style="color:${_wr.text3}">No DHQ data</span>` : `<span style="color:${_wr.text3}">DHQ loading...</span>`;
+    : LI_LOADED ? `<span style="color:${_wr.text3}">No DHQ data</span>` : `<span style="color:${_wr.text3}">DHQ loading...</span>`);
 
   // ── Right panel: Trade Profile (offense) or IDP stats ──
   const rightPanel = document.getElementById('fwpm-right');
-  if (isIDP && rawStats) {
+  if (!rightPanel) { /* skip */ } else if (isIDP && rawStats) {
     const gp = rawStats.gp || 17;
     const idpPts2 = _fwCalcPts(rawStats, sc);
     const idpPPG2 = +(idpPts2 / Math.max(1, gp)).toFixed(1);
@@ -527,21 +526,23 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
   const titleEl = document.getElementById('fwpm-stats-title');
 
   // Show current-year stats immediately if available, then fetch career
-  if (rawStats && Object.keys(rawStats).length > 1) {
-    const quickData = {};
-    quickData[curYear] = rawStats;
-    if (stats.prevRawStats) quickData[curYear - 1] = stats.prevRawStats;
-    titleEl.textContent = 'Career Stats';
-    careerEl.innerHTML = _fwBuildCareerTable(pid, quickData, pos, sc, p);
-  } else {
-    careerEl.innerHTML = `<div style="color:${_wr.text3};font-size:13px;padding:4px 0">Loading career stats...</div>`;
+  if (careerEl) {
+    if (rawStats && Object.keys(rawStats).length > 1) {
+      const quickData = {};
+      quickData[curYear] = rawStats;
+      if (stats.prevRawStats) quickData[curYear - 1] = stats.prevRawStats;
+      if(titleEl)titleEl.textContent = 'Career Stats';
+      careerEl.innerHTML = _fwBuildCareerTable(pid, quickData, pos, sc, p);
+    } else {
+      careerEl.innerHTML = `<div style="color:${_wr.text3};font-size:13px;padding:4px 0">Loading career stats...</div>`;
+    }
   }
 
   // Fetch full career in background
   _fwFetchCareerStats(pid, curYear, exp).then(careerData => {
-    if (Object.keys(careerData).length) {
+    if (Object.keys(careerData).length && careerEl) {
       const yrs = Object.keys(careerData).sort();
-      titleEl.textContent = yrs.length > 1
+      if(titleEl)titleEl.textContent = yrs.length > 1
         ? `Career Stats \u00B7 '${String(yrs[0]).slice(-2)}\u2013'${String(yrs[yrs.length-1]).slice(-2)}`
         : `'${String(yrs[0]).slice(-2)} Season Stats`;
       careerEl.innerHTML = _fwBuildCareerTable(pid, careerData, pos, sc, p);
@@ -550,12 +551,13 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
 
   // ── Actions ──
   const actionsEl = document.getElementById('fwpm-actions');
-  actionsEl.innerHTML = `
+  if(actionsEl)actionsEl.innerHTML = `
     <a href="${_fwFPUrl(name)}" target="_blank" class="fwpm-btn">FantasyPros</a>
     <a href="https://sleeper.com/players/nfl/${pid}" target="_blank" class="fwpm-btn">Sleeper</a>`;
 
   // ── Show ──
-  document.getElementById('fw-player-modal').style.display = 'flex';
+  const modal = document.getElementById('fw-player-modal');
+  if(modal)modal.style.display = 'flex';
 }
 
 // ── Helper: league position rank ────────────────────────────────

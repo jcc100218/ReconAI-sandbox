@@ -7,6 +7,19 @@
  */
 window.App = window.App || {};
 
+// ── HTML sanitizer (XSS protection for AI responses) ──────────
+function _sanitizeAIResponse(text){
+  if(!text)return'';
+  // Escape HTML entities first
+  const div=document.createElement('div');
+  div.textContent=text;
+  let safe=div.innerHTML;
+  // Re-add safe formatting: bold and line breaks
+  safe=safe.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  safe=safe.replace(/\n/g,'<br>');
+  return safe;
+}
+
 // ── Chat history state ─────────────────────────────────────────
 let homeChatHistory=[];
 let tradeChatHistory=[];
@@ -247,7 +260,7 @@ async function sendHomeChat(){
       const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor|SEARCH FOR CURRENT|Scout Report|current situation|dynasty outlook|2026/i.test(text);
       const reply=await callClaude(msgs,needsSearch,2,500);
       homeChatHistory.push({role:'assistant',content:reply});
-      lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+      lm.innerHTML=_sanitizeAIResponse(reply);
     }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
     msgsEl.scrollTop=99999;
   }
@@ -303,7 +316,7 @@ ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
     const tradeNeedsSearch=/search for|look up|find news|breaking/i.test(text);
     const reply=await callClaude(msgs,tradeNeedsSearch,2,500);
     tradeChatHistory.push({role:'assistant',content:reply});
-    lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    lm.innerHTML=_sanitizeAIResponse(reply);
     // Auto-save every 3rd message
     if(tradeChatHistory.length%6===0)autoSaveMemory(tradeChatHistory,'Trades');
   }catch(e){lm.innerHTML='<span style="color:var(--red)">Error: '+e.message+'</span>';}
@@ -360,7 +373,7 @@ async function sendWaiverChat(){
     }).join(';');
     const ctx='MY TEAM:\n'+dhqContext(false)+'\n'+dhqBuildMentalityContext()+'\n'+(faab.isFAAB?'FAAB:$'+faab.remaining:'Waiver priority #'+(myR()?.settings?.waiver_position||'?'))+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
     const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)??4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)??5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)??3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
-    lm.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    lm.innerHTML=_sanitizeAIResponse(reply);
   }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
   msgs.scrollTop=99999;
 }
@@ -409,7 +422,7 @@ NOTE: Sleeper's rookie data improves as the NFL draft approaches. Pre-NFL draft 
     const needsSearch=/search|look up|who is|rank|rookie|prospect|mock/i.test(text);
     const reply=await callClaude(msgs,needsSearch,2,500);
     draftChatHistory.push({role:'assistant',content:reply});
-    loading.innerHTML=reply.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
+    loading.innerHTML=_sanitizeAIResponse(reply);
   }catch(e){loading.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
   $('draft-msgs').scrollTop=99999;
 }
@@ -597,7 +610,7 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
       }
       data=JSON.parse(clean);
     }catch(err){
-      $('wq-list').innerHTML=`<div class="card"><div style="font-size:13px;color:var(--text2);line-height:1.6;padding:4px">${reply.replace(/\n/g,'<br>')}</div></div>`;
+      $('wq-list').innerHTML=`<div class="card"><div style="font-size:13px;color:var(--text2);line-height:1.6;padding:4px">${_sanitizeAIResponse(reply)}</div></div>`;
       btn.textContent='Generate';btn.disabled=false;return;
     }
     const mentLabel={balanced:'⚖️ Balanced',winnow:'🏆 Win Now',rebuild:'🔄 Rebuild',prime:'⭐ Dynasty Prime'}[loadMentality().mentality]||'';
