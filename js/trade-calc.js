@@ -1282,8 +1282,8 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
         <div style="font-size:16px;font-weight:700">${theirAssessment.ownerName}</div>
         <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
           <span style="font-size:12px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
-          ${theirDnaKey !== 'NONE' ? `<span style="font-size:11px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
-          <span style="font-size:11px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
+          ${theirDnaKey !== 'NONE' ? `<span style="font-size:12px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
+          <span style="font-size:12px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
         </div>
         ${tradeAngle ? `<div style="font-size:12px;color:var(--green);margin-top:4px;font-weight:600">${tradeAngle}</div>` : ''}
       </div>
@@ -1351,7 +1351,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
       </div>
       <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px">${verdictAction}</div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-size:11px;color:var(--text3)">Acceptance</div>
+        <div style="font-size:12px;color:var(--text3)">Acceptance</div>
         <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${acceptance}%;background:${acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)'};border-radius:3px"></div>
         </div>
@@ -1370,7 +1370,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
       const bg = isBonus ? 'var(--greenL)' : 'var(--redL)';
       html += `<div style="flex:1;min-width:140px;background:${bg};border:1px solid ${col}20;border-radius:var(--r);padding:8px 10px">
         <div style="font-size:12px;font-weight:700;color:${col}">${t.impact > 0 ? '+' : ''}${t.impact}% ${t.name}</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">${t.desc}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px;line-height:1.4">${t.desc}</div>
       </div>`;
     });
     html += `</div>`;
@@ -1381,15 +1381,15 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center">
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">You Give</div>
+        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">You Give</div>
         <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${myVal.toLocaleString()}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Net</div>
+        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Net</div>
         <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--text3)'}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">They Give</div>
+        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">They Give</div>
         <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${theirVal.toLocaleString()}</div>
       </div>
     </div>
@@ -1423,7 +1423,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
 
     if (suggestions.length) {
       html += `<div style="margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Improve This Trade</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Improve This Trade</div>
         ${suggestions.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:4px;cursor:${s.action ? 'pointer' : 'default'};transition:background .12s;-webkit-tap-highlight-color:transparent" ${s.action ? 'onclick="' + s.action + '"' : ''}>
           <span style="color:var(--accent);font-weight:700;font-size:14px;flex-shrink:0">→</span>
           <span style="font-size:13px;color:var(--text2)">${s.text}</span>

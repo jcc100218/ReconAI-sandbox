@@ -188,7 +188,8 @@ function buildCtxCompact(){
 // PROVIDERS, updateProviderHint, hasServerAI, hasAnyAI, callClaude,
 // callGrokNews, and _newsCache are now in shared/ai-dispatch.js
 // They are available via window.App.* and window.* globals.
-const PROVIDERS = window.App.PROVIDERS;
+// PROVIDERS already declared in shared/ai-dispatch.js — reference via window
+const _aiProviders = window.App.PROVIDERS || {};
 const {updateProviderHint, hasServerAI, hasAnyAI, callClaude, callGrokNews, _newsCache} = window.App;
 
 // ── Chat UI helpers ────────────────────────────────────────────
