@@ -493,107 +493,160 @@
 
     <!-- SETTINGS -->
     <div class="panel" id="panel-settings">
-      <div class="sec">AI Provider <div class="sec-line"></div></div>
-      <div class="card" style="border-color:rgba(124,107,248,.12)">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">Choose your AI provider and paste your API key. <strong style="color:var(--green)">Gemini is free.</strong> Keys stored locally only — never sent anywhere except the provider's API.</p>
-        <div class="grid-2" style="margin-bottom:10px">
-          <div>
-            <div style="font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Provider</div>
-            <select id="ai-provider-sel" style="width:100%;font-size:13px" onchange="updateProviderHint()">
+
+      <!-- 1. System Status -->
+      <div id="settings-status" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px">ReconAI Status</div>
+        <div id="settings-status-lines" style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="st-ai-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0"></span>
+            <span style="color:var(--text2)">AI:</span>
+            <span id="st-ai-label" style="color:var(--text3)">Checking...</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="st-league-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0"></span>
+            <span style="color:var(--text2)">League:</span>
+            <span id="st-league-label" style="color:var(--text3)">Not connected</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="st-strat-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0"></span>
+            <span style="color:var(--text2)">Strategy:</span>
+            <span id="st-strat-label" style="color:var(--text3)">Not set</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. AI Setup (collapsible) -->
+      <details class="settings-section" open id="ai-setup-details">
+        <summary class="settings-summary">
+          <span>AI Provider</span>
+          <span id="ai-setup-badge" style="font-size:12px;color:var(--text3);font-weight:400"></span>
+        </summary>
+        <div style="padding:12px 0 4px">
+          <div style="font-size:13px;color:var(--text3);margin-bottom:10px;line-height:1.5">Your AI powers trade, waiver, and draft recommendations. <strong style="color:var(--green)">Gemini is free.</strong></div>
+          <div style="margin-bottom:8px">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Provider</div>
+            <select id="ai-provider-sel" style="width:100%;font-size:14px;padding:10px 12px" onchange="updateProviderHint()">
               <option value="gemini">Gemini Flash — Free (Google)</option>
               <option value="anthropic">Claude (Anthropic) — Premium</option>
             </select>
           </div>
-          <div>
-            <div style="font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Model (optional)</div>
-            <input type="text" id="ai-model-in" placeholder="auto" style="font-size:13px;width:100%"/>
+          <div id="provider-hint" style="font-size:12px;color:var(--text3);margin-bottom:8px;line-height:1.5"></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input type="password" id="api-key-in" placeholder="Paste API key..." style="font-family:monospace;font-size:14px;flex:1;padding:10px 12px"/>
+            <button class="btn" onclick="saveKey()" style="padding:10px 18px">Save</button>
+          </div>
+          <div id="key-status" class="status-txt"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <input type="text" id="ai-model-in" placeholder="Model (auto)" style="font-size:13px;flex:1;padding:8px 10px"/>
+            <button class="btn btn-ghost btn-sm" onclick="clearKey()">Clear key</button>
+          </div>
+
+          <!-- xAI News (collapsed sub-section) -->
+          <details style="margin-top:10px">
+            <summary style="font-size:12px;color:var(--text3);cursor:pointer;padding:4px 0">Live news (optional — xAI/Grok)</summary>
+            <div style="padding:8px 0">
+              <div style="display:flex;gap:8px">
+                <input type="password" id="xai-key-in" placeholder="xai-..." style="font-family:monospace;font-size:13px;flex:1;padding:8px 10px" value=""/>
+                <button class="btn btn-ghost btn-sm" onclick="saveXaiKey()">Save</button>
+              </div>
+              <div id="xai-key-status" class="status-txt"></div>
+            </div>
+          </details>
+        </div>
+      </details>
+
+      <!-- 3. Team Strategy -->
+      <details class="settings-section" open>
+        <summary class="settings-summary">
+          <span>Team Strategy</span>
+          <span id="strat-badge" style="font-size:12px;color:var(--text3);font-weight:400"></span>
+        </summary>
+        <div style="padding:12px 0 4px">
+          <div style="font-size:13px;color:var(--text3);margin-bottom:10px">Shapes every AI recommendation — trades, waivers, and draft picks.</div>
+
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Mentality</div>
+            <select id="mentality-sel" style="width:100%;font-size:14px;padding:10px 12px">
+              <option value="balanced">Balanced — compete + build</option>
+              <option value="winnow">Win Now — maximize this season</option>
+              <option value="rebuild">Rebuild — youth + picks</option>
+              <option value="prime">Dynasty Prime — 2–3yr window</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:10px">
+            <div style="font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;font-weight:600">Untouchable players</div>
+            <input type="text" id="never-drop" placeholder="e.g. CeeDee Lamb, Bijan Robinson, 2026 1st..." style="font-size:14px;padding:10px 12px"/>
+          </div>
+
+          <details style="margin-bottom:10px">
+            <summary style="font-size:12px;color:var(--text3);cursor:pointer;padding:4px 0">Additional notes for AI</summary>
+            <textarea id="mentality-notes" placeholder="League rules, family rivalries, taxi squad notes..." style="font-size:13px;min-height:50px;margin-top:6px;padding:10px 12px"></textarea>
+          </details>
+
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn" onclick="saveMentality()" style="padding:10px 18px">Save strategy</button>
+            <div id="mentality-saved" style="font-size:13px;color:var(--green);display:none">Saved ✓</div>
           </div>
         </div>
-        <div id="provider-hint" style="font-size:13px;color:var(--text3);margin-bottom:10px;line-height:1.5"></div>
-        <div class="row">
-          <input type="password" id="api-key-in" placeholder="Paste API key..." style="font-family:monospace;font-size:13px"/>
-          <button class="btn" onclick="saveKey()">Save</button>
-          <button class="btn btn-ghost" onclick="clearKey()">Clear</button>
+      </details>
+
+      <!-- 4. Notifications -->
+      <details class="settings-section">
+        <summary class="settings-summary">Notifications</summary>
+        <div style="padding:12px 0 4px">
+          <div style="font-size:13px;color:var(--text3);margin-bottom:10px">Get alerts for key dynasty events.</div>
+          <button class="btn" onclick="enableNotifications()" id="notif-btn" style="padding:10px 18px;margin-bottom:6px">Enable notifications</button>
+          <div id="notif-status" class="status-txt"></div>
         </div>
-        <div id="key-status" class="status-txt"></div>
-        <!-- xAI News Key (optional) -->
-        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
-          <div style="font-size:13px;color:var(--text2);margin-bottom:6px">
-            <strong>Real-time news (optional)</strong> — Add an xAI key to get live player news from X/Twitter via Grok.
+      </details>
+
+      <!-- 5. Account + League -->
+      <details class="settings-section">
+        <summary class="settings-summary">
+          <span>Account</span>
+          <span id="s-user" style="font-size:12px;color:var(--text3);font-weight:400">—</span>
+        </summary>
+        <div style="padding:12px 0 4px">
+          <div style="display:flex;gap:8px">
+            <input type="text" id="s-user-in" placeholder="Change username" style="font-size:14px;flex:1;padding:10px 12px"/>
+            <button class="btn btn-ghost" onclick="reconnect()" style="padding:10px 14px">Reconnect</button>
           </div>
-          <div class="row">
-            <input type="password" id="xai-key-in" placeholder="xai-... (optional)" style="font-family:monospace;font-size:13px" value=""/>
-            <button class="btn btn-ghost btn-sm" onclick="saveXaiKey()">Save</button>
+        </div>
+      </details>
+
+      <!-- 6. Season -->
+      <details class="settings-section">
+        <summary class="settings-summary">Season</summary>
+        <div style="padding:12px 0 4px">
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="season-sel" style="font-size:14px;flex:1;padding:10px 12px">
+              <option value="2026" selected>2026</option>
+              <option value="2025">2025</option>
+              <option value="2024">2024</option>
+              <option value="2023">2023</option>
+              <option value="2022">2022</option>
+            </select>
+            <button class="btn btn-ghost" onclick="reloadSeason()" style="padding:10px 14px">Reload</button>
           </div>
-          <div id="xai-key-status" class="status-txt"></div>
         </div>
-      </div>
-      <div class="sec">Team strategy <div class="sec-line"></div></div>
-      <div class="card" style="border-color:rgba(124,107,248,.15)">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6">This is your GM profile — it shapes every AI recommendation. The more specific you are, the sharper the advice.</p>
+      </details>
 
-        <!-- Team mentality -->
-        <div style="margin-bottom:12px">
-          <div style="font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Team mentality</div>
-          <select id="mentality-sel" style="width:100%;font-size:13px">
-            <option value="balanced">Balanced — compete + build</option>
-            <option value="winnow">Win Now — maximize this season</option>
-            <option value="rebuild">Rebuild — youth + picks</option>
-            <option value="prime">Dynasty Prime — 2–3yr window</option>
-          </select>
+      <!-- 7. Data -->
+      <details class="settings-section">
+        <summary class="settings-summary">Data &amp; History</summary>
+        <div style="padding:12px 0 4px">
+          <div style="font-size:13px;color:var(--text3);margin-bottom:8px">Daily insights generate automatically when you open the app.</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="clearHistory()">Clear agent history</button>
+          </div>
         </div>
+      </details>
 
-        <!-- Untouchables -->
-        <div style="margin-bottom:10px">
-          <div style="font-size:13px;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Untouchable — never trade or drop</div>
-          <input type="text" id="never-drop" placeholder="e.g. CeeDee Lamb, Bijan Robinson, my 2026 1st..." style="font-size:13px"/>
-        </div>
-
-        <!-- Notes for AI -->
-        <div style="margin-bottom:12px">
-          <div style="font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;font-weight:600">Notes for AI</div>
-          <textarea id="mentality-notes" placeholder="e.g. my dad runs Team X so we can't trade with each other, league has taxi squads, IDP is deep..." style="font-size:13px;min-height:50px"></textarea>
-        </div>
-
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn" onclick="saveMentality()">Save strategy</button>
-          <div id="mentality-saved" style="font-size:13px;color:var(--green);display:none">Saved ✓</div>
-        </div>
-      </div>
-      <div class="sec">Notifications <div class="sec-line"></div></div>
-      <div class="card">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Get alerts for injuries, trending pickups, and trade opportunities.</p>
-        <button class="btn" onclick="enableNotifications()" id="notif-btn">Enable notifications</button>
-        <div id="notif-status" class="status-txt"></div>
-      </div>
-      <div class="sec">Account <div class="sec-line"></div></div>
-      <div class="card">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Connected: <span id="s-user" style="color:var(--text)">—</span></p>
-        <div class="row">
-          <input type="text" id="s-user-in" placeholder="Change username"/>
-          <button class="btn btn-ghost" onclick="reconnect()">Reconnect</button>
-        </div>
-      </div>
-      <div class="sec">Season <div class="sec-line"></div></div>
-      <div class="card">
-        <div class="row">
-          <select id="season-sel">
-            <option value="2026" selected>2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-            <option value="2022">2022</option>
-          </select>
-          <button class="btn btn-ghost" onclick="reloadSeason()">Reload</button>
-        </div>
-      </div>
-      <div class="sec">Agent schedule <div class="sec-line"></div></div>
-      <div class="card">
-        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">The Daily Digest runs automatically each time you open the app.</p>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost" onclick="switchTab('digest')">Go to home</button>
-          <button class="btn btn-ghost" onclick="clearHistory()">Clear agent history</button>
-        </div>
+      <!-- Feedback -->
+      <div style="text-align:center;padding:16px 0 8px">
+        <a href="https://forms.gle/uruweMzTNV5ZCrj39" target="_blank" style="font-size:13px;color:var(--accent);text-decoration:none;font-weight:600">Send feedback</a>
       </div>
     </div>
 

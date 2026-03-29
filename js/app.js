@@ -77,6 +77,7 @@ function switchTab(tab,btn){
     if(typeof renderMobileHome==='function')renderMobileHome();
     else if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();
   }
+  if(tab==='settings'&&typeof updateSettingsStatus==='function')updateSettingsStatus();
   if(tab==='roster'&&typeof buildRosterTable==='function')buildRosterTable();
   if(tab==='startsit'&&typeof renderStartSit==='function')renderStartSit();
   if(tab==='trades'){
@@ -285,6 +286,8 @@ function saveKey(){
   }catch(e){}
   const label = p?.name || provider;
   ss('key-status', label + ' key saved ✓');
+  if(typeof updateSettingsStatus==='function')updateSettingsStatus();
+  if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();
 }
 window.saveKey = saveKey;
 
@@ -293,6 +296,7 @@ function clearKey(){
   try{localStorage.removeItem('dynastyhq_apikey');localStorage.removeItem('dynastyhq_provider');localStorage.removeItem('dynastyhq_model');}catch(e){}
   const inp=$('api-key-in');if(inp)inp.value='';
   ss('key-status','Key cleared');
+  if(typeof updateSettingsStatus==='function')updateSettingsStatus();
 }
 window.clearKey = clearKey;
 

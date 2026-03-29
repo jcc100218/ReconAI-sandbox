@@ -26,6 +26,66 @@ window.App = window.App || {};
 // All available as globals from earlier script loads.
 
 // ── API Key Callout ────────────────────────────────────────────
+// ── Settings: System Status ────────────────────────────────────
+function updateSettingsStatus(){
+  // AI status
+  const aiDot=$('st-ai-dot');const aiLabel=$('st-ai-label');
+  const aiBadge=$('ai-setup-badge');
+  if(aiDot&&aiLabel){
+    const hasAI2=typeof hasAnyAI==='function'&&hasAnyAI(false);
+    const providerName=S.aiProvider==='anthropic'?'Claude':S.aiProvider==='gemini'?'Gemini':S.aiProvider||'None';
+    if(hasAI2){
+      aiDot.style.background='var(--green)';
+      aiLabel.style.color='var(--green)';
+      aiLabel.textContent='Connected ('+providerName+')';
+      if(aiBadge)aiBadge.textContent=providerName;
+      // Collapse AI section if already set up
+      const det=$('ai-setup-details');
+      if(det&&S.apiKey)det.removeAttribute('open');
+    }else{
+      aiDot.style.background='var(--red)';
+      aiLabel.style.color='var(--red)';
+      aiLabel.textContent='Not connected — some features limited';
+      if(aiBadge)aiBadge.textContent='Not set';
+    }
+  }
+  // League status
+  const lgDot=$('st-league-dot');const lgLabel=$('st-league-label');
+  if(lgDot&&lgLabel){
+    const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+    if(league){
+      lgDot.style.background='var(--green)';
+      lgLabel.style.color='var(--text)';
+      lgLabel.textContent=(league.name||'League')+' · '+S.season;
+    }else{
+      lgDot.style.background='var(--text3)';
+      lgLabel.textContent='Not connected';
+    }
+  }
+  // Strategy status
+  const strDot=$('st-strat-dot');const strLabel=$('st-strat-label');const stratBadge=$('strat-badge');
+  if(strDot&&strLabel){
+    const strat=typeof getMemory==='function'?getMemory('mentality',{}):{};
+    const labels={balanced:'Balanced',winnow:'Win Now',rebuild:'Rebuild',prime:'Dynasty Prime'};
+    const m=strat.mentality;
+    if(m&&m!=='balanced'){
+      strDot.style.background='var(--green)';
+      strLabel.style.color='var(--text)';
+      strLabel.textContent=labels[m]||m;
+      if(stratBadge)stratBadge.textContent=labels[m]||m;
+    }else if(m==='balanced'){
+      strDot.style.background='var(--accent)';
+      strLabel.style.color='var(--text)';
+      strLabel.textContent='Balanced (default)';
+      if(stratBadge)stratBadge.textContent='Balanced';
+    }else{
+      strDot.style.background='var(--text3)';
+      strLabel.textContent='Not configured';
+      if(stratBadge)stratBadge.textContent='';
+    }
+  }
+}
+
 function checkApiKeyCallout(){
   const el=$('api-key-callout');if(!el)return;
   // Hide callout if user has server-side AI (Supabase session) OR a client API key
