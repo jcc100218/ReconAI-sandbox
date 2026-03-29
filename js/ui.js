@@ -2864,57 +2864,78 @@ function renderDraftNeeds(){
       aging:aging.length,young:young.length,starterGap,needScore};
   }).sort((a,b)=>b.needScore-a.needScore);
 
-  // === RENDER: Best Bet ===
+  // === RENDER: ON THE CLOCK hero ===
   const bestBetEl=$('draft-best-bet');
-  if(bestBetEl&&LI_LOADED&&LI.hitRateByRound){
-    const topNeed=posAnalysis[0];
-    const lateRounds=ownPickRounds.filter(r=>r>=4);
-    const lateIdpHits={DL:0,LB:0,DB:0};
-    lateRounds.forEach(r=>{
-      (LI.hitRateByRound[r]?.bestPos||[]).forEach(bp=>{
-        if(bp.pos in lateIdpHits)lateIdpHits[bp.pos]+=bp.starters||bp.hits||0;
-      });
-    });
-    const bestLateIDP=Object.entries(lateIdpHits).sort((a,b)=>b[1]-a[1])[0];
+  if(bestBetEl&&LI_LOADED){
     const earlyRounds=ownPickRounds.filter(r=>r<=3);
-    const skipEarly=new Set(['K','DL','LB','DB']);
-    const bestEarlyNeed=earlyRounds[0]<=3
-      ?posAnalysis.find(p=>p.needScore>0&&!skipEarly.has(p.pos))||posAnalysis.find(p=>p.needScore>0&&p.pos!=='K')
-      :posAnalysis.find(p=>p.needScore>0&&p.pos!=='K');
+    const skipEarly=new Set(['K']);
+    const bestEarlyNeed=posAnalysis.find(p=>p.needScore>0&&!skipEarly.has(p.pos));
+    const nextPickRound=ownPickRounds[0];
 
-    let betHtml='';
-    if(earlyRounds.length&&bestEarlyNeed){
+    if(nextPickRound&&bestEarlyNeed){
+      const rosterRanks2=S.rosters.map(r=>({rid:r.roster_id,val:(r.players||[]).reduce((s,pid)=>s+dynastyValue(pid),0)})).sort((a,b)=>a.val-b.val);
+      const estPos2=rosterRanks2.findIndex(r=>r.rid===S.myRosterId)+1||Math.ceil(teams/2);
+      const pickLabel2=nextPickRound+'.'+String(estPos2).padStart(2,'0');
+      const val2=pickValue(year,nextPickRound,teams,estPos2);
+
+      // Find top rookie targets at this position
+      const rookieTargets=Object.entries(S.players)
+        .filter(([id,p])=>p.years_exp===0&&LI.playerScores?.[id]>0&&posMapD(p.position)===bestEarlyNeed.pos)
+        .map(([id,p])=>({id,name:p.first_name+' '+p.last_name,val:LI.playerScores[id],pos:posMapD(p.position)}))
+        .sort((a,b)=>b.val-a.val).slice(0,3);
+
       const reasons=[];
-      if(bestEarlyNeed.starterGap>0)reasons.push(`${bestEarlyNeed.startable}/${bestEarlyNeed.slotsNeeded} starters`);
-      if(bestEarlyNeed.aging>0)reasons.push(`${bestEarlyNeed.aging} aging past peak`);
-      if(bestEarlyNeed.elite===0&&bestEarlyNeed.slotsNeeded>0)reasons.push('no elite talent');
-      if(bestEarlyNeed.young===0)reasons.push('no young depth');
-      const reasonStr=reasons.length?reasons.join(', '):'biggest positional need';
-      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:13px;color:var(--green);line-height:1.5">
-        🎯 <strong>Priority target:</strong> Use your R${earlyRounds[0]} pick on <strong>${bestEarlyNeed.pos}</strong> — ${reasonStr}.
-      </div>`;
-    } else if(!earlyRounds.length&&ownPickRounds.length){
-      const bestMidNeed=posAnalysis.find(p=>p.needScore>0&&p.pos!=='K');
-      if(bestMidNeed){
-        const reasons=[];
-        if(bestMidNeed.starterGap>0)reasons.push(`${bestMidNeed.startable}/${bestMidNeed.slotsNeeded} starters`);
-        if(bestMidNeed.aging>0)reasons.push(`${bestMidNeed.aging} aging past peak`);
-        const reasonStr=reasons.length?reasons.join(', '):'biggest need';
-        betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:var(--r);font-size:13px;color:var(--green);line-height:1.5">
-          🎯 <strong>Priority target:</strong> Look for <strong>${bestMidNeed.pos}</strong> value in mid rounds — ${reasonStr}.
+      if(bestEarlyNeed.starterGap>0)reasons.push(bestEarlyNeed.startable+'/'+bestEarlyNeed.slotsNeeded+' starters — gap at '+bestEarlyNeed.pos);
+      if(bestEarlyNeed.aging>0)reasons.push(bestEarlyNeed.aging+' players aging past peak');
+      if(bestEarlyNeed.elite===0&&bestEarlyNeed.slotsNeeded>0)reasons.push('No elite '+bestEarlyNeed.pos+' talent on roster');
+      if(bestEarlyNeed.young===0)reasons.push('No young depth developing');
+
+      // Trade pick suggestion
+      const tradeHint=nextPickRound<=2
+        ?'Trade down: could gain mid-round value if top target is gone'
+        :nextPickRound>=3&&nextPickRound<=5?'Trade up: move into R1–2 range for elite '+bestEarlyNeed.pos+' talent':'';
+
+      bestBetEl.innerHTML=`
+        <div class="hero-action-card" style="margin-bottom:14px;border-color:rgba(124,107,248,.2)">
+          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#9b8afb,var(--accent));background-size:200% 100%;animation:progGlow 3s ease-in-out infinite"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
+            <span style="font-size:13px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${pickLabel2}</span>
+            <span style="font-size:12px;color:var(--text3)">~${val2.toLocaleString()} DHQ</span>
+          </div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);margin-bottom:2px">Draft ${bestEarlyNeed.pos}</div>
+          <div style="font-size:13px;color:var(--text3);margin-bottom:10px">${bestEarlyNeed.pos} is your biggest positional need</div>
+          ${rookieTargets.length?`
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Top Targets</div>
+            ${rookieTargets.map((t,i)=>`
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${i<rookieTargets.length-1?'border-bottom:1px solid var(--border)':''};cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="openPlayerModal('${t.id}')">
+                <span style="font-size:14px;font-weight:800;color:var(--accent);min-width:18px">${i+1}</span>
+                <span style="font-size:14px;font-weight:600;flex:1">${t.name}</span>
+                <span style="font-size:12px;font-weight:700;color:${t.val>=5000?'var(--green)':'var(--accent)'};font-family:'JetBrains Mono',monospace">${t.val.toLocaleString()}</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </div>`).join('')}
+          `:''}
+          <ul style="margin:10px 0;padding:0;list-style:none">
+            ${reasons.map(r=>`<li style="font-size:13px;color:var(--text2);padding:2px 0;padding-left:14px;position:relative"><span style="position:absolute;left:0;color:var(--accent);font-weight:700">›</span>${r}</li>`).join('')}
+          </ul>
+          ${tradeHint?`<div style="font-size:12px;color:var(--amber);padding:6px 10px;background:var(--amberL);border-radius:6px;margin-bottom:10px">${tradeHint}</div>`:''}
+          <div style="display:flex;gap:8px">
+            <button class="hero-cta" style="flex:1;background:linear-gradient(135deg,var(--accent),#9b8afb);box-shadow:0 2px 8px rgba(124,107,248,.25)" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel2}? My biggest need is ${bestEarlyNeed.pos}.')">Draft Advice</button>
+            <button class="pm-action-btn" style="flex:0 0 auto;padding:12px 14px" onclick="sendDraftChatMsg('Should I trade pick ${pickLabel2}? What could I get for it?')">Trade Pick</button>
+          </div>
         </div>`;
-      }
-    }
-    if(lateRounds.length&&bestLateIDP&&bestLateIDP[1]>0){
-      const avgLateHit=lateRounds.map(r=>LI.hitRateByRound[r]?.rate||0).reduce((a,b)=>a+b,0)/lateRounds.length;
-      betHtml+=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r);font-size:13px;color:var(--amber);line-height:1.5">
-        ⚠️ Late picks (R${lateRounds.join(', R')}): ${avgLateHit.toFixed(0)}% starter rate. Best bet: <strong>${bestLateIDP[0]}</strong> — highest late-round hit rate in your league's history.
+    } else if(ownPickRounds.length) {
+      // Fallback: no strong need — show BPA guidance
+      bestBetEl.innerHTML=`<div style="padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">Draft BPA with your R${ownPickRounds[0]} pick</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.5">No critical positional needs — take the best player available and build long-term value.</div>
       </div>`;
+    } else {
+      bestBetEl.innerHTML='';
     }
-    bestBetEl.innerHTML=betHtml;
   }
 
-  // === RENDER: Your Picks ===
+  // === RENDER: Your Picks (interactive) ===
   const pickEl=$('draft-my-picks');
   if(pickEl){
     const rosterRanks=S.rosters.map(r=>{
@@ -2926,16 +2947,26 @@ function renderDraftNeeds(){
       return idx>=0?idx+1:Math.ceil(teams/2);
     };
 
+    // Find best position to target per round
+    const roundTarget=(rd)=>{
+      if(rd<=2){const n=posAnalysis.find(p=>p.needScore>0&&p.pos!=='K');return n?n.pos:'BPA';}
+      if(rd<=4)return posAnalysis.find(p=>p.needScore>10&&p.pos!=='K')?.pos||'BPA';
+      return posAnalysis.find(p=>p.needScore>0&&['DL','LB','DB'].includes(p.pos))?.pos||'BPA';
+    };
+
     pickEl.innerHTML=ownedPicks.length?ownedPicks.map(p=>{
       const fromRoster=p.own?S.myRosterId:p.fromRosterId;
       const estPos=getPickPos(fromRoster);
       const val=pickValue(year,p.round,teams,estPos);
       const pickLabel=p.round+'.'+String(estPos).padStart(2,'0');
-      const fromName=p.own?'Own':'From '+p.from;
-      return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg4)':'rgba(124,107,248,.12)'};border:1px solid ${p.own?'var(--border2)':'rgba(124,107,248,.25)'};border-radius:8px;padding:6px 12px">
-        <span style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</span>
-        <span style="font-size:13px;color:var(--text3)">${fromName}</span>
-        <span style="font-size:13px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace">~${val.toLocaleString()}</span>
+      const fromName=p.own?'':'via '+p.from;
+      const target=roundTarget(p.round);
+      return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(124,107,248,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(124,107,248,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</div>
+          <div style="font-size:11px;color:var(--text3)">${fromName?fromName:'~'+val.toLocaleString()}</div>
+        </div>
+        <span style="font-size:11px;font-weight:700;padding:2px 5px;border-radius:4px;background:var(--accentL);color:var(--accent)">${target}</span>
       </div>`;
     }).join(''):`<span style="color:var(--text3);font-size:13px">No picks for ${year}</span>`;
   }
@@ -2949,27 +2980,42 @@ function renderDraftNeeds(){
   const gradeColorD=ns=>ns>=50?'var(--red)':ns>=20?'var(--amber)':ns>0?'var(--text2)':'var(--green)';
   const gradeLabelD=ns=>ns>=50?'Critical':ns>=20?'Need':ns>0?'Thin':'Solid';
 
-  let dhtml=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-    <span style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Draft priority</span>
-    ${LI_LOADED?`<span style="font-size:13px;padding:2px 6px;border-radius:4px;background:rgba(52,211,153,.1);color:var(--green)">DHQ · ${LI.leagueYears?.length||0}yr</span>`:''}
-    <span style="font-size:13px;color:var(--text3);margin-left:auto">Picks: ${ownPickRounds.map(r=>'R'+r).join(', ')||'none'}</span>
-  </div>`;
+  // Split into top needs (expanded) and rest (collapsed)
+  const topNeeds=posAnalysis.filter(p=>p.needScore>=20);
+  const solidPos=posAnalysis.filter(p=>p.needScore<20);
 
-  dhtml+=posAnalysis.map(p=>{
-    const bar=Math.min(100,Math.max(5,p.needScore*1.2));
-    const barCol=gradeColorD(p.needScore);
-    return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-      <span style="font-size:13px;font-weight:700;min-width:24px;color:${barCol}">${p.pos}</span>
-      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:13px;color:${barCol};min-width:44px">${gradeLabelD(p.needScore)}</span>
-          <div style="flex:1;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${bar}%;height:100%;background:${barCol};border-radius:2px"></div></div>
+  let dhtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+    <div class="home-sec-title" style="margin-bottom:8px">Draft Strategy</div>`;
+
+  // Top needs: expanded
+  if(topNeeds.length){
+    dhtml+=topNeeds.map(p=>{
+      const barCol=gradeColorD(p.needScore);
+      const detail=[];
+      if(p.starterGap>0)detail.push(p.startable+'/'+p.slotsNeeded+' starters');
+      if(p.aging)detail.push(p.aging+' aging');
+      if(p.young)detail.push(p.young+' young');
+      return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:14px;font-weight:800;color:${barCol};min-width:28px">${p.pos}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:700;color:${barCol}">${gradeLabelD(p.needScore)}</div>
+          <div style="font-size:12px;color:var(--text3)">${detail.join(' · ')}</div>
         </div>
-        <span style="font-size:13px;color:var(--text3)">${p.startable}/${p.slotsNeeded} starters${p.aging?' · '+p.aging+' aging':''}${p.young?' · '+p.young+' young':''}</span>
-      </div>
-    </div>`;
-  }).join('');
+        <div style="width:50px;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${Math.min(100,p.needScore*1.5)}%;height:100%;background:${barCol};border-radius:2px"></div></div>
+      </div>`;
+    }).join('');
+  } else {
+    dhtml+=`<div style="font-size:13px;color:var(--green);padding:6px 0">No critical needs — draft best player available.</div>`;
+  }
 
+  // Solid positions: compressed one-liner
+  if(solidPos.length){
+    dhtml+=`<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;font-size:12px">
+      ${solidPos.map(p=>`<span style="color:var(--text3)">${p.pos}: <span style="color:var(--green)">Solid</span></span>`).join('<span style="color:var(--border)">·</span>')}
+    </div>`;
+  }
+
+  dhtml+=`</div>`;
   summaryContent.innerHTML=dhtml;
   needsEl.style.display='none';
 
@@ -2977,11 +3023,37 @@ function renderDraftNeeds(){
   const histEl=$('draft-history-section');
   if(histEl&&LI_LOADED&&LI.hitRateByRound){
     histEl.style.display='block';
-    let hHtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">
-      <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Historical starter rate by round — ${LI.totalPicks||0} picks across ${LI.draftMeta?.length||0} drafts</div>`;
+    // Compressed historical insights
+    const myPickRoundsSet=new Set(ownPickRounds);
+    const keyInsights=[];
+    for(let rd=1;rd<=Math.min(draftRounds,7);rd++){
+      const roundData=LI.hitRateByRound[rd];
+      if(!roundData)continue;
+      const rate=roundData.rate||0;
+      const isMine=myPickRoundsSet.has(rd);
+      const bestPos2=(roundData.bestPos||[]).slice(0,2).map(bp=>bp.pos).join('/');
+      if(isMine)keyInsights.push({rd,rate,bestPos:bestPos2,mine:true});
+    }
 
-    hHtml+=`<div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:13px;margin-bottom:6px">
-      <span style="font-weight:700;color:var(--text3)">Round</span><span style="font-weight:700;color:var(--text3)">League-wide</span><span style="font-weight:700;color:var(--text3)">Rate</span><span style="font-weight:700;color:var(--text3)">Best positions</span>`;
+    let hHtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+      <div class="home-sec-title" style="margin-bottom:8px">Draft History · ${LI.draftMeta?.length||0} drafts</div>`;
+
+    // Show key insights as compact lines
+    if(keyInsights.length){
+      hHtml+=keyInsights.map(k=>{
+        const hitCol=k.rate>=50?'var(--green)':k.rate>=25?'var(--amber)':'var(--text3)';
+        return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">
+          <span style="font-weight:700;color:var(--accent);min-width:24px">R${k.rd}</span>
+          <span style="color:${hitCol};font-weight:700">${k.rate}% hit rate</span>
+          ${k.bestPos?`<span style="color:var(--text3)">— best at ${k.bestPos}</span>`:''}
+        </div>`;
+      }).join('');
+    }
+
+    // Full grid below (collapsed by default)
+    hHtml+=`<details style="margin-top:8px"><summary style="font-size:12px;color:var(--text3);cursor:pointer;padding:4px 0">View all rounds</summary>
+    <div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:12px;margin-top:8px">
+      <span style="font-weight:700;color:var(--text3)">Rd</span><span style="font-weight:700;color:var(--text3)">Rate</span><span></span><span style="font-weight:700;color:var(--text3)">Best</span>`;
 
     for(let rd=1;rd<=draftRounds;rd++){
       const roundData=LI.hitRateByRound[rd];
@@ -3002,9 +3074,7 @@ function renderDraftNeeds(){
         <span style="color:var(--text3)">${posRecs||'—'}</span>`;
     }
 
-    hHtml+=`</div>
-      <div style="font-size:13px;color:var(--text3);margin-top:8px;padding-top:6px;border-top:1px solid var(--border)">% = starter rate (top 15% at position). 🎯 = matches your need. ► = you have this pick.</div>
-    </div>`;
+    hHtml+=`</div></details></div>`;
     histEl.innerHTML=hHtml;
   }
 
@@ -3108,8 +3178,16 @@ function renderRookieProfiles(){
         ${fcRank?`<span style="color:var(--text3)">·</span><span style="color:var(--amber);font-weight:600">${fcRank}</span>`:''}
       </div>
       <div style="font-size:13px;color:var(--text3);margin-bottom:6px">Age ${age} · ${yrsToPeak>0?yrsToPeak+'yr to peak':'At peak window'}</div>
-      <div style="font-size:13px;color:var(--text2);padding:6px 8px;background:var(--bg2);border-radius:6px;line-height:1.4">
-        <span style="font-weight:600;color:var(--text)">Profile:</span> ${profile}
+      ${(()=>{
+        // Fit tags
+        const assess3=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+        const needPos3=assess3?.needs?.map(n=>n.pos)||[];
+        const isFit=needPos3.includes(pos);
+        const isTopTarget=isFit&&i<5;
+        return(isTopTarget?`<div style="font-size:11px;font-weight:700;color:var(--green);padding:2px 6px;background:var(--greenL);border-radius:4px;display:inline-block;margin-bottom:6px">Target at your pick</div>`:isFit?`<div style="font-size:11px;font-weight:700;color:var(--accent);padding:2px 6px;background:var(--accentL);border-radius:4px;display:inline-block;margin-bottom:6px">Fits your team</div>`:'');
+      })()}
+      <div style="font-size:12px;color:var(--text2);padding:6px 8px;background:var(--bg2);border-radius:6px;line-height:1.4">
+        ${profile}
       </div>
     </div>`;
   });

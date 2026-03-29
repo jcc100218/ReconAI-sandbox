@@ -427,62 +427,62 @@
 
     <!-- DRAFT SCOUTING -->
     <div class="panel" id="panel-draftroom">
-      <!-- Header -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <div style="flex:1">
-          <div style="font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft</div>
-        </div>
-        <select id="draft-year-sel" onchange="renderDraftNeeds()" style="font-size:13px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;color:var(--text2)">
+      <!-- Header (compact) -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="flex:1;font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft</div>
+        <select id="draft-year-sel" onchange="renderDraftNeeds()" style="font-size:12px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text2)">
           <option value="2026">2026</option>
           <option value="2025">2025</option>
           <option value="2027">2027</option>
         </select>
+        <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:12px;padding:4px 10px">Scout ↗</button>
       </div>
 
-      <!-- Rookie data quality note -->
-      <div style="font-size:13px;color:var(--text3);padding:6px 12px;background:var(--bg3);border-radius:var(--r);margin-bottom:10px;line-height:1.5;display:flex;align-items:center;gap:6px">
-        <span style="font-size:15px">📋</span>
-        <span>Rookie rankings improve as the NFL draft approaches. Sleeper adds players throughout the offseason — pre-draft data is speculative.</span>
-      </div>
-
-      <!-- Best bet insight — TOP of page -->
+      <!-- 1. ON THE CLOCK — hero card -->
       <div id="draft-best-bet"></div>
 
-      <!-- AI Draft Advisor — consistent with other pages: chat near top -->
-      <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.2);margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg3)">
-          <div style="font-size:13px;font-weight:700;color:var(--text)">Draft Advisor</div>
-          <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:13px;padding:3px 10px">Scout my picks ↗</button>
-        </div>
-        <div id="draft-msgs" style="max-height:64px;overflow:hidden;padding:10px 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease">
-          <div class="hc-msg-a" style="font-size:13px">Ask me about the draft — who to target, whether to trade up, or which positions to prioritize.</div>
-        </div>
-        <div id="draft-scout-content" style="display:none"></div>
-        <div style="border-top:1px solid var(--border);display:flex;gap:8px;padding:10px 14px;background:var(--bg3)">
-          <input type="text" id="draft-chat-in" placeholder="Who's the best RB? Should I trade up for 1.01?" style="flex:1;font-size:14px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
-          <button class="btn btn-sm" onclick="sendDraftChat()">Ask</button>
-        </div>
-        <div style="padding:6px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;background:var(--bg3)">
-          <button class="chip" onclick="sendDraftChatMsg('Who is the best value at my pick slots?')">Best value at my picks</button>
-          <button class="chip" onclick="sendDraftChatMsg('What position should I target first?')">Position to target</button>
-          <button class="chip" onclick="sendDraftChatMsg('Should I trade up or down?')">Trade up/down?</button>
+      <!-- 2. Your picks — interactive -->
+      <div id="draft-my-picks-section" style="margin-bottom:14px">
+        <div class="home-sec-title">Your Picks</div>
+        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px">
+          <span style="color:var(--text3);font-size:13px">Connect to see picks</span>
         </div>
       </div>
 
-      <!-- Your picks — spelled out -->
-      <div id="draft-my-picks-section" style="background:var(--bg3);border-radius:var(--r);padding:10px 14px;margin-bottom:14px">
-        <div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your picks</div>
-        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px"><span style="color:var(--text3);font-size:13px">Connect to see picks</span></div>
-      </div>
-
-      <!-- Draft priority with picks called out -->
+      <!-- 3. Draft Strategy (condensed from priority) -->
       <div id="draft-summary" style="display:none;margin-bottom:14px">
-        <div id="draft-summary-content" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;display:flex;flex-direction:column;gap:10px"></div>
+        <div id="draft-summary-content"></div>
       </div>
-      <div id="draft-needs" style="display:none"></div>
-      <!-- Historical success — league-wide + your picks -->
+
+      <!-- 4. Draft Advisor chat -->
+      <div class="recon-chat-module" style="margin-bottom:14px">
+        <div id="draft-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
+        <div id="draft-scout-content" style="display:none"></div>
+        <div style="display:flex;gap:10px;padding:12px 16px;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:16px">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;opacity:.7"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <input type="text" id="draft-chat-in" placeholder="Who should I draft?" style="flex:1;font-size:15px;background:transparent;border:none;outline:none;color:var(--text);padding:4px 0" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
+          <button onclick="sendDraftChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:12px;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="chip chip-lg" onclick="sendDraftChatMsg('Who should I take at my next pick?')">Who at my pick?</button>
+          <button class="chip chip-lg" onclick="sendDraftChatMsg('Should I trade up or down?')">Trade up/down?</button>
+          <button class="chip chip-lg" onclick="sendDraftChatMsg('Best value available at my draft slots?')">Best value?</button>
+        </div>
+      </div>
+
+      <!-- 5. Historical (compressed) -->
       <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
-      <div id="rookie-profiles" style="margin-top:14px"></div>
+
+      <!-- 6. Scouting Board -->
+      <div id="draft-needs" style="display:none"></div>
+      <div id="rookie-profiles" style="margin-top:0"></div>
+
+      <!-- Data quality note (bottom, subtle) -->
+      <div style="font-size:11px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-top:14px;line-height:1.5">
+        Rookie rankings improve as the NFL draft approaches. Pre-draft data is speculative.
+      </div>
     </div>
 
     <!-- AI AGENT -->
