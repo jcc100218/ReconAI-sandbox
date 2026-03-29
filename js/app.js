@@ -204,7 +204,13 @@ async function selectLeague(leagueId,userId){
   const leagueName=(league?.name||'League').substring(0,20);
   const isDynasty=league?.settings?.type===2;
   $('league-pill').innerHTML=leagueName+(isDynasty?'':'<span style="font-size:13px;font-weight:500;color:var(--amber);background:rgba(255,180,0,.12);padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle">(Redraft — dynasty features limited)</span>');
-  $('setup-block').innerHTML=`<div style="font-size:14px;color:var(--text2);padding:4px 0"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></span>Loading ${league?.name||'league'}...</div>`;
+  $('setup-block').innerHTML=`<div style="text-align:center;padding:20px 0">
+    <div style="margin:0 auto 16px;width:52px;height:52px;background:linear-gradient(135deg,#7c6bf8,#5b4cc4);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(124,107,248,0.3)">
+      <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#c4b5fd;border-radius:50%;animation:spin .7s linear infinite"></span>
+    </div>
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Scanning your league...</div>
+    <div style="font-size:13px;color:var(--text3);line-height:1.5" id="scan-step">Fetching rosters and player data</div>
+  </div>`;
   try{
     await loadLeague(leagueId,userId);
     const sb2=$('setup-block');if(sb2)sb2.style.display='none';
