@@ -1180,7 +1180,8 @@ function renderInsightCards(){
   if(!assess){wrap.innerHTML='';return;}
 
   // Build position grades
-  const posGrades=Object.entries(assess.posAssessment||{}).sort((a,b)=>(TC_POS_ORDER?.[a[0]]??9)-(TC_POS_ORDER?.[b[0]]??9)).map(([pos,data])=>{
+  const _POS_ORD={QB:0,RB:1,WR:2,TE:3,K:4,DL:5,LB:6,DB:7};
+  const posGrades=Object.entries(assess.posAssessment||{}).sort((a,b)=>(_POS_ORD[a[0]]??9)-(_POS_ORD[b[0]]??9)).map(([pos,data])=>{
     const status=data.status||'ok';
     const grade=status==='surplus'?'A':status==='ok'?'B':status==='thin'?'C':'D';
     const col=grade==='A'?'var(--green)':grade==='B'?'var(--text2)':grade==='C'?'var(--amber)':'var(--red)';
