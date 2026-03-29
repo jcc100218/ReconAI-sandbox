@@ -22,16 +22,15 @@
 <div class="app">
   <div class="header">
     <div class="logo" style="font-size:16px;font-weight:800;letter-spacing:-.03em">Recon<span style="-webkit-text-fill-color:var(--accent)">AI</span></div>
-    <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" target="_blank" style="font-size:13px;color:#fff;text-decoration:none;padding:4px 10px;background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:6px;white-space:nowrap;font-weight:700;letter-spacing:.02em;box-shadow:0 2px 6px rgba(245,158,11,.25)">⚔️ War Room</a>
     <div class="spacer"></div>
-    <div style="display:flex;align-items:center;gap:5px;flex-shrink:1;min-width:0;overflow:hidden">
-      <span class="pill pd" id="league-pill" style="font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:140px" onclick="switchLeagueMode()" title="Click to switch league">Not connected</span>
-      <span class="pill pd header-hide-sm" id="week-pill" style="font-size:13px">—</span>
-      <div class="agent-status" id="agent-status" style="font-size:13px;display:none">
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow:hidden">
+      <span class="pill pd" id="league-pill" style="font-size:11px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:120px;padding:2px 8px" onclick="switchLeagueMode()" title="Click to switch league">Not connected</span>
+      <span class="pill pd header-hide-sm" id="week-pill" style="font-size:11px;padding:2px 8px">—</span>
+      <div class="agent-status" id="agent-status" style="font-size:11px;display:none">
         <div class="status-dot" id="agent-dot"></div>
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
-      <a href="https://forms.gle/uruweMzTNV5ZCrj39" target="_blank" class="feedback-link" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:#0a0b0d;background:var(--amber);padding:3px 10px;border-radius:20px;white-space:nowrap;letter-spacing:.02em;flex-shrink:0" title="Send feedback or report a bug"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Feedback</a>
+      <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" target="_blank" class="header-hide-sm" style="font-size:11px;color:var(--amber);text-decoration:none;font-weight:700;padding:2px 8px;border:1px solid rgba(251,191,36,.2);border-radius:6px;white-space:nowrap" title="War Room">War Room</a>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;transition:color .15s;flex-shrink:0" title="Settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
   </div>
@@ -90,21 +89,8 @@
 
       <!-- Home feed — post-connection -->
       <div id="digest-content" style="display:none">
-        <!-- Header -->
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-          <div>
-            <div style="font-size:18px;font-weight:800;letter-spacing:-.03em" id="home-team-name">ReconAI</div>
-            <div style="font-size:13px;color:var(--text3);margin-top:2px" id="home-league-meta"></div>
-          </div>
-        </div>
-        <!-- Data sync status -->
-        <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:13px;color:var(--text2);align-items:center">
-          <span id="sync-fc" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>DHQ values</span>
-          <span id="sync-stats" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Stats</span>
-          <span id="sync-li" style="display:flex;align-items:center;gap:3px"><span style="width:6px;height:6px;border-radius:50%;background:var(--text3)"></span>Intel</span>
-          <button onclick="resyncAllData()" style="background:none;border:1px solid var(--border2);border-radius:5px;color:var(--text3);font-size:13px;padding:2px 8px;cursor:pointer;font-family:inherit;margin-left:auto">Resync ↺</button>
-        </div>
-        <!-- Loading banner -->
+
+        <!-- Loading banner (conditional) -->
         <div id="dhq-loading-banner" style="display:none;margin-bottom:12px;padding:12px 16px;background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);text-align:center">
           <div style="display:flex;align-items:center;justify-content:center;gap:8px">
             <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>
@@ -112,50 +98,100 @@
           </div>
           <div style="font-size:13px;color:var(--text3);margin-top:6px">Analyzing 5 years of stats, drafts, and transactions. First time takes ~15 seconds, then it's cached.</div>
         </div>
-        <!-- API key callout -->
+
+        <!-- API key callout (conditional) -->
         <div id="api-key-callout" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r)">
-          <div style="font-size:13px;color:var(--amber);line-height:1.5">🔑 <strong>Add an AI key to unlock chat features.</strong> Go to <a onclick="switchTab('settings')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a> and paste a free <strong>Groq</strong> or <strong>Gemini</strong> API key. It takes 30 seconds.</div>
+          <div style="font-size:13px;color:var(--amber);line-height:1.5"></div>
         </div>
-        <!-- Player search -->
-        <div style="margin-bottom:12px;position:relative" id="player-search-wrap">
-          <input type="text" id="player-search-in" placeholder="Search any player..." oninput="handlePlayerSearch(this.value)" onfocus="this.parentElement.querySelector('#player-search-results').style.display='block'" style="width:100%;font-size:14px;padding:8px 14px 8px 32px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);outline:none;box-sizing:border-box"/>
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2" style="position:absolute;left:10px;top:10px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <div id="player-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:0 0 var(--r) var(--r);max-height:280px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
-        </div>
-        <!-- Snapshot pills -->
-        <div id="home-snapshot" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px"></div>
-        <!-- Daily Briefing -->
-        <div id="home-briefing"></div>
-        <!-- Proactive Insight Cards -->
-        <div id="home-insights"></div>
-        <!-- Persistent chat -->
-        <div style="background:var(--bg2);border-radius:var(--rxl);overflow:hidden;border:1px solid var(--border2);margin-bottom:18px;box-shadow:0 2px 12px rgba(0,0,0,.2)">
-          <div id="home-chat-msgs" style="max-height:0;overflow:hidden;padding:0 14px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
-          <div style="display:flex;gap:8px;padding:10px 14px;align-items:center;border-top:1px solid var(--border);background:var(--bg3)">
-            <input type="text" id="home-chat-in" placeholder="Ask anything about your team..." style="flex:1;font-size:14px;background:transparent;border:none;outline:none;color:var(--text)" onkeydown="if(event.key==='Enter')sendHomeChat()"/>
-            <button onclick="sendHomeChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:10px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+
+        <!-- 1. HERO: Do This Now -->
+        <div id="home-hero-action"></div>
+
+        <!-- 2. Prepare For This (max 2 compact cards) -->
+        <div id="home-prepare"></div>
+
+        <!-- 3. Chat / Assistant module -->
+        <div class="recon-chat-module" style="margin-bottom:18px">
+          <div id="home-chat-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
+          <div style="display:flex;gap:10px;padding:12px 16px;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:16px">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;opacity:.7"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <input type="text" id="home-chat-in" placeholder="Ask ReconAI anything..." style="flex:1;font-size:15px;background:transparent;border:none;outline:none;color:var(--text);padding:4px 0" onkeydown="if(event.key==='Enter')sendHomeChat()"/>
+            <button onclick="sendHomeChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:12px;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
           </div>
-          <div style="padding:6px 14px 12px;display:flex;gap:6px;flex-wrap:wrap;background:var(--bg3)">
-            <button class="chip" onclick="homeAsk('What moves should I make this week?')">What should I do?</button>
-            <button class="chip" onclick="homeAsk('Who is the best available player I should add and why?')">Best pickup?</button>
-            <button class="chip" onclick="homeAsk('Which team has a weakness I can exploit in a trade?')">Trade exploit?</button>
-            <button class="chip" onclick="homeAsk('Where is my roster weakest heading into the rookie draft?')">Roster gaps?</button>
+          <div style="padding:8px 0 0;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="chip chip-lg" onclick="homeAsk('What moves should I make this week?')">What should I do?</button>
+            <button class="chip chip-lg" onclick="homeAsk('Who is the best available player I should add and why?')">Best pickup?</button>
+            <button class="chip chip-lg" onclick="homeAsk('Which team has a weakness I can exploit in a trade?')">Trade exploit?</button>
+            <button class="chip chip-lg" onclick="homeAsk('Where is my roster weakest heading into the rookie draft?')">Fix roster gaps?</button>
           </div>
         </div>
-        <!-- Team overview — replaces AI recommendations (saves API call) -->
-        <div id="home-team-overview">
-          <div class="skel-card"><div class="skel skel-line" style="width:40%"></div><div class="skel skel-block"></div><div class="skel skel-line" style="width:70%"></div><div class="skel skel-line" style="width:55%"></div></div>
+
+        <!-- 4. Team Snapshot (horizontal scroll) -->
+        <div id="home-team-snapshot"></div>
+
+        <!-- 5. Biggest Needs -->
+        <div id="home-biggest-needs"></div>
+
+        <!-- 6. Crown Jewels (collapsible) -->
+        <div id="home-crown-jewels"></div>
+
+        <!-- 7. Player Search -->
+        <div style="margin-bottom:14px;position:relative" id="player-search-wrap">
+          <input type="text" id="player-search-in" placeholder="Search any player..." oninput="handlePlayerSearch(this.value)" onfocus="this.parentElement.querySelector('#player-search-results').style.display='block'" style="width:100%;font-size:15px;padding:12px 16px 12px 38px;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;color:var(--text);outline:none;box-sizing:border-box"/>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" stroke-width="2" style="position:absolute;left:14px;top:14px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <div id="player-search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:0 0 12px 12px;max-height:280px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.4)"></div>
         </div>
-        <!-- League Pulse — trending adds/drops from Sleeper -->
+
+        <!-- 8. Data sync status (compact) -->
+        <div id="sync-status" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;font-size:11px;color:var(--text3);align-items:center">
+          <span id="sync-fc" style="display:flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:var(--text3)"></span>DHQ</span>
+          <span id="sync-stats" style="display:flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:var(--text3)"></span>Stats</span>
+          <span id="sync-li" style="display:flex;align-items:center;gap:3px"><span style="width:5px;height:5px;border-radius:50%;background:var(--text3)"></span>Intel</span>
+          <button onclick="resyncAllData()" style="background:none;border:1px solid var(--border);border-radius:5px;color:var(--text3);font-size:11px;padding:2px 6px;cursor:pointer;font-family:inherit;margin-left:auto">Resync ↺</button>
+        </div>
+
+        <!-- 9. League Pulse -->
         <div id="league-pulse"></div>
+
+        <!-- Hidden: retained for data but not shown in old position -->
+        <div id="home-snapshot" style="display:none"></div>
+        <div id="home-briefing" style="display:none"></div>
+        <div id="home-insights" style="display:none"></div>
+        <div id="home-team-overview" style="display:none"></div>
       </div>
-    </div>    <!-- START/SIT -->
+    </div>    <!-- START/SIT / LINEUP -->
     <div class="panel" id="panel-startsit">
-      <div class="sec">Start/Sit <span class="sec-line"></span></div>
-      <div id="startsit-content">
-        <div class="skel-card"><div class="skel skel-line" style="width:50%"></div><div class="skel skel-block"></div><div class="skel skel-line" style="width:80%"></div></div>
+      <!-- Lineup header + optimize bar -->
+      <div id="lineup-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.02em" id="lineup-week-title">Lineup</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:2px" id="lineup-subtitle">Optimal starters by projection</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em" id="lineup-total-proj">—</div>
+          <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Projected</div>
+        </div>
+      </div>
+
+      <!-- Optimize button -->
+      <div id="lineup-optimize-bar"></div>
+
+      <!-- View toggle: Starters / Bench -->
+      <div style="display:flex;gap:0;margin-bottom:12px;background:var(--bg2);border-radius:10px;padding:3px;border:1px solid var(--border)">
+        <button class="lu-seg active" id="lu-seg-starters" onclick="switchLineupView('starters')">Starters</button>
+        <button class="lu-seg" id="lu-seg-bench" onclick="switchLineupView('bench')">Better Options</button>
+      </div>
+
+      <!-- Content -->
+      <div id="lineup-starters-view">
+        <div id="startsit-content">
+          <div class="skel-card"><div class="skel skel-line" style="width:50%"></div><div class="skel skel-block"></div><div class="skel skel-line" style="width:80%"></div></div>
+        </div>
+      </div>
+      <div id="lineup-bench-view" style="display:none">
+        <div id="lineup-bench-content"></div>
       </div>
     </div>    <!-- ROSTER -->
     <div class="panel" id="panel-roster">

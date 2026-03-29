@@ -73,7 +73,10 @@ function switchTab(tab,btn){
   if(panel)panel.classList.add('active');
   if(tab==='waivers'&&typeof loadMentality==='function')loadMentality();
   if(tab==='draftroom'&&typeof renderDraftNeeds==='function')renderDraftNeeds();
-  if(tab==='digest'&&typeof renderHomeSnapshot==='function')renderHomeSnapshot();
+  if(tab==='digest'){
+    if(typeof renderMobileHome==='function')renderMobileHome();
+    else if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();
+  }
   if(tab==='roster'&&typeof buildRosterTable==='function')buildRosterTable();
   if(tab==='startsit'&&typeof renderStartSit==='function')renderStartSit();
   if(tab==='trades'){
@@ -247,6 +250,7 @@ async function loadAllData(){
     try{if(typeof renderTeamOverview==='function')renderTeamOverview();}catch(e){console.warn('renderTeamOverview:',e);}
     try{if(typeof renderHealthTimeline==='function')renderHealthTimeline();}catch(e){console.warn('renderHealthTimeline:',e);}
     try{if(typeof renderLeaguePulse==='function')renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
+    try{if(typeof renderMobileHome==='function')renderMobileHome();}catch(e){console.warn('renderMobileHome:',e);}
     try{if(typeof renderTradeIntel==='function')renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
     try{checkForAlerts();}catch(e){console.warn('checkForAlerts:',e);}
     if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();

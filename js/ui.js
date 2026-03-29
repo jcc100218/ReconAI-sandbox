@@ -1057,19 +1057,21 @@ function renderDailyBriefing(){
 }
 
 // ═══════════════════════════════════════════════════════════════
-// START/SIT — Optimal lineup for this week
+// LINEUP — Decision-support optimizer (mobile-first)
 // ═══════════════════════════════════════════════════════════════
-function renderStartSit(){
-  const wrap=$('startsit-content');if(!wrap)return;
-  const my=myR();if(!my||!S.leagues)return;
-  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  if(!league)return;
-  const positions=league.roster_positions||[];
-  const starters=positions.filter(p=>p!=='BN');
-  const myPids=my.players||[];
-  if(!myPids.length){wrap.innerHTML='';return;}
 
-  // Score each player
+// Shared lineup state so optimize/toggle can reuse data
+let _luState=null;
+
+function _buildLineupState(){
+  const my=myR();if(!my||!S.leagues)return null;
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  if(!league)return null;
+  const positions=league.roster_positions||[];
+  const starterSlots=positions.filter(p=>p!=='BN'&&p!=='IR'&&p!=='TAXI');
+  const myPids=my.players||[];
+  if(!myPids.length)return null;
+
   const scored=myPids.map(pid=>{
     const p=S.players?.[pid];if(!p)return null;
     const stats=S.playerStats?.[pid]||{};
@@ -1080,30 +1082,26 @@ function renderStartSit(){
     return{pid,pos,score,name:p.full_name||pName(pid),team:p.team||'FA',injury:p.injury_status};
   }).filter(Boolean);
 
-  // Greedy lineup optimizer
+  const flexMap={SUPER_FLEX:['QB','RB','WR','TE'],WRTQ:['QB','RB','WR','TE'],FLEX:['RB','WR','TE'],REC_FLEX:['WR','TE'],IDP_FLEX:['DL','LB','DB']};
   const used=new Set();
   const lineup=[];
-  const flexOrder=['SUPER_FLEX','WRTQ','FLEX','REC_FLEX','IDP_FLEX'];
-  const flexMap={SUPER_FLEX:['QB','RB','WR','TE'],WRTQ:['QB','RB','WR','TE'],FLEX:['RB','WR','TE'],REC_FLEX:['WR','TE'],IDP_FLEX:['DL','LB','DB']};
 
-  // Fill fixed positions first
-  starters.filter(s=>!flexMap[s]).forEach(slot=>{
+  // Fixed positions first
+  starterSlots.filter(s=>!flexMap[s]).forEach(slot=>{
     const pos=normPos(slot)||slot;
     const best=scored.filter(p=>p.pos===pos&&!used.has(p.pid)).sort((a,b)=>b.score-a.score)[0];
     if(best){used.add(best.pid);lineup.push({slot:pos,player:best,isFlex:false});}
     else lineup.push({slot:pos,player:null,isFlex:false});
   });
 
-  // Fill flex slots
-  starters.filter(s=>flexMap[s]).forEach(slot=>{
+  // Flex slots
+  starterSlots.filter(s=>flexMap[s]).forEach(slot=>{
     const eligible=flexMap[slot]||[];
     const best=scored.filter(p=>eligible.includes(p.pos)&&!used.has(p.pid)).sort((a,b)=>b.score-a.score)[0];
-    if(best){used.add(best.pid);lineup.push({slot:slot==='SUPER_FLEX'?'SF':slot==='IDP_FLEX'?'IDP_FLX':'FLX',player:best,isFlex:true});}
-    else lineup.push({slot:'FLX',player:null,isFlex:true});
+    const label=slot==='SUPER_FLEX'?'SF':slot==='IDP_FLEX'?'IDP_FLX':slot==='REC_FLEX'?'R_FLX':'FLX';
+    if(best){used.add(best.pid);lineup.push({slot:label,player:best,isFlex:true});}
+    else lineup.push({slot:label,player:null,isFlex:true});
   });
-
-  const totalProj=lineup.reduce((s,l)=>s+(l.player?.score||0),0);
-  const bench=scored.filter(p=>!used.has(p.pid)).sort((a,b)=>b.score-a.score).slice(0,3);
 
   // Bench alternatives by position
   const benchByPos={};
@@ -1113,60 +1111,307 @@ function renderStartSit(){
   });
   Object.values(benchByPos).forEach(arr=>arr.sort((a,b)=>b.score-a.score));
 
-  wrap.innerHTML=`
-    <div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div>
-          <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.02em">Week ${S.currentWeek||'?'} Lineup</div>
-          <div style="font-size:13px;color:var(--text3);margin-top:2px">Optimal starters based on PPG and projections</div>
+  // Confidence + swap analysis for each starter
+  const analyzed=lineup.map(l=>{
+    if(!l.player)return{...l,confidence:'empty',bestAlt:null,delta:0};
+    const alts=(benchByPos[l.player.pos]||[]);
+    const bestAlt=alts[0]||null;
+    const delta=bestAlt?(bestAlt.score-l.player.score):0;
+
+    let confidence='locked';
+    if(delta>1)confidence='suboptimal';
+    else if(delta>-0.5&&bestAlt)confidence='close';
+
+    return{...l,confidence,bestAlt,delta};
+  });
+
+  const totalProj=analyzed.reduce((s,l)=>s+(l.player?.score||0),0);
+  const suboptimalCount=analyzed.filter(l=>l.confidence==='suboptimal').length;
+  const closeCount=analyzed.filter(l=>l.confidence==='close').length;
+  const allBench=scored.filter(p=>!used.has(p.pid)).sort((a,b)=>b.score-a.score);
+
+  // Better options: bench players that outscore or are close to starters
+  const betterOptions=[];
+  analyzed.forEach(l=>{
+    if(!l.player||!l.bestAlt)return;
+    if(l.delta>0){
+      betterOptions.push({benchPlayer:l.bestAlt,starter:l.player,slot:l.slot,delta:l.delta});
+    }
+  });
+  betterOptions.sort((a,b)=>b.delta-a.delta);
+
+  return{analyzed,totalProj,suboptimalCount,closeCount,allBench,betterOptions,scored,used};
+}
+
+function renderStartSit(){
+  _luState=_buildLineupState();
+  if(!_luState){
+    const wrap=$('startsit-content');
+    if(wrap)wrap.innerHTML='';
+    return;
+  }
+
+  const{analyzed,totalProj,suboptimalCount,closeCount,betterOptions}=_luState;
+
+  // Header
+  const weekTitle=$('lineup-week-title');
+  if(weekTitle)weekTitle.textContent='Week '+(S.currentWeek||'?')+' Lineup';
+  const projEl=$('lineup-total-proj');
+  if(projEl)projEl.textContent=totalProj.toFixed(1);
+  const subEl=$('lineup-subtitle');
+  if(subEl){
+    if(suboptimalCount)subEl.textContent=suboptimalCount+' swap'+(suboptimalCount>1?'s':'')+' recommended';
+    else if(closeCount)subEl.textContent='Optimal \u2014 '+closeCount+' close call'+(closeCount>1?'s':'');
+    else subEl.textContent='Lineup is optimized';
+  }
+
+  // Optimize bar
+  const optBar=$('lineup-optimize-bar');
+  if(optBar){
+    if(suboptimalCount>0){
+      const gain=betterOptions.reduce((s,b)=>s+b.delta,0);
+      optBar.innerHTML=`<div class="optimize-bar">
+        <div class="optimize-count has-swaps">${suboptimalCount}</div>
+        <div class="optimize-text">
+          <div class="optimize-title">${suboptimalCount} better option${suboptimalCount>1?'s':''} found</div>
+          <div class="optimize-sub">+${gain.toFixed(1)} projected points available</div>
         </div>
-        <div style="text-align:right">
-          <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;letter-spacing:-.03em">${totalProj.toFixed(1)}</div>
-          <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Projected</div>
+        <button class="optimize-btn" onclick="optimizeLineup()">Optimize</button>
+      </div>`;
+    } else {
+      optBar.innerHTML=`<div class="optimize-bar clean">
+        <div class="optimize-count optimal">\u2713</div>
+        <div class="optimize-text">
+          <div class="optimize-title" style="color:var(--green)">Lineup is optimal</div>
+          <div class="optimize-sub">No better options on your bench</div>
+        </div>
+      </div>`;
+    }
+  }
+
+  // Render starters
+  _renderStartersView(analyzed);
+
+  // Render bench/better options
+  _renderBenchView(_luState);
+
+  // Update bench tab label
+  const benchSeg=$('lu-seg-bench');
+  if(benchSeg){
+    benchSeg.textContent=betterOptions.length?'Better Options ('+betterOptions.length+')':'Bench';
+  }
+}
+
+function _renderStartersView(analyzed){
+  const wrap=$('startsit-content');if(!wrap)return;
+
+  // Group by position category for section headers
+  const posOrder=['QB','RB','WR','TE','FLX','SF','R_FLX','K','DL','LB','DB','IDP_FLX'];
+  const offPos=new Set(['QB','RB','WR','TE']);
+  const idpPos=new Set(['DL','LB','DB']);
+
+  let html='';
+  let lastGroup='';
+
+  analyzed.forEach((l,idx)=>{
+    // Section headers
+    const slot=l.slot;
+    let group='';
+    if(offPos.has(slot))group=slot;
+    else if(idpPos.has(slot))group='IDP';
+    else if(['FLX','SF','R_FLX','IDP_FLX'].includes(slot))group='FLEX';
+    else group=slot;
+
+    if(group!==lastGroup){
+      const groupLabel=group==='FLEX'?'Flex':group==='IDP'?'IDP':group;
+      html+=`<div class="lu-pos-group">${groupLabel}</div>`;
+      lastGroup=group;
+    }
+
+    // Empty slot
+    if(!l.player){
+      html+=`<div class="lu-row lu-empty"><div class="lu-slot lu-slot-fixed">${slot}</div><div class="lu-info"><div class="lu-name" style="color:var(--text3)">Empty slot</div></div></div>`;
+      return;
+    }
+
+    const p=l.player;
+    const dhq=dynastyValue(p.pid);
+    const dhqCol=dhq>=7000?'var(--green)':dhq>=4000?'var(--accent)':dhq>=2000?'var(--text2)':'var(--text3)';
+    const scoreCol=p.score>=15?'var(--green)':p.score>=8?'var(--text)':'var(--text3)';
+
+    // Confidence class and label
+    let confCls='lu-locked',confIcon='\u2713',confLabel='Locked';
+    if(l.confidence==='suboptimal'){confCls='lu-suboptimal';confIcon='!';confLabel='Swap';}
+    else if(l.confidence==='close'){confCls='lu-close-call';confIcon='\u2248';confLabel='Close';}
+
+    const confLabelCls=l.confidence==='suboptimal'?'lu-conf-sub':l.confidence==='close'?'lu-conf-close':'lu-conf-locked';
+    const rowCls='lu-row '+(l.confidence==='suboptimal'?'lu-suboptimal':l.confidence==='close'?'lu-close-call':'lu-locked');
+
+    const injHtml=p.injury?`<span class="lu-inj">${p.injury}</span>`:'';
+
+    html+=`<div class="${rowCls}" onclick="openPlayerModal('${p.pid}')">
+      <div class="lu-slot ${l.isFlex?'lu-slot-flex':'lu-slot-fixed'}">${slot}</div>
+      <div class="lu-info">
+        <div class="lu-name">${p.name}${injHtml}</div>
+        <div class="lu-meta">
+          <span>${p.team}</span>
+          ${dhq>0?`<span style="color:${dhqCol};font-weight:600">${dhq.toLocaleString()}</span>`:''}
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:16px">
-        ${lineup.map(l=>{
-          if(!l.player)return`<div style="display:grid;grid-template-columns:40px 1fr 50px;gap:6px;padding:8px 10px;background:var(--bg2);border-radius:var(--r);align-items:center;opacity:0.35">
-            <span style="font-size:13px;font-weight:700;color:var(--text3)">${l.slot}</span><span style="font-size:13px;color:var(--text3)">Empty slot</span><span></span></div>`;
-          const col=l.player.score>=15?'var(--green)':l.player.score>=8?'var(--text)':'var(--text3)';
-          const injBadge=l.player.injury?`<span style="font-size:13px;color:var(--red);font-weight:700;background:var(--redL);padding:1px 5px;border-radius:3px;margin-left:4px">${l.player.injury}</span>`:'';
-          const dhq=dynastyValue(l.player.pid);
-          const dhqCol=dhq>=7000?'var(--green)':dhq>=4000?'var(--accent)':dhq>=2000?'var(--text2)':'var(--text3)';
-          // Check if a bench player at this position scores higher
-          const benchAlt=(benchByPos[l.player.pos]||[])[0];
-          const hasBetterBench=benchAlt&&benchAlt.score>l.player.score+1;
-          return`<div style="display:grid;grid-template-columns:40px 1fr 50px;gap:6px;padding:8px 10px;background:var(--bg2);border:1px solid ${hasBetterBench?'var(--amber)':'var(--border)'};border-radius:var(--r);align-items:center;cursor:pointer;transition:background .12s" onclick="openPlayerModal('${l.player.pid}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">
-            <span style="font-size:13px;font-weight:700;color:${l.isFlex?'var(--accent)':'var(--text3)'}">${l.slot}</span>
-            <div style="overflow:hidden">
-              <div style="display:flex;align-items:center;gap:4px">
-                <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.player.name}</span>
-                ${injBadge}
-              </div>
-              <div style="display:flex;gap:8px;margin-top:2px">
-                <span style="font-size:13px;color:var(--text3)">${l.player.team}</span>
-                <span style="font-size:13px;color:${dhqCol};font-weight:600">${dhq>0?dhq.toLocaleString()+' DHQ':''}</span>
-                ${hasBetterBench?`<span style="font-size:13px;color:var(--amber);font-weight:700">Consider ${benchAlt.name} (${benchAlt.score.toFixed(1)})</span>`:''}
-              </div>
-            </div>
-            <span style="font-size:14px;font-weight:800;color:${col};font-family:'JetBrains Mono',monospace;text-align:right">${l.player.score.toFixed(1)}</span>
-          </div>`;
-        }).join('')}
+      <div class="lu-score-col">
+        <div class="lu-score" style="color:${scoreCol}">${p.score.toFixed(1)}</div>
+        <div class="lu-confidence ${confLabelCls}">${confLabel}</div>
       </div>
-      ${bench.length?`<div style="padding-top:10px;border-top:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Bench Depth</div>
-        <div style="display:flex;flex-direction:column;gap:3px">
-          ${scored.filter(p=>!used.has(p.pid)).sort((a,b)=>b.score-a.score).slice(0,8).map(b=>{
-            const dhq2=dynastyValue(b.pid);
-            return`<div style="display:grid;grid-template-columns:40px 1fr 50px;gap:6px;padding:5px 10px;background:var(--bg2);border-radius:6px;align-items:center;opacity:0.7;cursor:pointer" onclick="openPlayerModal('${b.pid}')">
-              <span style="font-size:13px;color:var(--text3);font-weight:600">${b.pos}</span>
-              <div style="overflow:hidden"><span style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</span><span style="font-size:13px;color:var(--text3);margin-left:4px">${b.team}</span></div>
-              <span style="font-size:13px;font-weight:600;color:var(--text3);font-family:'JetBrains Mono',monospace;text-align:right">${b.score.toFixed(1)}</span>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`:''}
+      <div class="lu-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>`;
+
+    // Inline swap hint for suboptimal starters
+    if(l.confidence==='suboptimal'&&l.bestAlt){
+      html+=`<div class="lu-swap-hint" onclick="event.stopPropagation();openPlayerModal('${l.bestAlt.pid}')">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/></svg>
+        Start instead: ${l.bestAlt.name}
+        <span class="lu-swap-delta">+${l.delta.toFixed(1)}</span>
+      </div>`;
+    }
+  });
+
+  wrap.innerHTML=html||'<div style="padding:20px;text-align:center;color:var(--text3)">Connect to build your lineup.</div>';
+}
+
+function _renderBenchView(state){
+  const wrap=$('lineup-bench-content');if(!wrap)return;
+  const{betterOptions,allBench}=state;
+
+  let html='';
+
+  // Better options section
+  if(betterOptions.length){
+    html+=`<div style="margin-bottom:14px">
+      <div class="lu-pos-group" style="color:var(--amber)">Upgrades Available</div>
+      ${betterOptions.map(bo=>{
+        const dhq=dynastyValue(bo.benchPlayer.pid);
+        const dhqCol=dhq>=7000?'var(--green)':dhq>=4000?'var(--accent)':dhq>=2000?'var(--text2)':'var(--text3)';
+        return`<div class="lu-bench-card lu-upgrade" onclick="openPlayerModal('${bo.benchPlayer.pid}')">
+          <div style="flex:1;min-width:0">
+            <div class="lu-name">${bo.benchPlayer.name} <span class="lu-upgrade-badge">+${bo.delta.toFixed(1)}</span></div>
+            <div class="lu-meta">
+              <span>${bo.benchPlayer.pos} \u00B7 ${bo.benchPlayer.team}</span>
+              ${dhq>0?`<span style="color:${dhqCol};font-weight:600">${dhq.toLocaleString()}</span>`:''}
+              <span style="color:var(--text3)">replaces ${bo.starter.name}</span>
+            </div>
+          </div>
+          <div class="lu-score-col">
+            <div class="lu-score" style="color:var(--amber)">${bo.benchPlayer.score.toFixed(1)}</div>
+          </div>
+          <div class="lu-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // Remaining bench
+  const upgradeIds=new Set(betterOptions.map(b=>b.benchPlayer.pid));
+  const rest=allBench.filter(b=>!upgradeIds.has(b.pid));
+  if(rest.length){
+    html+=`<div class="lu-pos-group">Bench</div>`;
+    html+=rest.slice(0,12).map(b=>{
+      const dhq=dynastyValue(b.pid);
+      const dhqCol=dhq>=7000?'var(--green)':dhq>=4000?'var(--accent)':dhq>=2000?'var(--text2)':'var(--text3)';
+      return`<div class="lu-bench-card" onclick="openPlayerModal('${b.pid}')">
+        <div class="lu-slot lu-slot-fixed">${b.pos}</div>
+        <div style="flex:1;min-width:0;overflow:hidden">
+          <div class="lu-name">${b.name}</div>
+          <div class="lu-meta">
+            <span>${b.team}</span>
+            ${dhq>0?`<span style="color:${dhqCol};font-weight:600">${dhq.toLocaleString()}</span>`:''}
+          </div>
+        </div>
+        <div class="lu-score-col">
+          <div class="lu-score" style="color:var(--text3)">${b.score.toFixed(1)}</div>
+        </div>
+        <div class="lu-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>`;
+    }).join('');
+  }
+
+  if(!html)html='<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">No bench players with projections.</div>';
+  wrap.innerHTML=html;
+}
+
+// View toggle
+function switchLineupView(view){
+  const starters=$('lineup-starters-view');
+  const bench=$('lineup-bench-view');
+  const segS=$('lu-seg-starters');
+  const segB=$('lu-seg-bench');
+  if(!starters||!bench)return;
+
+  if(view==='bench'){
+    starters.style.display='none';bench.style.display='block';
+    segS?.classList.remove('active');segB?.classList.add('active');
+  } else {
+    starters.style.display='block';bench.style.display='none';
+    segS?.classList.add('active');segB?.classList.remove('active');
+  }
+}
+
+// Optimize lineup — show diff then re-render
+function optimizeLineup(){
+  if(!_luState)return;
+  const{betterOptions,totalProj}=_luState;
+  if(!betterOptions.length)return;
+
+  const gain=betterOptions.reduce((s,b)=>s+b.delta,0);
+  const newProj=totalProj+gain;
+
+  // Show diff
+  const wrap=$('startsit-content');if(!wrap)return;
+  let diffHtml=`<div class="lu-diff-list">
+    <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Lineup optimized \u2014 +${gain.toFixed(1)} pts</div>
+    ${betterOptions.map(bo=>`<div class="lu-diff-item">
+      <span class="lu-diff-icon">\u2191</span>
+      <span class="lu-diff-text"><strong>${bo.benchPlayer.name}</strong> in for <span style="color:var(--text3)">${bo.starter.name}</span> at ${bo.slot}</span>
+      <span class="lu-diff-pts">+${bo.delta.toFixed(1)}</span>
+    </div>`).join('')}
+  </div>`;
+
+  // Build optimized lineup: swap suboptimal starters with their best alternatives
+  const optimized=_luState.analyzed.map(l=>{
+    if(l.confidence==='suboptimal'&&l.bestAlt){
+      return{...l,player:l.bestAlt,confidence:'locked',bestAlt:l.player,delta:-l.delta};
+    }
+    return{...l,confidence:l.player?'locked':l.confidence,bestAlt:null,delta:0};
+  });
+
+  // Update header projection
+  const projEl=$('lineup-total-proj');
+  if(projEl)projEl.textContent=newProj.toFixed(1);
+  const subEl=$('lineup-subtitle');
+  if(subEl)subEl.textContent='Lineup is optimized';
+
+  // Update optimize bar
+  const optBar=$('lineup-optimize-bar');
+  if(optBar)optBar.innerHTML=`<div class="optimize-bar clean">
+    <div class="optimize-count optimal">\u2713</div>
+    <div class="optimize-text">
+      <div class="optimize-title" style="color:var(--green)">Lineup optimized</div>
+      <div class="optimize-sub">+${gain.toFixed(1)} pts \u2014 ${betterOptions.length} swap${betterOptions.length>1?'s':''} applied</div>
+    </div>
+  </div>`;
+
+  // Render diff then optimized starters below it
+  // Save current wrap reference, render optimized lineup, capture HTML, restore
+  const savedHTML=wrap.innerHTML;
+  _renderStartersView(optimized);
+  const optimizedHTML=wrap.innerHTML;
+  wrap.innerHTML=diffHtml+optimizedHTML;
+
+  // Switch to starters view
+  switchLineupView('starters');
+
+  // Update bench tab
+  const benchSeg=$('lu-seg-bench');
+  if(benchSeg)benchSeg.textContent='Bench';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1547,6 +1792,351 @@ function renderHealthTimeline(){
 // homeAsk: defined in ai-chat.js
 // goAsk: defined in ai-chat.js
 // expandChat: defined in ai-chat.js
+
+// ═══════════════════════════════════════════════════════════════
+// MOBILE-FIRST HOME SCREEN — New rendering layer
+// These functions consume the same data as the original briefing/
+// overview but render into the new mobile-optimized containers.
+// ═══════════════════════════════════════════════════════════════
+
+function renderHeroAction(){
+  const el=$('home-hero-action');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const myPids=my.players||[];
+  const mySet=new Set(myPids);
+  const peaks=window.App?.peakWindows||{QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+  const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  const faab=getFAAB();
+  const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+
+  // Try waiver pickup first
+  let hero=null;
+  if(assess?.needs?.length){
+    const need=assess.needs[0];
+    const avail=typeof getAvailablePlayers==='function'?getAvailablePlayers():[];
+    const bestAtNeed=avail.filter(a=>(normPos(S.players?.[a.id]?.position)||'')=== need.pos).sort((a,b)=>dynastyValue(b.id)-dynastyValue(a.id))[0];
+    if(bestAtNeed){
+      const val=dynastyValue(bestAtNeed.id);
+      const p=S.players?.[bestAtNeed.id];
+      const peakW=peaks[need.pos]||[24,29];
+      const peakYrs=Math.max(0,peakW[1]-(p?.age||25));
+      const ppg=S.playerStats?.[bestAtNeed.id]?.seasonAvg||S.playerStats?.[bestAtNeed.id]?.prevAvg||0;
+      let competitors=0;
+      S.rosters.forEach(r=>{if(r.roster_id===S.myRosterId)return;const cnt=(r.players||[]).filter(pid=>(normPos(S.players?.[pid]?.position)||'')=== need.pos).length;const req=(league?.roster_positions||[]).filter(s=>s===need.pos||s==='FLEX'||s==='SUPER_FLEX').length;if(cnt<req)competitors++;});
+      const comp=competitors===0?'No real competition on waivers':competitors<=2?'Only '+competitors+' teams competing':''+competitors+' teams may bid';
+      const bidAmt=faab.isFAAB&&val>0?Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(val/200))):0;
+      hero={
+        type:'add',
+        pid:bestAtNeed.id,
+        title:'Add '+pName(bestAtNeed.id),
+        subtitle:need.pos+' \u00B7 '+peakYrs+'-year peak window',
+        reasons:['Fills biggest '+need.pos+' gap'+(need.urgency==='deficit'?' (critical)':''),comp,ppg?ppg.toFixed(1)+' PPG':'',bidAmt?'Suggested bid: $'+bidAmt:''],
+        ctaLabel:bidAmt?'Add for $'+bidAmt:'Add to roster',
+        ctaAction:"mobileTab('waivers')"
+      };
+    }
+  }
+
+  // Fallback: sell declining asset
+  if(!hero){
+    const declining=myPids.map(pid=>{const meta=LI.playerMeta?.[pid];const val=dynastyValue(pid);if(!meta||val<2000)return null;const [,pHi]=peaks[meta.pos]||[24,29];const pastPeak=meta.age-pHi;if(pastPeak>=2&&(meta.trend||0)<=-10)return{pid,val,pastPeak,trend:meta.trend||0,pos:meta.pos,age:meta.age};return null;}).filter(Boolean).sort((a,b)=>b.val-a.val);
+    if(declining.length){
+      const d=declining[0];
+      hero={
+        type:'sell',
+        pid:d.pid,
+        title:'Sell '+pName(d.pid),
+        subtitle:d.pos+' \u00B7 Age '+d.age,
+        reasons:[d.val.toLocaleString()+' DHQ \u2014 value dropping',d.pastPeak+'yr past '+d.pos+' peak','PPG down '+Math.abs(d.trend)+'%','Trade while value remains'],
+        ctaLabel:'Find trade partner',
+        ctaAction:"mobileTab('trades')"
+      };
+    }
+  }
+
+  if(!hero){el.innerHTML='';return;}
+
+  const reasonsHtml=hero.reasons.filter(Boolean).map(r=>'<li>'+r+'</li>').join('');
+  el.innerHTML=`
+    <div class="hero-action-card" onclick="openPlayerModal('${hero.pid}')">
+      <div class="hero-chevron"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+      <div class="hero-title">${hero.title}</div>
+      <div class="hero-subtitle">${hero.subtitle}</div>
+      <div class="hero-reason"><ul>${reasonsHtml}</ul></div>
+      <button class="hero-cta" onclick="event.stopPropagation();${hero.ctaAction}">
+        ${hero.ctaLabel}
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>`;
+}
+
+function renderPrepareCards(){
+  const el=$('home-prepare');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const myPids=my.players||[];
+  const peaks=window.App?.peakWindows||{QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+  const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  const items=[];
+
+  // Draft prep
+  const picks=typeof buildPicksByOwner==='function'?buildPicksByOwner():null;
+  const myPicks=picks?picks[S.myRosterId]||[]:[];
+  if(myPicks.length){
+    const nextPick=myPicks.sort((a,b)=>a.year-b.year||a.round-b.round)[0];
+    const biggestNeed=assess?.needs?.[0];
+    items.push({
+      title:'Draft: target '+(biggestNeed?biggestNeed.pos:'BPA')+' with '+nextPick.year+' R'+nextPick.round,
+      sub:myPicks.length+' picks total'+(biggestNeed?' \u00B7 '+biggestNeed.pos+' is biggest gap':''),
+      action:"mobileTab('draftroom')"
+    });
+  }
+
+  // Trade surplus
+  if(assess?.strengths?.length&&assess?.needs?.length){
+    items.push({
+      title:'Trade '+assess.strengths[0]+' surplus for '+assess.needs[0].pos+' help',
+      sub:'Depth at '+assess.strengths.join(', ')+' \u00B7 '+assess.needs[0].pos+' is '+assess.needs[0].urgency,
+      action:"mobileTab('trades')"
+    });
+  }
+
+  if(!items.length){el.innerHTML='';return;}
+
+  el.innerHTML=`<div style="margin-bottom:14px">
+    <div class="home-sec-title">Prepare for this</div>
+    ${items.slice(0,2).map(it=>`
+      <div class="prepare-card" onclick="${it.action}">
+        <div class="prepare-text">
+          <div class="prepare-title">${it.title}</div>
+          <div class="prepare-sub">${it.sub}</div>
+        </div>
+        <div class="prepare-chevron"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function renderTeamSnapshot(){
+  const el=$('home-team-snapshot');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const teams=S.rosters.length||16;
+
+  // Health score
+  const myAssessment=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  const healthScore=myAssessment?.healthScore||0;
+  const panic=myAssessment?.panic||0;
+  const tierDisplayMap={ELITE:['Elite','var(--green)'],CONTENDER:['Contender','var(--accent)'],CROSSROADS:['Crossroads','var(--amber)'],REBUILDING:['Rebuilding','var(--red)']};
+  const [hTier,hCol]=tierDisplayMap[myAssessment?.tier]||['—','var(--text3)'];
+
+  // Contender rank
+  const rp=league?.roster_positions||[];
+  const slotCounts={QB:0,RB:0,WR:0,TE:0,FLEX:0,SUPER_FLEX:0,DL:0,LB:0,DB:0,IDP_FLEX:0};
+  rp.forEach(s=>{
+    if(s==='DE'||s==='DT')slotCounts.DL++;
+    else if(s==='CB'||s==='S')slotCounts.DB++;
+    else if(s in slotCounts)slotCounts[s]++;
+    else if(s==='REC_FLEX')slotCounts.FLEX++;
+    else if(s==='BN'||s==='IR'||s==='TAXI'){}
+    else slotCounts.FLEX++;
+  });
+  const _pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+  function _calcPPG(pids){
+    const byPos={};
+    (pids||[]).forEach(pid=>{
+      const pos=_pM(pPos(pid));const ppg=S.playerStats?.[pid]?.seasonAvg||S.playerStats?.[pid]?.prevAvg||0;
+      if(ppg<=0)return;if(!byPos[pos])byPos[pos]=[];byPos[pos].push({pid,ppg,pos});
+    });
+    Object.values(byPos).forEach(arr=>arr.sort((a,b)=>b.ppg-a.ppg));
+    const used=new Set();let total=0;
+    ['QB','RB','WR','TE','DL','LB','DB'].forEach(pos=>{const need=slotCounts[pos]||0;const avail=byPos[pos]||[];for(let i=0;i<need&&i<avail.length;i++){total+=avail[i].ppg;used.add(avail[i].pid);}});
+    const fp=['RB','WR','TE'].flatMap(pos=>(byPos[pos]||[]).filter(p=>!used.has(p.pid))).sort((a,b)=>b.ppg-a.ppg);
+    for(let i=0;i<(slotCounts.FLEX||0)&&i<fp.length;i++){total+=fp[i].ppg;used.add(fp[i].pid);}
+    const sfp=['QB','RB','WR','TE'].flatMap(pos=>(byPos[pos]||[]).filter(p=>!used.has(p.pid))).sort((a,b)=>b.ppg-a.ppg);
+    for(let i=0;i<(slotCounts.SUPER_FLEX||0)&&i<sfp.length;i++){total+=sfp[i].ppg;used.add(sfp[i].pid);}
+    const ip=['DL','LB','DB'].flatMap(pos=>(byPos[pos]||[]).filter(p=>!used.has(p.pid))).sort((a,b)=>b.ppg-a.ppg);
+    for(let i=0;i<(slotCounts.IDP_FLEX||0)&&i<ip.length;i++){total+=ip[i].ppg;used.add(ip[i].pid);}
+    return +total.toFixed(1);
+  }
+  const contenderRanks=S.rosters.map(r=>({rid:r.roster_id,ppg:_calcPPG(r.players||[])})).sort((a,b)=>b.ppg-a.ppg);
+  const myContenderRank=contenderRanks.findIndex(r=>r.rid===S.myRosterId)+1;
+  const myContenderPPG=contenderRanks.find(r=>r.rid===S.myRosterId)?.ppg||0;
+
+  // Dynasty rank
+  const rosterVals=S.rosters.map(r=>({rid:r.roster_id,val:(r.players||[]).reduce((s,pid)=>s+dynastyValue(pid),0)})).sort((a,b)=>b.val-a.val);
+  const myValRank=rosterVals.findIndex(r=>r.rid===S.myRosterId)+1;
+  const totalVal=rosterVals.find(r=>r.rid===S.myRosterId)?.val||0;
+
+  // Draft capital
+  const year=parseInt(S.season)||2026;
+  const draftRounds=league?.settings?.draft_rounds||7;
+  const allTP=S.tradedPicks;
+  let totalPicks=0;
+  const pickYears=[];
+  for(let yr=year;yr<=year+2;yr++){
+    let count=0;
+    for(let rd=1;rd<=draftRounds;rd++){
+      const tradedAway=allTP.find(p=>parseInt(p.season)===yr&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
+      const acquired=allTP.filter(p=>parseInt(p.season)===yr&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
+      if(!tradedAway)count++;count+=acquired.length;
+    }
+    totalPicks+=count;pickYears.push("'"+String(yr).slice(2)+': '+count);
+  }
+
+  const cCol=myContenderRank<=3?'var(--green)':myContenderRank<=8?'var(--accent)':'var(--amber)';
+  const dCol=myValRank<=3?'var(--green)':myValRank<=8?'var(--accent)':'var(--amber)';
+
+  el.innerHTML=`
+    <div class="home-sec-title">Team Snapshot</div>
+    <div class="snapshot-scroll">
+      <div class="snapshot-card" onclick="toggleTip('tip-health')">
+        <div class="snap-label">Health</div>
+        <div class="snap-value" style="color:${hCol}">${healthScore}</div>
+        <div class="snap-detail">${hTier}${panic>=3?' \u00B7 Panic '+panic+'/5':''}</div>
+        <div class="snap-bar"><div class="snap-bar-fill" style="width:${healthScore}%;background:${hCol}"></div></div>
+      </div>
+      <div class="snapshot-card" onclick="toggleTip('tip-contender')">
+        <div class="snap-label">Contender</div>
+        <div class="snap-value" style="color:${cCol}">#${myContenderRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
+        <div class="snap-detail">${myContenderPPG.toFixed(1)} starter PPG</div>
+        <div class="snap-bar"><div class="snap-bar-fill" style="width:${Math.round(myContenderPPG/(contenderRanks[0]?.ppg||1)*100)}%;background:${cCol}"></div></div>
+      </div>
+      <div class="snapshot-card" onclick="toggleTip('tip-dynasty')">
+        <div class="snap-label">Dynasty</div>
+        <div class="snap-value" style="color:${dCol}">#${myValRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
+        <div class="snap-detail">${totalVal.toLocaleString()} DHQ</div>
+        <div class="snap-bar"><div class="snap-bar-fill" style="width:${Math.round(totalVal/(rosterVals[0]?.val||1)*100)}%;background:${dCol}"></div></div>
+      </div>
+      <div class="snapshot-card" onclick="mobileTab('draftroom')">
+        <div class="snap-label">Draft Capital</div>
+        <div class="snap-value" style="color:var(--text)">${totalPicks}<span style="font-size:13px;color:var(--text3);font-weight:500"> picks</span></div>
+        <div class="snap-detail">${pickYears.join(' \u00B7 ')}</div>
+      </div>
+    </div>`;
+
+  // Also run original functions to keep data recording
+  if(typeof recordHealthSnapshot==='function')recordHealthSnapshot(healthScore,hTier);
+}
+
+function renderBiggestNeeds(){
+  const el=$('home-biggest-needs');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const players=my.players||[];
+  // Use global pM from app.js
+
+  // Grade each position relative to league average
+  const positions=['QB','RB','WR','TE','K','DL','LB','DB'];
+  const posGroups={};
+  positions.forEach(pos=>{posGroups[pos]={total:0,count:0};});
+  players.forEach(pid=>{
+    const pos=pM(pPos(pid));if(!pos||!posGroups[pos])return;
+    posGroups[pos].total+=dynastyValue(pid);posGroups[pos].count++;
+  });
+
+  const leagueTotalByPos={};
+  positions.forEach(pos=>{
+    const teamTotals=S.rosters.map(r=>(r.players||[]).reduce((sum,pid)=>{if(pM(pPos(pid))===pos)sum+=dynastyValue(pid);return sum;},0));
+    leagueTotalByPos[pos]=teamTotals.length?Math.round(teamTotals.reduce((a,b)=>a+b,0)/teamTotals.length):5000;
+  });
+
+  const gradeLetter=(myTotal,pos)=>{
+    const la=leagueTotalByPos[pos]||5000;const pct=myTotal/la;
+    return pct>=1.3?'A':pct>=1.05?'B':pct>=0.85?'C':pct>=0.65?'D':'F';
+  };
+  const gradeColor=(myTotal,pos)=>{
+    const la=leagueTotalByPos[pos]||5000;const pct=myTotal/la;
+    return pct>=1.3?'var(--green)':pct>=1.0?'var(--accent)':pct>=0.75?'var(--amber)':'var(--red)';
+  };
+
+  // Sort: weakest first
+  const graded=positions.map(pos=>{
+    const g=posGroups[pos];
+    const grade=gradeLetter(g.total,pos);
+    const col=gradeColor(g.total,pos);
+    return{pos,grade,col,total:g.total,count:g.count};
+  }).sort((a,b)=>{
+    const order={F:0,D:1,C:2,B:3,A:4};
+    return (order[a.grade]||5)-(order[b.grade]||5);
+  });
+
+  el.innerHTML=`
+    <div class="needs-section">
+      <div class="home-sec-title">Position Grades <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;font-size:11px">\u2014 weakest first</span></div>
+      <div class="needs-row">
+        ${graded.map(g=>`
+          <div class="need-chip" onclick="mobileTab('roster')">
+            <span class="need-pos" style="color:var(--text2)">${g.pos}</span>
+            <span class="need-grade" style="color:${g.col}">${g.grade}</span>
+            <span class="need-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderCrownJewels(){
+  const el=$('home-crown-jewels');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const my=myR();if(!my)return;
+  const players=my.players||[];
+  // Use global pM from app.js
+
+  const topPlayers=players.map(pid=>({pid,val:dynastyValue(pid),name:pName(pid),pos:pM(pPos(pid)),age:pAge(pid)}))
+    .filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
+  if(!topPlayers.length){el.innerHTML='';return;}
+
+  const previewStr=topPlayers.slice(0,3).map(p=>pNameShort(p.pid)).join(', ');
+
+  el.innerHTML=`
+    <div class="jewels-section">
+      <div class="jewels-toggle" id="jewels-toggle" onclick="toggleJewels()">
+        <div><span class="jt-label">Crown Jewels</span><span class="jt-preview">${previewStr}</span></div>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="jewels-body" id="jewels-body">
+        ${topPlayers.map((p,i)=>{
+          const {col}=tradeValueTier(p.val);
+          const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
+          const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':'past peak';
+          return`<div class="jewel-row" onclick="openPlayerModal('${p.pid}')">
+            <span style="font-size:14px;font-weight:800;color:var(--text3);min-width:18px">${i+1}</span>
+            <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
+              <div style="font-size:12px;color:var(--text3)">${p.pos} \u00B7 ${p.age} \u00B7 ${peakStr}</div>
+            </div>
+            <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function toggleJewels(){
+  const toggle=document.getElementById('jewels-toggle');
+  const body=document.getElementById('jewels-body');
+  if(!toggle||!body)return;
+  toggle.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+// ── Master home render — calls all new mobile components ──────
+function renderMobileHome(){
+  renderHeroAction();
+  renderPrepareCards();
+  renderTeamSnapshot();
+  renderBiggestNeeds();
+  renderCrownJewels();
+  // Also call originals for data they record (health timeline etc)
+  if(typeof renderDailyBriefing==='function')renderDailyBriefing();
+  if(typeof renderInsightCards==='function')renderInsightCards();
+  if(typeof renderTeamOverview==='function')renderTeamOverview();
+  if(typeof renderHealthTimeline==='function')renderHealthTimeline();
+  if(typeof renderLeaguePulse==='function')renderLeaguePulse();
+}
 
 // ── Strategy Walkthrough ───────────────────────────────────────
 const STRATEGY_QUESTIONS=[
