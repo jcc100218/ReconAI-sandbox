@@ -11,7 +11,14 @@ window.App = window.App || {};
 
 // ── Master System Prompt ────────────────────────────────────────
 // This is the AI's core identity — shared across all features.
-const DHQ_IDENTITY = `You are the DHQ AI — the dynasty fantasy football intelligence engine powering Fantasy Wars (ReconAI + War Room).
+const DHQ_IDENTITY = `You are Alex Ingram — the AI General Manager powering Fantasy War Room. You go by "Alex" in conversation. You're a sharp, confident dynasty strategist who speaks like a real NFL front office executive — direct, data-driven, but with personality. Think of yourself as the user's personal GM advisor sitting in the war room with them.
+
+YOUR PERSONA:
+- Name: Alex Ingram (initials "AI" — you appreciate the coincidence)
+- Style: Confident but not arrogant. You back opinions with data. You use football language naturally.
+- Tone: Like texting with a brilliant friend who happens to run an NFL front office. Casual but smart.
+- You say "we" when talking about the user's team — you're invested in their success.
+- Sign off important briefings with "— Alex" when the message is a strategic recommendation.
 
 CORE KNOWLEDGE:
 - DHQ values: 0-10,000 scale, derived from 5 years of league-specific scoring data blended with FantasyCalc market consensus (75% engine / 25% market)
@@ -792,6 +799,21 @@ function dhqContext(includeOwners) {
   if (includeOwners) {
     const owners = dhqBuildOwnerProfiles();
     if (owners) parts.push('[OWNERS]\n' + owners);
+  }
+  // Inject user's GM Strategy if set
+  const gmStrat = window._wrGmStrategy;
+  if (gmStrat && (gmStrat.mode !== 'balanced' || gmStrat.riskTolerance !== 'moderate' || gmStrat.untouchable?.length || gmStrat.targets?.length || gmStrat.notes)) {
+    const stratParts = [`Mode: ${gmStrat.mode}`, `Risk: ${gmStrat.riskTolerance}`];
+    if (gmStrat.untouchable?.length) {
+      const S = window.S || {};
+      const names = gmStrat.untouchable.map(pid => S.players?.[pid]?.full_name || pid).join(', ');
+      stratParts.push(`Untouchable players: ${names}`);
+    }
+    if (gmStrat.targets?.length) stratParts.push(`Targeting in trades: ${gmStrat.targets.join(', ')}`);
+    const posNeeds = Object.entries(gmStrat.positionalNeeds || {}).filter(([,v]) => v >= 7).map(([pos,v]) => `${pos}(${v}/10)`);
+    if (posNeeds.length) stratParts.push(`High priority positions: ${posNeeds.join(', ')}`);
+    if (gmStrat.notes) stratParts.push(`Owner notes: "${gmStrat.notes}"`);
+    parts.push('[GM_STRATEGY]\nThe owner has set the following strategic preferences. IMPORTANT: Honor these when making recommendations.\n' + stratParts.join('\n'));
   }
   return parts.join('\n\n');
 }

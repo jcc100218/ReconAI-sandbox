@@ -212,7 +212,7 @@ async function loadLeagueIntel(){
       // Reduced from 117 fetches to ~55 (5 seasons × 11 key weeks)
       const tradeTxns=[];
       const txnPromise=(async()=>{
-        const txnWeeks=[1,2,3,4,5,6,7,8,9,10,11]; // weeks 12-18 rarely have trades, skip
+        const txnWeeks=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]; // include offseason (0) and full season
         const allTxnFetches=[];
         chain.forEach(c=>{
           const seasonNum=parseInt(c.season);

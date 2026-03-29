@@ -13,7 +13,7 @@ const PROVIDERS = {
     name: 'Gemini Flash (Free)',
     placeholder: 'AIza...',
     hint: 'Free tier at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a>. 1M tokens/day free. No web search.',
-    defaultModel: 'gemini-1.5-flash',
+    defaultModel: 'gemini-2.0-flash',
     validate: k => k.length > 10,
   },
   anthropic: {
@@ -184,7 +184,7 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600, 
         return (data.content||[]).filter(c=>c.type==='text').map(c=>c.text||'').join('') || 'No response.';
 
       } else if(provider === 'gemini'){
-        const body = {model, max_tokens:maxTok, messages:[{role:'system',content:sys},...messages]};
+        const body = {model, max_completion_tokens:maxTok, messages:[{role:'system',content:sys},...messages]};
         res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', {method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey}, body:JSON.stringify(body)});
         if((res.status===429)&&attempt<_retries){await new Promise(r=>setTimeout(r,(attempt+1)*10000));continue;}
         if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'API error '+res.status);}
