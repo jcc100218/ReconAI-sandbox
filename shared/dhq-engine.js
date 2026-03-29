@@ -602,7 +602,13 @@ async function loadLeagueIntel(){
 
     // Score all players with recent production
     const recentPlayers=Object.entries(playerSeasons)
-      .filter(([pid,ps])=>ps.seasons[curSeason]||ps.seasons[curSeason-1]||ps.seasons[curSeason-2])
+      .filter(([pid,ps])=>{
+        if(!(ps.seasons[curSeason]||ps.seasons[curSeason-1]||ps.seasons[curSeason-2]))return false;
+        // Skip players Sleeper explicitly marks as retired/inactive
+        const p=S.players[pid];
+        if(p&&(p.status==='Inactive'||p.status==='Retired'))return false;
+        return true;
+      })
       .map(([pid,ps])=>{
         const pos=ps.pos;
         const p=S.players[pid];
@@ -660,8 +666,17 @@ async function loadLeagueIntel(){
         const hasRealTeam=p?.team&&p.team!=='null'&&p.team!==null&&p.team!=='FA'&&p.team!=='';
 
         // A) Team / roster status — smart offseason handling
-        if(!isRostered&&!hasRealTeam){
-          // Not rostered by anyone AND no NFL team = effectively retired/worthless
+        // During offseason, Sleeper nulls out team fields for many active players.
+        // Use recent production as a proxy: if they played recently, they're not retired.
+        const hasRecentProduction=!!(ps.seasons[curSeason]||ps.seasons[curSeason-1]);
+        if(!isRostered&&!hasRealTeam&&!isOffseasonTeams){
+          // Mid-season: not rostered, no NFL team = effectively retired/worthless
+          sitMult*=0.30;
+        }else if(!isRostered&&!hasRealTeam&&isOffseasonTeams&&hasRecentProduction){
+          // Offseason: team data stale but player produced recently = likely unsigned FA, not retired
+          sitMult*=0.50;
+        }else if(!isRostered&&!hasRealTeam&&isOffseasonTeams&&!hasRecentProduction){
+          // Offseason: no team, no recent production = likely retired
           sitMult*=0.30;
         }else if(!isRostered&&hasRealTeam){
           // Has an NFL team but no one in the league rosters them = available FA
