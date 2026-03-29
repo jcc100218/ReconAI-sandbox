@@ -303,8 +303,25 @@ ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
 }
 
 // ── Waiver Chat ────────────────────────────────────────────────
+function sendWaiverChatMsg(text){
+  const input=$('wq-chat-in');
+  if(input){input.value=text;}
+  sendWaiverChat();
+}
+window.sendWaiverChatMsg=sendWaiverChatMsg;
+
 async function sendWaiverChat(){
-  if(!hasAnyAI(true)){return;}
+  if(!hasAnyAI(false)){
+    const msgs=$('wq-chat-msgs');
+    if(msgs){
+      expandChat(msgs);
+      const m=document.createElement('div');
+      m.className='hc-msg-a';m.style.fontSize='13px';
+      m.innerHTML='Waiver assistant requires AI. Enable an API key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';
+      msgs.appendChild(m);msgs.scrollTop=99999;
+    }
+    return;
+  }
   const input=$('wq-chat-in');const text=input?.value?.trim();if(!text)return;
   input.value='';
 
@@ -442,9 +459,76 @@ Object.assign(window.App, {
 
 // ── Waiver AI Agent ────────────────────────────────────────────
 async function runWaiverAgent(){
-  if(!hasAnyAI(true)){return;}
-  const btn=$('wq-btn');btn.textContent='Scanning...';btn.disabled=true;
-  $('wq-list').innerHTML='<div class="card"><div class="empty">Computing available players, FAAB context, and roster slots...</div></div>';
+  const btn=$('wq-btn');
+  if(!hasAnyAI(false)){
+    // Fallback: generate a data-driven queue without AI
+    btn.textContent='Building...';btn.disabled=true;
+    try{
+      const avail=getAvailablePlayers();
+      const faab=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0,isFAAB:false};
+      const slots=typeof getRosterSlots==='function'?getRosterSlots():{openBench:0};
+      const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+      const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
+      const posMapF=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+      const needPositions=assess?.needs?.map(n=>n.pos)||[];
+
+      // Score and rank
+      const ranked=avail.slice(0,15).map((a,i)=>{
+        const pos=posMapF(a.p.position);
+        const fillsNeed=needPositions.includes(pos);
+        const st=S.playerStats?.[a.id]||{};
+        const ppg=st.prevAvg||st.seasonAvg||0;
+        const market=faabMarket[pos];
+        let faabLo=0,faabHi=0;
+        if(market&&market.count>=3&&faab.budget>0&&faab.isFAAB){
+          const sug=Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(a.val/4000))));
+          faabLo=Math.max(1,Math.round(sug*0.7));
+          faabHi=Math.min(faab.remaining,Math.round(sug*1.3));
+        }
+        const conf=a.val>=4000?'High':a.val>=2000?'Medium':'Speculative';
+        const reason=fillsNeed?'Fills '+pos+' need'+(ppg?' · '+ppg.toFixed(1)+' PPG':''):ppg?ppg.toFixed(1)+' PPG · '+a.val.toLocaleString()+' DHQ':'Dynasty value: '+a.val.toLocaleString();
+        return{name:pName(a.id),pid:a.id,pos,team:a.p.team||'FA',val:a.val,rank:i+1,faabLo,faabHi,conf,reason,fillsNeed};
+      });
+
+      // Sort: needs first, then by value
+      ranked.sort((a,b)=>(b.fillsNeed?1:0)-(a.fillsNeed?1:0)||b.val-a.val);
+      ranked.forEach((r,i)=>r.rank=i+1);
+
+      const list=ranked.slice(0,6);
+      const confCol=c=>c==='High'?'var(--green)':c==='Medium'?'var(--amber)':'var(--text3)';
+      const confCls=c=>c==='High'?'wv-high':c==='Medium'?'wv-med':'wv-low';
+
+      $('wq-list').innerHTML=`
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
+          Data-driven recommendations · ${avail.length} available · ${slots.openBench} open slots
+          ${faab.isFAAB?` · $${faab.remaining} FAAB`:''}
+        </div>
+        ${list.map(r=>`
+          <div class="wv-queue-item ${confCls(r.conf)}" onclick="openPlayerModal('${r.pid}')">
+            <div class="wv-rank">#${r.rank}</div>
+            <div class="wv-item-info">
+              <div class="wv-item-name">
+                ${r.name}
+                <span class="rr-pos" style="${getPosBadgeStyle(r.pos)}">${r.pos}</span>
+              </div>
+              <div class="wv-item-reason">${r.reason}</div>
+            </div>
+            <div class="wv-item-right">
+              ${r.faabLo?`<div class="wv-faab-badge">$${r.faabLo}–${r.faabHi}</div>`:''}
+              <div class="wv-conf-badge" style="color:${confCol(r.conf)}">${r.conf}</div>
+            </div>
+          </div>`).join('')}
+        <div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">
+          Enable AI in Settings for personalized recommendations with drop suggestions.
+        </div>`;
+    }catch(e){
+      $('wq-list').innerHTML=`<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">Waiver engine temporarily unavailable. Showing top projected pickups above.</div>`;
+    }
+    btn.textContent='Generate';btn.disabled=false;
+    return;
+  }
+  btn.textContent='Scanning...';btn.disabled=true;
+  $('wq-list').innerHTML='<div style="padding:16px;text-align:center"><div style="display:inline-block;width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle"></div><span style="color:var(--text3);font-size:13px">Analyzing roster needs, FAAB context, and available players...</span></div>';
   try{
     const avail=getAvailablePlayers();
     const posFilter=$('avail-pos-sel')?.value||'';
@@ -513,36 +597,42 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
         return true;
       });
     }
+    const confFromRank=rank=>rank===1?'High':rank<=3?'High':rank<=5?'Medium':'Speculative';
+    const confCol2=c=>c==='High'?'var(--green)':c==='Medium'?'var(--amber)':'var(--text3)';
+    const confCls2=c=>c==='High'?'wv-high':c==='Medium'?'wv-med':'wv-low';
+
     $('wq-list').innerHTML=`
-      <div style="font-size:13px;color:var(--text3);margin-bottom:10px;padding:6px 10px;background:var(--bg3);border-radius:6px;display:flex;gap:12px;flex-wrap:wrap">
-        <span>${mentLabel}</span><span>${avail.length} available</span>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;display:flex;gap:10px;flex-wrap:wrap">
+        ${mentLabel?'<span>'+mentLabel+'</span>':''}<span>${avail.length} available</span>
         <span style="color:${slots.openBench>0?'var(--green)':'var(--red)'}">${slots.openBench} open slot${slots.openBench!==1?'s':''}</span>
-        ${isFAAB?`<span style="color:var(--green)">$${faab.remaining} FAAB remaining</span>`:''}
+        ${isFAAB?`<span style="color:var(--green)">$${faab.remaining} FAAB</span>`:''}
       </div>
-      ${data.recommendations.length?data.recommendations.map(r=>`
-        <div class="action-item priority-${r.rank===1?'high':r.rank<=3?'med':'low'}" style="margin-bottom:10px">
-          <div class="action-body" style="width:100%">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
-              <span style="font-size:14px;font-weight:700;color:var(--accent)">#${r.rank}</span>
-              <span class="pos ${posClass(r.position)}" style="font-size:13px">${r.position||'?'}</span>
-              <span style="font-size:14px;font-weight:500">${r.name}</span>
-              ${r.age?`<span style="font-size:13px;color:var(--text3)">age ${r.age}</span>`:''}
-              ${r.dynastyValue?`<span style="font-size:13px;color:var(--accent);font-weight:600">${r.dynastyValue.toLocaleString()}</span>`:''}
+      ${data.recommendations.length?data.recommendations.map(r=>{
+        const pid2=Object.entries(S.players).find(([,p])=>(p.first_name+' '+p.last_name).toLowerCase()===r.name?.toLowerCase())?.[0]||'';
+        const conf2=confFromRank(r.rank);
+        return`<div class="wv-queue-item ${confCls2(conf2)}" ${pid2?`onclick="openPlayerModal('${pid2}')"`:''}style="cursor:${pid2?'pointer':'default'}">
+          <div class="wv-rank">#${r.rank}</div>
+          <div class="wv-item-info">
+            <div class="wv-item-name">
+              ${r.name}
+              <span class="rr-pos" style="${getPosBadgeStyle(r.position)}">${r.position||'?'}</span>
+              ${r.age?'<span style="font-size:12px;color:var(--text3)">'+r.age+'</span>':''}
             </div>
-            <div style="font-size:13px;color:var(--text3);margin-bottom:5px">${fullTeam(r.team)||''}${r.drop?` · Drop: <span style="color:var(--red);font-weight:500">${r.drop}</span>${r.drop_reason?' ('+r.drop_reason+')':''}`:''}</div>
-            <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:7px">${r.reason}</div>
-            ${isFAAB&&r.faab_low!=null?`<div style="background:var(--bg3);border-radius:6px;padding:7px 10px;margin-bottom:7px;display:inline-flex;align-items:center;gap:10px">
-              <span style="font-size:13px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em">FAAB bid</span>
-              <span style="font-size:17px;font-weight:700;color:var(--green)">$${r.faab_low}–$${r.faab_high}</span>
-              ${r.faab_rationale?`<span style="font-size:13px;color:var(--text2)">${r.faab_rationale}</span>`:''}
-            </div>`:''}
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${r.copyText?`<button class="copy-btn" onclick="copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}
-              <button class="deep-btn" onclick="goAsk('Deep dive: should I add ${(r.name||'').replace(/'/g,'')} to my roster? ${dhqBuildMentalityContext()}')">Ask more ↗</button>
+            <div class="wv-item-reason">
+              ${r.reason}
+              ${r.drop?'<br><span style="color:var(--red)">Drop: '+r.drop+'</span>'+(r.drop_reason?' <span style="color:var(--text3)">('+r.drop_reason+')</span>':''):''}
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+              ${r.copyText?`<button class="copy-btn" style="font-size:12px" onclick="event.stopPropagation();copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}
+              <button class="copy-btn" style="font-size:12px" onclick="event.stopPropagation();goAsk('Deep dive: should I add ${(r.name||'').replace(/'/g,'')}?')">Ask more</button>
             </div>
           </div>
-        </div>`).join('')
-      :'<div class="empty">No recommendations. Adjust position filter or strategy.</div>'}`;
+          <div class="wv-item-right">
+            ${isFAAB&&r.faab_low!=null?`<div class="wv-faab-badge">$${r.faab_low}–${r.faab_high}</div>`:''}
+            <div class="wv-conf-badge" style="color:${confCol2(conf2)}">${conf2}</div>
+          </div>
+        </div>`;}).join('')
+      :'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>'}`;
   }catch(e){$('wq-list').innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;}
   btn.textContent='Generate';btn.disabled=false;
 }

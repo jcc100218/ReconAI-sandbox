@@ -476,12 +476,7 @@ function renderAvailable(){
   const faab=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0};
   const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
 
-  // Tight roster-style table: Photo | Name+Team | Pos | Age | DHQ | PPG | FAAB | Ask
-  const sortIcon=(key)=>availSortKey===key?(availSortDir===-1?'▼':'▲'):'';
-  const hdrStyle='cursor:pointer;user-select:none';
-  const header=`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 58px 32px;gap:3px;padding:5px 8px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border2);align-items:center">
-    <span></span><span>Player</span><span>Pos</span><span style="${hdrStyle}" onclick="availSortKey='age';availSortDir=availSortKey==='age'?-availSortDir:-1;renderAvailable()">Age ${sortIcon('age')}</span><span style="${hdrStyle}" onclick="availSortKey='value';availSortDir=availSortKey==='value'?-availSortDir:-1;renderAvailable()">DHQ ${sortIcon('value')}</span><span style="${hdrStyle}" onclick="availSortKey='ppg';availSortDir=availSortKey==='ppg'?-availSortDir:-1;renderAvailable()">PPG ${sortIcon('ppg')}</span><span style="${hdrStyle}" onclick="availSortKey='faab';availSortDir=availSortKey==='faab'?-availSortDir:-1;renderAvailable()">FAAB ${sortIcon('faab')}</span><span></span></div>`;
-
+  // Mobile card rows
   const rows=filtered.slice(0,25).map(({id,p,val},i)=>{
     const stats=S.playerStats?.[id]||{};
     const {col}=tradeValueTier(val);
@@ -489,69 +484,154 @@ function renderAvailable(){
     const isIDP=['DL','LB','DB'].includes(mPos);
     const raw=stats?.prevRawStats;
     const ppg=isIDP&&raw?+(calcIDPScore(raw,sc)/Math.max(1,raw.gp||17)).toFixed(1):(stats.seasonAvg||stats.prevAvg||0);
-    // FAAB suggestion with confidence and bid range
+    const initials=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
+
+    // FAAB calc
     const market=faabMarket[mPos];
-    let faabSug='—';
-    let faabConf='';
+    let faabStr='';let conf='';let confCol='var(--text3)';
     if(market&&market.count>=3&&faab.budget>0){
       const baseB=Math.round(market.avg*(val/4000));
       const sug=Math.max(1,Math.min(Math.round(faab.remaining*0.15),baseB));
       const lo=Math.max(1,Math.round(sug*0.7));
       const hi=Math.min(faab.remaining,Math.round(sug*1.3));
-      const conf=val>=4000?'High':val>=2000?'Med':'Low';
-      const confCol=conf==='High'?'var(--green)':conf==='Med'?'var(--amber)':'var(--text3)';
-      faabSug=`$${lo}-${hi}`;
-      faabConf=`<span style="font-size:10px;color:${confCol};font-weight:700;display:block">${conf}</span>`;
+      faabStr=`$${lo}–${hi}`;
+      conf=val>=4000?'High':val>=2000?'Med':'Low';
+      confCol=conf==='High'?'var(--green)':conf==='Med'?'var(--amber)':'var(--text3)';
     }
 
-    return`<div style="display:grid;grid-template-columns:24px 1fr 34px 28px 56px 38px 58px 32px;gap:3px;padding:4px 8px;align-items:center;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s" onclick="openPlayerModal('${id}')" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:22px;height:22px;border-radius:50%" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,var(--bg4),var(--bg3))';this.parentElement.style.border='1px solid var(--border2)';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:800;color:var(--text2);letter-spacing:.02em\\'>'+(this.alt||'??')+'</span>'" alt="${(pName(id)||'??').split(' ').map(n=>n[0]).join('')}" loading="lazy"/></div>
-      <div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</div><div style="font-size:13px;color:var(--text3)">${p.team||'FA'}</div></div>
-      <span class="pos ${posClass(p.position)}" style="font-size:13px;padding:1px 4px">${p.position||'?'}</span>
-      <span style="font-size:13px;color:var(--text2)">${p.age||'—'}</span>
-      <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}</span>
-      <span style="font-size:13px;color:${ppg>=8?'var(--green)':ppg>=4?'var(--text2)':'var(--text3)'}">${ppg?ppg.toFixed(1):'—'}</span>
-      <span style="font-size:13px;font-weight:600;color:var(--amber);text-align:center">${faabSug}${faabConf}</span>
-      <button class="copy-btn" style="font-size:13px;padding:1px 4px" onclick="event.stopPropagation();goAsk('Should I add ${pName(id).replace(/'/g,'')}? What FAAB bid?')">Ask</button>
+    // Priority tag
+    let prioLabel='';let prioBg='';let prioCol='';
+    if(i<3&&val>=3000){prioLabel='Must Add';prioBg='var(--greenL)';prioCol='var(--green)';}
+    else if(i<8&&val>=2000){prioLabel='Strong';prioBg='var(--accentL)';prioCol='var(--accent)';}
+    else if(val>=1000){prioLabel='Depth';prioBg='rgba(255,255,255,.04)';prioCol='var(--text3)';}
+    else{prioLabel='Spec';prioBg='rgba(255,255,255,.03)';prioCol='var(--text3)';}
+
+    return`<div class="wv-avail-card" onclick="openPlayerModal('${id}')">
+      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:32px;height:32px;font-size:11px>${initials}</span>')" loading="lazy"/>
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</span>
+          <span class="rr-pos" style="${getPosBadgeStyle(p.position)}">${mPos}</span>
+          ${prioLabel?'<span class="wv-priority-tag" style="color:'+prioCol+';background:'+prioBg+'">'+prioLabel+'</span>':''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:12px;color:var(--text3)">
+          <span>${p.team||'FA'} · ${p.age||'?'}</span>
+          <span class="rr-val" style="color:${col}">${val>0?val.toLocaleString():'—'}</span>
+          ${ppg?'<span>'+ppg.toFixed(1)+' PPG</span>':''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        ${faabStr?`<div class="wv-faab-badge">${faabStr}</div><div class="wv-conf-badge" style="color:${confCol}">${conf}</div>`:''}
+      </div>
+      <div class="rr-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>`;
   }).join('');
 
-  tbody.innerHTML=header+rows+(filtered.length>10?`<div style="padding:6px 8px;font-size:13px;color:var(--text3);text-align:center">${filtered.length-10} more — filter by position</div>`:'');
+  tbody.innerHTML=rows||(filtered.length===0?'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>':'');
+}
+
+function renderTopPickupHero(){
+  const el=$('wv-top-pickup');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const avail=getAvailablePlayers();
+  if(!avail.length){el.innerHTML='';return;}
+
+  const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  const faab=getFAAB();
+  const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
+  const posMapF=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+
+  // Find best pickup — prefer needs, then highest value
+  let best=null;
+  if(assess?.needs?.length){
+    const need=assess.needs[0];
+    best=avail.find(a=>posMapF(a.p.position)===need.pos);
+  }
+  if(!best)best=avail[0];
+  if(!best){el.innerHTML='';return;}
+
+  const p=best.p;const pid=best.id;const pos=posMapF(p.position);
+  const val=best.val;
+  const stats=S.playerStats?.[pid]||{};
+  const ppg=stats.prevAvg||stats.seasonAvg||0;
+  const pk=peakYears(pid);
+  const meta=LI.playerMeta?.[pid];
+  const peakYrs=meta?.peakYrsLeft||0;
+
+  // FAAB calc
+  const market=faabMarket[pos];
+  let faabStr='';let bidAmt=0;
+  if(market&&market.count>=3&&faab.budget>0&&faab.isFAAB){
+    bidAmt=Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(val/4000))));
+    const lo=Math.max(1,Math.round(bidAmt*0.7));
+    const hi=Math.min(faab.remaining,Math.round(bidAmt*1.3));
+    faabStr=`$${lo}–$${hi}`;
+  }
+
+  // Reasons
+  const reasons=[];
+  if(assess?.needs?.length&&posMapF(p.position)===assess.needs[0].pos){
+    reasons.push('Fills your biggest '+pos+' gap');
+  }
+  if(ppg)reasons.push(ppg.toFixed(1)+' PPG last season');
+  if(peakYrs>=3)reasons.push(peakYrs+'-year peak window');
+  if(val>=4000)reasons.push('Strong dynasty value ('+val.toLocaleString()+' DHQ)');
+  else if(val>=2000)reasons.push(val.toLocaleString()+' DHQ');
+
+  const ctaLabel=bidAmt?'Add for ~$'+bidAmt:'Add to roster';
+
+  el.innerHTML=`
+    <div class="wv-hero" onclick="openPlayerModal('${pid}')">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Top Pickup</span>
+      </div>
+      <div class="wv-hero-title">${pName(pid)}</div>
+      <div class="wv-hero-sub">${pos} · ${fullTeam(p.team)||p.team||'FA'} · Age ${p.age||'?'} · ${pk.label}</div>
+      <ul class="wv-hero-reasons">${reasons.map(r=>'<li>'+r+'</li>').join('')}</ul>
+      <div class="wv-hero-actions">
+        <button class="wv-hero-cta" onclick="event.stopPropagation();mobileTab('waivers')">${ctaLabel}</button>
+        <button class="pm-action-btn" onclick="event.stopPropagation();openPlayerModal('${pid}')" style="flex:0 0 auto;padding:12px 16px">Details</button>
+      </div>
+    </div>`;
 }
 
 function renderWaivers(){
   loadMentality();
 
-  // FAAB status bar
+  // FAAB context banner
   if(S.myRosterId){
-    const faab=getFAAB();const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
+    const faab=getFAAB();
     const slots=getRosterSlots();
     const leagueFaab=(()=>{
       const budgets=S.rosters.map(r=>(r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0));
       const avg=budgets.length?Math.round(budgets.reduce((a,b)=>a+b,0)/budgets.length):100;
       return{avg};
     })();
-    const bar=$('faab-bar');if(bar)bar.style.display='flex';
-    const faabHint=$('waiver-faab-hint');
-    if(faabHint){
+    const bar=$('faab-bar');if(bar)bar.style.display='block';
+
+    // Context line
+    const ctxLine=$('faab-context-line');
+    if(ctxLine){
       if(faab.isFAAB&&faab.budget>0){
         const pct=Math.round((faab.remaining/faab.budget)*100);
-        faabHint.textContent=`$${faab.remaining} remaining (${pct}% of budget)`;
-        faabHint.style.color=pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)';
+        const tone=pct>70?'Aggressive buying window':pct>40?'Healthy budget remaining':pct>15?'Budget getting tight':'Low budget — be selective';
+        ctxLine.innerHTML=`$${faab.remaining} FAAB <span style="color:var(--text3);font-weight:400">(${pct}%)</span> — <span style="color:${pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)'}">${tone}</span>`;
       }else{
-        faabHint.textContent='Waiver priority #'+(myR()?.settings?.waiver_position||'?');
-        faabHint.style.color='var(--text3)';
+        ctxLine.textContent='Waiver priority: #'+(myR()?.settings?.waiver_position||'?');
       }
     }
-    const mineEl=$('faab-mine');if(mineEl)mineEl.textContent=faab.isFAAB?'$'+faab.remaining:'—';
-    const avgEl=$('faab-avg');if(avgEl)avgEl.textContent=faab.isFAAB?'$'+leagueFaab.avg:'—';
+
+    // Sub-stats
+    const mineEl=$('faab-mine');if(mineEl)mineEl.innerHTML=faab.isFAAB?'FAAB: $'+faab.remaining:'';
+    const avgEl=$('faab-avg');if(avgEl)avgEl.innerHTML=faab.isFAAB?'Lg avg: $'+leagueFaab.avg:'';
     const slotsEl=$('bench-slots');if(slotsEl){
-      slotsEl.textContent=slots.openBench;
-      slotsEl.style.color=slots.openBench>0?'var(--green)':'var(--red)';
+      slotsEl.innerHTML=`<span style="color:${slots.openBench>0?'var(--green)':'var(--red)'}">` + slots.openBench+'</span> open slots';
     }
-    const wposEl=$('waiver-pos-display');if(wposEl)wposEl.textContent='#'+(myR()?.settings?.waiver_position||'?');
+    const wposEl=$('waiver-pos-display');if(wposEl)wposEl.innerHTML='Priority: #'+(myR()?.settings?.waiver_position||'?');
   }
 
+  // Top pickup hero
+  renderTopPickupHero();
   renderAvailable();
 
 
