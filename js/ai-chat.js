@@ -190,7 +190,7 @@ function buildCtxCompact(){
 // They are available via window.App.* and window.* globals.
 // PROVIDERS already declared in shared/ai-dispatch.js — reference via window
 const _aiProviders = window.App.PROVIDERS || {};
-const {hasServerAI, hasAnyAI, callClaude, callGrokNews, _newsCache} = window.App;
+// hasServerAI, hasAnyAI, callClaude, callGrokNews, _newsCache are all globals from ai-dispatch.js
 
 // ── Chat UI helpers ────────────────────────────────────────────
 function expandChat(el){
@@ -540,7 +540,7 @@ async function runWaiverAgent(){
       const confCls=c=>c==='High'?'wv-high':c==='Medium'?'wv-med':'wv-low';
 
       $('wq-list').innerHTML=`
-        <div style="font-size:12px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
+        <div style="font-size:13px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px">
           Data-driven recommendations · ${avail.length} available · ${slots.openBench} open slots
           ${faab.isFAAB?` · $${faab.remaining} FAAB`:''}
         </div>
@@ -559,7 +559,7 @@ async function runWaiverAgent(){
               <div class="wv-conf-badge" style="color:${confCol(r.conf)}">${r.conf}</div>
             </div>
           </div>`).join('')}
-        <div style="font-size:12px;color:var(--text3);padding:8px 0;text-align:center">
+        <div style="font-size:13px;color:var(--text3);padding:8px 0;text-align:center">
           Enable AI in Settings for personalized recommendations with drop suggestions.
         </div>`;
     }catch(e){
@@ -643,7 +643,7 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
     const confCls2=c=>c==='High'?'wv-high':c==='Medium'?'wv-med':'wv-low';
 
     $('wq-list').innerHTML=`
-      <div style="font-size:12px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;display:flex;gap:10px;flex-wrap:wrap">
+      <div style="font-size:13px;color:var(--text3);margin-bottom:8px;padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;display:flex;gap:10px;flex-wrap:wrap">
         ${mentLabel?'<span>'+mentLabel+'</span>':''}<span>${avail.length} available</span>
         <span style="color:${slots.openBench>0?'var(--green)':'var(--red)'}">${slots.openBench} open slot${slots.openBench!==1?'s':''}</span>
         ${isFAAB?`<span style="color:var(--green)">$${faab.remaining} FAAB</span>`:''}
@@ -657,15 +657,15 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
             <div class="wv-item-name">
               ${r.name}
               <span class="rr-pos" style="${getPosBadgeStyle(r.position)}">${r.position||'?'}</span>
-              ${r.age?'<span style="font-size:12px;color:var(--text3)">'+r.age+'</span>':''}
+              ${r.age?'<span style="font-size:13px;color:var(--text3)">'+r.age+'</span>':''}
             </div>
             <div class="wv-item-reason">
               ${r.reason}
               ${r.drop?'<br><span style="color:var(--red)">Drop: '+r.drop+'</span>'+(r.drop_reason?' <span style="color:var(--text3)">('+r.drop_reason+')</span>':''):''}
             </div>
             <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-              ${r.copyText?`<button class="copy-btn" style="font-size:12px" onclick="event.stopPropagation();copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}
-              <button class="copy-btn" style="font-size:12px" onclick="event.stopPropagation();goAsk('Deep dive: should I add ${(r.name||'').replace(/'/g,'')}?')">Ask more</button>
+              ${r.copyText?`<button class="copy-btn" style="font-size:13px" onclick="event.stopPropagation();copyText(${JSON.stringify(r.copyText)},this)">Copy claim</button>`:''}
+              <button class="copy-btn" style="font-size:13px" onclick="event.stopPropagation();goAsk('Deep dive: should I add ${(r.name||'').replace(/'/g,'')}?')">Ask more</button>
             </div>
           </div>
           <div class="wv-item-right">

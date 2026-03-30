@@ -1183,7 +1183,7 @@ function renderPartnerFinder(myAssessment, allAssessments, container) {
   const partners = findBestPartners(myAssessment, allAssessments);
 
   let html = `<div class="sec">Partner Finder <span class="sec-line"></span></div>
-  <div style="font-size:12px;color:var(--text3);margin-bottom:8px">by dynasty value</div>`;
+  <div style="font-size:13px;color:var(--text3);margin-bottom:8px">by dynasty value</div>`;
 
   // My summary
   html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">`;
@@ -1301,11 +1301,11 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
       <div style="flex:1;min-width:0">
         <div style="font-size:16px;font-weight:700">${theirAssessment.ownerName}</div>
         <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;align-items:center">
-          <span style="font-size:12px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
-          ${theirDnaKey !== 'NONE' ? `<span style="font-size:12px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
-          <span style="font-size:12px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
+          <span style="font-size:13px;color:${theirAssessment.tierColor};font-weight:600">${theirAssessment.tier}</span>
+          ${theirDnaKey !== 'NONE' ? `<span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${theirDna.color}22;color:${theirDna.color};font-weight:600">${theirDna.label}</span>` : ''}
+          <span style="font-size:13px;padding:1px 5px;border-radius:8px;background:${posture.color}22;color:${posture.color};font-weight:600">${posture.label}</span>
         </div>
-        ${tradeAngle ? `<div style="font-size:12px;color:var(--green);margin-top:4px;font-weight:600">${tradeAngle}</div>` : ''}
+        ${tradeAngle ? `<div style="font-size:13px;color:var(--green);margin-top:4px;font-weight:600">${tradeAngle}</div>` : ''}
       </div>
       <button class="btn btn-sm btn-ghost" onclick="_tcScoutTeam(${theirAssessment.rosterId})">Scout</button>
     </div>
@@ -1366,12 +1366,12 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
 
     html += `<div style="background:${verdictBg};border:1px solid ${verdictColor}30;border-radius:var(--rl);padding:14px 16px;margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;color:${verdictColor};border:1px solid ${verdictColor}">${verdictLabel}</span>
+        <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:6px;color:${verdictColor};border:1px solid ${verdictColor}">${verdictLabel}</span>
         <span style="font-size:13px;font-weight:700;color:${verdictColor}">${youWin ? 'You win' : close ? 'Nearly fair' : 'You lose'} by ${close ? '<500' : absDiff.toLocaleString()} DHQ</span>
       </div>
       <div style="font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:6px">${verdictAction}</div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="font-size:12px;color:var(--text3)">Acceptance</div>
+        <div style="font-size:13px;color:var(--text3)">Acceptance</div>
         <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${acceptance}%;background:${acceptance >= 65 ? 'var(--green)' : acceptance >= 40 ? 'var(--amber)' : 'var(--red)'};border-radius:3px"></div>
         </div>
@@ -1389,8 +1389,8 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
       const col = isBonus ? 'var(--green)' : 'var(--red)';
       const bg = isBonus ? 'var(--greenL)' : 'var(--redL)';
       html += `<div style="flex:1;min-width:140px;background:${bg};border:1px solid ${col}20;border-radius:var(--r);padding:8px 10px">
-        <div style="font-size:12px;font-weight:700;color:${col}">${t.impact > 0 ? '+' : ''}${t.impact}% ${t.name}</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px;line-height:1.4">${t.desc}</div>
+        <div style="font-size:13px;font-weight:700;color:${col}">${t.impact > 0 ? '+' : ''}${t.impact}% ${t.name}</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:2px;line-height:1.4">${t.desc}</div>
       </div>`;
     });
     html += `</div>`;
@@ -1401,15 +1401,15 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
     <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center">
       <div style="text-align:center">
-        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">You Give</div>
+        <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">You Give</div>
         <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${myVal.toLocaleString()}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Net</div>
+        <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Net</div>
         <div style="font-size:18px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${diff > 0 ? 'var(--red)' : diff < 0 ? 'var(--green)' : 'var(--text3)'}">${diff > 0 ? '+' : ''}${diff.toLocaleString()}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">They Give</div>
+        <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">They Give</div>
         <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--accent)">${theirVal.toLocaleString()}</div>
       </div>
     </div>
@@ -1443,7 +1443,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
 
     if (suggestions.length) {
       html += `<div style="margin-bottom:12px">
-        <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Improve This Trade</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Improve This Trade</div>
         ${suggestions.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:4px;cursor:${s.action ? 'pointer' : 'default'};transition:background .12s;-webkit-tap-highlight-color:transparent" ${s.action ? 'onclick="' + s.action + '"' : ''}>
           <span style="color:var(--accent);font-weight:700;font-size:14px;flex-shrink:0">→</span>
           <span style="font-size:13px;color:var(--text2)">${s.text}</span>
@@ -1517,7 +1517,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="openPlayerModal('${pid}')">
       <span class="rr-pos" style="${getPosBadgeStyle(pos)};font-size:10px;padding:1px 4px">${pos}</span>
       <span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pNameShort(pid)}</span>
-      <span style="font-size:12px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
+      <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
       <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0 4px;line-height:1" onclick="event.stopPropagation();_tcRemoveAsset('${side}','player','${pid}')">&times;</button>
     </div>`;
   }).join('');
@@ -1527,7 +1527,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
       <span style="font-size:10px;font-weight:800;padding:1px 4px;border-radius:4px;background:var(--amberL);color:var(--amber)">PICK</span>
       <span style="font-size:13px;font-weight:600;flex:1">${pk.year} Rd ${pk.round}</span>
-      <span style="font-size:12px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
+      <span style="font-size:13px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
       <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0 4px;line-height:1" onclick="_tcRemoveAsset('${side}','pick',${idx})">&times;</button>
     </div>`;
   }).join('');
@@ -1567,7 +1567,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
         <span style="font-size:13px;font-weight:600;color:var(--amber);font-family:'JetBrains Mono',monospace">${Math.round(assets.faab * FAAB_RATE).toLocaleString()}</span>
         <button style="background:none;border:1px solid var(--border2);border-radius:4px;padding:1px 5px;cursor:pointer;color:var(--text3);font-size:13px;font-family:inherit" onclick="_tcRemoveAsset('${side}','faab',0)">&times;</button>
       </div>` : ''}
-      ${!selectedPlayerHtml && !selectedPickHtml && assets.faab <= 0 ? `<div style="font-size:12px;color:var(--text3);padding:10px 0;text-align:center;line-height:1.5">${isMySide ? 'Add players or picks you want to trade away' : 'Add what you want from ' + assessment.ownerName}</div>` : ''}
+      ${!selectedPlayerHtml && !selectedPickHtml && assets.faab <= 0 ? `<div style="font-size:13px;color:var(--text3);padding:10px 0;text-align:center;line-height:1.5">${isMySide ? 'Add players or picks you want to trade away' : 'Add what you want from ' + assessment.ownerName}</div>` : ''}
     </div>
 
     <!-- Add player -->

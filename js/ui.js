@@ -277,7 +277,9 @@ function buildRosterTable(){
   if(countEl)countEl.textContent=rows.length+' player'+(rows.length!==1?'s':'');
 
   const wrap=$('roster-tbody');
-  let html='';
+  let html=`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 6px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;opacity:.6">
+    <span style="min-width:36px"></span><span style="flex:1">Player</span><span style="min-width:54px;text-align:right">DHQ</span><span style="min-width:44px;text-align:right">PPG</span><span style="min-width:42px;text-align:right">Phase</span>
+  </div>`;
   let lastSection='';
 
   rows.forEach(r=>{
@@ -568,14 +570,14 @@ function renderAvailable(){
     else{prioLabel='Spec';prioBg='rgba(255,255,255,.03)';prioCol='var(--text3)';}
 
     return`<div class="wv-avail-card" onclick="openPlayerModal('${id}')">
-      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:32px;height:32px;font-size:12px>${initials}</span>')" loading="lazy"/>
+      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.parentElement.insertAdjacentHTML('beforeend','<span class=&quot;rr-initials&quot; style=&quot;width:32px;height:32px;font-size:13px&quot;>${initials}</span>')" loading="lazy"/>
       <div style="flex:1;min-width:0;overflow:hidden">
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</span>
           <span class="rr-pos" style="${getPosBadgeStyle(p.position)}">${mPos}</span>
           ${prioLabel?'<span class="wv-priority-tag" style="color:'+prioCol+';background:'+prioBg+'">'+prioLabel+'</span>':''}
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:12px;color:var(--text3)">
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:13px;color:var(--text3)">
           <span>${p.team||'FA'} · ${p.age||'?'}</span>
           <span class="rr-val" style="color:${col}">${val>0?val.toLocaleString():'—'}</span>
           ${ppg?'<span>'+ppg.toFixed(1)+' PPG</span>':''}
@@ -645,7 +647,7 @@ function renderTopPickupHero(){
   el.innerHTML=`
     <div class="wv-hero" onclick="openPlayerModal('${pid}')">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:12px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Top Pickup</span>
+        <span style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Top Pickup</span>
         ${_strategyContextLine()||''}
       </div>
       <div class="wv-hero-title">${pName(pid)}</div>
@@ -793,7 +795,7 @@ function renderTradeIntel(){
   el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
       <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Surplus — sell high</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:6px">by roster depth</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:6px">by roster depth</div>
       ${depth.length?depth.map(([pos,v])=>{
         const sell=sellByPos[pos];
         return`<div style="font-size:13px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, +${v.surplus} over need${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
@@ -801,7 +803,7 @@ function renderTradeIntel(){
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
       <div style="font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Thin — buy low</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:6px">by roster depth</div>
+      <div style="font-size:13px;color:var(--text3);margin-bottom:6px">by roster depth</div>
       ${weak.length?weak.map(([pos,v])=>`<div style="font-size:13px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, need ${Math.abs(v.surplus)} more</div>`).join(''):'<div style="font-size:13px;color:var(--text3)">All positions covered</div>'}
     </div>
   </div>
@@ -1877,10 +1879,9 @@ function renderTeamOverview(){
     html+=topPlayers.map((p,i)=>{
       const {col}=tradeValueTier(p.val);
       const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
-      const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
+      const pyLeft=meta?.peakYrsLeft||0;
+      const peakStr=pyLeft>=5?'long peak window':pyLeft>=3?'in prime':pyLeft>=1?'peak closing':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
       const reasons=[];
-      if(meta?.peakYrsLeft>=4)reasons.push('long peak window');
-      else if(meta?.peakYrsLeft>=2)reasons.push('in prime');
       if(meta?.starterSeasons>=3)reasons.push(meta.starterSeasons+'yr starter');
       if(meta?.sitMult>=1.20&&p.age<=25)reasons.push('elite young producer');
       const trend=meta?.trend||0;
@@ -1981,7 +1982,7 @@ function _strategyContextLine(){
   const labels={balanced:'Balanced',winnow:'Win Now',rebuild:'Rebuild',prime:'Dynasty Prime'};
   const m=strat.mentality;
   if(!m)return'';
-  return`<span style="font-size:12px;color:var(--text3);font-weight:500">Based on your <strong style="color:var(--accent)">${labels[m]||m}</strong> strategy</span>`;
+  return`<span style="font-size:13px;color:var(--text3);font-weight:500">Based on your <strong style="color:var(--accent)">${labels[m]||m}</strong> strategy</span>`;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2184,10 +2185,13 @@ function renderTeamSnapshot(){
     <div class="home-sec-title">Team Snapshot</div>
     <div class="snapshot-scroll">
       <div class="snapshot-card" onclick="toggleTip('tip-health')">
-        <div class="snap-label">Health</div>
+        <div class="snap-label">Health <span class="tip-icon" style="font-size:10px;opacity:.5">?</span></div>
         <div class="snap-value" style="color:${hCol}">${healthScore}</div>
         <div class="snap-detail">${hTier}${panic>=3?' \u00B7 Panic '+panic+'/5':''}</div>
         <div class="snap-bar"><div class="snap-bar-fill" style="width:${healthScore}%;background:${hCol}"></div></div>
+        <div class="tip-box" id="tip-health" style="font-size:13px;margin-top:4px">
+          Health Score combines scoring potential (starter PPG), roster depth (position coverage), and dynasty value into a 0-100 scale. Higher = more competitive.
+        </div>
       </div>
       <div class="snapshot-card" onclick="toggleTip('tip-contender')">
         <div class="snap-label">Contender</div>
@@ -2214,7 +2218,7 @@ function renderTeamSnapshot(){
   const tierToMentality={REBUILDING:'rebuild',ELITE:'winnow',CONTENDER:'winnow'};
   const suggestedMentality=tierToMentality[assessedTier];
   if(suggestedMentality&&userMentality!==suggestedMentality&&userMentality==='balanced'&&assessedTier==='REBUILDING'){
-    el.innerHTML+=`<div style="background:var(--amberL);border:1px solid var(--amber);border-radius:var(--rl);padding:10px 12px;margin-top:8px;font-size:12px;color:var(--amber);line-height:1.4">
+    el.innerHTML+=`<div style="background:var(--amberL);border:1px solid var(--amber);border-radius:var(--rl);padding:10px 12px;margin-top:8px;font-size:13px;color:var(--amber);line-height:1.4">
       Your team is assessed as <strong>${hTier}</strong> but strategy is set to <strong>Balanced</strong>. Consider switching to <strong>Rebuild</strong> in Settings for better AI recommendations.
     </div>`;
   }
@@ -2231,7 +2235,11 @@ function renderBiggestNeeds(){
   // Use global pM from app.js
 
   // Grade each position relative to league average
-  const positions=['QB','RB','WR','TE','K','DL','LB','DB'];
+  // Only show positions that exist in the league roster config
+  const league2=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const rp2=league2?.roster_positions||[];
+  const rpNorm=new Set(rp2.map(s=>{if(['DE','DT'].includes(s))return'DL';if(['CB','S'].includes(s))return'DB';return s;}));
+  const positions=['QB','RB','WR','TE','DL','LB','DB','K'].filter(p=>rpNorm.has(p));
   const posGroups={};
   positions.forEach(pos=>{posGroups[pos]={total:0,count:0};});
   players.forEach(pid=>{
@@ -2259,7 +2267,7 @@ function renderBiggestNeeds(){
 
   el.innerHTML=`
     <div class="needs-section">
-      <div class="home-sec-title">Position Grades <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;font-size:12px">\u2014 weakest first</span></div>
+      <div class="home-sec-title">Position Grades <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;font-size:13px">\u2014 weakest first</span></div>
       <div class="needs-row">
         ${graded.map(g=>`
           <div class="need-chip" onclick="mobileTab('roster')">
@@ -2300,7 +2308,7 @@ function renderCrownJewels(){
             <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
             <div style="flex:1;min-width:0;overflow:hidden">
               <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-              <div style="font-size:12px;color:var(--text3)">${p.pos} \u00B7 ${p.age} \u00B7 ${peakStr}</div>
+              <div style="font-size:13px;color:var(--text3)">${p.pos} \u00B7 ${p.age} \u00B7 ${peakStr}</div>
             </div>
             <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
@@ -2473,7 +2481,7 @@ function openPlayerModal(playerId){
   $('pm-pos-badge').textContent=pos;
   $('pm-pos-badge').className='';
   $('pm-pos-badge').style.cssText=`position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;${getPosBadgeStyle(pos)}`;
-  $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:12px;color:var(--green);font-weight:600">✓ roster</span>':''}`;
+  $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:13px;color:var(--green);font-weight:600">✓ roster</span>':''}`;
   $('pm-bio').innerHTML=`${pos} · ${fullTeam(p.team)} · Age ${age} · ${exp}yr exp${p.college?' · '+p.college:''}`;
 
   // Recon Verdict
@@ -2990,27 +2998,27 @@ function renderDraftNeeds(){
         <div class="hero-action-card" style="margin-bottom:14px;border-color:rgba(124,107,248,.2)">
           <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#9b8afb,var(--accent));background-size:200% 100%;animation:progGlow 3s ease-in-out infinite"></div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-            <span style="font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
+            <span style="font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
             ${_strategyContextLine()||''}
             <span style="font-size:13px;font-weight:800;color:var(--text);font-family:'JetBrains Mono',monospace">${pickLabel2}</span>
-            <span style="font-size:12px;color:var(--text3)">~${val2.toLocaleString()} DHQ</span>
+            <span style="font-size:13px;color:var(--text3)">~${val2.toLocaleString()} DHQ</span>
           </div>
           <div style="font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--text);margin-bottom:2px">Draft ${bestEarlyNeed.pos}</div>
           <div style="font-size:13px;color:var(--text3);margin-bottom:10px">${bestEarlyNeed.pos} is your biggest positional need</div>
           ${rookieTargets.length?`
-            <div style="font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Top Targets</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Top Targets</div>
             ${rookieTargets.map((t,i)=>`
               <div style="display:flex;align-items:center;gap:8px;padding:6px 0;${i<rookieTargets.length-1?'border-bottom:1px solid var(--border)':''};cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="openPlayerModal('${t.id}')">
                 <span style="font-size:14px;font-weight:800;color:var(--accent);min-width:18px">${i+1}</span>
                 <span style="font-size:14px;font-weight:600;flex:1">${t.name}</span>
-                <span style="font-size:12px;font-weight:700;color:${t.val>=5000?'var(--green)':'var(--accent)'};font-family:'JetBrains Mono',monospace">${t.val.toLocaleString()}</span>
+                <span style="font-size:13px;font-weight:700;color:${t.val>=5000?'var(--green)':'var(--accent)'};font-family:'JetBrains Mono',monospace">${t.val.toLocaleString()}</span>
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
               </div>`).join('')}
           `:''}
           <ul style="margin:10px 0;padding:0;list-style:none">
             ${reasons.map(r=>`<li style="font-size:13px;color:var(--text2);padding:2px 0;padding-left:14px;position:relative"><span style="position:absolute;left:0;color:var(--accent);font-weight:700">›</span>${r}</li>`).join('')}
           </ul>
-          ${tradeHint?`<div style="font-size:12px;color:var(--amber);padding:6px 10px;background:var(--amberL);border-radius:6px;margin-bottom:10px">${tradeHint}</div>`:''}
+          ${tradeHint?`<div style="font-size:13px;color:var(--amber);padding:6px 10px;background:var(--amberL);border-radius:6px;margin-bottom:10px">${tradeHint}</div>`:''}
           <div style="display:flex;gap:8px">
             <button class="hero-cta" style="flex:1;background:linear-gradient(135deg,var(--accent),#9b8afb);box-shadow:0 2px 8px rgba(124,107,248,.25)" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel2}? My biggest need is ${bestEarlyNeed.pos}.')">Draft Advice</button>
             <button class="pm-action-btn" style="flex:0 0 auto;padding:12px 14px" onclick="sendDraftChatMsg('Should I trade pick ${pickLabel2}? What could I get for it?')">Trade Pick</button>
@@ -3056,9 +3064,9 @@ function renderDraftNeeds(){
       return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(124,107,248,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(124,107,248,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
         <div>
           <div style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</div>
-          <div style="font-size:12px;color:var(--text3)">${fromName?fromName:'~'+val.toLocaleString()}</div>
+          <div style="font-size:13px;color:var(--text3)">${fromName?fromName:'~'+val.toLocaleString()}</div>
         </div>
-        <span style="font-size:12px;font-weight:700;padding:2px 5px;border-radius:4px;background:var(--accentL);color:var(--accent)">${target}</span>
+        <span style="font-size:13px;font-weight:700;padding:2px 5px;border-radius:4px;background:var(--accentL);color:var(--accent)">${target}</span>
       </div>`;
     }).join(''):`<span style="color:var(--text3);font-size:13px">No picks for ${year}</span>`;
   }
@@ -3091,7 +3099,7 @@ function renderDraftNeeds(){
         <span style="font-size:14px;font-weight:800;color:${barCol};min-width:28px">${p.pos}</span>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:700;color:${barCol}">${gradeLabelD(p.needScore)}</div>
-          <div style="font-size:12px;color:var(--text3)">${detail.join(' · ')}</div>
+          <div style="font-size:13px;color:var(--text3)">${detail.join(' · ')}</div>
         </div>
         <div style="width:50px;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${Math.min(100,p.needScore*1.5)}%;height:100%;background:${barCol};border-radius:2px"></div></div>
       </div>`;
@@ -3102,7 +3110,7 @@ function renderDraftNeeds(){
 
   // Solid positions: compressed one-liner
   if(solidPos.length){
-    dhtml+=`<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;font-size:12px">
+    dhtml+=`<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;font-size:13px">
       ${solidPos.map(p=>`<span style="color:var(--text3)">${p.pos}: <span style="color:var(--green)">Solid</span></span>`).join('<span style="color:var(--border)">·</span>')}
     </div>`;
   }
@@ -3143,8 +3151,8 @@ function renderDraftNeeds(){
     }
 
     // Full grid below (collapsed by default)
-    hHtml+=`<details style="margin-top:8px"><summary style="font-size:12px;color:var(--text3);cursor:pointer;padding:4px 0">View all rounds</summary>
-    <div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:12px;margin-top:8px">
+    hHtml+=`<details style="margin-top:8px"><summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0">View all rounds</summary>
+    <div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:13px;margin-top:8px">
       <span style="font-weight:700;color:var(--text3)">Rd</span><span style="font-weight:700;color:var(--text3)">Rate</span><span></span><span style="font-weight:700;color:var(--text3)">Best</span>`;
 
     for(let rd=1;rd<=draftRounds;rd++){
@@ -3276,9 +3284,9 @@ function renderRookieProfiles(){
         const needPos3=assess3?.needs?.map(n=>n.pos)||[];
         const isFit=needPos3.includes(pos);
         const isTopTarget=isFit&&i<5;
-        return(isTopTarget?`<div style="font-size:12px;font-weight:700;color:var(--green);padding:2px 6px;background:var(--greenL);border-radius:4px;display:inline-block;margin-bottom:6px">Target at your pick</div>`:isFit?`<div style="font-size:12px;font-weight:700;color:var(--accent);padding:2px 6px;background:var(--accentL);border-radius:4px;display:inline-block;margin-bottom:6px">Fits your team</div>`:'');
+        return(isTopTarget?`<div style="font-size:13px;font-weight:700;color:var(--green);padding:2px 6px;background:var(--greenL);border-radius:4px;display:inline-block;margin-bottom:6px">Target at your pick</div>`:isFit?`<div style="font-size:13px;font-weight:700;color:var(--accent);padding:2px 6px;background:var(--accentL);border-radius:4px;display:inline-block;margin-bottom:6px">Fits your team</div>`:'');
       })()}
-      <div style="font-size:12px;color:var(--text2);padding:6px 8px;background:var(--bg2);border-radius:6px;line-height:1.4">
+      <div style="font-size:13px;color:var(--text2);padding:6px 8px;background:var(--bg2);border-radius:6px;line-height:1.4">
         ${profile}
       </div>
     </div>`;
@@ -3411,8 +3419,11 @@ Object.assign(window.App, {
   // Memory
   loadMemory, saveMemory, getMemory, setMemory,
   MEM_KEY,
-  loadConvMemory, saveConvMemory, addConvMemory, buildMemoryCtx,
-  autoSaveMemory,
+  loadConvMemory: typeof loadConvMemory==='function'?loadConvMemory:()=>[],
+  saveConvMemory: typeof saveConvMemory==='function'?saveConvMemory:()=>{},
+  addConvMemory: typeof addConvMemory==='function'?addConvMemory:()=>{},
+  buildMemoryCtx: typeof buildMemoryCtx==='function'?buildMemoryCtx:()=>'',
+  autoSaveMemory: typeof autoSaveMemory==='function'?autoSaveMemory:()=>{},
 
   // API Key Callout
   checkApiKeyCallout,
@@ -3527,8 +3538,8 @@ window.getMemory = getMemory;
 window.setMemory = setMemory;
 window.loadMemory = loadMemory;
 window.saveMemory = saveMemory;
-window.loadConvMemory = loadConvMemory;
-window.addConvMemory = addConvMemory;
-window.autoSaveMemory = autoSaveMemory;
+if(typeof loadConvMemory==='function')window.loadConvMemory = loadConvMemory;
+if(typeof addConvMemory==='function')window.addConvMemory = addConvMemory;
+if(typeof autoSaveMemory==='function')window.autoSaveMemory = autoSaveMemory;
 window.buildMemoryCtx = buildMemoryCtx;
 window.renderStatsTable = renderStatsTable;
