@@ -49,7 +49,8 @@ COMMUNICATION STYLE:
 - Show your math when proposing trades.
 - Keep responses concise (3-5 sentences for chat, longer for reports).
 - Use Sleeper-ready language when drafting messages.
-- Tailor advice to the user's mentality (win-now vs rebuild vs balanced).`;
+- Tailor advice to the user's mentality (win-now vs rebuild vs balanced).
+- Adapt your emotional tone to match the [TONE] context when provided. Don't be generically upbeat — match the team's reality. A 2-10 rebuild needs patience, not hype. A 10-2 contender needs aggressive closer energy.`;
 
 // ── Feature-Specific Prompts (with Few-Shot Examples) ───────────
 // Each feature gets the master identity PLUS feature-specific instructions.
@@ -86,15 +87,16 @@ RULES:
 6. Adjust for team mentality: win-now = get better players, rebuilding = get picks/youth
 7. Consider owner DNA/trade tendencies when available
 
+TRADE CARD FORMAT: When you propose a specific trade, include a structured block at the END of your response using this exact format:
+<!-- TRADE_CARD:{"yourSide":[{"name":"Player Name","dhq":3200}],"theirSide":[{"name":"Player Name","dhq":2800}],"target":"Owner Name","sleeperDM":"Hey! ..."} -->
+Include ALL assets (players + picks) on each side. Pick DHQ values should use approximate values. The narrative explanation should come BEFORE this block.
+
 EXAMPLE OF AN IDEAL RESPONSE:
 User: "What can I get for Kelce?"
 Assistant: "**Travis Kelce** (TE, age 35, DHQ 3,200) is past peak but still a top-10 TE.
 **Best target: Big Loco's team** — he needs a TE (only 1 rostered) and is in win-now mode.
-**Proposed trade:**
-Your side: Kelce (DHQ 3,200)
-Their side: 2026 R2 (DHQ ~2,800) + Dawson Knox (TE, DHQ 1,100) = DHQ 3,900
 You gain ~700 DHQ in future value, they get an immediate TE upgrade.
-**Sleeper DM:** 'Hey! Saw you are thin at TE — would you move your 2026 2nd + Knox for Kelce? Instant starter for your playoff push.'"`,
+<!-- TRADE_CARD:{"yourSide":[{"name":"Travis Kelce","dhq":3200}],"theirSide":[{"name":"2026 R2","dhq":2800},{"name":"Dawson Knox","dhq":1100}],"target":"Big Loco","sleeperDM":"Hey! Saw you are thin at TE — would you move your 2026 2nd + Knox for Kelce? Instant starter for your playoff push."} -->"`,
     maxTokens: 600,
   },
 
@@ -184,7 +186,10 @@ Assistant: "**TEAM TIER:** Rebuilding (3-9, DHQ 62k). Window is 2+ years away.
 **DESPERATE NEEDS:** QB (0 top-32 QBs — critical), RB (1 starter, need 2)
 **TRADE TENDENCIES:** Pick hoarder — acquired 4 picks in last 3 trades. Will overpay for proven starters.
 **TARGET #1:** Their 2026 1st (projected top-3). Offer: James Cook (RB, DHQ 4,200) — fills their RB need, you get a premium pick.
-**Sleeper DM:** 'Hey man, I see you need RBs. Would you move your 2026 1st for Cook? He would be a day-1 starter for you.'"`,
+**Sleeper DM:** 'Hey man, I see you need RBs. Would you move your 2026 1st for Cook? He would be a day-1 starter for you.'
+
+When you suggest specific trade proposals, include a TRADE_CARD block at the end:
+<!-- TRADE_CARD:{\"yourSide\":[{\"name\":\"Player\",\"dhq\":4200}],\"theirSide\":[{\"name\":\"2026 R1\",\"dhq\":5500}],\"target\":\"Owner\",\"sleeperDM\":\"Hey...\"} -->"`,
     maxTokens: 900,
   },
 
@@ -774,7 +779,12 @@ async function dhqAI(type, message, context, options) {
     return m;
   });
 
-  const reply = await callClaude(systemPrefixed, useWebSearch, 2, maxTokens, type);
+  // Auto-enable web search for real-time intent (injuries, news, rumors)
+  const lastUserContent = (options?.messages || []).filter(m => m.role === 'user').slice(-1)[0]?.content || message || '';
+  const realTimeIntent = /\b(injur|news|update|latest|rumor|contract|sign(ed|ing)|cut|release|suspend|arrest|trade rumor|depth chart|status|headline|report)\b/i.test(lastUserContent);
+  const finalWebSearch = useWebSearch || realTimeIntent;
+
+  const reply = await callClaude(systemPrefixed, finalWebSearch, 2, maxTokens, type);
 
   // Validate response — fast, non-blocking, appends notes if issues found
   const validated = validateAIResponse(type, reply, {
@@ -786,6 +796,55 @@ async function dhqAI(type, message, context, options) {
 }
 
 // ── Convenience Functions ───────────────────────────────────────
+
+// Situational tone — adapts Alex's personality to the user's reality
+function dhqBuildToneContext() {
+  const S = window.S || window.App?.S;
+  if (!S?.rosters?.length) return '';
+  const my = (window.myR || window.App?.myR);
+  const roster = typeof my === 'function' ? my() : null;
+  if (!roster) return '';
+  const s = roster.settings || {};
+  const wins = s.wins || 0;
+  const losses = s.losses || 0;
+  const gp = wins + losses + (s.ties || 0);
+  const sorted = [...S.rosters].sort((a, b) => (b.settings?.wins || 0) - (a.settings?.wins || 0));
+  const rank = sorted.findIndex(r => r.roster_id === S.myRosterId) + 1;
+  const teams = S.rosters.length;
+  const topHalf = rank <= Math.ceil(teams / 2);
+
+  // Season phase
+  const nfl = S.nflState || {};
+  const week = nfl.week || 0;
+  const phase = nfl.season_type === 'off' || week === 0 ? 'offseason'
+    : week <= 4 ? 'early' : week <= 10 ? 'midseason' : week <= 14 ? 'late' : 'playoffs';
+
+  // GM Strategy mode
+  const gmStrat = window._wrGmStrategy;
+  const mode = gmStrat?.mode || 'balanced';
+
+  // Build tone guidance
+  const lines = [];
+  if (mode === 'contend' || (mode === 'balanced' && topHalf)) {
+    if (gp > 0 && wins / gp >= 0.65) {
+      lines.push('Team is winning and contending. Be confident and aggressive. Use language like "let\'s close this out", "championship-caliber move", "we\'re in the driver\'s seat".');
+    } else if (gp > 0 && wins / gp >= 0.45) {
+      lines.push('Team is competitive but not dominant. Be strategic and focused. Use language like "we need to be smart here", "one move away", "this is where good GMs separate".');
+    } else {
+      lines.push('Team is contending but struggling. Be honest but motivating. Use language like "we need to make a move", "the window is still open but narrowing".');
+    }
+  } else if (mode === 'rebuild') {
+    lines.push('Team is rebuilding. Be patient and future-focused. Use language like "investing in the future", "building blocks", "this is a process — trust it", "we\'re stacking assets".');
+  } else {
+    lines.push('Team is at a crossroads. Be analytical and decisive. Use language like "this decision defines our direction", "we need to pick a lane", "the data says...".');
+  }
+
+  if (phase === 'offseason') lines.push('It\'s the offseason — be proactive and forward-planning. "Offseason is where championships are built."');
+  else if (phase === 'late') lines.push('Late season — urgency matters. Every move counts for playoff positioning.');
+  else if (phase === 'playoffs') lines.push('Playoff time — maximum intensity. Win-now moves only, no long-term thinking.');
+
+  return lines.join(' ');
+}
 
 // Full context builder — assembles labeled JSON sections for detailed prompts
 function dhqContext(includeOwners) {
@@ -800,6 +859,25 @@ function dhqContext(includeOwners) {
     const owners = dhqBuildOwnerProfiles();
     if (owners) parts.push('[OWNERS]\n' + owners);
   }
+  // Inject situational tone
+  const tone = dhqBuildToneContext();
+  if (tone) parts.push('[TONE]\n' + tone);
+
+  // Inject recent chat summary for continuity
+  try {
+    const leagueId = (window.S || window.App?.S)?.currentLeagueId;
+    const chatKey = 'wr_chat_' + leagueId;
+    const saved = leagueId ? localStorage.getItem(chatKey) : null;
+    if (saved) {
+      const msgs = JSON.parse(saved);
+      const recent = msgs.filter(m => m.role === 'assistant' && m.content.length > 50).slice(-2);
+      if (recent.length) {
+        const summaries = recent.map(m => m.content.substring(0, 150) + (m.content.length > 150 ? '...' : ''));
+        parts.push('[RECENT_CONVERSATIONS]\nYour recent advice to this user (reference naturally if relevant):\n' + summaries.join('\n---\n'));
+      }
+    }
+  } catch {}
+
   // Inject user's GM Strategy if set
   const gmStrat = window._wrGmStrategy;
   if (gmStrat && (gmStrat.mode !== 'balanced' || gmStrat.riskTolerance !== 'moderate' || gmStrat.untouchable?.length || gmStrat.targets?.length || gmStrat.notes)) {
@@ -839,6 +917,7 @@ Object.assign(window.App, {
   dhqBuildMentalityContext,
   dhqBuildLeagueContext,
   dhqBuildOwnerProfiles,
+  dhqBuildToneContext,
   dhqEnrichWithNews,
   extractPlayerNames,
   findPlayerId,
@@ -853,6 +932,7 @@ Object.assign(window, {
   dhqBuildMentalityContext,
   dhqBuildLeagueContext,
   dhqBuildOwnerProfiles,
+  dhqBuildToneContext,
   dhqEnrichWithNews,
   extractPlayerNames,
   findPlayerId,
