@@ -1,9 +1,15 @@
 // ══════════════════════════════════════════════════════════════════
-// ReconAI Service Worker — Offline caching + app shell
-// Strategy: Cache-first for static assets, network-first for API calls
+// ReconAI Service Worker — Offline caching + auto-update
+// Strategy: Stale-while-revalidate for app shell (fast loads)
+//           Network-first for API data (always fresh)
+//           Auto-reload prompt when new version is deployed
 // ══════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'reconai-v2';
+// CACHE VERSION — bump this on every deploy, or use CI to inject a hash.
+// When this changes, the SW re-installs, wipes old caches, and tells
+// the page to refresh. Users get the new code within seconds.
+const CACHE_NAME = 'reconai-v3';
+
 const APP_SHELL = [
   './',
   './index.html',
@@ -12,21 +18,25 @@ const APP_SHELL = [
   './js/sleeper-api.js',
   './js/ai-chat.js',
   './js/ui.js',
+  './js/trade-calc.js',
   'shared/constants.js',
   'shared/dhq-engine.js',
+  'shared/team-assess.js',
+  'shared/analytics-engine.js',
+  'shared/ai-dispatch.js',
+  'shared/player-modal.js',
+  'shared/league-memory.js',
   'shared/supabase-client.js',
   './manifest.json',
   './icons/icon-192.svg',
   './icons/icon-512.svg',
 ];
 
-// Fonts to cache on first load
 const FONT_ORIGINS = [
   'https://fonts.googleapis.com',
   'https://fonts.gstatic.com',
 ];
 
-// API origins — always network-first, never cache stale data
 const API_ORIGINS = [
   'https://api.sleeper.app',
   'https://api.sleeper.com',
@@ -35,27 +45,32 @@ const API_ORIGINS = [
   'https://sxshiqyxhhifvtfqawbq.supabase.co',
 ];
 
-// ── Install: pre-cache app shell ────────────────────────────────
+// ── Install: pre-cache app shell, skip waiting immediately ─────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(APP_SHELL))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()) // activate immediately, don't wait for tabs to close
   );
 });
 
-// ── Activate: clean old caches ──────────────────────────────────
+// ── Activate: wipe ALL old caches, claim all clients, notify page ─
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+    .then(() => self.clients.claim()) // take control of all open tabs
+    .then(() => {
+      // Tell all open pages that a new version is active
+      self.clients.matchAll({ type: 'window' }).then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME }));
+      });
+    })
   );
 });
 
-// ── Push notifications ──────────────────────────────────────
+// ── Push notifications ─────────────────────────────────────────
 self.addEventListener('push', event => {
   const data = event.data?.json() || { title: 'ReconAI', body: 'New dynasty intel available' };
   event.waitUntil(
@@ -74,22 +89,17 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(clients.openWindow(event.notification.data || './'));
 });
 
-// ── Fetch: routing strategy ─────────────────────────────────────
+// ── Fetch: routing strategy ────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // API calls: network-first with no cache fallback
-  // Fantasy data must always be fresh
+  // API calls: network-only (fantasy data must always be fresh)
   if (API_ORIGINS.some(origin => url.href.startsWith(origin))) {
     event.respondWith(
       fetch(event.request).catch(() => {
-        // If offline and it's the Sleeper players DB, try cache
-        if (url.pathname.includes('/players/nfl')) {
-          return caches.match(event.request);
-        }
+        if (url.pathname.includes('/players/nfl')) return caches.match(event.request);
         return new Response(JSON.stringify({ error: 'offline' }), {
           headers: { 'Content-Type': 'application/json' }
         });
@@ -98,19 +108,15 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Fonts: cache-first (they never change)
+  // Fonts: cache-first (immutable)
   if (FONT_ORIGINS.some(origin => url.href.startsWith(origin))) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        if (cached) return cached;
-        return fetch(event.request).then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
+      caches.match(event.request).then(cached =>
+        cached || fetch(event.request).then(response => {
+          if (response.ok) caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
           return response;
-        });
-      })
+        })
+      )
     );
     return;
   }
@@ -118,33 +124,26 @@ self.addEventListener('fetch', event => {
   // Player images: cache-first with network fallback
   if (url.href.includes('sleepercdn.com')) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        if (cached) return cached;
-        return fetch(event.request).then(response => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
+      caches.match(event.request).then(cached =>
+        cached || fetch(event.request).then(response => {
+          if (response.ok) caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
           return response;
-        }).catch(() => new Response('', { status: 404 }));
-      })
+        }).catch(() => new Response('', { status: 404 }))
+      )
     );
     return;
   }
 
-  // App shell: stale-while-revalidate
-  // Serve cached version immediately, update cache in background
+  // App shell: network-first with cache fallback
+  // This ensures users always get the latest JS/CSS/HTML on every load.
+  // Falls back to cache only if offline.
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const fetchPromise = fetch(event.request).then(response => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => cached);
-
-      return cached || fetchPromise;
-    })
+    fetch(event.request).then(response => {
+      if (response.ok) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+      }
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
