@@ -67,21 +67,17 @@ function updateSettingsStatus(){
   if(strDot&&strLabel){
     const strat=typeof getMemory==='function'?getMemory('mentality',{}):{};
     const labels={balanced:'Balanced',winnow:'Win Now',rebuild:'Rebuild',prime:'Dynasty Prime'};
-    const m=strat.mentality;
-    if(m&&m!=='balanced'){
+    const m=strat.mentality||'balanced';
+    if(m!=='balanced'){
       strDot.style.background='var(--green)';
       strLabel.style.color='var(--text)';
       strLabel.textContent=labels[m]||m;
       if(stratBadge)stratBadge.textContent=labels[m]||m;
-    }else if(m==='balanced'){
+    }else{
       strDot.style.background='var(--accent)';
       strLabel.style.color='var(--text)';
       strLabel.textContent='Balanced (default)';
       if(stratBadge)stratBadge.textContent='Balanced';
-    }else{
-      strDot.style.background='var(--text3)';
-      strLabel.textContent='Not configured';
-      if(stratBadge)stratBadge.textContent='';
     }
   }
 }
@@ -670,9 +666,11 @@ function renderWaivers(){
     const faab=getFAAB();
     const slots=getRosterSlots();
     const leagueFaab=(()=>{
-      const budgets=S.rosters.map(r=>Math.max(0,(r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0)));
-      const avg=budgets.length?Math.round(budgets.reduce((a,b)=>a+b,0)/budgets.length):100;
-      return{avg};
+      const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+      const leagueBudget=league?.settings?.waiver_budget||200;
+      const budgets=S.rosters.filter(r=>r.settings).map(r=>Math.max(0,leagueBudget-(r.settings?.waiver_budget_used||0)));
+      const avg=budgets.length?Math.round(budgets.reduce((a,b)=>a+b,0)/budgets.length):leagueBudget;
+      return{avg:Math.max(0,avg)};
     })();
     const bar=$('faab-bar');if(bar)bar.style.display='block';
 
@@ -726,7 +724,7 @@ function renderTrades(){
   const el=$('trades-recent');if(!el)return;
   el.innerHTML=trades.length?trades.map(t=>{
     const rids=t.roster_ids||[];
-    const names=rids.map(id=>{const r=S.rosters.find(r=>r.roster_id===id);return r?getUser(r.owner_id):`Team ${id}`;});
+    const names=rids.map(id=>{const r=S.rosters.find(r=>r.roster_id===id);const n=r?getUser(r.owner_id):`Team ${id}`;return id===S.myRosterId?n+' (you)':n;});
     const sides={};rids.forEach(id=>sides[id]={players:[],picks:[]});
     Object.keys(t.adds||{}).forEach(pid=>{const d=t.adds[pid];if(sides[d])sides[d].players.push(pName(pid));});
     (t.draft_picks||[]).forEach(pk=>{if(sides[pk.owner_id])sides[pk.owner_id].picks.push(pk.season+' R'+pk.round);});
@@ -735,7 +733,7 @@ function renderTrades(){
     const sidesTxt=sideArr.map(s=>s.name+' gets: '+s.gets.join(', ')).join('. ');
     return`<div class="card-sm" style="${isMe?'border-color:rgba(108,99,245,.3)':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
-        <span style="font-size:13px;font-weight:500">${names.join(' ↔ ')}${isMe?' (you)':''}</span>
+        <span style="font-size:13px;font-weight:500">${names.join(' ↔ ')}</span>
         <span class="tag tag-t">Trade</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 18px 1fr;gap:6px;font-size:13px">
@@ -2209,6 +2207,17 @@ function renderTeamSnapshot(){
         <div class="snap-detail">${pickYears.join(' \u00B7 ')}</div>
       </div>
     </div>`;
+
+  // Strategy mismatch warning
+  const userMentality=getMemory('mentality',{}).mentality||'balanced';
+  const assessedTier=(myAssessment?.tier||'').toUpperCase();
+  const tierToMentality={REBUILDING:'rebuild',ELITE:'winnow',CONTENDER:'winnow'};
+  const suggestedMentality=tierToMentality[assessedTier];
+  if(suggestedMentality&&userMentality!==suggestedMentality&&userMentality==='balanced'&&assessedTier==='REBUILDING'){
+    el.innerHTML+=`<div style="background:var(--amberL);border:1px solid var(--amber);border-radius:var(--rl);padding:10px 12px;margin-top:8px;font-size:12px;color:var(--amber);line-height:1.4">
+      Your team is assessed as <strong>${hTier}</strong> but strategy is set to <strong>Balanced</strong>. Consider switching to <strong>Rebuild</strong> in Settings for better AI recommendations.
+    </div>`;
+  }
 
   // Also run original functions to keep data recording
   if(typeof recordHealthSnapshot==='function')recordHealthSnapshot(healthScore,hTier);

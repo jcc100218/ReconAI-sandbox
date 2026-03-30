@@ -201,6 +201,9 @@ function expandChat(el){
 }
 
 function homeAsk(text){
+  if(!hasAnyAI(false)){
+    if(typeof showToast==='function')showToast('Add an API key in Settings to enable AI chat');
+  }
   const input=$('home-chat-in');
   if(input)input.value=text;
   sendHomeChat();
@@ -269,6 +272,9 @@ async function sendHomeChat(){
 
 // ── Trade Chat ─────────────────────────────────────────────────
 function sendTradeChatMsg(text){
+  if(!hasAnyAI(false)){
+    if(typeof showToast==='function')showToast('Add an API key in Settings to enable AI chat');
+  }
   const inp=$('trade-chat-in');if(inp)inp.value=text;
   sendTradeChat();
 }
@@ -326,11 +332,15 @@ ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
 
 // ── Waiver Chat ────────────────────────────────────────────────
 function sendWaiverChatMsg(text){
+  if(!hasAnyAI(false)){
+    if(typeof showToast==='function')showToast('Add an API key in Settings to enable AI chat');
+  }
   const input=$('wq-chat-in');
   if(input){input.value=text;}
   sendWaiverChat();
 }
 window.sendWaiverChatMsg=sendWaiverChatMsg;
+window.sendTradeChatMsg=sendTradeChatMsg;
 window.runWaiverAgent=runWaiverAgent;
 window.sendHomeChat=sendHomeChat;
 window.sendWaiverChat=sendWaiverChat;

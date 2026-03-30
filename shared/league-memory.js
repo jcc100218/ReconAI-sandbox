@@ -80,16 +80,21 @@ async function saveMemoryEntry(leagueId, type, content) {
       created_at: new Date().toISOString(),
     };
 
-    // Try Supabase first
+    // Try Supabase (skip if table not created yet)
     let saved = false;
-    try {
-      const db = window.OD?.getClient ? window.OD.getClient() : null;
-      if (db) {
-        const { error } = await db.from(MEMORY_TABLE).insert([entry]);
-        if (!error) saved = true;
-        else console.warn('[LeagueMemory] Supabase save error:', error.message);
-      }
-    } catch (e) { console.warn('[LeagueMemory] Supabase save failed:', e); }
+    if (!window._leagueMemoryDbDisabled) {
+      try {
+        const db = window.OD?.getClient ? window.OD.getClient() : null;
+        if (db) {
+          const { error } = await db.from(MEMORY_TABLE).insert([entry]);
+          if (!error) saved = true;
+          else if (error.code === '42P01' || error.message?.includes('does not exist')) {
+            console.warn('[LeagueMemory] Table not created yet — using localStorage only. Run the SQL from console to enable.');
+            window._leagueMemoryDbDisabled = true;
+          }
+        }
+      } catch (e) {}
+    }
 
     // Always save to localStorage as backup/fallback
     const local = _lsLoad(leagueId);
@@ -119,23 +124,26 @@ async function loadLeagueMemory(leagueId, limit = 20) {
 
   let entries = [];
 
-  // Try Supabase first
-  try {
-    const db = window.OD?.getClient ? window.OD.getClient() : null;
-    if (db) {
-      const { data, error } = await db
-        .from(MEMORY_TABLE)
-        .select('*')
-        .eq('league_id', leagueId)
-        .eq('username', _username())
-        .order('created_at', { ascending: false })
-        .limit(MAX_MEMORY_ENTRIES);
-      if (!error && data?.length) {
-        entries = data;
-        console.log('[LeagueMemory] Loaded', entries.length, 'entries from Supabase');
+  // Try Supabase (skip if table not created yet)
+  if (!window._leagueMemoryDbDisabled) {
+    try {
+      const db = window.OD?.getClient ? window.OD.getClient() : null;
+      if (db) {
+        const { data, error } = await db
+          .from(MEMORY_TABLE)
+          .select('*')
+          .eq('league_id', leagueId)
+          .eq('username', _username())
+          .order('created_at', { ascending: false })
+          .limit(MAX_MEMORY_ENTRIES);
+        if (!error && data?.length) {
+          entries = data;
+        } else if (error && (error.code === '42P01' || error.message?.includes('does not exist'))) {
+          window._leagueMemoryDbDisabled = true;
+        }
       }
-    }
-  } catch (e) { console.warn('[LeagueMemory] Supabase load failed:', e); }
+    } catch (e) {}
+  }
 
   // Fallback to localStorage
   if (!entries.length) {
@@ -258,15 +266,17 @@ async function captureTradeOutcomes(leagueId) {
       const tKey = (t.ts || '') + '_' + (t.roster_ids || []).join('-');
       if (seenSet.has(tKey)) continue;
 
-      // Build summary
-      const mySide = (t.sides || []).find(s => s.rosterId === myRid);
-      const otherSide = (t.sides || []).find(s => s.rosterId !== myRid);
+      // Build summary — t.sides is an object keyed by roster_id
+      const sides = t.sides || {};
+      const mySide = sides[myRid];
+      const otherRid = (t.roster_ids || []).find(r => r !== myRid);
+      const otherSide = otherRid != null ? sides[otherRid] : null;
       if (!mySide || !otherSide) continue;
 
       const gave = (mySide.players || []).map(p => pName(p)).join(', ') || 'nothing';
       const got = (otherSide.players || []).map(p => pName(p)).join(', ') || 'nothing';
-      const pickGave = mySide.picks || 0;
-      const pickGot = otherSide.picks || 0;
+      const pickGave = Array.isArray(mySide.picks) ? mySide.picks.length : (mySide.picks || 0);
+      const pickGot = Array.isArray(otherSide.picks) ? otherSide.picks.length : (otherSide.picks || 0);
 
       let summary = `Gave: ${gave}`;
       if (pickGave) summary += ` + ${pickGave} pick(s)`;
