@@ -7,7 +7,7 @@ window.App = window.App || {};
 // Builds IDP value from real scoring data + draft history + FAAB market
 // ══════════════════════════════════════════════════════════════════
 
-const LI_CACHE_KEY='dhq_leagueintel_v10';
+const LI_CACHE_KEY='dhq_leagueintel_v11';
 const LI_TTL=8*60*60*1000; // 8 hours
 let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
@@ -461,17 +461,10 @@ async function loadLeagueIntel(){
       };
     }
 
-    // Assign values using a strict decay curve by pick position
-    // R1 picks: 7000-10000 (real assets)
-    // R2 picks: 3000-5000 (solid value)
-    // R3 picks: 1500-2500 (decent)
-    // R4 picks: 500-1200 (speculative)
-    // R5+ picks: 100-500 (lottery tickets)
-    //
     // ── BLENDED PICK VALUES ──
-    // With small sample sizes (young leagues), league-specific hit rates are noisy.
-    // We blend league-derived values with industry consensus, shifting weight
-    // toward league data as the league ages and sample size grows.
+    // League-specific hit rates blended with industry consensus (FantasyCalc).
+    // Uses CONVEX DECAY (exponential) instead of linear — matches real market
+    // where value drops steeply from 1.01→1.04, then flattens through 1.12+.
     //
     // League Age Weighting:
     //   1-3 seasons:  80% industry / 20% league
@@ -486,34 +479,42 @@ async function loadLeagueIntel(){
     const industryWeight = 1 - leagueWeight;
     console.log(`DHQ Pick Blend: ${leagueSeasons} seasons → ${Math.round(leagueWeight*100)}% league / ${Math.round(industryWeight*100)}% industry`);
 
-    // Industry consensus pick values (SF dynasty, from FantasyCalc API March 2026)
-    // Calibrated to actual market data: FC 12-team SF 1PPR pick values
-    // 1.01=7016, 1.06=3039, 1.12=2073, 2.01=1957, 2.12=1213, 3.01=1172, 3.12=857, 4.01=837
-    const INDUSTRY_PICK_BASE = {1:7016, 2:1957, 3:1172, 4:837, 5:500, 6:250, 7:125};
-    const INDUSTRY_PICK_END  = {1:2073, 2:1213, 3:857,  4:663, 5:300, 6:150, 7:75};
+    // Industry consensus: FC 16-team SF 0.5PPR pick values (March 2026)
+    // R1: 1.01=7043, 1.04=3806, 1.06=3046, 1.08=2543, 1.12=2126
+    // R2: 2.01=1892  |  Generic: 2027 1st=3041, 2028 1st=2192
+    // These are BASE values for a 12-team league; adjusted below for league size.
+    const INDUSTRY_PICK_START = {1:7200, 2:1950, 3:1200, 4:850, 5:500, 6:250, 7:125};
+    const INDUSTRY_PICK_END   = {1:2100, 2:1200, 3:850,  4:650, 5:300, 6:150, 7:75};
+    // Convex decay steepness per round (higher = steeper early drop)
+    const DECAY_RATE = {1:2.8, 2:1.8, 3:1.5, 4:1.2, 5:1.0, 6:1.0, 7:1.0};
+    // League size adjustment: more teams = faster value decay within a round
+    // 12-team=1.0 baseline, 16-team=~1.15 (15% steeper), 10-team=~0.90
+    const sizeAdj = 1 + (totalTeams - 12) * 0.04;
 
     for(let pick=1;pick<=maxPicks;pick++){
       if(!dhqPickValues[pick])continue;
       const rd=Math.ceil(pick/totalTeams);
       const posInRound=((pick-1)%totalTeams)+1;
-      const pickPct=posInRound/totalTeams; // 0-1 within round
+      const pickPct=(posInRound-1)/Math.max(1,totalTeams-1); // 0-1 within round (1.01=0, last pick=1)
 
       // League-derived value (from actual draft outcomes in THIS league)
-      // These start higher than industry because league-specific hit rates can justify premium
-      const roundBase={1:8500,2:4000,3:2000,4:800,5:400,6:200,7:100};
-      const roundEnd={1:5500,2:2500,3:1200,4:400,5:200,6:100,7:50};
+      // Lowered to be closer to market reality; hit rate adjusts ±15%
+      const roundBase={1:7200,2:2000,3:1200,4:850,5:400,6:200,7:100};
+      const roundEnd={1:2100,2:1200,3:850,4:400,5:200,6:100,7:50};
       const lBase=roundBase[rd]||50;
       const lEnd=roundEnd[rd]||25;
-      const leagueVal=lBase-(lBase-lEnd)*pickPct;
-      // Adjust by actual hit rate (+/- 20% max)
+      const lDecay=DECAY_RATE[rd]||1.5;
+      // Convex decay: value = end + (base-end) * exp(-decay * pct * sizeAdj)
+      const leagueVal=lEnd+(lBase-lEnd)*Math.exp(-lDecay*pickPct*sizeAdj);
       const hitBonus=dhqPickValues[pick].starterRate>0?
-        Math.min(0.2,Math.max(-0.2,(dhqPickValues[pick].starterRate-50)/250)):0;
+        Math.min(0.15,Math.max(-0.15,(dhqPickValues[pick].starterRate-50)/333)):0;
       const leagueFinal=leagueVal*(1+hitBonus);
 
-      // Industry consensus value (smooth curve, no noise)
-      const iBase=INDUSTRY_PICK_BASE[rd]||50;
+      // Industry consensus value (convex decay, league-size adjusted)
+      const iBase=INDUSTRY_PICK_START[rd]||50;
       const iEnd=INDUSTRY_PICK_END[rd]||25;
-      const industryVal=iBase-(iBase-iEnd)*pickPct;
+      const iDecay=DECAY_RATE[rd]||1.5;
+      const industryVal=iEnd+(iBase-iEnd)*Math.exp(-iDecay*pickPct*sizeAdj);
 
       // Blend: weighted average
       const blended = (leagueFinal * leagueWeight) + (industryVal * industryWeight);
@@ -586,7 +587,12 @@ async function loadLeagueIntel(){
       if(pos==='QB'&&isSF)mult=Math.max(mult,1.25); // SF QB premium
       else if(pos==='TE')mult=Math.max(mult,1.15); // TE scarcity
       else if(pos==='WR')mult=Math.min(mult,1.0); // deepest position
-      else if(['DL','LB','DB'].includes(pos))mult=Math.min(mult,0.92); // IDP replaceable
+      else if(['DL','LB','DB'].includes(pos)){
+        // IDP scarcity cap depends on how many IDP starters the league requires
+        const idpStarters=(starterCounts.DL||0)+(starterCounts.LB||0)+(starterCounts.DB||0);
+        const idpCap=idpStarters>=6?1.05:idpStarters>=3?1.0:0.92;
+        mult=Math.min(mult,idpCap);
+      }
       scarcityMult[pos]=+mult.toFixed(3);
     });
 
@@ -635,9 +641,12 @@ async function loadLeagueIntel(){
         const isElitePedigree=starterSeasonsEarly>=4&&bestSeason.avg>=(eliteThresh[pos]||15);
         let pedigreeFloor=0;
         if(isElitePedigree){
-          if(age>=33) pedigreeFloor=0; // No protection past 33 — sell window is closed
-          else if(age>=30) pedigreeFloor=bestSeason.avg*0.30; // Reduced protection 30-32
-          else pedigreeFloor=bestSeason.avg*0.50; // Full protection under 30
+          // QB market value drops faster — start reducing pedigree at 28 instead of 30
+          const pedigreeAgeStart=pos==='QB'?28:30;
+          const pedigreeAgeEnd=pos==='QB'?32:33;
+          if(age>=pedigreeAgeEnd) pedigreeFloor=0;
+          else if(age>=pedigreeAgeStart) pedigreeFloor=bestSeason.avg*(0.30-0.10*((age-pedigreeAgeStart)/(pedigreeAgeEnd-pedigreeAgeStart)));
+          else pedigreeFloor=bestSeason.avg*0.50;
         }
         const adjustedWPPG=Math.max(wPPG, pedigreeFloor);
 
@@ -1056,10 +1065,20 @@ async function loadLeagueIntel(){
       const fcUrl=`https://api.fantasycalc.com/values/current?isDynasty=true&numQbs=${isSF?2:1}&numTeams=${totalTeams}&ppr=${pprVal}`;
       const fcData=await fetch(fcUrl).then(r=>r.ok?r.json():[]).catch(()=>[]);
       if(fcData.length){
-        // Find the FC-to-DHQ scale factor by comparing top players
-        const fcTop=Math.max(...fcData.filter(d=>d.player?.sleeperId).map(d=>d.value||0),1);
-        const dhqTop=Math.max(...Object.values(playerScores),1);
-        const scaleFactor=dhqTop/fcTop;
+        // ── SCALE FACTOR: use median ratio of top-20 matched players ──
+        // More robust than single max-player ratio (avoids outlier skew)
+        const fcMatched=fcData.filter(d=>d.player?.sleeperId&&d.player.position!=='PICK'&&d.value>0&&playerScores[d.player.sleeperId])
+          .map(d=>({sid:d.player.sleeperId,fcVal:d.value,dhqVal:playerScores[d.player.sleeperId]}))
+          .sort((a,b)=>b.fcVal-a.fcVal);
+        let scaleFactor;
+        if(fcMatched.length>=10){
+          const ratios=fcMatched.slice(0,20).map(m=>m.dhqVal/m.fcVal).sort((a,b)=>a-b);
+          scaleFactor=ratios[Math.floor(ratios.length/2)]; // median
+        }else{
+          const fcTop=Math.max(...fcData.filter(d=>d.player?.sleeperId).map(d=>d.value||0),1);
+          const dhqTop=Math.max(...Object.values(playerScores),1);
+          scaleFactor=dhqTop/fcTop;
+        }
 
         fcData.forEach(d=>{
           const sid=d.player?.sleeperId;
@@ -1071,15 +1090,19 @@ async function loadLeagueIntel(){
           const fcScaled=Math.round(val*scaleFactor);
 
           if(playerScores[sid]){
-            // ── VETERAN BLEND: 75% DHQ engine + 25% FC market consensus ──
+            // ── VETERAN BLEND: deviation-aware FC weight ──
+            // Base: 75% DHQ / 25% FC. When DHQ deviates >50% from FC,
+            // increase FC weight to 40% to prevent extreme outliers.
             const dhqVal=playerScores[sid];
-            const blended=Math.round(dhqVal*0.75+fcScaled*0.25);
+            const deviation=Math.abs(dhqVal-fcScaled)/Math.max(dhqVal,fcScaled,1);
+            const fcWt=deviation>0.5?0.40:deviation>0.3?0.35:0.25;
+            const blended=Math.round(dhqVal*(1-fcWt)+fcScaled*fcWt);
             playerScores[sid]=Math.min(10000,Math.max(0,blended));
-            // Store FC data in meta for transparency
             if(playerMeta[sid]){
               playerMeta[sid].fcValue=val;
               playerMeta[sid].fcScaled=fcScaled;
               playerMeta[sid].dhqRaw=dhqVal;
+              playerMeta[sid].fcWeight=Math.round(fcWt*100);
               playerMeta[sid].source='DHQ_FC_BLEND';
             }
             vetBlendCount++;
@@ -1097,7 +1120,7 @@ async function loadLeagueIntel(){
             rookieCount++;
           }
         });
-        console.log(`FC blend: ${vetBlendCount} veterans blended (75/25), ${rookieCount} rookies imported (scale factor: ${scaleFactor.toFixed(3)})`);
+        console.log(`FC blend: ${vetBlendCount} veterans (deviation-aware), ${rookieCount} rookies (scale: ${scaleFactor.toFixed(3)}, matched: ${fcMatched.length})`);
       }
     }catch(e){console.warn('FC blend failed:',e);}
 
