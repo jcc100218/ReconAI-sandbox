@@ -507,9 +507,13 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
         ${tklLoss?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tklLoss}</strong> TFL</div>`:''}
       </div>`;
   } else {
-    // Trade Profile: BUY / HOLD / SELL
-    const rec = peakYrsLeft <= 0 ? 'SELL' : peakYrsLeft <= 2 ? (trend >= 10 ? 'HOLD' : 'SELL') : (val >= 7000 ? 'HOLD' : 'BUY');
-    const recCol = rec === 'BUY' ? _wr.green : rec === 'HOLD' ? _wr.gold : _wr.red;
+    // Trade Profile: BUY / HOLD / SELL / CORE (HOLD/CORE for owned players)
+    const myRoster = S.rosters?.find(r => r.owner_id === S.user?.user_id || (r.co_owners||[]).includes(S.user?.user_id));
+    const isOwned = (myRoster?.players||[]).map(String).includes(String(playerId));
+    let rec = peakYrsLeft <= 0 ? 'SELL' : peakYrsLeft <= 2 ? (trend >= 10 ? 'HOLD' : 'SELL') : (val >= 7000 ? 'HOLD' : 'BUY');
+    if(isOwned && rec === 'BUY') rec = 'HOLD';
+    if(isOwned && rec === 'HOLD' && val >= 7000 && peakYrsLeft >= 3) rec = 'CORE';
+    const recCol = rec === 'BUY' ? _wr.green : rec === 'CORE' ? _wr.green : rec === 'HOLD' ? _wr.gold : _wr.red;
     const tpTrend = trend >= 15 ? '+'+trend+'%' : trend <= -15 ? trend+'%' : 'Stable';
     const tpTrendCol = trend >= 15 ? _wr.green : trend <= -15 ? _wr.red : _wr.text3;
 

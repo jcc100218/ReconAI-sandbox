@@ -11,6 +11,15 @@
 
 window.App = window.App || {};
 
+// ── Co-owner-safe "is this my roster?" helper ──────────────────
+function _isMyRoster(rosterId) {
+  if (rosterId === S.myRosterId) return true;
+  const uid = S.user?.user_id;
+  if (!uid) return false;
+  const r = S.rosters?.find(r => r.roster_id === rosterId);
+  return r ? (r.owner_id === uid || (r.co_owners || []).includes(uid)) : false;
+}
+
 // ═══════════════════════════════════════════════════════════════
 // SECTION 1: Constants & DNA System
 // ═══════════════════════════════════════════════════════════════
@@ -959,7 +968,7 @@ function renderLeagueOverview(assessments, container) {
   sorted.forEach((a, idx) => {
     const dnaKey = _tcDnaMap[a.rosterId] || 'NONE';
     const dna = DNA_TYPES[dnaKey] || DNA_TYPES.NONE;
-    const isMe = a.rosterId === S.myRosterId;
+    const isMe = _isMyRoster(a.rosterId);
     const topNeed = a.needs[0]?.pos || '--';
     const topStrength = a.strengths[0] || '--';
     const posture = calcOwnerPosture(a, dnaKey);
@@ -1013,7 +1022,7 @@ function renderTeamScout(assessment, container) {
   const dnaKey = _tcDnaMap[a.rosterId] || 'NONE';
   const dna = DNA_TYPES[dnaKey] || DNA_TYPES.NONE;
   const posture = calcOwnerPosture(a, dnaKey);
-  const isMe = a.rosterId === S.myRosterId;
+  const isMe = _isMyRoster(a.rosterId);
   const compat = _tcMyAssessment && !isMe ? calcComplementarity(_tcMyAssessment, a) : null;
 
   const avatarHtml = a.avatar
@@ -1163,7 +1172,8 @@ function renderPartnerFinder(myAssessment, allAssessments, container) {
 
   const partners = findBestPartners(myAssessment, allAssessments);
 
-  let html = `<div class="sec">Partner Finder <span class="sec-line"></span></div>`;
+  let html = `<div class="sec">Partner Finder <span class="sec-line"></span></div>
+  <div style="font-size:12px;color:var(--text3);margin-bottom:8px">by dynasty value</div>`;
 
   // My summary
   html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">`;
@@ -1254,7 +1264,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
     html += `<div class="card" style="margin-bottom:14px">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px">Select trade partner</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
-        ${_tcAssessments.filter(a => a.rosterId !== myRosterId).map(a => `
+        ${_tcAssessments.filter(a => !_isMyRoster(a.rosterId)).map(a => `
           <button class="btn btn-sm btn-ghost" onclick="_tcStartTrade(${a.rosterId})" style="text-align:left;padding:8px 10px">
             <div style="font-size:13px;font-weight:600">${a.ownerName}</div>
             <div style="font-size:13px;color:var(--text3)">${a.tier} &middot; ${a.wins}-${a.losses}</div>
@@ -1639,7 +1649,7 @@ function renderDNAPanel(assessments, container) {
     const derivedDna = derivedKey ? DNA_TYPES[derivedKey] : null;
     const derivedConf = derived ? derived.confidence : 0;
     const posture = calcOwnerPosture(a, dnaKey);
-    const isMe = a.rosterId === S.myRosterId;
+    const isMe = _isMyRoster(a.rosterId);
 
     // Trade history stats from LI.ownerProfiles
     const profile = LI_LOADED && LI.ownerProfiles?.[a.rosterId];
@@ -2145,7 +2155,7 @@ function _finderGenerate(pid) {
   if (_finderMode === 'my') {
     // Shopping my player — find offers from other teams
     _tcAssessments.forEach(a => {
-      if (a.rosterId === myRosterId) return;
+      if (_isMyRoster(a.rosterId)) return;
       const roster = S.rosters.find(r => r.roster_id === a.rosterId);
       if (!roster) return;
       const dnaKey = _tcDnaMap[a.rosterId] || 'NONE';
@@ -2290,7 +2300,7 @@ function renderTradeFinder(container) {
 
   const allOtherPlayers = [];
   (S.rosters || []).forEach(r => {
-    if (r.roster_id === myRosterId) return;
+    if (_isMyRoster(r.roster_id)) return;
     (r.players || []).forEach(pid => {
       const v = dynastyValue(pid);
       if (v > 0) allOtherPlayers.push({ pid, name: pName(pid), pos: pPos(pid), val: v });

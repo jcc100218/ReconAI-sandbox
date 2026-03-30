@@ -190,7 +190,7 @@ function buildCtxCompact(){
 // They are available via window.App.* and window.* globals.
 // PROVIDERS already declared in shared/ai-dispatch.js — reference via window
 const _aiProviders = window.App.PROVIDERS || {};
-const {updateProviderHint, hasServerAI, hasAnyAI, callClaude, callGrokNews, _newsCache} = window.App;
+const {hasServerAI, hasAnyAI, callClaude, callGrokNews, _newsCache} = window.App;
 
 // ── Chat UI helpers ────────────────────────────────────────────
 function expandChat(el){
@@ -331,6 +331,10 @@ function sendWaiverChatMsg(text){
   sendWaiverChat();
 }
 window.sendWaiverChatMsg=sendWaiverChatMsg;
+window.runWaiverAgent=runWaiverAgent;
+window.sendHomeChat=sendHomeChat;
+window.sendWaiverChat=sendWaiverChat;
+window.sendTradeChat=sendTradeChat;
 
 async function sendWaiverChat(){
   if(!hasAnyAI(false)){

@@ -428,6 +428,7 @@ function saveMentality(){
   setMemory('mentality',m);
   const saved=$('mentality-saved');
   if(saved){saved.style.display='block';setTimeout(()=>saved.style.display='none',2000);}
+  if(typeof updateSettingsStatus==='function')updateSettingsStatus();
 }
 
 // buildMentalityCtx: defined in ai-chat.js
@@ -445,7 +446,8 @@ function getAvailablePlayers(){
     Object.keys(LI.playerScores).forEach(id=>{
       if(rostered.has(id))return;
       const p=S.players[id];if(!p)return;
-      if(!offPos.includes(p.position)&&!idpPos.includes(p.position))return;
+      const mappedPos=(['DE','DT'].includes(p.position)?'DL':['CB','S'].includes(p.position)?'DB':p.position);
+      if(!offPos.includes(mappedPos)&&!idpPos.includes(mappedPos))return;
       if(p.status==='Inactive'||p.status==='Retired')return;
       // Skip rookies (FC imports) — they can only be added via rookie draft
       const meta=LI.playerMeta?.[id];
@@ -462,7 +464,8 @@ function getAvailablePlayers(){
     if(rostered.has(id))return;
     if(results.some(r=>r.id===id))return;
     const p=S.players[id];if(!p)return;
-    if(!idpPos.includes(p.position)&&!offPos.includes(p.position))return;
+    const mappedPos2=(['DE','DT'].includes(p.position)?'DL':['CB','S'].includes(p.position)?'DB':p.position);
+    if(!idpPos.includes(mappedPos2)&&!offPos.includes(mappedPos2))return;
     if(p.status==='Inactive'||p.status==='Retired')return;
     const stats=S.playerStats[id];
     if(!stats?.prevAvg&&!stats?.seasonAvg)return;
@@ -476,7 +479,7 @@ function getAvailablePlayers(){
 
 let _availCache=null;
 let _availCacheKey='';
-let availSortDir=-1;
+let availSortDir=1;
 let availSortKey='value';
 
 function availSort(key){
@@ -641,7 +644,7 @@ function renderTopPickupHero(){
   if(val>=4000)reasons.push('Strong dynasty value ('+val.toLocaleString()+' DHQ)');
   else if(val>=2000)reasons.push(val.toLocaleString()+' DHQ');
 
-  const ctaLabel=bidAmt?'Add for ~$'+bidAmt:'Add to roster';
+  const ctaLabel=bidAmt?'View in Waivers · ~$'+bidAmt:'View in Waivers →';
 
   el.innerHTML=`
     <div class="wv-hero" onclick="openPlayerModal('${pid}')">
@@ -667,7 +670,7 @@ function renderWaivers(){
     const faab=getFAAB();
     const slots=getRosterSlots();
     const leagueFaab=(()=>{
-      const budgets=S.rosters.map(r=>(r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0));
+      const budgets=S.rosters.map(r=>Math.max(0,(r.settings?.waiver_budget||200)-(r.settings?.waiver_budget_used||0)));
       const avg=budgets.length?Math.round(budgets.reduce((a,b)=>a+b,0)/budgets.length):100;
       return{avg};
     })();
@@ -791,14 +794,16 @@ function renderTradeIntel(){
 
   el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Surplus — sell high</div>
+      <div style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Surplus — sell high</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:6px">by roster depth</div>
       ${depth.length?depth.map(([pos,v])=>{
         const sell=sellByPos[pos];
         return`<div style="font-size:13px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, +${v.surplus} over need${sell?' · <span style="color:var(--text3)">sell '+sell.name+'</span>':''}</div>`;
       }).join(''):'<div style="font-size:13px;color:var(--text3)">No surplus positions</div>'}
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
-      <div style="font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Thin — buy low</div>
+      <div style="font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">Thin — buy low</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:6px">by roster depth</div>
       ${weak.length?weak.map(([pos,v])=>`<div style="font-size:13px;color:var(--text2);margin-bottom:4px"><strong>${pos}</strong> ${v.have} rostered, need ${Math.abs(v.surplus)} more</div>`).join(''):'<div style="font-size:13px;color:var(--text3)">All positions covered</div>'}
     </div>
   </div>
@@ -1028,7 +1033,7 @@ function renderHomeSnapshot(){
   const sorted=[...S.rosters].sort((a,b)=>(b.settings?.wins||0)-(a.settings?.wins||0));
   const s=my.settings||{};
   const faab=getFAAB();
-  const sessions=loadConvMemory();
+  const sessions=typeof loadConvMemory==='function'?loadConvMemory():[];
   const lastSession=sessions.length?sessions[sessions.length-1]:null;
 
   // Calculate avg PPG for my team and league
@@ -1265,9 +1270,10 @@ function _buildLineupState(){
   // Fixed positions first
   starterSlots.filter(s=>!flexMap[s]).forEach(slot=>{
     const pos=normPos(slot)||slot;
+    const displaySlot=slot;
     const best=scored.filter(p=>p.pos===pos&&!used.has(p.pid)).sort((a,b)=>b.score-a.score)[0];
-    if(best){used.add(best.pid);lineup.push({slot:pos,player:best,isFlex:false});}
-    else lineup.push({slot:pos,player:null,isFlex:false});
+    if(best){used.add(best.pid);lineup.push({slot:displaySlot,player:best,isFlex:false});}
+    else lineup.push({slot:displaySlot,player:null,isFlex:false});
   });
 
   // Flex slots
@@ -1805,10 +1811,10 @@ function renderTeamOverview(){
         <span style="font-size:22px;font-weight:800;color:${cCol};font-family:'JetBrains Mono',monospace">#${myContenderRank}</span>
         <span style="font-size:13px;color:var(--text2)">/${teams}</span>
       </div>
-      <div style="font-size:13px;color:var(--text2);margin-top:2px">${myContenderPPG.toFixed(1)} starter PPG</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:2px">${myContenderPPG.toFixed(1)} avg starter PPG</div>
       <div style="background:var(--bg4);border-radius:2px;height:3px;margin-top:4px;overflow:hidden"><div style="width:${Math.round(myContenderPPG/topContender*100)}%;height:100%;background:${cCol};border-radius:2px"></div></div>
       <div class="tip-box" id="tip-contender">
-        <strong>Contender Rank</strong> ranks all teams by optimal starting lineup PPG — your best possible weekly score using your league's actual scoring settings and roster positions. This shows who can put up the most points RIGHT NOW, regardless of bench depth or dynasty value.
+        <strong>Contender Rank</strong> ranks all teams by historical average starter PPG — your best possible weekly score based on past performance using your league's actual scoring settings and roster positions. The Lineup tab shows week-specific projections which may differ.
       </div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px">
@@ -1873,7 +1879,7 @@ function renderTeamOverview(){
     html+=topPlayers.map((p,i)=>{
       const {col}=tradeValueTier(p.val);
       const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
-      const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':'past peak';
+      const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
       const reasons=[];
       if(meta?.peakYrsLeft>=4)reasons.push('long peak window');
       else if(meta?.peakYrsLeft>=2)reasons.push('in prime');
@@ -2019,7 +2025,7 @@ function renderHeroAction(){
         title:'Add '+pName(bestAtNeed.id),
         subtitle:need.pos+' \u00B7 '+peakYrs+'-year peak window',
         reasons:['Fills biggest '+need.pos+' gap'+(need.urgency==='deficit'?' (critical)':''),comp,ppg?ppg.toFixed(1)+' PPG':'',bidAmt?'Suggested bid: $'+bidAmt:''],
-        ctaLabel:bidAmt?'Add for $'+bidAmt:'Add to roster',
+        ctaLabel:bidAmt?'View in Waivers · ~$'+bidAmt:'View in Waivers →',
         ctaAction:"mobileTab('waivers')"
       };
     }
@@ -2188,7 +2194,7 @@ function renderTeamSnapshot(){
       <div class="snapshot-card" onclick="toggleTip('tip-contender')">
         <div class="snap-label">Contender</div>
         <div class="snap-value" style="color:${cCol}">#${myContenderRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
-        <div class="snap-detail">${myContenderPPG.toFixed(1)} starter PPG</div>
+        <div class="snap-detail">${myContenderPPG.toFixed(1)} avg starter PPG</div>
         <div class="snap-bar"><div class="snap-bar-fill" style="width:${Math.round(myContenderPPG/(contenderRanks[0]?.ppg||1)*100)}%;background:${cCol}"></div></div>
       </div>
       <div class="snapshot-card" onclick="toggleTip('tip-dynasty')">
@@ -2224,30 +2230,22 @@ function renderBiggestNeeds(){
     posGroups[pos].total+=dynastyValue(pid);posGroups[pos].count++;
   });
 
-  const leagueTotalByPos={};
-  positions.forEach(pos=>{
-    const teamTotals=S.rosters.map(r=>(r.players||[]).reduce((sum,pid)=>{if(pM(pPos(pid))===pos)sum+=dynastyValue(pid);return sum;},0));
-    leagueTotalByPos[pos]=teamTotals.length?Math.round(teamTotals.reduce((a,b)=>a+b,0)/teamTotals.length):5000;
-  });
-
-  const gradeLetter=(myTotal,pos)=>{
-    const la=leagueTotalByPos[pos]||5000;const pct=myTotal/la;
-    return pct>=1.3?'A':pct>=1.05?'B':pct>=0.85?'C':pct>=0.65?'D':'F';
-  };
-  const gradeColor=(myTotal,pos)=>{
-    const la=leagueTotalByPos[pos]||5000;const pct=myTotal/la;
-    return pct>=1.3?'var(--green)':pct>=1.0?'var(--accent)':pct>=0.75?'var(--amber)':'var(--red)';
-  };
+  // Use assessment-based grades (same method as Roster Health bar) for consistency
+  const homeAssess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  const statusToGrade=s=>s==='surplus'?'A':s==='ok'?'B':s==='thin'?'C':'D';
+  const statusToCol=s=>s==='surplus'?'var(--green)':s==='ok'?'var(--accent)':s==='thin'?'var(--amber)':'var(--red)';
 
   // Sort: weakest first
   const graded=positions.map(pos=>{
     const g=posGroups[pos];
-    const grade=gradeLetter(g.total,pos);
-    const col=gradeColor(g.total,pos);
+    const pa=homeAssess?.posAssessment?.[pos];
+    const status=pa?.status||'ok';
+    const grade=statusToGrade(status);
+    const col=statusToCol(status);
     return{pos,grade,col,total:g.total,count:g.count};
   }).sort((a,b)=>{
-    const order={F:0,D:1,C:2,B:3,A:4};
-    return (order[a.grade]||5)-(order[b.grade]||5);
+    const order={D:0,C:1,B:2,A:3};
+    return (order[a.grade]??4)-(order[b.grade]??4);
   });
 
   el.innerHTML=`
@@ -2287,7 +2285,7 @@ function renderCrownJewels(){
         ${topPlayers.map((p,i)=>{
           const {col}=tradeValueTier(p.val);
           const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
-          const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':'past peak';
+          const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
           return`<div class="jewel-row" onclick="openPlayerModal('${p.pid}')">
             <span style="font-size:14px;font-weight:800;color:var(--text3);min-width:18px">${i+1}</span>
             <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
@@ -2427,14 +2425,18 @@ async function loadPlayerNewsNow(playerId){
   const newsEl=$('pm-news');if(!newsEl)return;
   newsEl.innerHTML='<div style="color:var(--text3);font-size:13px;display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>Loading from X...</div>';
   try{
-    const news=await fetchPlayerNews(playerId);
+    const newsPromise=fetchPlayerNews(playerId);
+    const timeoutPromise=new Promise((_,reject)=>setTimeout(()=>reject(new Error('timeout')),5000));
+    const news=await Promise.race([newsPromise,timeoutPromise]);
     if(news){
       newsEl.innerHTML=`<div style="font-size:13px;color:var(--text2);line-height:1.5">${news.replace(/\n/g,'<br>')}</div><div style="font-size:13px;color:var(--text3);margin-top:4px">via Grok · X/Twitter</div>`;
     }else{
       newsEl.innerHTML='<div style="color:var(--text3);font-size:13px">No recent news found for this player.</div>';
     }
   }catch(e){
-    newsEl.innerHTML='<div style="color:var(--red);font-size:13px">Error loading news. Check your xAI key in Settings.</div>';
+    newsEl.innerHTML=e.message==='timeout'
+      ?'<div style="color:var(--text3);font-size:13px">News request timed out. Tap to retry.</div>'
+      :'<div style="color:var(--red);font-size:13px">Error loading news. Check your xAI key in Settings.</div>';
   }
 }
 
@@ -2544,7 +2546,7 @@ function openPlayerModal(playerId){
         blurb=`${meta.peakYrsLeft} peak year${meta.peakYrsLeft>1?'s':''} left at age ${age}. Window closing${meta.starterSeasons>=3?' but still a reliable starter':''}.${trendNote}`;
         blurbColor='var(--amber)';
       }else{
-        blurb=`At the edge of ${mappedPos} peak at age ${age}. Value peaks now — it only goes down from here.`;
+        blurb=`Final ${mappedPos} peak year at age ${age}. Value peaks now — it only goes down from here.`;
         blurbColor='var(--amber)';
       }
 
@@ -2654,8 +2656,11 @@ function openPlayerModal(playerId){
       const tpMeta=LI_LOADED?LI.playerMeta?.[playerId]:null;
       const trend=tpMeta?.trend||0;
       const peakYrsLeft=tpMeta?.peakYrsLeft||0;
-      const rec=peakYrsLeft<=0?'SELL':peakYrsLeft<=2?(trend>=10?'HOLD':'SELL'):(val>=7000?'HOLD':'BUY');
-      const recCol=rec==='BUY'?'var(--green)':rec==='HOLD'?'var(--accent)':'var(--red)';
+      const isOwned=(myR()?.players||[]).map(String).includes(String(playerId));
+      let rec=peakYrsLeft<=0?'SELL':peakYrsLeft<=2?(trend>=10?'HOLD':'SELL'):(val>=7000?'HOLD':'BUY');
+      if(isOwned&&rec==='BUY')rec='HOLD';
+      if(isOwned&&rec==='HOLD'&&val>=7000&&peakYrsLeft>=3)rec='CORE';
+      const recCol=rec==='BUY'?'var(--green)':rec==='CORE'?'var(--green)':rec==='HOLD'?'var(--accent)':'var(--red)';
       const trendLabel=trend>=15?'▲ '+trend+'%':trend<=-15?'▼ '+Math.abs(trend)+'%':'→ Stable';
       const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
 
@@ -2946,7 +2951,7 @@ function renderDraftNeeds(){
   if(bestBetEl&&LI_LOADED){
     const earlyRounds=ownPickRounds.filter(r=>r<=3);
     const skipEarly=new Set(['K']);
-    const bestEarlyNeed=posAnalysis.find(p=>p.needScore>0&&!skipEarly.has(p.pos));
+    const bestEarlyNeed=posAnalysis.find(p=>p.needScore>=20&&!skipEarly.has(p.pos));
     const nextPickRound=ownPickRounds[0];
 
     if(nextPickRound&&bestEarlyNeed){
@@ -3059,8 +3064,8 @@ function renderDraftNeeds(){
   const gradeLabelD=ns=>ns>=50?'Critical':ns>=20?'Need':ns>0?'Thin':'Solid';
 
   // Split into top needs (expanded) and rest (collapsed)
-  const topNeeds=posAnalysis.filter(p=>p.needScore>=20);
-  const solidPos=posAnalysis.filter(p=>p.needScore<20);
+  const topNeeds=posAnalysis.filter(p=>p.needScore>=20&&p.pos!=='K');
+  const solidPos=posAnalysis.filter(p=>p.needScore<20&&p.pos!=='K');
 
   let dhtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
     <div class="home-sec-title" style="margin-bottom:8px">Draft Strategy</div>`;
@@ -3299,7 +3304,7 @@ async function runDraftScouting(){
     const needsStr=Object.keys(starterSlots).filter(p=>starterSlots[p]>0).map(pos=>{
       const posPlayers=allPlayers.filter(pid=>pPos(pid)===pos);
       const aging=posPlayers.filter(pid=>{const a=pAge(pid);const peaksD={QB:33,RB:27,WR:30,TE:30,DL:29,LB:28,DB:29};return a>(peaksD[pos]||29);}).length;
-      return`${pos}:${posPlayers.length}rostered/${starterSlots[pos]}slots${aging?'('+aging+' aging)':''}`;
+      return`${pos}: ${posPlayers.length} rostered / ${starterSlots[pos]} slots${aging?' ('+aging+' aging)':''}`;
     }).join(', ');
 
     const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&String(p.season)===year);

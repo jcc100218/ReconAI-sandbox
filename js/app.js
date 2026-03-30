@@ -219,6 +219,7 @@ async function selectLeague(leagueId,userId){
     prog(100);
     try{renderHomeSnapshot();}catch(e){}
     checkApiKeyCallout();
+    if(typeof updateSettingsStatus==='function')updateSettingsStatus();
     Promise.resolve().then(()=>{
       console.log('loadAllData: triggered via microtask');
       loadAllData();
