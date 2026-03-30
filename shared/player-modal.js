@@ -587,5 +587,11 @@ function closeFWPlayerModal() {
 // ── Expose globally ────────────────────────────────────────────
 window.openFWPlayerModal = openFWPlayerModal;
 window.closeFWPlayerModal = closeFWPlayerModal;
+window.fwFetchCareerStats = _fwFetchCareerStats;
+window.fwBuildCareerTable = _fwBuildCareerTable;
+window.fwCalcPts = _fwCalcPts;
 window.App.openFWPlayerModal = openFWPlayerModal;
 window.App.closeFWPlayerModal = closeFWPlayerModal;
+window.App.fwFetchCareerStats = _fwFetchCareerStats;
+window.App.fwBuildCareerTable = _fwBuildCareerTable;
+window.App.fwCalcPts = _fwCalcPts;
