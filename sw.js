@@ -3,7 +3,7 @@
 // Strategy: Cache-first for static assets, network-first for API calls
 // ══════════════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'reconai-v1';
+const CACHE_NAME = 'reconai-v2';
 const APP_SHELL = [
   './',
   './index.html',
