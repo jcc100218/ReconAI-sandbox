@@ -308,15 +308,29 @@ async function sendTradeChat(){
       tradeStats=`\nLEAGUE: ${lt.totalTrades} trades in history, ${lt.pickHeavy} involved picks`;
     }
     const msgs=tradeChatHistory.map(function(m,i){
-      if(m.role==='user'&&i===tradeChatHistory.length-1)return{role:'user',content:`Dynasty trade advisor with REAL league data. RULES:
+      if(m.role==='user'&&i===tradeChatHistory.length-1){
+      // Build dynamic pick value string from actual DHQ engine data
+      const teams=S.rosters?.length||16;
+      let pickStr='Picks: ';
+      if(LI_LOADED&&LI.dhqPickValues){
+        const pv=LI.dhqPickValues;
+        const rv=(r)=>{const e=pv[((r-1)*teams)+1]?.value||0;const m=pv[((r-1)*teams)+Math.ceil(teams/2)]?.value||0;const l=pv[r*teams]?.value||0;return`R${r}:${l}-${e}(early=${e},mid=${m},late=${l})`;};
+        pickStr+=rv(1)+', '+rv(2)+', '+rv(3)+', '+rv(4);
+      }else{
+        pickStr+='1st≈5000-8500, 2nd≈2200-3800, 3rd≈1000-1800, 4th≈400-800';
+      }
+      return{role:'user',content:`Dynasty trade advisor with REAL league data. RULES:
 1. Name SPECIFIC owners from the list below — use their actual names
 2. MATH MUST WORK: both sides of a trade must be within 15% of equal DHQ value. If Player A is DHQ 3500, the return must total DHQ 3000-4000. Never propose a DHQ 3500 player for a DHQ 7000 player straight up.
 3. Show the math: "Your side: Player A (DHQ 3500) + 2026 R2 (~DHQ 2000) = ~5500 total. Their side: Player B (DHQ 5200) = fair deal"
 4. Only propose trades where the OTHER owner benefits too — explain what THEY gain
 5. Draft a short Sleeper DM message to copy-paste
 6. If user wants to win now, propose getting better players. If rebuilding, propose getting picks/youth.
-DHQ scale: 0-10000 (7000+=elite, 4000+=starter, 2000+=depth). Picks: 1st≈2000-7000 (early1st=7000, late1st=2000), 2nd≈1200-1950, 3rd≈850-1170, 4th≈660-840. Always say "DHQ" not "FC".
+7. NEVER suggest selling a top-10 DHQ player for a player ranked 50+ lower. Elite players (DHQ 7000+) should only be traded for elite returns.
+8. NEVER suggest a trade where one side has 30%+ more DHQ than the other. That is a robbery, not a trade.
+DHQ scale: 0-10000 (7000+=elite, 4000+=starter, 2000+=depth). ${pickStr}. Always say "DHQ" not "FC".
 ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
+      }
       if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};
       return m;
     });
