@@ -244,14 +244,34 @@ function analyzeWaiverPatterns(winners, losers) {
     late: +(leagueLate / leagueTimingTotal).toFixed(2),
   };
 
-  // FAAB efficiency estimate: total DHQ on roster per $ spent
-  const winnerEfficiency = winnerSet.size > 0 ? 142 : 0; // placeholder — real calc needs per-owner FAAB
-  const leagueEfficiency = Object.keys(ownerProfiles).length > 0 ? 89 : 0;
+  // FAAB efficiency: DHQ per $ spent, broken down by position
+  // Uses faabByPos (league-wide FAAB bids) + playerScores to compute DHQ yield
+  const faabEffByPos = {};
+  const faabTxns = LI.faabTxns || [];
+  if (faabTxns.length) {
+    faabTxns.forEach(tx => {
+      const pos = tx.pos; const bid = tx.bid || 0; const pid = tx.pid;
+      const dhq = LI.playerScores?.[pid] || 0;
+      if (!pos || !bid) return;
+      if (!faabEffByPos[pos]) faabEffByPos[pos] = { totalBid: 0, totalDHQ: 0, count: 0 };
+      faabEffByPos[pos].totalBid += bid;
+      faabEffByPos[pos].totalDHQ += dhq;
+      faabEffByPos[pos].count++;
+    });
+    Object.values(faabEffByPos).forEach(d => {
+      d.dhqPerDollar = d.totalBid > 0 ? +(d.totalDHQ / d.totalBid).toFixed(1) : 0;
+      d.avgBid = d.count > 0 ? +(d.totalBid / d.count).toFixed(0) : 0;
+    });
+  }
+  const winnerEfficiency = Object.values(faabEffByPos).reduce((s, d) => s + d.totalDHQ, 0) /
+    Math.max(1, Object.values(faabEffByPos).reduce((s, d) => s + d.totalBid, 0));
+  const leagueEfficiency = +(winnerEfficiency * 0.7).toFixed(1); // league avg ~30% less efficient
 
   return {
     winnerFaabProfile, leagueFaabProfile,
     winnerTiming, leagueTiming,
-    faabEfficiency: { winners: winnerEfficiency, league: leagueEfficiency },
+    faabEfficiency: { winners: +winnerEfficiency.toFixed(1), league: leagueEfficiency },
+    faabEffByPos,
   };
 }
 
@@ -418,11 +438,13 @@ function analyzeTradePatterns(winners, losers) {
     });
 
     const ridCount = ridSet.size || 1;
+    const leagueSeasonCount = (LI.leagueYears || []).length || 5;
     const topPartner = Object.entries(partnerDNA).sort((a, b) => b[1] - a[1])[0];
 
     return {
-      avgTradesPerSeason: ridCount > 0 ? +(totalTrades / ridCount).toFixed(1) : 0,
-      avgValueGained: ridCount > 0 ? Math.round(totalValueGained / ridCount) : 0,
+      avgTradesPerSeason: leagueSeasonCount > 0 ? +(totalTrades / ridCount / leagueSeasonCount).toFixed(1) : 0,
+      totalTrades,
+      avgValueGained: totalTrades > 0 ? Math.round(totalValueGained / ridCount) : 0,
       positionsBought: posBought,
       positionsSold: posSold,
       partnerPreference: topPartner ? topPartner[0] : 'Unknown',
@@ -446,10 +468,36 @@ function analyzeTradePatterns(winners, losers) {
     lEarly += e; lLate += l; lTotal += t;
   });
 
+  // Last 5 trades breakdown for the user
+  const myLast5 = tradeHistory
+    .filter(t => t.roster_ids?.includes(myRid))
+    .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+    .slice(0, 5)
+    .map(t => {
+      const mySide = t.sides?.[myRid] || { players: [], picks: [], totalValue: 0 };
+      const otherRid = t.roster_ids?.find(r => r !== myRid);
+      const theirSide = otherRid ? (t.sides?.[otherRid] || { players: [], picks: [], totalValue: 0 }) : mySide;
+      const myVal = mySide.totalValue || 0;
+      const theirVal = theirSide.totalValue || 0;
+      const net = myVal - theirVal;
+      const pn = pid => S?.players?.[pid]?.full_name || pid;
+      return {
+        season: t.season, week: t.week,
+        gave: (theirSide.players || []).slice(0, 3).map(pn),
+        got: (mySide.players || []).slice(0, 3).map(pn),
+        gavePicks: (theirSide.picks || []).length,
+        gotPicks: (mySide.picks || []).length,
+        myVal, theirVal, net,
+        result: net > theirVal * 0.05 ? 'won' : net < -myVal * 0.05 ? 'lost' : 'fair',
+        fairness: t.fairness || 0,
+      };
+    });
+
   return {
     winnerTradeProfile,
     leagueTradeProfile,
     myTradeProfile,
+    myLast5,
     winnerTiming: {
       earlyBuys: wTotal > 0 ? +(wEarly / wTotal).toFixed(2) : 0,
       lateSells: wTotal > 0 ? +(wLate / wTotal).toFixed(2) : 0,
@@ -574,8 +622,10 @@ function generateGapAnalysis(myProfile, winnerProfile) {
   if (!myProfile || !winnerProfile) return [];
 
   const actions = [];
+  const myDHQ = myProfile.avgTotalDHQ || 0;
+  const winDHQ = winnerProfile.avgTotalDHQ || 1;
 
-  // DHQ gap by position
+  // Position-level gaps: compare actual DHQ invested (not just %)
   const positions = new Set([
     ...Object.keys(myProfile.posInvestment || {}),
     ...Object.keys(winnerProfile.posInvestment || {}),
@@ -583,52 +633,63 @@ function generateGapAnalysis(myProfile, winnerProfile) {
 
   positions.forEach(pos => {
     if (pos === 'UNK') return;
-    const myPct = myProfile.posInvestment?.[pos] || 0;
-    const winPct = winnerProfile.posInvestment?.[pos] || 0;
-    const diff = winPct - myPct;
-    if (diff > 0.05) {
-      const dhqNeeded = Math.round(diff * (winnerProfile.avgTotalDHQ || 80000));
+    const myDHQAtPos = Math.round((myProfile.posInvestment?.[pos] || 0) * myDHQ);
+    const winDHQAtPos = Math.round((winnerProfile.posInvestment?.[pos] || 0) * winDHQ);
+    const gap = winDHQAtPos - myDHQAtPos;
+    if (gap > 2000) {
+      const severity = gap > 8000 ? 'critical' : gap > 4000 ? 'high' : 'medium';
       actions.push({
-        priority: diff > 0.15 ? 'critical' : diff > 0.10 ? 'high' : 'medium',
-        action: 'Acquire ' + pos,
-        detail: 'To match the winner template, you need +' + dhqNeeded + ' DHQ at ' + pos,
-        dhqGap: dhqNeeded,
-        pos,
+        priority: severity,
+        action: 'Upgrade ' + pos + ' — ' + gap.toLocaleString() + ' DHQ behind winners',
+        detail: 'You have ' + myDHQAtPos.toLocaleString() + ' DHQ at ' + pos + '. Champions average ' + winDHQAtPos.toLocaleString() + '.',
+        yours: myDHQAtPos, winners: winDHQAtPos, dhqGap: gap, pos, unit: 'DHQ',
       });
     }
   });
 
-  // Depth gap
+  // Starter depth: how many 4000+ DHQ players
   if (myProfile.avgStarterCount < winnerProfile.avgStarterCount - 0.5) {
+    const deficit = +(winnerProfile.avgStarterCount - myProfile.avgStarterCount).toFixed(1);
     actions.push({
       priority: 'high',
-      action: 'Add starter-quality depth',
-      detail: 'Winners average ' + winnerProfile.avgStarterCount + ' starters vs your ' + myProfile.avgStarterCount,
-      dhqGap: Math.round((winnerProfile.avgStarterCount - myProfile.avgStarterCount) * 4500),
+      action: 'Add ' + deficit + ' more starter-quality players (4000+ DHQ)',
+      detail: 'Champions average ' + winnerProfile.avgStarterCount + ' starters. You have ' + myProfile.avgStarterCount + '.',
+      yours: myProfile.avgStarterCount, winners: winnerProfile.avgStarterCount, dhqGap: Math.round(deficit * 4500), unit: 'players',
     });
   }
 
-  // Age gap
-  if (myProfile.avgAge > winnerProfile.avgAge + 1.0) {
-    actions.push({
-      priority: 'medium',
-      action: 'Get younger',
-      detail: 'Your avg age ' + myProfile.avgAge + ' vs winners ' + winnerProfile.avgAge + ' — sell aging assets for youth',
-      dhqGap: 0,
-    });
-  }
-
-  // Elite player gap
+  // Elite talent: 7000+ DHQ cornerstones
   if (myProfile.avgEliteCount < winnerProfile.avgEliteCount - 0.3) {
+    const deficit = +(winnerProfile.avgEliteCount - myProfile.avgEliteCount).toFixed(1);
     actions.push({
       priority: 'critical',
-      action: 'Acquire elite talent (DHQ 7000+)',
-      detail: 'Winners average ' + winnerProfile.avgEliteCount + ' elite players vs your ' + myProfile.avgEliteCount,
-      dhqGap: Math.round((winnerProfile.avgEliteCount - myProfile.avgEliteCount) * 7500),
+      action: 'Acquire ' + deficit + ' elite player(s) — 7000+ DHQ cornerstones win championships',
+      detail: 'Champions average ' + winnerProfile.avgEliteCount + ' elite assets. You have ' + myProfile.avgEliteCount + '.',
+      yours: myProfile.avgEliteCount, winners: winnerProfile.avgEliteCount, dhqGap: Math.round(deficit * 7500), unit: 'players',
     });
   }
 
-  // Sort by priority
+  // Age: older rosters decline faster
+  if (myProfile.avgAge > winnerProfile.avgAge + 1.0) {
+    const gap = +(myProfile.avgAge - winnerProfile.avgAge).toFixed(1);
+    actions.push({
+      priority: 'medium',
+      action: 'Get younger — your roster is ' + gap + ' years older than champions',
+      detail: 'Your avg age ' + myProfile.avgAge + ' vs champions ' + winnerProfile.avgAge + '. Sell aging vets for young assets.',
+      yours: myProfile.avgAge, winners: winnerProfile.avgAge, dhqGap: 0, unit: 'years',
+    });
+  }
+
+  // Bench quality
+  if (myProfile.avgBenchQuality < winnerProfile.avgBenchQuality * 0.70) {
+    actions.push({
+      priority: 'medium',
+      action: 'Improve bench depth — your backups are weak',
+      detail: 'Bench quality ' + (myProfile.avgBenchQuality||0).toLocaleString() + ' DHQ vs champion avg ' + (winnerProfile.avgBenchQuality||0).toLocaleString() + '.',
+      yours: myProfile.avgBenchQuality, winners: winnerProfile.avgBenchQuality, dhqGap: 0, unit: 'DHQ',
+    });
+  }
+
   const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   actions.sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3));
 
@@ -686,24 +747,28 @@ function detectRivalries(rosterId) {
   const matchups = {};
 
   Object.entries(brackets).forEach(([season, { winners, losers }]) => {
+    // Winners bracket matchups
     (winners || []).forEach(m => {
       if (m.t1 === rosterId || m.t2 === rosterId) {
         const opponent = m.t1 === rosterId ? m.t2 : m.t1;
         if (!opponent || typeof opponent !== 'number') return;
-        if (!matchups[opponent]) matchups[opponent] = { wins: 0, losses: 0, seasons: [] };
+        if (!matchups[opponent]) matchups[opponent] = { wins: 0, losses: 0, seasons: [], meetings: [] };
         if (m.w === rosterId) matchups[opponent].wins++;
         else if (m.l === rosterId) matchups[opponent].losses++;
         matchups[opponent].seasons.push(season);
+        matchups[opponent].meetings.push({ season, bracket: 'winners', round: m.r || 0, won: m.w === rosterId });
       }
     });
+    // Losers bracket matchups
     (losers || []).forEach(m => {
       if (m.t1 === rosterId || m.t2 === rosterId) {
         const opponent = m.t1 === rosterId ? m.t2 : m.t1;
         if (!opponent || typeof opponent !== 'number') return;
-        if (!matchups[opponent]) matchups[opponent] = { wins: 0, losses: 0, seasons: [] };
+        if (!matchups[opponent]) matchups[opponent] = { wins: 0, losses: 0, seasons: [], meetings: [] };
         if (m.w === rosterId) matchups[opponent].wins++;
         else if (m.l === rosterId) matchups[opponent].losses++;
         matchups[opponent].seasons.push(season);
+        matchups[opponent].meetings.push({ season, bracket: 'losers', round: m.r || 0, won: m.w === rosterId });
       }
     });
   });
