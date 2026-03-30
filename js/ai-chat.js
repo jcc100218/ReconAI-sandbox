@@ -507,8 +507,9 @@ async function runWaiverAgent(){
         const market=faabMarket[pos];
         let faabLo=0,faabHi=0;
         if(market&&market.count>=3&&faab.budget>0&&faab.isFAAB){
-          const sug=Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(a.val/4000))));
-          faabLo=Math.max(1,Math.round(sug*0.7));
+          const fl=faab.minBid||1;
+          const sug=Math.max(fl,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(a.val/4000))));
+          faabLo=Math.max(fl,Math.round(sug*0.7));
           faabHi=Math.min(faab.remaining,Math.round(sug*1.3));
         }
         const conf=a.val>=4000?'High':a.val>=2000?'Medium':'Speculative';
@@ -593,7 +594,7 @@ CRITICAL RULES:
 4. Respond with ONLY a JSON object — no markdown, no backticks, no explanation.
 ${dhqBuildMentalityContext()}
 ROSTER:${slots.openBench}open,${slots.rosterMax}max. POS:${Object.entries(myPosCounts).map(([p,c])=>`${p}:${c}`).join(',')}
-${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
+${isFAAB?`FAAB:$${faab.remaining}/$${faab.budget}${faab.minBid>0?',min bid $'+faab.minBid:''}.${faabCtxStr?'History:'+faabCtxStr:''}`:'Waiver priority #'+(myR()?.settings?.waiver_position||'?')}
 AVAILABLE FREE AGENTS (ONLY pick from this list):${topAvailStr||'still loading'}
 IDP:sack=${sc.idp_sack??4},INT=${sc.idp_int??5},PD=${sc.idp_pass_def??3}
 ${slots.openBench===0?'ROSTER FULL — must suggest who to drop.':''}

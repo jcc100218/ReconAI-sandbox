@@ -301,6 +301,7 @@ window.App = window.App || {};
     const waiverBudget  = Number(leagueInfo?.settings?.waiver_budget || 100);
     const waiverUsed    = Number(roster.settings?.waiver_budget_used || 0);
     const faabRemaining = Math.max(0, waiverBudget - waiverUsed);
+    const faabMinBid    = Number(leagueInfo?.settings?.waiver_budget_min || 0);
 
     // Group players by normalized position
     const posGroups = {};
@@ -460,7 +461,7 @@ window.App = window.App || {};
       tier, tierColor, tierBg,
       panic, window: tradeWindow,
       needs, strengths,
-      faabRemaining, waiverBudget,
+      faabRemaining, waiverBudget, faabMinBid,
     };
   }
 

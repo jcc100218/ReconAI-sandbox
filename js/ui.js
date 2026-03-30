@@ -387,7 +387,8 @@ function getFAAB(){
   const isFAAB = waiverType === 2 || (league?.settings?.waiver_budget > 0);
   const budget = isFAAB ? (league?.settings?.waiver_budget || 0) : 0;
   const spent = my?.settings?.waiver_budget_used || 0;
-  return { budget, spent, remaining: Math.max(0, budget - spent), isFAAB };
+  const minBid = isFAAB ? (league?.settings?.waiver_budget_min ?? 0) : 0;
+  return { budget, spent, remaining: Math.max(0, budget - spent), isFAAB, minBid };
 }
 
 function getRosterSlots(){
@@ -525,7 +526,7 @@ function renderAvailable(){
     if(availSortKey==='faab'){
       const fm=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
       const fb=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0};
-      const getFaab=(x)=>{const mP2=posMapFilter(x.p.position);const mk=fm[mP2];if(!mk||mk.count<3||!fb.budget)return 0;return Math.max(1,Math.min(Math.round(fb.remaining*0.15),Math.round(mk.avg*(x.val/4000))));};
+      const getFaab=(x)=>{const mP2=posMapFilter(x.p.position);const mk=fm[mP2];if(!mk||mk.count<3||!fb.budget)return 0;const fl=fb.minBid||1;return Math.max(fl,Math.min(Math.round(fb.remaining*0.15),Math.round(mk.avg*(x.val/4000))));};
       return(getFaab(b)-getFaab(a))*availSortDir;
     }
     return(b.val-a.val)*availSortDir;
@@ -551,8 +552,9 @@ function renderAvailable(){
     let faabStr='';let conf='';let confCol='var(--text3)';
     if(market&&market.count>=3&&faab.budget>0){
       const baseB=Math.round(market.avg*(val/4000));
-      const sug=Math.max(1,Math.min(Math.round(faab.remaining*0.15),baseB));
-      const lo=Math.max(1,Math.round(sug*0.7));
+      const fl=faab.minBid||1;
+      const sug=Math.max(fl,Math.min(Math.round(faab.remaining*0.15),baseB));
+      const lo=Math.max(fl,Math.round(sug*0.7));
       const hi=Math.min(faab.remaining,Math.round(sug*1.3));
       faabStr=`$${lo}–${hi}`;
       conf=val>=4000?'High':val>=2000?'Med':'Low';
@@ -622,8 +624,9 @@ function renderTopPickupHero(){
   const market=faabMarket[pos];
   let faabStr='';let bidAmt=0;
   if(market&&market.count>=3&&faab.budget>0&&faab.isFAAB){
-    bidAmt=Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(val/4000))));
-    const lo=Math.max(1,Math.round(bidAmt*0.7));
+    const floor=faab.minBid||1;
+    bidAmt=Math.max(floor,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(val/4000))));
+    const lo=Math.max(floor,Math.round(bidAmt*0.7));
     const hi=Math.min(faab.remaining,Math.round(bidAmt*1.3));
     faabStr=`$${lo}–$${hi}`;
   }
@@ -1116,7 +1119,7 @@ function renderDailyBriefing(){
       let competitors=0;
       S.rosters.forEach(r=>{if(r.roster_id===S.myRosterId)return;const cnt=(r.players||[]).filter(pid=>(normPos(S.players?.[pid]?.position)||'')=== need.pos).length;const req=(league?.roster_positions||[]).filter(s=>s===need.pos||s==='FLEX'||s==='SUPER_FLEX').length;if(cnt<req)competitors++;});
       const comp=competitors===0?'no competition':competitors<=2?competitors+' competing teams':competitors+' teams bidding';
-      const faabHint=faab.isFAAB&&val>0?'Suggested bid: $'+Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(val/200))):'';
+      const faabHint=faab.isFAAB&&val>0?'Suggested bid: $'+Math.max(faab.minBid||1,Math.min(Math.round(faab.remaining*0.12),Math.round(val/200))):'';
       doNow.push({
         action:`Add ${pName(bestAtNeed.id)}`,
         rationale:_buildRationale([`fills ${need.pos} ${need.urgency}`,val>0?val.toLocaleString()+' DHQ':'',ppg?ppg.toFixed(1)+' PPG':'',peakYrs+'yr peak window',comp,faabHint])
@@ -2009,7 +2012,7 @@ function renderHeroAction(){
       let competitors=0;
       S.rosters.forEach(r=>{if(r.roster_id===S.myRosterId)return;const cnt=(r.players||[]).filter(pid=>(normPos(S.players?.[pid]?.position)||'')=== need.pos).length;const req=(league?.roster_positions||[]).filter(s=>s===need.pos||s==='FLEX'||s==='SUPER_FLEX').length;if(cnt<req)competitors++;});
       const comp=competitors===0?'No real competition on waivers':competitors<=2?'Only '+competitors+' teams competing':''+competitors+' teams may bid';
-      const bidAmt=faab.isFAAB&&val>0?Math.max(1,Math.min(Math.round(faab.remaining*0.12),Math.round(val/200))):0;
+      const bidAmt=faab.isFAAB&&val>0?Math.max(faab.minBid||1,Math.min(Math.round(faab.remaining*0.12),Math.round(val/200))):0;
       hero={
         type:'add',
         pid:bestAtNeed.id,
