@@ -778,34 +778,44 @@ function calcTradeValue(playerIds, picks, faab) {
  */
 function calcAcceptanceLikelihood(myValue, theirValue, theirDnaKey, psychTaxes, myAssessment, theirAssessment) {
   let likelihood = 50;
-  const totalA = myValue;
-  const totalB = theirValue;
+  const totalA = myValue;  // what I'm giving
+  const totalB = theirValue;  // what I'm receiving
   if (totalA > 0 && totalB > 0) {
-    const diff = totalA - totalB; // positive = I'm offering more
+    const diff = totalA - totalB; // positive = I'm offering more (good for them), negative = I'm winning (bad for them)
     const maxSide = Math.max(totalA, totalB, 1);
-    const normalizedDiff = diff / maxSide;
+    const nd = diff / maxSide; // normalized diff: +0.2 = I overpay 20%, -0.3 = I underpay 30%
 
     if (theirDnaKey === 'FLEECER') {
-      // Fleecers accept overpays enthusiastically, reject fair/underpays
-      likelihood = normalizedDiff > 0.05
-        ? 75 + Math.round(normalizedDiff * 60)  // I'm overpaying = they love it
-        : Math.max(10, 35 - Math.round(Math.abs(normalizedDiff) * 150));  // I'm winning = they reject
+      // Fleecers accept overpays enthusiastically, reject fair/underpays hard
+      likelihood = nd > 0.05
+        ? Math.min(95, 75 + Math.round(nd * 60))  // I'm overpaying = they love it
+        : Math.max(5, 30 + Math.round(nd * 150));  // I'm winning = they reject (nd is negative so this drops fast)
     } else if (theirDnaKey === 'DOMINATOR') {
-      likelihood = normalizedDiff < -0.10
-        ? 70
-        : normalizedDiff < 0 ? 55 : Math.max(10, 40 - Math.round(normalizedDiff * 200));
+      // Dominators only accept when they clearly win, reject when losing
+      likelihood = nd > 0.10
+        ? Math.min(85, 65 + Math.round(nd * 50))  // I overpay big = they'll take it
+        : nd > 0 ? 50 + Math.round(nd * 100)      // slight overpay = maybe
+        : Math.max(5, 40 + Math.round(nd * 120));  // I'm winning = drops fast
     } else if (theirDnaKey === 'STALWART') {
-      likelihood = Math.min(85, Math.max(20, Math.round((1 - Math.abs(normalizedDiff) * 3) * 80)));
+      // Stalwarts only accept fair trades, reject big gaps in either direction
+      likelihood = Math.min(80, Math.max(10, Math.round((1 - Math.abs(nd) * 4) * 75)));
     } else if (theirDnaKey === 'ACCEPTOR') {
-      likelihood = Math.min(90, Math.max(30, 60 + Math.round(normalizedDiff * 100)));
+      // Acceptors are lenient but still won't give away huge value
+      likelihood = nd >= 0
+        ? Math.min(92, 65 + Math.round(nd * 80))   // I overpay = high acceptance
+        : Math.max(15, 60 + Math.round(nd * 100));  // I'm winning = drops but slower
     } else if (theirDnaKey === 'DESPERATE') {
+      // Desperate teams accept more if the trade fills a need, but still won't give away stars for nothing
       const fitsNeed = theirAssessment?.needs?.some(n => (myAssessment?.strengths || []).includes(n.pos));
-      likelihood = fitsNeed
-        ? Math.min(92, 65 + Math.round(Math.abs(normalizedDiff) * 20) + 20)
-        : Math.min(75, 55 + Math.round(Math.abs(normalizedDiff) * 30));
+      const needBonus = fitsNeed ? 15 : 0;
+      likelihood = nd >= 0
+        ? Math.min(92, 60 + needBonus + Math.round(nd * 50))
+        : Math.max(8, 45 + needBonus + Math.round(nd * 100));  // negative nd pulls it down
     } else {
-      // NONE / default
-      likelihood = Math.min(85, Math.max(15, 50 - Math.round(normalizedDiff * 120)));
+      // NONE / default — reasonable opponent
+      likelihood = nd >= 0
+        ? Math.min(85, 50 + Math.round(nd * 100))   // I overpay = acceptance rises
+        : Math.max(8, 50 + Math.round(nd * 120));   // I'm winning = acceptance drops
     }
 
     // Apply psych tax total
