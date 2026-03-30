@@ -509,7 +509,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
   } else {
     // Trade Profile: BUY / HOLD / SELL / CORE (HOLD/CORE for owned players)
     const myRoster = S.rosters?.find(r => r.owner_id === S.user?.user_id || (r.co_owners||[]).includes(S.user?.user_id));
-    const isOwned = (myRoster?.players||[]).map(String).includes(String(playerId));
+    const isOwned = (myRoster?.players||[]).map(String).includes(String(pid));
     let rec = peakYrsLeft <= 0 ? 'SELL' : peakYrsLeft <= 2 ? (trend >= 10 ? 'HOLD' : 'SELL') : (val >= 7000 ? 'HOLD' : 'BUY');
     if(isOwned && rec === 'BUY') rec = 'HOLD';
     if(isOwned && rec === 'HOLD' && val >= 7000 && peakYrsLeft >= 3) rec = 'CORE';
