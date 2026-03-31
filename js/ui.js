@@ -2187,17 +2187,23 @@ function renderTeamSnapshot(){
           Health Score combines scoring potential (starter PPG), roster depth (position coverage), and dynasty value into a 0-100 scale. Higher = more competitive.
         </div>
       </div>
-      <div class="snapshot-card" onclick="toggleTip('tip-contender')">
-        <div class="snap-label">Contender</div>
+      <div class="snapshot-card" onclick="toggleTip('tip-contender-snap')">
+        <div class="snap-label">Contender <span class="tip-icon" style="opacity:.5">?</span></div>
         <div class="snap-value" style="color:${cCol}">#${myContenderRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
         <div class="snap-detail">${myContenderPPG.toFixed(1)} avg starter PPG</div>
         <div class="snap-bar"><div class="snap-bar-fill" style="width:${Math.round(myContenderPPG/(contenderRanks[0]?.ppg||1)*100)}%;background:${cCol}"></div></div>
+        <div class="tip-box" id="tip-contender-snap" style="font-size:13px;margin-top:4px">
+          Contender rank is based on your optimal starting lineup PPG compared to other teams. Higher PPG = better chance of winning weekly matchups.
+        </div>
       </div>
-      <div class="snapshot-card" onclick="toggleTip('tip-dynasty')">
-        <div class="snap-label">Dynasty</div>
+      <div class="snapshot-card" onclick="toggleTip('tip-dynasty-snap')">
+        <div class="snap-label">Dynasty <span class="tip-icon" style="opacity:.5">?</span></div>
         <div class="snap-value" style="color:${dCol}">#${myValRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
         <div class="snap-detail">${totalVal.toLocaleString()} DHQ</div>
         <div class="snap-bar"><div class="snap-bar-fill" style="width:${Math.round(totalVal/(rosterVals[0]?.val||1)*100)}%;background:${dCol}"></div></div>
+        <div class="tip-box" id="tip-dynasty-snap" style="font-size:13px;margin-top:4px">
+          Dynasty rank is based on your total roster DHQ value. Higher = more long-term dynasty capital across all players and picks.
+        </div>
       </div>
       <div class="snapshot-card" onclick="mobileTab('draftroom')">
         <div class="snap-label">Draft Capital</div>
