@@ -82,9 +82,11 @@ async function fetchTransactions(leagueId, week){ return sleeperFetch('/league/'
 async function fetchNflState()                  { return sleeperFetch('/state/nfl'); }
 
 async function fetchTrending(type, hours, limit) {
-  return sleeperFetch('/players/trending/nfl/' + type
-    + '?lookback_hours=' + (hours || 24)
-    + '&limit=' + (limit || 25));
+  try {
+    return await sleeperFetch('/players/trending/nfl/' + type
+      + '?lookback_hours=' + (hours || 24)
+      + '&limit=' + (limit || 25));
+  } catch (e) { return []; }
 }
 
 async function fetchWinnersBracket(leagueId) {
