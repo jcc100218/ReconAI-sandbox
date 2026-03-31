@@ -837,7 +837,13 @@ async function loadLeagueIntel(){
       // Scarcity doesn't apply to unrostered players either
       const scarcityFinal=isUnrostered?0:scarcityScore;
 
-      const raw=coreScore+scarcityFinal+peakBonus+consistencyBonus+durabilityBonus;
+      // Trend modifier — in-season only, capped at ±8%
+      // A +30% trending player gets ~+5% DHQ boost; -30% gets ~-5% penalty
+      const nflSt=S.nflState?.season_type;
+      const inSeason=nflSt==='regular'||nflSt==='post';
+      const trendMod=inSeason&&p.trend?Math.max(-0.08,Math.min(0.08,p.trend/100*0.25)):0;
+
+      const raw=(coreScore+scarcityFinal+peakBonus+consistencyBonus+durabilityBonus)*(1+trendMod);
       const val=Math.round(Math.min(10000,Math.max(0,raw)));
       playerScores[p.pid]=val;
       playerMeta[p.pid]={
