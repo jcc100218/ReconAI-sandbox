@@ -386,7 +386,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     if (meta.source === 'FC_ROOKIE') {
       blurb = `Incoming rookie with ${peakYrsLeft||'?'} peak years ahead. Value based on DHQ dynasty consensus.`;
       blurbCol = _wr.green;
-    } else if (meta.sitMult <= 0.45) {
+    } else if (meta.sitMult <= 0.35 && (!team || team === 'FA')) {
       blurb = `Not rostered by anyone in the league and no NFL team. ${yrsPast>=2?'Likely retired or out of football.':'Needs a landing spot.'}`;
       blurbCol = _wr.red;
     } else if (yrsPast >= 5) {

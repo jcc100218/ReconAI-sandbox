@@ -68,7 +68,11 @@ function hasServerAI(){
 // ── Helper: check if ANY AI is available (server or client key) ─
 function hasAnyAI(showPrompt=false){
   const S = window.S || window.App?.S || {};
-  // Paywall check: free tier has no AI access
+  // BYOK users always have AI access — skip paywall for them
+  if (S.apiKey) return true;
+  // Server-side AI available
+  if (hasServerAI()) return true;
+  // No key, no server — check paywall before showing prompt
   if (typeof canAccess === 'function' && !canAccess('ai-unlimited')) {
     if (showPrompt && typeof showUpgradePrompt === 'function') {
       const containers = ['home-chat-msgs','trade-chat-msgs','wq-chat-msgs','draft-msgs'];
@@ -77,7 +81,7 @@ function hasAnyAI(showPrompt=false){
     }
     return false;
   }
-  return !!(S.apiKey || hasServerAI());
+  return false;
 }
 
 // ── Core AI call ──────────────────────────────────────────────

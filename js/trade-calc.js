@@ -929,11 +929,11 @@ function _renderTradeCalcShell(el) {
         <button class="btn btn-sm ${_tcActiveView === 'partners' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('partners')">Partners</button>
         <button class="btn btn-sm ${_tcActiveView === 'builder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('builder')">Builder</button>
         <div style="position:relative;margin-left:auto;flex-shrink:0">
-          <button class="btn btn-sm ${isToolView ? '' : 'btn-ghost'}" onclick="document.getElementById('tc-tools-menu').style.display=document.getElementById('tc-tools-menu').style.display==='block'?'none':'block'" style="display:flex;align-items:center;gap:4px">${isToolView ? toolLabel : 'Tools'} <span style="font-size:13px">▼</span></button>
+          <button class="btn btn-sm ${isToolView ? '' : 'btn-ghost'}" onclick="event.stopPropagation();_tcToggleTools()" style="display:flex;align-items:center;gap:4px">${isToolView ? toolLabel : 'Tools'} <span style="font-size:13px">▼</span></button>
           <div id="tc-tools-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:4px;min-width:140px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.3)">
-            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('dna');document.getElementById('tc-tools-menu').style.display='none'">Owner DNA</button>
-            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('valuechart');document.getElementById('tc-tools-menu').style.display='none'">Value Chart</button>
-            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('history');document.getElementById('tc-tools-menu').style.display='none'">History</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('dna')">Owner DNA</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('valuechart')">Value Chart</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('history')">History</button>
           </div>
         </div>
       </div>
@@ -952,6 +952,18 @@ function _renderTradeCalcShell(el) {
   else if (_tcActiveView === 'history') renderTradeHistory(content);
   else renderLeagueOverview(_tcAssessments, content);
 }
+
+function _tcToggleTools() {
+  const menu = document.getElementById('tc-tools-menu');
+  if (!menu) return;
+  const show = menu.style.display !== 'block';
+  menu.style.display = show ? 'block' : 'none';
+  if (show) {
+    const close = (e) => { if (!menu.contains(e.target)) { menu.style.display = 'none'; document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 0);
+  }
+}
+window._tcToggleTools = _tcToggleTools;
 
 function _tcSwitchView(view) {
   _tcActiveView = view;
