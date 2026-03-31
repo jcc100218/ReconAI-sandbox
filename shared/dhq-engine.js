@@ -1107,19 +1107,52 @@ async function loadLeagueIntel(){
             }
             vetBlendCount++;
           }else{
-            // ── ROOKIE: 100% FC value (no NFL production) ──
-            if(fcScaled<100)return;
-            playerScores[sid]=Math.min(10000,fcScaled);
+            // ── ROOKIE: veteran-anchored DHQ mapping ──
+            // Skip IDP rookies if league has no IDP slots
+            const isIDPPos=['DL','LB','DB'].includes(mappedPos);
+            const hasIDP=(starterCounts.DL||0)>1||(starterCounts.LB||0)>1||(starterCounts.DB||0)>1;
+            if(isIDPPos&&!hasIDP)return;
+
+            // Find nearest veteran by FC value to anchor the DHQ mapping
+            let anchorDHQ=null;
+            if(fcMatched.length>=5){
+              // Binary search for closest FC value among matched veterans
+              let bestDist=Infinity;
+              for(const m of fcMatched){
+                const dist=Math.abs(m.fcVal-val);
+                if(dist<bestDist){bestDist=dist;anchorDHQ=m.dhqVal;}
+              }
+            }
+            // Fallback to scaled value if no good anchor
+            const baseDHQ=anchorDHQ!==null?anchorDHQ:Math.round(val*scaleFactor);
+            // 15% unproven discount (no NFL production yet)
+            let rookieDHQ=Math.round(baseDHQ*0.85);
+
+            // SF QB premium: rookie QBs in superflex get scarcity bonus
+            if(mappedPos==='QB'&&isSF){
+              const sfBoost=rookieDHQ>=5000?1.15:rookieDHQ>=3000?1.10:1.05;
+              rookieDHQ=Math.round(rookieDHQ*sfBoost);
+            }
+
+            if(rookieDHQ<100)return;
+            playerScores[sid]=Math.min(10000,rookieDHQ);
             playerMeta[sid]={
               pos:mappedPos,ppg:0,age:S.players[sid]?.age||21,
               ageFactor:1.0,sitMult:1.0,
               peakYrsLeft:(peakWindows[mappedPos]||[23,29])[1]-(S.players[sid]?.age||21),
               starterSeasons:0,recentGP:0,
-              source:'FC_ROOKIE',fcValue:val,fcRank:d.overallRank||999
+              source:'FC_ROOKIE',fcValue:val,fcRank:d.overallRank||999,
+              anchorDHQ:anchorDHQ,unprovenDiscount:0.85
             };
             rookieCount++;
           }
         });
+
+        // Log top 10 rookies for verification
+        const topRookies=Object.entries(playerMeta).filter(([,m])=>m.source==='FC_ROOKIE')
+          .map(([sid,m])=>({name:S.players[sid]?.full_name||sid,dhq:playerScores[sid],fc:m.fcValue,rank:m.fcRank}))
+          .sort((a,b)=>b.dhq-a.dhq).slice(0,10);
+        console.log('Top rookies:',topRookies.map(r=>r.name+' '+r.dhq+' (FC:'+r.fc+')').join(', '));
         console.log(`FC blend: ${vetBlendCount} veterans (deviation-aware), ${rookieCount} rookies (scale: ${scaleFactor.toFixed(3)}, matched: ${fcMatched.length})`);
       }
     }catch(e){console.warn('FC blend failed:',e);}

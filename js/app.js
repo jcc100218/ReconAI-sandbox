@@ -64,6 +64,39 @@ const setAgentStatus=(txt,active)=>{const t=$('agent-txt');const d=$('agent-dot'
 Object.assign(window, {$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
 Object.assign(window.App, {$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
 
+// ── Season detection & Lineup tab visibility ──────────────────
+function isNFLInSeason() {
+  const st = S.nflState?.season_type;
+  if (st === 'regular' || st === 'post') return true;
+  if (st === 'pre' || st === 'off') return false;
+  const m = new Date().getMonth();
+  return m >= 8 || m <= 1;
+}
+
+function updateLineupTabVisibility() {
+  const inSeason = isNFLInSeason();
+  const lineupNav = document.getElementById('mnav-startsit');
+  if (lineupNav) lineupNav.style.display = inSeason ? '' : 'none';
+
+  const existingPromo = document.getElementById('lineup-promo-card');
+  if (inSeason) {
+    if (existingPromo) existingPromo.remove();
+  } else if (!existingPromo) {
+    const homePanel = document.getElementById('panel-digest');
+    const chatModule = homePanel?.querySelector('.recon-chat-module');
+    if (chatModule) {
+      const promo = document.createElement('div');
+      promo.id = 'lineup-promo-card';
+      promo.style.cssText = 'margin:12px 0;padding:16px 18px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);text-align:center;background-image:linear-gradient(135deg,rgba(124,107,248,.06),rgba(124,107,248,.02))';
+      promo.innerHTML = '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">\u{1F3C8} START/SIT ASSISTANT \u2014 Coming Fall 2026</div><div style="font-size:13px;color:var(--text3);line-height:1.5">Get AI-powered lineup recommendations every week during the NFL season.</div>';
+      chatModule.insertAdjacentElement('afterend', promo);
+    }
+  }
+}
+window.isNFLInSeason = isNFLInSeason;
+window.updateLineupTabVisibility = updateLineupTabVisibility;
+document.addEventListener('DOMContentLoaded', updateLineupTabVisibility);
+
 // ── Tab switching ──────────────────────────────────────────────
 function switchTab(tab,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -259,6 +292,7 @@ async function loadAllData(){
     try{if(typeof renderHealthTimeline==='function')renderHealthTimeline();}catch(e){console.warn('renderHealthTimeline:',e);}
     try{if(typeof renderLeaguePulse==='function')renderLeaguePulse();}catch(e){console.warn('renderLeaguePulse:',e);}
     try{if(typeof renderMobileHome==='function')renderMobileHome();}catch(e){console.warn('renderMobileHome:',e);}
+    updateLineupTabVisibility(); // re-check with Sleeper nflState data
     try{if(typeof renderTradeIntel==='function')renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
     try{checkForAlerts();}catch(e){console.warn('checkForAlerts:',e);}
     if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();

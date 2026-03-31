@@ -7,6 +7,9 @@
  */
 window.App = window.App || {};
 
+(function() {
+'use strict';
+
 // ── AI Provider config ───────────────────────────────────────
 const PROVIDERS = {
   gemini: {
@@ -240,3 +243,5 @@ window.hasAnyAI = hasAnyAI;
 window.callClaude = callClaude;
 window.callGrokNews = callGrokNews;
 window._newsCache = _newsCache;
+
+})();

@@ -919,16 +919,23 @@ async function renderTradeCalc() {
 }
 
 function _renderTradeCalcShell(el) {
+  const isToolView = ['dna','valuechart','history'].includes(_tcActiveView);
+  const toolLabel = _tcActiveView === 'dna' ? 'Owner DNA' : _tcActiveView === 'valuechart' ? 'Value Chart' : _tcActiveView === 'history' ? 'History' : 'Tools';
   el.innerHTML = `
     <div style="margin-bottom:12px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-sm ${_tcActiveView === 'overview' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('overview')">League Overview</button>
-        <button class="btn btn-sm ${_tcActiveView === 'partners' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('partners')">Partner Finder</button>
-        <button class="btn btn-sm ${_tcActiveView === 'builder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('builder')">Trade Builder</button>
-        <button class="btn btn-sm ${_tcActiveView === 'dna' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('dna')">Owner DNA</button>
-        <button class="btn btn-sm ${_tcActiveView === 'valuechart' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('valuechart')">Value Chart</button>
-        <button class="btn btn-sm ${_tcActiveView === 'history' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('history')">History</button>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
+        <button class="btn btn-sm ${_tcActiveView === 'overview' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('overview')">Overview</button>
         <button class="btn btn-sm ${_tcActiveView === 'finder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('finder')">Trade Finder</button>
+        <button class="btn btn-sm ${_tcActiveView === 'partners' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('partners')">Partners</button>
+        <button class="btn btn-sm ${_tcActiveView === 'builder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('builder')">Builder</button>
+        <div style="position:relative;margin-left:auto;flex-shrink:0">
+          <button class="btn btn-sm ${isToolView ? '' : 'btn-ghost'}" onclick="document.getElementById('tc-tools-menu').style.display=document.getElementById('tc-tools-menu').style.display==='block'?'none':'block'" style="display:flex;align-items:center;gap:4px">${isToolView ? toolLabel : 'Tools'} <span style="font-size:10px">▼</span></button>
+          <div id="tc-tools-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:4px;min-width:140px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.3)">
+            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('dna');document.getElementById('tc-tools-menu').style.display='none'">Owner DNA</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('valuechart');document.getElementById('tc-tools-menu').style.display='none'">Value Chart</button>
+            <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('history');document.getElementById('tc-tools-menu').style.display='none'">History</button>
+          </div>
+        </div>
       </div>
     </div>
     <div id="tc-view-content"></div>
@@ -937,12 +944,12 @@ function _renderTradeCalcShell(el) {
   const content = $('tc-view-content');
   if (_tcActiveView === 'overview') renderLeagueOverview(_tcAssessments, content);
   else if (_tcActiveView === 'scout' && _tcSelectedScout) renderTeamScout(_tcSelectedScout, content);
+  else if (_tcActiveView === 'finder') renderTradeFinder(content);
   else if (_tcActiveView === 'partners') renderPartnerFinder(_tcMyAssessment, _tcAssessments, content);
   else if (_tcActiveView === 'builder') renderTradeBuilder(_tcBuilderMy?.rosterId || S.myRosterId, _tcBuilderTheir?.rosterId, content);
   else if (_tcActiveView === 'dna') renderDNAPanel(_tcAssessments, content);
   else if (_tcActiveView === 'valuechart') renderValueChart(content);
   else if (_tcActiveView === 'history') renderTradeHistory(content);
-  else if (_tcActiveView === 'finder') renderTradeFinder(content);
   else renderLeagueOverview(_tcAssessments, content);
 }
 

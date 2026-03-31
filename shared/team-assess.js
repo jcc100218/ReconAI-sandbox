@@ -564,6 +564,93 @@ window.App = window.App || {};
   }
 
   // ─────────────────────────────────────────────────────────────
+  // getPlayerAction — single source of truth for BUY/SELL/HOLD
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * Returns a dynasty action recommendation for a player.
+   * Considers: age vs peak window, DHQ value, trend, positional surplus/deficit,
+   * contender/rebuilder status, and ownership.
+   *
+   * @param {string} pid - player ID
+   * @returns {{ action: string, label: string, reason: string, col: string, bg: string }}
+   */
+  function getPlayerAction(pid) {
+    const S = window.S || window.App?.S || {};
+    const LI = window.App?.LI || {};
+    const meta = LI.playerMeta?.[pid];
+    const val = (typeof getDynastyValue === 'function') ? getDynastyValue(pid) :
+                (typeof dynastyValue === 'function') ? dynastyValue(pid) :
+                (LI.playerScores?.[pid] || 0);
+
+    if (!meta || val <= 0) return { action: 'HOLD', label: 'Hold', reason: 'Not enough data', col: 'var(--accent)', bg: 'var(--accentL)' };
+
+    const peakYrsLeft = meta.peakYrsLeft || 0;
+    const trend = meta.trend || 0;
+    const pos = meta.pos || playerPos(pid, S.players || {});
+
+    // Ownership check
+    const myRoster = S.rosters?.find(r =>
+      r.owner_id === (S.myUserId || S.user?.user_id) ||
+      (r.co_owners || []).includes(S.myUserId || S.user?.user_id)
+    );
+    const isOwned = (myRoster?.players || []).map(String).includes(String(pid));
+
+    // Positional context (surplus/deficit)
+    let posSurplus = 0;
+    if (isOwned && myRoster && S.players) {
+      const myPlayers = myRoster.players || [];
+      const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+      const rp = league?.roster_positions || [];
+      const posCount = myPlayers.filter(p => playerPos(p, S.players) === pos).length;
+      const slotsNeeded = rp.filter(s =>
+        normPos(s) === pos ||
+        (s === 'FLEX' && ['RB','WR','TE'].includes(pos)) ||
+        (s === 'SUPER_FLEX' && ['QB','RB','WR','TE'].includes(pos)) ||
+        (s === 'IDP_FLEX' && ['DL','LB','DB'].includes(pos)) ||
+        (s === 'REC_FLEX' && ['WR','TE'].includes(pos))
+      ).length;
+      posSurplus = posCount - Math.max(1, Math.round(slotsNeeded));
+    }
+
+    // Rookie stash
+    if (meta.source === 'FC_ROOKIE') return { action: 'STASH', label: 'Stash', reason: 'Incoming rookie — hold and develop', col: 'var(--blue)', bg: 'var(--blueL)' };
+
+    // Elite cornerstone
+    if (val >= 7000 && peakYrsLeft >= 3) return { action: 'CORE', label: 'Build Around', reason: 'Elite value with ' + peakYrsLeft + ' peak years left', col: 'var(--green)', bg: 'var(--greenL)' };
+
+    // Rising buy target
+    if (peakYrsLeft >= 4 && trend >= 10 && !isOwned) return { action: 'BUY', label: 'Buy', reason: 'Trending up (+' + trend + '%) with ' + peakYrsLeft + ' peak years ahead', col: 'var(--green)', bg: 'var(--greenL)' };
+    if (peakYrsLeft >= 4 && trend >= 10 && isOwned) return { action: 'HOLD', label: 'Hold', reason: 'Rising asset — keep and ride the wave', col: 'var(--green)', bg: 'var(--greenL)' };
+
+    // Sell high window — near end of peak, still has value
+    if (peakYrsLeft <= 1 && val >= 3000) return { action: 'SELL_HIGH', label: 'Sell High', reason: (peakYrsLeft <= 0 ? 'Past peak' : '1 peak year left') + ' — sell while value holds', col: 'var(--amber)', bg: 'var(--amberL)' };
+
+    // Past peak and declining
+    if (peakYrsLeft <= 0 && trend <= -10) return { action: 'SELL', label: 'Sell', reason: 'Past peak and declining (' + trend + '%)', col: 'var(--red)', bg: 'var(--redL)' };
+
+    // Past peak, any trend
+    if (peakYrsLeft <= 0) return { action: 'SELL', label: 'Sell', reason: 'Past peak — trade while value remains', col: 'var(--red)', bg: 'var(--redL)' };
+
+    // Near peak end with declining trend
+    if (peakYrsLeft <= 2 && trend <= -10) return { action: 'SELL_HIGH', label: 'Sell High', reason: 'Window closing and production declining', col: 'var(--amber)', bg: 'var(--amberL)' };
+
+    // Solid hold — in peak with good value
+    if (peakYrsLeft >= 2 && val >= 4000) return { action: 'HOLD', label: 'Hold', reason: peakYrsLeft + ' peak years left at starter value', col: 'var(--accent)', bg: 'var(--accentL)' };
+
+    // Low value stash with upside
+    if (val < 2000 && peakYrsLeft >= 3) return { action: 'STASH', label: 'Stash', reason: 'Low value but ' + peakYrsLeft + ' peak years ahead', col: 'var(--blue)', bg: 'var(--blueL)' };
+
+    // Buy candidate (not owned, has peak years)
+    if (!isOwned && peakYrsLeft >= 2 && val < 5000) return { action: 'BUY', label: 'Buy', reason: 'Undervalued with ' + peakYrsLeft + ' peak years remaining', col: 'var(--green)', bg: 'var(--greenL)' };
+
+    // Default hold
+    if (peakYrsLeft >= 1) return { action: 'HOLD', label: 'Hold', reason: peakYrsLeft + ' peak year' + (peakYrsLeft > 1 ? 's' : '') + ' remaining', col: 'var(--accent)', bg: 'var(--accentL)' };
+
+    return { action: 'SELL', label: 'Sell', reason: 'Past prime — move for future assets', col: 'var(--red)', bg: 'var(--redL)' };
+  }
+
+  // ─────────────────────────────────────────────────────────────
   // Expose on window.App and window
   // ─────────────────────────────────────────────────────────────
 
@@ -588,13 +675,17 @@ window.App = window.App || {};
   window.App.assessAllTeamsFromGlobal     = assessAllTeamsFromGlobal;
   window.App.assessTeamFromGlobal         = assessTeamFromGlobal;
 
+  // Player action recommendation
+  window.App.getPlayerAction = getPlayerAction;
+
   // Also expose on window for direct access
-  window.buildNflStarterSetShared   = buildNflStarterSet;
-  window.calcOptimalPPGShared       = calcOptimalPPG;
-  window.assessTeamShared           = assessTeam;
-  window.assessAllTeamsShared       = assessAllTeams;
-  window.assessAllTeamsFromGlobal   = assessAllTeamsFromGlobal;
-  window.assessTeamFromGlobal       = assessTeamFromGlobal;
+  window.getPlayerAction              = getPlayerAction;
+  window.buildNflStarterSetShared     = buildNflStarterSet;
+  window.calcOptimalPPGShared         = calcOptimalPPG;
+  window.assessTeamShared             = assessTeam;
+  window.assessAllTeamsShared         = assessAllTeams;
+  window.assessAllTeamsFromGlobal     = assessAllTeamsFromGlobal;
+  window.assessTeamFromGlobal         = assessTeamFromGlobal;
   window.buildNflStarterSetFromGlobal = buildNflStarterSetFromGlobal;
 
 })();

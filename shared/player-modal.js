@@ -91,6 +91,10 @@ function _ensureModalDOM() {
         .fwpm-career-row:last-child{border-bottom:none}
         .fwpm-career-hdr{font-size:13px;font-weight:700;color:${_wr.text3};text-transform:uppercase}
       </style>
+      <!-- Drag handle for swipe-to-dismiss -->
+      <div id="fwpm-handle" style="display:flex;justify-content:center;padding:10px 0 2px;cursor:grab">
+        <div style="width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15)"></div>
+      </div>
       <!-- Banner -->
       <div id="fwpm-banner" style="border-radius:14px 14px 0 0;padding:20px 22px;position:relative;overflow:hidden;background:linear-gradient(135deg,${_wr.panel} 0%,rgba(212,175,55,.04) 100%)">
         <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 20% 50%,rgba(212,175,55,.06),transparent 60%);pointer-events:none"></div>
@@ -149,6 +153,28 @@ function _ensureModalDOM() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeFWPlayerModal();
   });
+
+  // Swipe-to-dismiss on drag handle
+  const fwModal = document.getElementById('fw-player-modal');
+  const fwSheet = fwModal?.firstElementChild;
+  const fwHandle = document.getElementById('fwpm-handle');
+  if (fwSheet && fwHandle) {
+    let startY = 0, dragging = false;
+    fwHandle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; dragging = true; fwSheet.style.transition = 'none'; }, { passive: true });
+    fwSheet.addEventListener('touchmove', e => {
+      if (!dragging) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0) { fwSheet.style.transform = `translateY(${dy}px)`; fwSheet.style.opacity = Math.max(0.4, 1 - dy / 400); }
+    }, { passive: true });
+    fwSheet.addEventListener('touchend', e => {
+      if (!dragging) return;
+      dragging = false;
+      const dy = e.changedTouches[0].clientY - startY;
+      fwSheet.style.transition = 'transform .2s ease, opacity .2s ease';
+      if (dy > 100) { fwSheet.style.transform = 'translateY(100%)'; fwSheet.style.opacity = '0'; setTimeout(() => { closeFWPlayerModal(); fwSheet.style.transform = ''; fwSheet.style.opacity = ''; }, 200); }
+      else { fwSheet.style.transform = ''; fwSheet.style.opacity = ''; }
+    });
+  }
 }
 
 // ── Fetch career stats from Sleeper ────────────────────────────
@@ -481,48 +507,21 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     ? `<span style="color:${tierCol}">${tier}</span>${fcRankData ? ' \u00B7 Overall #'+fcRankData.overall : ''}`
     : LI_LOADED ? `<span style="color:${_wr.text3}">No DHQ data</span>` : `<span style="color:${_wr.text3}">DHQ loading...</span>`);
 
-  // ── Right panel: Trade Profile (offense) or IDP stats ──
+  // ── Right panel: Trade Profile for ALL positions (unified layout) ──
   const rightPanel = document.getElementById('fwpm-right');
-  if (!rightPanel) { /* skip */ } else if (isIDP && rawStats) {
-    const gp = rawStats.gp || 17;
-    const idpPts2 = _fwCalcPts(rawStats, sc);
-    const idpPPG2 = +(idpPts2 / Math.max(1, gp)).toFixed(1);
-    const tkl = Math.round((rawStats.idp_tkl_solo||0) + (rawStats.idp_tkl_ast||0));
-    const sacks = +(rawStats.idp_sack||0).toFixed(1);
-    const ints = rawStats.idp_int || 0;
-    const pds = rawStats.idp_pass_def || 0;
-    const ff = rawStats.idp_ff || 0;
-    const qbhits = rawStats.idp_qb_hit || 0;
-    const tklLoss = rawStats.idp_tkl_loss || 0;
-    rightPanel.innerHTML = `
-      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">IDP Stats <span style="font-weight:400;text-transform:none">\u00B7 ${gp}gp</span></div>
-      <div style="font-size:20px;font-weight:800;color:${_wr.green};margin-bottom:6px;font-family:'Bebas Neue',Oswald,monospace">${idpPPG2||'\u2014'} <span style="font-size:13px;font-weight:600;color:${_wr.text2}">PPG</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
-        ${tkl?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tkl}</strong> tackles</div>`:''}
-        ${sacks?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${sacks}</strong> sacks</div>`:''}
-        ${ints?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${ints}</strong> INT</div>`:''}
-        ${pds?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${pds}</strong> PD</div>`:''}
-        ${ff?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${ff}</strong> FF</div>`:''}
-        ${qbhits?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${qbhits}</strong> QB hits</div>`:''}
-        ${tklLoss?`<div style="font-size:13px;color:${_wr.text2}"><strong style="color:${_wr.text}">${tklLoss}</strong> TFL</div>`:''}
-      </div>`;
-  } else {
-    // Trade Profile: BUY / HOLD / SELL / CORE (HOLD/CORE for owned players)
-    const myRoster = S.rosters?.find(r => r.owner_id === S.user?.user_id || (r.co_owners||[]).includes(S.user?.user_id));
-    const isOwned = (myRoster?.players||[]).map(String).includes(String(pid));
-    let rec = peakYrsLeft <= 0 ? 'SELL' : peakYrsLeft <= 2 ? (trend >= 10 ? 'HOLD' : 'SELL') : (val >= 7000 ? 'HOLD' : 'BUY');
-    if(isOwned && rec === 'BUY') rec = 'HOLD';
-    if(isOwned && rec === 'HOLD' && val >= 7000 && peakYrsLeft >= 3) rec = 'CORE';
-    const recCol = rec === 'BUY' ? _wr.green : rec === 'CORE' ? _wr.green : rec === 'HOLD' ? _wr.gold : _wr.red;
+  if (rightPanel) {
+    const pa = (typeof getPlayerAction === 'function') ? getPlayerAction(pid) : { label: 'Hold', col: _wr.gold, reason: '' };
+    const recCol = pa.col || _wr.gold;
     const tpTrend = trend >= 15 ? '+'+trend+'%' : trend <= -15 ? trend+'%' : 'Stable';
     const tpTrendCol = trend >= 15 ? _wr.green : trend <= -15 ? _wr.red : _wr.text3;
 
     rightPanel.innerHTML = `
-      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile</div>
-      <div style="font-size:22px;font-weight:800;color:${recCol};font-family:'Bebas Neue',Oswald,monospace;letter-spacing:.02em">${rec}</div>
+      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDP ? ' <span style="font-size:10px;color:'+_wr.gold+';background:rgba(212,175,55,.1);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>' : ''}</div>
+      <div style="font-size:22px;font-weight:800;color:${recCol};font-family:'Bebas Neue',Oswald,monospace;letter-spacing:.02em">${pa.label}</div>
       <div style="font-size:13px;color:${_wr.text2};margin-top:4px;line-height:1.4">
         <span style="color:${tpTrendCol}">${tpTrend}</span> \u00B7 ${peakYrsLeft > 0 ? peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left' : 'Past peak'}
-      </div>`;
+      </div>
+      <div style="font-size:12px;color:${_wr.text3};margin-top:4px">${pa.reason}</div>`;
   }
 
   // ── Career stats ──

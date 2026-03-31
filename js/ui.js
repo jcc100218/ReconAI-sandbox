@@ -206,20 +206,12 @@ function setRosterFilter(f, btn){
 }
 function resetRosterSort(){rosterSortKey='value';rosterSortDir=-1;rosterFilter='all';_rosterSortIdx=0;buildRosterTable();}
 
-// Recon verdict helper
-function _reconVerdict(pid,val,pos,age,meta){
-  if(!meta||val<=0)return null;
-  const peakYrsLeft=meta.peakYrsLeft||0;
-  const trend=meta.trend||0;
-  if(meta.source==='FC_ROOKIE')return{label:'Stash',col:'var(--blue)',bg:'var(--blueL)'};
-  if(val>=7000&&peakYrsLeft>=3)return{label:'Build Around',col:'var(--green)',bg:'var(--greenL)'};
-  if(peakYrsLeft>=4&&trend>=10)return{label:'Buy',col:'var(--green)',bg:'var(--greenL)'};
-  if(peakYrsLeft>=2&&val>=4000)return{label:'Hold',col:'var(--accent)',bg:'var(--accentL)'};
-  if(peakYrsLeft<=1&&val>=3000)return{label:'Sell High',col:'var(--amber)',bg:'var(--amberL)'};
-  if(peakYrsLeft<=0&&trend<=-10)return{label:'Sell',col:'var(--red)',bg:'var(--redL)'};
-  if(val<2000&&peakYrsLeft>=3)return{label:'Stash',col:'var(--blue)',bg:'var(--blueL)'};
-  if(peakYrsLeft>=1)return{label:'Hold',col:'var(--accent)',bg:'var(--accentL)'};
-  return{label:'Sell',col:'var(--red)',bg:'var(--redL)'};
+// Recon verdict helper — delegates to shared getPlayerAction()
+function _reconVerdict(pid){
+  if(typeof getPlayerAction!=='function')return null;
+  const v=getPlayerAction(pid);
+  if(!v||v.action==='HOLD'&&v.reason==='Not enough data')return null;
+  return v;
 }
 
 function buildRosterTable(){
@@ -299,7 +291,7 @@ function buildRosterTable(){
     const dhqTrend=meta?.trend||0;
     const trendHtml=dhqTrend>=15?'<span class="rr-trend" style="color:var(--green)">▲</span>':dhqTrend<=-15?'<span class="rr-trend" style="color:var(--red)">▼</span>':'';
     const ppg=stats.prevAvg||stats.seasonAvg||0;
-    const verdict=_reconVerdict(pid,val,pos,age,meta);
+    const verdict=_reconVerdict(pid);
     const isRookie=meta?.source==='FC_ROOKIE';
 
     // Phase color
@@ -570,7 +562,7 @@ function renderAvailable(){
     else{prioLabel='Spec';prioBg='rgba(255,255,255,.03)';prioCol='var(--text3)';}
 
     return`<div class="wv-avail-card" onclick="openPlayerModal('${id}')">
-      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.parentElement.insertAdjacentHTML('beforeend','<span class=&quot;rr-initials&quot; style=&quot;width:32px;height:32px;font-size:13px&quot;>${initials}</span>')" loading="lazy"/>
+      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:32px;height:32px;font-size:13px>${initials}</span>')" loading="lazy"/>
       <div style="flex:1;min-width:0;overflow:hidden">
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</span>
@@ -2644,55 +2636,23 @@ function openPlayerModal(playerId){
   $('pm-trade-val').textContent=val>0?val.toLocaleString():LI_LOADED?'Not valued':'Loading...';
   $('pm-trade-tier').innerHTML=val>0?`<span style="color:${col}">${tier}</span>${fcRankData?' · Overall #'+fcRankData.overall:''}`:LI_LOADED?'<span style="color:var(--text3)">No DHQ production data</span>':'<span style="color:var(--text3)">DHQ engine loading...</span>';
 
+  // Unified Trade Profile for ALL positions (offense + IDP)
   const rightPanel=$('pm-right-panel');
   if(rightPanel){
-    if(isIDPModal&&rawModal){
-      // IDP: show key defensive stats instead of peak projection
-      const gp=rawModal.gp||17;
-      const sacks=+(rawModal.idp_sack||0).toFixed(1);
-      const tkl=Math.round((rawModal.idp_tkl_solo||0)+(rawModal.idp_tkl_ast||0));
-      const ints=rawModal.idp_int||0;
-      const pds=rawModal.idp_pass_def||0;
-      const ff=rawModal.idp_ff||0;
-      const qbhits=rawModal.idp_qb_hit||0;
-      const tklLoss=rawModal.idp_tkl_loss||0;
-      rightPanel.innerHTML=`
-        <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">IDP Stats <span style="font-weight:400;text-transform:none">· ${gp}gp</span></div>
-        <div style="font-size:18px;font-weight:800;color:var(--green);margin-bottom:6px">${idpPPGModal||'—'} <span style="font-size:13px;font-weight:600;color:var(--text2)">PPG</span></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:3px">
-          ${tkl?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${tkl}</strong> tackles</div>`:''}
-          ${sacks?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${sacks}</strong> sacks</div>`:''}
-          ${ints?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${ints}</strong> INT</div>`:''}
-          ${pds?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${pds}</strong> PD</div>`:''}
-          ${ff?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${ff}</strong> FF</div>`:''}
-          ${qbhits?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${qbhits}</strong> QB hits</div>`:''}
-          ${tklLoss?`<div style="font-size:13px;color:var(--text2)"><strong style="color:var(--text)">${tklLoss}</strong> TFL</div>`:''}
-        </div>`;
-    }else{
-      // Offensive: Trade Profile
-      const tpMeta=LI_LOADED?LI.playerMeta?.[playerId]:null;
-      const trend=tpMeta?.trend||0;
-      const peakYrsLeft=tpMeta?.peakYrsLeft||0;
-      const isOwned=(myR()?.players||[]).map(String).includes(String(playerId));
-      let rec=peakYrsLeft<=0?'SELL':peakYrsLeft<=2?(trend>=10?'HOLD':'SELL'):(val>=7000?'HOLD':'BUY');
-      if(isOwned&&rec==='BUY')rec='HOLD';
-      if(isOwned&&rec==='HOLD'&&val>=7000&&peakYrsLeft>=3)rec='CORE';
-      const recCol=rec==='BUY'?'var(--green)':rec==='CORE'?'var(--green)':rec==='HOLD'?'var(--accent)':'var(--red)';
-      const trendLabel=trend>=15?'▲ '+trend+'%':trend<=-15?'▼ '+Math.abs(trend)+'%':'→ Stable';
-      const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
+    const tpMeta=LI_LOADED?LI.playerMeta?.[playerId]:null;
+    const trend=tpMeta?.trend||0;
+    const peakYrsLeft=tpMeta?.peakYrsLeft||0;
+    const pa=typeof getPlayerAction==='function'?getPlayerAction(playerId):{label:'Hold',col:'var(--accent)',reason:''};
+    const trendLabel=trend>=15?'▲ '+trend+'%':trend<=-15?'▼ '+Math.abs(trend)+'%':'→ Stable';
+    const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
 
-      rightPanel.innerHTML=`
-        <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile <span class="tip-icon" onclick="toggleTip('tip-trade-profile')" style="font-size:9px">?</span></div>
-        <div style="font-size:20px;font-weight:800;color:${recCol}">${rec}</div>
-        <div style="font-size:13px;color:var(--text2);margin-top:4px">
-          <span style="color:${trendCol}">${trendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
-        </div>
-        <div class="tip-box" id="tip-trade-profile">
-          <strong>BUY</strong> = player has peak years ahead and is undervalued — acquire now<br>
-          <strong>HOLD</strong> = player is producing at peak or trending up — keep<br>
-          <strong>SELL</strong> = player is past peak or trending down — trade while value remains
-        </div>`;
-    }
+    rightPanel.innerHTML=`
+      <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDPModal?' <span style="font-size:10px;color:var(--accent);background:var(--accentL);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>':''}</div>
+      <div style="font-size:20px;font-weight:800;color:${pa.col}">${pa.label}</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px">
+        <span style="color:${trendCol}">${trendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">${pa.reason}</div>`;
   }
 
   // Action buttons
@@ -2720,6 +2680,28 @@ function openPlayerModal(playerId){
   // Scroll body to top
   const pmBody=modal.querySelector('.pm-body');
   if(pmBody)pmBody.scrollTop=0;
+
+  // Swipe-to-dismiss gesture on drag handle
+  const pmSheet=modal.querySelector('.pm-sheet');
+  const pmHandle=modal.querySelector('.pm-handle');
+  if(pmSheet&&pmHandle&&!pmSheet._swipeInit){
+    pmSheet._swipeInit=true;
+    let startY=0,dragging=false;
+    pmHandle.addEventListener('touchstart',e=>{startY=e.touches[0].clientY;dragging=true;pmSheet.style.transition='none';},{passive:true});
+    pmSheet.addEventListener('touchmove',e=>{
+      if(!dragging)return;
+      const dy=e.touches[0].clientY-startY;
+      if(dy>0){pmSheet.style.transform=`translateY(${dy}px)`;pmSheet.style.opacity=Math.max(0.4,1-dy/400);}
+    },{passive:true});
+    pmSheet.addEventListener('touchend',e=>{
+      if(!dragging)return;
+      dragging=false;
+      const dy=e.changedTouches[0].clientY-startY;
+      pmSheet.style.transition='transform .2s ease,opacity .2s ease';
+      if(dy>100){pmSheet.style.transform='translateY(100%)';pmSheet.style.opacity='0';setTimeout(()=>{closePlayerModal();pmSheet.style.transform='';pmSheet.style.opacity='';},200);}
+      else{pmSheet.style.transform='';pmSheet.style.opacity='';}
+    });
+  }
 
   // News
   const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
