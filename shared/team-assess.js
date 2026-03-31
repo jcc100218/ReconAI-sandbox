@@ -394,7 +394,15 @@ window.App = window.App || {};
 
     // Optimal weekly scoring
     const rosterPositions = leagueInfo?.roster_positions || [];
-    const weeklyPts = calcOptimalPPG(roster.players || [], players, playerStats, rosterPositions);
+    let weeklyPts = calcOptimalPPG(roster.players || [], players, playerStats, rosterPositions);
+
+    // Offseason fallback: if no stats available, estimate weekly PPG from DHQ values
+    // A roster with 87K total DHQ should project ~150+ PPG, not 0
+    if (weeklyPts <= 0) {
+      const totalDHQ = (roster.players || []).reduce((s, pid) => s + getDynastyValue(pid), 0);
+      // Rough mapping: 80K DHQ ≈ 140 PPG, 100K DHQ ≈ 170 PPG (based on typical correlation)
+      weeklyPts = totalDHQ > 0 ? Math.round(totalDHQ / 550) : 0;
+    }
 
     // Health score: 60% scoring + 40% coverage
     const scoringScore = Math.min(60, (weeklyPts / WEEKLY_TARGET) * 60);
