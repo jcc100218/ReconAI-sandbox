@@ -198,6 +198,12 @@ window.App.connect = connect;
 
 function showLeaguePicker(leagues,userId){
   try{
+    // URL param from War Room takes priority
+    const urlLeague=new URLSearchParams(window.location.search).get('league');
+    if(urlLeague&&leagues.find(l=>l.league_id===urlLeague)){
+      selectLeague(urlLeague,userId);
+      return;
+    }
     const savedLeague=localStorage.getItem('dynastyhq_league');
     if(savedLeague&&leagues.find(l=>l.league_id===savedLeague)){
       selectLeague(savedLeague,userId);
