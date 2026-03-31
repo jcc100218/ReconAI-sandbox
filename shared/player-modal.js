@@ -426,7 +426,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
 
     if (blurb && insightEl) {
       const bg = blurbCol === _wr.red ? 'rgba(231,76,60,.08)' : blurbCol === _wr.green ? 'rgba(46,204,113,.08)' : 'rgba(212,175,55,.08)';
-      insightEl.innerHTML = `<div style="font-size:11.5px;color:${blurbCol};line-height:1.45;padding:6px 10px;background:${bg};border-radius:6px;border-left:3px solid ${blurbCol}">${blurb}</div>`;
+      insightEl.innerHTML = `<div style="font-size:13px;color:${blurbCol};line-height:1.45;padding:6px 10px;background:${bg};border-radius:6px;border-left:3px solid ${blurbCol}">${blurb}</div>`;
     } else if(insightEl) insightEl.innerHTML = '';
   } else if(insightEl) insightEl.innerHTML = '';
 
@@ -516,12 +516,12 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
     const tpTrendCol = trend >= 15 ? _wr.green : trend <= -15 ? _wr.red : _wr.text3;
 
     rightPanel.innerHTML = `
-      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDP ? ' <span style="font-size:10px;color:'+_wr.gold+';background:rgba(212,175,55,.1);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>' : ''}</div>
+      <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDP ? ' <span style="font-size:13px;color:'+_wr.gold+';background:rgba(212,175,55,.1);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>' : ''}</div>
       <div style="font-size:22px;font-weight:800;color:${recCol};font-family:'Bebas Neue',Oswald,monospace;letter-spacing:.02em">${pa.label}</div>
       <div style="font-size:13px;color:${_wr.text2};margin-top:4px;line-height:1.4">
         <span style="color:${tpTrendCol}">${tpTrend}</span> \u00B7 ${peakYrsLeft > 0 ? peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left' : 'Past peak'}
       </div>
-      <div style="font-size:12px;color:${_wr.text3};margin-top:4px">${pa.reason}</div>`;
+      <div style="font-size:13px;color:${_wr.text3};margin-top:4px">${pa.reason}</div>`;
   }
 
   // ── Career stats ──

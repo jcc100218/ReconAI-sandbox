@@ -929,7 +929,7 @@ function _renderTradeCalcShell(el) {
         <button class="btn btn-sm ${_tcActiveView === 'partners' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('partners')">Partners</button>
         <button class="btn btn-sm ${_tcActiveView === 'builder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('builder')">Builder</button>
         <div style="position:relative;margin-left:auto;flex-shrink:0">
-          <button class="btn btn-sm ${isToolView ? '' : 'btn-ghost'}" onclick="document.getElementById('tc-tools-menu').style.display=document.getElementById('tc-tools-menu').style.display==='block'?'none':'block'" style="display:flex;align-items:center;gap:4px">${isToolView ? toolLabel : 'Tools'} <span style="font-size:10px">▼</span></button>
+          <button class="btn btn-sm ${isToolView ? '' : 'btn-ghost'}" onclick="document.getElementById('tc-tools-menu').style.display=document.getElementById('tc-tools-menu').style.display==='block'?'none':'block'" style="display:flex;align-items:center;gap:4px">${isToolView ? toolLabel : 'Tools'} <span style="font-size:13px">▼</span></button>
           <div id="tc-tools-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:4px;min-width:140px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.3)">
             <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('dna');document.getElementById('tc-tools-menu').style.display='none'">Owner DNA</button>
             <button class="btn btn-sm btn-ghost" style="width:100%;text-align:left;justify-content:flex-start" onclick="_tcSwitchView('valuechart');document.getElementById('tc-tools-menu').style.display='none'">Value Chart</button>
@@ -1003,9 +1003,10 @@ function renderLeagueOverview(assessments, container) {
     const topNeed = a.needs[0]?.pos || '--';
     const topStrength = a.strengths[0] || '--';
     const posture = calcOwnerPosture(a, dnaKey);
+    const _ini = (a.ownerName || '?')[0].toUpperCase();
     const avatarHtml = a.avatar
-      ? `<img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`
-      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3)">${(a.ownerName || '?')[0].toUpperCase()}</div>`;
+      ? `<div style="position:relative;width:32px;height:32px;flex-shrink:0"><img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div style="display:none;width:32px;height:32px;border-radius:50%;background:var(--bg3);align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3)">${_ini}</div></div>`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3);flex-shrink:0">${_ini}</div>`;
 
     html += `
       <div class="card" style="cursor:pointer;${isMe ? 'border-color:rgba(124,107,248,.35);box-shadow:0 0 12px rgba(124,107,248,.1)' : ''}" onclick="_tcScoutTeam(${a.rosterId})">
@@ -1056,9 +1057,10 @@ function renderTeamScout(assessment, container) {
   const isMe = _isMyRoster(a.rosterId);
   const compat = _tcMyAssessment && !isMe ? calcComplementarity(_tcMyAssessment, a) : null;
 
+  const _ini2 = (a.ownerName || '?')[0].toUpperCase();
   const avatarHtml = a.avatar
-    ? `<img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`
-    : `<div style="width:44px;height:44px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text3)">${(a.ownerName || '?')[0].toUpperCase()}</div>`;
+    ? `<div style="position:relative;width:44px;height:44px;flex-shrink:0"><img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div style="display:none;width:44px;height:44px;border-radius:50%;background:var(--bg3);align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text3)">${_ini2}</div></div>`
+    : `<div style="width:44px;height:44px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text3);flex-shrink:0">${_ini2}</div>`;
 
   let html = `
     <button class="btn btn-sm btn-ghost" onclick="_tcSwitchView('overview')" style="margin-bottom:12px">&larr; Back to Overview</button>
@@ -1116,7 +1118,7 @@ function renderTeamScout(assessment, container) {
       const val = dynastyValue(pid);
       const isStarter = pa.nflStarterIds?.includes(pid);
       return `<div style="display:flex;align-items:center;gap:4px;font-size:13px;padding:1px 0">
-        <span style="color:${isStarter ? 'var(--green)' : 'var(--text3)'};font-size:9px">${isStarter ? '●' : '○'}</span>
+        <span style="color:${isStarter ? 'var(--green)' : 'var(--text3)'};font-size:13px">${isStarter ? '●' : '○'}</span>
         <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--text2)" onclick="openPlayerModal('${pid}')">${pNameShort(pid)}</span>
         ${val > 0 ? `<span style="font-size:13px;color:var(--text3);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>` : ''}
       </div>`;
@@ -1536,7 +1538,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
     const { col } = tradeValueTier(val);
     const pos = pPos(pid);
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;-webkit-tap-highlight-color:transparent" onclick="openPlayerModal('${pid}')">
-      <span class="rr-pos" style="${getPosBadgeStyle(pos)};font-size:10px;padding:1px 4px">${pos}</span>
+      <span class="rr-pos" style="${getPosBadgeStyle(pos)};font-size:13px;padding:1px 4px">${pos}</span>
       <span style="font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pNameShort(pid)}</span>
       <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
       <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0 4px;line-height:1" onclick="event.stopPropagation();_tcRemoveAsset('${side}','player','${pid}')">&times;</button>
@@ -1546,7 +1548,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
   const selectedPickHtml = assets.picks.map((pk, idx) => {
     const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
-      <span style="font-size:10px;font-weight:800;padding:1px 4px;border-radius:4px;background:var(--amberL);color:var(--amber)">PICK</span>
+      <span style="font-size:13px;font-weight:800;padding:1px 4px;border-radius:4px;background:var(--amberL);color:var(--amber)">PICK</span>
       <span style="font-size:13px;font-weight:600;flex:1">${pk.year} Rd ${pk.round}</span>
       <span style="font-size:13px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${val.toLocaleString()}</span>
       <button style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:16px;padding:0 4px;line-height:1" onclick="_tcRemoveAsset('${side}','pick',${idx})">&times;</button>
@@ -1911,7 +1913,7 @@ function renderValueChart(container) {
       html += `<span></span>`;
     } else {
       // Photo
-      html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,var(--bg4),var(--bg3))';this.parentElement.style.border='1px solid var(--border2)';this.parentElement.innerHTML='<span style=\\'font-size:9px;font-weight:800;color:var(--text2);letter-spacing:.02em\\'>${initials}</span>'" loading="lazy"/></div>`;
+      html += `<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;background:var(--bg4);display:flex;align-items:center;justify-content:center;flex-shrink:0"><img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,var(--bg4),var(--bg3))';this.parentElement.style.border='1px solid var(--border2)';this.parentElement.innerHTML='<span style=\\'font-size:13px;font-weight:800;color:var(--text2);letter-spacing:.02em\\'>${initials}</span>'" loading="lazy"/></div>`;
       // Name + Team
       html += `<div style="overflow:hidden"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div><div style="font-size:13px;color:var(--text3)">${p.team}</div></div>`;
       // Pos badge
@@ -1974,8 +1976,9 @@ function _thOwner(rid) {
 }
 function _thAvatar(rid) {
   const a = _tcAssessments.find(x => x.rosterId === rid);
-  if (a?.avatar) return `<img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">`;
-  return `<div style="width:22px;height:22px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text3)">${(_thOwner(rid)[0] || '?').toUpperCase()}</div>`;
+  const _i = (_thOwner(rid)[0] || '?').toUpperCase();
+  if (a?.avatar) return `<div style="position:relative;width:22px;height:22px;flex-shrink:0"><img src="https://sleepercdn.com/avatars/thumbs/${a.avatar}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div style="display:none;width:22px;height:22px;border-radius:50%;background:var(--bg3);align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3)">${_i}</div></div>`;
+  return `<div style="width:22px;height:22px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3)">${_i}</div>`;
 }
 
 function renderTradeHistory(container) {

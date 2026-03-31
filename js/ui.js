@@ -269,7 +269,7 @@ function buildRosterTable(){
   if(countEl)countEl.textContent=rows.length+' player'+(rows.length!==1?'s':'');
 
   const wrap=$('roster-tbody');
-  let html=`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 6px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;opacity:.6">
+  let html=`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 6px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;opacity:.6">
     <span style="min-width:36px"></span><span style="flex:1">Player</span><span style="min-width:54px;text-align:right">DHQ</span><span style="min-width:44px;text-align:right">PPG</span><span style="min-width:42px;text-align:right">Phase</span>
   </div>`;
   let lastSection='';
@@ -305,7 +305,7 @@ function buildRosterTable(){
           <span class="rr-name">${pName(pid)}</span>
           <span class="rr-pos" style="${getPosBadgeStyle(pos)}">${pos}</span>
           ${inj?'<span class="rr-inj">'+inj+'</span>':''}
-          ${isRookie?'<span style="font-size:10px;color:var(--blue);font-weight:700">R</span>':''}
+          ${isRookie?'<span style="font-size:13px;color:var(--blue);font-weight:700">R</span>':''}
         </div>
         <div class="rr-bottom">
           <span>Age ${age||'?'}</span>
@@ -1002,7 +1002,7 @@ function handlePlayerSearch(query){
     const {col}=tradeValueTier(val);
     const ini=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
     return`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s" onclick="openPlayerModal('${id}');$('player-search-results').style.display='none';$('player-search-in').value=''" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:11px>${ini}</span>')" loading="lazy"/>
+      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:13px>${ini}</span>')" loading="lazy"/>
       <div style="flex:1;overflow:hidden">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:13px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
         <div style="font-size:13px;color:var(--text3)">${posMapS(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
@@ -1884,7 +1884,7 @@ function renderTeamOverview(){
       const ini2=(p.name||'??').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
       return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0${i<4?';border-bottom:1px solid var(--border)':''};cursor:pointer" onclick="openPlayerModal('${p.pid}')">
         <span style="font-size:13px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
-        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:24px;height:24px;font-size:10px>${ini2}</span>')" loading="lazy"/>
+        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:24px;height:24px;font-size:13px>${ini2}</span>')" loading="lazy"/>
         <div style="flex:1;overflow:hidden">
           <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
           <div style="font-size:13px;color:var(--text2)">${p.pos} · ${p.age} · ${peakStr}${reasonStr?' · '+reasonStr:''}</div>
@@ -2179,7 +2179,7 @@ function renderTeamSnapshot(){
     <div class="home-sec-title">Team Snapshot</div>
     <div class="snapshot-scroll">
       <div class="snapshot-card" onclick="toggleTip('tip-health')">
-        <div class="snap-label">Health <span class="tip-icon" style="font-size:10px;opacity:.5">?</span></div>
+        <div class="snap-label">Health <span class="tip-icon" style="opacity:.5">?</span></div>
         <div class="snap-value" style="color:${hCol}">${healthScore}</div>
         <div class="snap-detail">${hTier}${panic>=3?' \u00B7 Panic '+panic+'/5':''}</div>
         <div class="snap-bar"><div class="snap-bar-fill" style="width:${healthScore}%;background:${hCol}"></div></div>
@@ -2300,7 +2300,7 @@ function renderCrownJewels(){
           const ini3=(p.name||'??').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
           return`<div class="jewel-row" onclick="openPlayerModal('${p.pid}')">
             <span style="font-size:14px;font-weight:800;color:var(--text3);min-width:18px">${i+1}</span>
-            <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:11px>${ini3}</span>')" loading="lazy"/>
+            <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:13px>${ini3}</span>')" loading="lazy"/>
             <div style="flex:1;min-width:0;overflow:hidden">
               <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
               <div style="font-size:13px;color:var(--text3)">${p.pos} \u00B7 ${p.age} \u00B7 ${peakStr}</div>
@@ -2650,12 +2650,12 @@ function openPlayerModal(playerId){
     const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
 
     rightPanel.innerHTML=`
-      <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDPModal?' <span style="font-size:10px;color:var(--accent);background:var(--accentL);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>':''}</div>
+      <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDPModal?' <span style="font-size:13px;color:var(--accent);background:var(--accentL);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>':''}</div>
       <div style="font-size:20px;font-weight:800;color:${pa.col}">${pa.label}</div>
       <div style="font-size:13px;color:var(--text2);margin-top:4px">
         <span style="color:${trendCol}">${trendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
       </div>
-      <div style="font-size:12px;color:var(--text3);margin-top:4px">${pa.reason}</div>`;
+      <div style="font-size:13px;color:var(--text3);margin-top:4px">${pa.reason}</div>`;
   }
 
   // Action buttons

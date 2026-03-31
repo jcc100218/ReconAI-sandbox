@@ -524,6 +524,22 @@ async function loadLeagueIntel(){
       dhqPickValues[pick].blendWeights={league:Math.round(leagueWeight*100),industry:Math.round(industryWeight*100)};
     }
 
+    // ── Enforce monotonic ordering within each round ──
+    // Hit bonus + rounding can cause later picks to exceed earlier picks.
+    // Clamp so each pick is <= the one before it (within same round).
+    for(let rd=1;rd<=7;rd++){
+      const start=(rd-1)*totalTeams+1;
+      const end=Math.min(rd*totalTeams,maxPicks);
+      let prevVal=Infinity;
+      for(let pick=start;pick<=end;pick++){
+        if(!dhqPickValues[pick])continue;
+        if(dhqPickValues[pick].value>prevVal){
+          dhqPickValues[pick].value=prevVal;
+        }
+        prevVal=dhqPickValues[pick].value;
+      }
+    }
+
     // Round-level summary
     const draftRounds=draftMeta[0]?.rounds||7;
     for(let rd=1;rd<=draftRounds;rd++){

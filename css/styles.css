@@ -517,7 +517,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .snap-pill:hover{border-color:var(--border2)}
 .snap-pill strong{color:var(--text);font-weight:700}
 /* Tooltips */
-.tip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--bg4);color:var(--text3);font-size:10px;font-weight:700;cursor:pointer;margin-left:4px;transition:all .15s;flex-shrink:0;vertical-align:middle;line-height:1}
+.tip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--bg4);color:var(--text3);font-size:13px;font-weight:700;cursor:pointer;margin-left:4px;transition:all .15s;flex-shrink:0;vertical-align:middle;line-height:1}
 .tip-icon:hover{background:var(--accent);color:#fff}
 .tip-box{display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:13px;color:var(--text2);line-height:1.6;margin-top:6px;animation:tipIn .2s ease}
 .tip-box.show{display:block}
@@ -757,7 +757,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 /* Score + confidence */
 .lu-score-col{text-align:right;flex-shrink:0;min-width:50px}
 .lu-score{font-size:16px;font-weight:800;font-family:'JetBrains Mono',monospace;letter-spacing:-.02em}
-.lu-confidence{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.lu-confidence{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
 .lu-conf-locked{color:var(--green)}
 .lu-conf-close{color:var(--blue)}
 .lu-conf-sub{color:var(--amber)}
@@ -840,10 +840,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .rr-right{text-align:right;flex-shrink:0;min-width:60px}
 .rr-phase{font-size:13px;font-weight:600}
 .rr-phase-desc{font-size:13px;color:var(--text3);margin-top:1px}
-.rr-verdict-chip{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;margin-top:2px;display:inline-block;text-transform:uppercase;letter-spacing:.03em}
+.rr-verdict-chip{font-size:13px;font-weight:700;padding:1px 5px;border-radius:4px;margin-top:2px;display:inline-block;text-transform:uppercase;letter-spacing:.03em}
 .rr-chevron{color:var(--text3);flex-shrink:0;opacity:.4}
 .rr-section-hdr{font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding:10px 0 4px}
-.rr-inj{font-size:10px;font-weight:700;padding:1px 4px;border-radius:3px;background:var(--redL);color:var(--red);margin-left:4px}
+.rr-inj{font-size:13px;font-weight:700;padding:1px 4px;border-radius:3px;background:var(--redL);color:var(--red);margin-left:4px}
 .rr-trend{font-size:13px;margin-left:3px}
 
 /* Sort cycle button */
@@ -906,7 +906,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .pm-stats-grid .pm-stat-box{padding:10px 4px;text-align:center;border-right:1px solid var(--border)}
 .pm-stats-grid .pm-stat-box:last-child{border-right:none}
 .pm-stat-box-val{font-size:16px;font-weight:800;letter-spacing:-.03em;line-height:1;font-family:'JetBrains Mono',monospace}
-.pm-stat-box-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;font-weight:600}
+.pm-stat-box-lbl{font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:4px;font-weight:600}
 
 /* Verdict banner */
 .pm-verdict-banner{
@@ -989,7 +989,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .wv-item-reason{font-size:13px;color:var(--text3);margin-top:2px;line-height:1.4}
 .wv-item-right{text-align:right;flex-shrink:0}
 .wv-faab-badge{font-size:14px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace}
-.wv-conf-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
+.wv-conf-badge{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-top:2px}
 
 /* Available player card (mobile) */
 .wv-avail-card{
@@ -1003,7 +1003,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .wv-avail-card:active{background:var(--bg3)}
 .wv-avail-card .rr-photo{width:32px;height:32px}
 .wv-avail-card .rr-initials{width:32px;height:32px;font-size:13px}
-.wv-priority-tag{font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
+.wv-priority-tag{font-size:13px;font-weight:700;padding:1px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.03em}
 
 /* ═══════════════════════════════════════════════════════
    TRADE BUILDER REFINEMENTS
