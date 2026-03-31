@@ -451,8 +451,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 }
 /* Small phones */
 @media(max-width:400px){
-  .header{padding:0 10px;gap:4px}
+  .header{padding:0 8px;gap:2px}
   .header-hide-sm{display:none!important}
+  .header button[title="Settings"]{padding:6px;min-width:36px;min-height:36px}
+  #league-pill{max-width:110px!important;padding:3px 8px!important}
   .content{padding:10px;padding-bottom:76px}
   .setup{padding:18px 14px}
   .setup h3{font-size:16px}

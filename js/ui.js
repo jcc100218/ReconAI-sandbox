@@ -1000,8 +1000,9 @@ function handlePlayerSearch(query){
     const meta=LI_LOADED?LI.playerMeta?.[id]:null;
     const isRookie=meta?.source==='FC_ROOKIE';
     const {col}=tradeValueTier(val);
+    const ini=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
     return`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s" onclick="openPlayerModal('${id}');$('player-search-results').style.display='none';$('player-search-in').value=''" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:11px>${ini}</span>')" loading="lazy"/>
       <div style="flex:1;overflow:hidden">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:13px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
         <div style="font-size:13px;color:var(--text3)">${posMapS(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
@@ -1880,9 +1881,10 @@ function renderTeamOverview(){
       if(trend>=20)reasons.push('trending up');
       else if(trend<=-20)reasons.push('declining');
       const reasonStr=reasons.length?reasons.slice(0,2).join(', '):'';
+      const ini2=(p.name||'??').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
       return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0${i<4?';border-bottom:1px solid var(--border)':''};cursor:pointer" onclick="openPlayerModal('${p.pid}')">
         <span style="font-size:13px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
-        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:24px;height:24px;font-size:10px>${ini2}</span>')" loading="lazy"/>
         <div style="flex:1;overflow:hidden">
           <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
           <div style="font-size:13px;color:var(--text2)">${p.pos} · ${p.age} · ${peakStr}${reasonStr?' · '+reasonStr:''}</div>
@@ -2295,9 +2297,10 @@ function renderCrownJewels(){
           const {col}=tradeValueTier(p.val);
           const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
           const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
+          const ini3=(p.name||'??').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
           return`<div class="jewel-row" onclick="openPlayerModal('${p.pid}')">
             <span style="font-size:14px;font-weight:800;color:var(--text3);min-width:18px">${i+1}</span>
-            <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none'" loading="lazy"/>
+            <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:11px>${ini3}</span>')" loading="lazy"/>
             <div style="flex:1;min-width:0;overflow:hidden">
               <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
               <div style="font-size:13px;color:var(--text3)">${p.pos} \u00B7 ${p.age} \u00B7 ${peakStr}</div>

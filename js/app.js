@@ -99,9 +99,17 @@ document.addEventListener('DOMContentLoaded', updateLineupTabVisibility);
 
 // ── Tab switching ──────────────────────────────────────────────
 function switchTab(tab,btn){
+  // Guard: redirect to home if not connected (except settings)
+  if(!S.user && tab!=='digest' && tab!=='settings'){
+    tab='digest';btn=null;
+    showToast('Connect your Sleeper account first');
+    // Focus the username input
+    setTimeout(()=>{const inp=$('u-input');if(inp)inp.focus();},200);
+  }
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   if(btn)btn.classList.add('active');
+  else{const homeBtn=document.querySelector('.tab[onclick*="digest"],.mobile-nav-item[onclick*="digest"]');if(homeBtn)homeBtn.classList.add('active');}
   const panel=$('panel-'+tab);
   if(panel)panel.classList.add('active');
   if(tab==='waivers'&&typeof loadMentality==='function')loadMentality();
@@ -547,6 +555,9 @@ window.checkForAlerts = checkForAlerts;
       const uInput = $('u-input');
       if(uInput) uInput.value = savedUser;
       setTimeout(()=>{if(!S.user)connect();},500);
+    } else {
+      // First-time user: focus the username input so they know where to start
+      setTimeout(()=>{const inp=$('u-input');if(inp)inp.focus();},600);
     }
     // Load user tier for paywall
     if (typeof loadUserTier === 'function') loadUserTier().catch(() => {});
