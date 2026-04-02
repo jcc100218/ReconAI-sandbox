@@ -417,18 +417,12 @@ window.App = window.App || {};
     const projBonus   = weeklyPts > WEEKLY_TARGET + 10 ? 3 : weeklyPts >= WEEKLY_TARGET ? 1 : 0;
     const healthScore = Math.min(100, Math.round(scoringScore + coverageScore + projBonus));
 
-    // Tier classification — driven by weekly scoring vs target
+    // Tier classification — driven by health score for balanced distribution
     let tier, tierColor, tierBg;
-    if (weeklyPts > 0) {
-      if      (weeklyPts > WEEKLY_TARGET + 10)   { tier = 'ELITE';      tierColor = '#D4AF37'; tierBg = 'rgba(212,175,55,0.15)'; }
-      else if (weeklyPts >= WEEKLY_TARGET - 15)   { tier = 'CONTENDER';  tierColor = '#2ECC71'; tierBg = 'rgba(46,204,113,0.12)'; }
-      else if (weeklyPts >= WEEKLY_TARGET * 0.85) { tier = 'CROSSROADS'; tierColor = '#F0A500'; tierBg = 'rgba(240,165,0,0.12)'; }
-      else                                         { tier = 'REBUILDING'; tierColor = '#E74C3C'; tierBg = 'rgba(231,76,60,0.12)'; }
-    } else {
-      if      (coverageScore >= 36) { tier = 'CONTENDER';  tierColor = '#2ECC71'; tierBg = 'rgba(46,204,113,0.12)'; }
-      else if (coverageScore >= 26) { tier = 'CROSSROADS'; tierColor = '#F0A500'; tierBg = 'rgba(240,165,0,0.12)'; }
-      else                           { tier = 'REBUILDING'; tierColor = '#E74C3C'; tierBg = 'rgba(231,76,60,0.12)'; }
-    }
+    if (healthScore >= 85) { tier = 'ELITE';      tierColor = '#D4AF37'; tierBg = 'rgba(212,175,55,0.15)'; }
+    else if (healthScore >= 72) { tier = 'CONTENDER';  tierColor = '#2ECC71'; tierBg = 'rgba(46,204,113,0.12)'; }
+    else if (healthScore >= 60) { tier = 'CROSSROADS'; tierColor = '#F0A500'; tierBg = 'rgba(240,165,0,0.12)'; }
+    else                         { tier = 'REBUILDING'; tierColor = '#E74C3C'; tierBg = 'rgba(231,76,60,0.12)'; }
 
     // Panic meter (0-5)
     let panic = 0;
