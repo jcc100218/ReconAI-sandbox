@@ -1147,8 +1147,10 @@ async function loadLeagueIntel(){
             }
             // Fallback to scaled value if no good anchor
             const baseDHQ=anchorDHQ!==null?anchorDHQ:Math.round(val*scaleFactor);
-            // 15% unproven discount (no NFL production yet)
-            let rookieDHQ=Math.round(baseDHQ*0.85);
+            // Tiered discount: elite picks get minimal discount, late picks more
+            const fcRank=d.overallRank||999;
+            const discount=fcRank<=5?0.97:fcRank<=15?0.93:fcRank<=30?0.90:fcRank<=60?0.87:0.82;
+            let rookieDHQ=Math.round(baseDHQ*discount);
 
             // SF QB premium: rookie QBs in superflex get scarcity bonus
             if(mappedPos==='QB'&&isSF){
@@ -1163,8 +1165,8 @@ async function loadLeagueIntel(){
               ageFactor:1.0,sitMult:1.0,
               peakYrsLeft:(peakWindows[mappedPos]||[23,29])[1]-(S.players[sid]?.age||21),
               starterSeasons:0,recentGP:0,
-              source:'FC_ROOKIE',fcValue:val,fcRank:d.overallRank||999,
-              anchorDHQ:anchorDHQ,unprovenDiscount:0.85
+              source:'FC_ROOKIE',fcValue:val,fcRank:fcRank,
+              anchorDHQ:anchorDHQ,unprovenDiscount:discount
             };
             rookieCount++;
           }
