@@ -426,13 +426,8 @@
           <div id="pm-peak-years" style="display:none"></div>
           <div id="pm-peak-desc" style="display:none"></div>
 
-          <!-- News -->
-          <div style="margin-bottom:14px">
-            <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Latest News</div>
-            <div id="pm-news" style="background:var(--bg3);border-radius:var(--r);padding:10px 12px;min-height:36px">
-              <div style="color:var(--text3);font-size:13px">Loading...</div>
-            </div>
-          </div>
+          <!-- News — disabled until API available -->
+          <div id="pm-news" style="display:none"></div>
           <div id="pm-tweet" style="display:none"></div>
           <div class="tip-box" id="tip-dhq-modal" style="display:none"></div>
           <div class="tip-box" id="tip-trade-profile" style="display:none"></div>
@@ -564,17 +559,8 @@
             <button class="btn btn-ghost btn-sm" onclick="clearKey()">Clear key</button>
           </div>
 
-          <!-- xAI News (collapsed sub-section) -->
-          <details style="margin-top:10px">
-            <summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0">Live news (optional — xAI/Grok)</summary>
-            <div style="padding:8px 0">
-              <div style="display:flex;gap:8px">
-                <input type="password" id="xai-key-in" placeholder="xai-..." style="font-family:monospace;font-size:13px;flex:1;padding:8px 10px" value=""/>
-                <button class="btn btn-ghost btn-sm" onclick="saveXaiKey()">Save</button>
-              </div>
-              <div id="xai-key-status" class="status-txt"></div>
-            </div>
-          </details>
+          <!-- xAI News — disabled until API is available -->
+
         </div>
       </details>
 

@@ -209,24 +209,9 @@ async function callClaude(messages, useWebSearch=false, _retries=2, maxTok=600, 
   throw new Error('Rate limit — please wait and try again.');
 }
 
-// ── Grok News — real-time X/Twitter intelligence ──────────────
+// ── Grok News — disabled until xAI API is available ──────────
 const _newsCache={};
-async function callGrokNews(query, maxTok=300){
-  const S = window.S || window.App?.S || {};
-  const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
-  if(!xaiKey)return null;
-  try{
-    const sys=(typeof DHQ_PROMPTS!=='undefined'&&DHQ_PROMPTS['player-news'])?DHQ_PROMPTS['player-news'].system:'You are a sports news aggregator. Provide recent NFL player news.';
-    const res=await fetch('https://api.x.ai/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+xaiKey},
-      body:JSON.stringify({model:'grok-3-mini',max_tokens:maxTok,messages:[{role:'system',content:sys},{role:'user',content:query}]})
-    });
-    if(!res.ok)return null;
-    const data=await res.json();
-    return data.choices?.[0]?.message?.content||null;
-  }catch(e){console.warn('Grok news error:',e);return null;}
-}
+async function callGrokNews(query, maxTok=300){ return null; }
 
 // ── Expose on window.App AND window (for dhq-ai.js compatibility) ──
 Object.assign(window.App, {

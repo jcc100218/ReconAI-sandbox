@@ -355,13 +355,8 @@ function clearKey(){
 }
 window.clearKey = clearKey;
 
-function saveXaiKey(){
-  const k=($('xai-key-in')?.value||'').trim();
-  if(!k){try{localStorage.removeItem('dynastyhq_xai_key');}catch(e){} ss('xai-key-status','xAI key cleared');return;}
-  if(!k.startsWith('xai-')){ss('xai-key-status','Key should start with xai-',true);return;}
-  try{localStorage.setItem('dynastyhq_xai_key',k);}catch(e){}
-  ss('xai-key-status','xAI news key saved ✓');
-}
+// saveXaiKey — disabled until xAI API is available
+function saveXaiKey(){}
 window.saveXaiKey = saveXaiKey;
 
 function reconnect(){
