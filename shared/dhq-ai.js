@@ -229,6 +229,31 @@ Assistant: "**Amon-Ra St. Brown (WR, age 25, DHQ 7,400) — HOLD.** Elite WR1 lo
     useWebSearch: true,
   },
 
+  // ── ROOKIE SCOUT REPORT ──────────────────────────────────────────
+  'rookie-scout': {
+    system: DHQ_IDENTITY,
+    instructions: `Context is provided as JSON. SEARCH THE WEB for current scouting info on this rookie prospect.
+Generate a detailed dynasty scouting report. Format EXACTLY as:
+
+**PROFILE:** Physical build, athletic traits, measurables. What does his body and athleticism tell you?
+
+**COLLEGE PRODUCTION:** Key stats from his last 2 college seasons. Volume, efficiency, role. How dominant was he at the college level?
+
+**POSITION GRADES (1-10):**
+For RB: Vision/Patience, Power/Balance, Agility/Accel, Passing Game, Competitiveness
+For WR: Route Running, Separation, Hands/Catch, YAC Ability, Contested Catch
+For QB: Arm Strength, Accuracy, Pocket Presence, Mobility, Decision Making
+For TE: Blocking, Route Running, Hands, YAC, Versatility
+For IDP: Tackling, Pass Rush, Coverage, Football IQ, Athleticism
+Rate each 1-10 with a one-line explanation.
+
+**NFL COMPARISON:** One specific NFL player comparison with reasoning. Not a lazy comp — explain WHY they're similar.
+
+**DYNASTY TAKEAWAY:** Clear buy/sell recommendation, ideal rookie draft range (e.g. "1.03-1.06"), ceiling outcome vs floor outcome, and how this player fits the user's roster needs. Be opinionated and specific.`,
+    maxTokens: 1500,
+    useWebSearch: true,
+  },
+
   // ── POWER RANKINGS X POST (skip few-shot) ──────────────────────
   'power-posts': {
     system: 'You are @ReconAI_FW, a bold and entertaining dynasty fantasy football analyst on X (Twitter).',
