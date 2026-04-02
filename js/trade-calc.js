@@ -1415,6 +1415,72 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
     </div>`;
   }
 
+  // ── TRADE IMPACT SIMULATOR ─────────────────────────────
+  if (hasTrade && typeof assessTeamFromGlobal === 'function') {
+    // Get current assessments
+    const myAssessNow = assessTeamFromGlobal(myRosterId);
+    const theirAssessNow = theirRosterId ? assessTeamFromGlobal(theirRosterId) : null;
+
+    if (myAssessNow) {
+      // Simulate swap: remove my given players, add their given players
+      const myGivePids = _tcBuilderMyAssets.players.map(String);
+      const myGetPids = _tcBuilderTheirAssets.players.map(String);
+      const myRosterObj = S.rosters?.find(r => r.roster_id === myRosterId);
+      if (myRosterObj) {
+        const simPlayers = (myRosterObj.players || []).filter(pid => !myGivePids.includes(String(pid))).concat(myGetPids);
+        const simRoster = { ...myRosterObj, players: simPlayers };
+        const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+        const nflStarterSet = typeof buildNflStarterSetFromGlobal === 'function' ? buildNflStarterSetFromGlobal() : {};
+        const picksByOwner = typeof window.App?.buildPicksByOwner === 'function' ? window.App.buildPicksByOwner(S.rosters, league, S.tradedPicks) : {};
+        const simAssess = typeof assessTeam === 'function' ? assessTeam(simRoster, S.players, S.playerStats, league, S.leagueUsers, nflStarterSet, picksByOwner[myRosterId] || []) : null;
+
+        if (simAssess) {
+          const hsDelta = simAssess.healthScore - myAssessNow.healthScore;
+          const nowElite = (myRosterObj.players || []).filter(pid => (dynastyValue(pid) || 0) >= 7000).length;
+          const simElite = simPlayers.filter(pid => (dynastyValue(pid) || 0) >= 7000).length;
+          const eDelta = simElite - nowElite;
+          const nowTier = myAssessNow.tier;
+          const simTier = simAssess.tier;
+          const tierChanged = nowTier !== simTier;
+
+          // Position changes
+          const posChanges = [];
+          Object.keys(simAssess.posAssessment || {}).forEach(pos => {
+            const before = myAssessNow.posAssessment?.[pos]?.status;
+            const after = simAssess.posAssessment?.[pos]?.status;
+            if (before !== after) posChanges.push({ pos, before, after });
+          });
+
+          html += `<div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:14px 16px;margin-bottom:12px">
+            <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Trade Impact Preview</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+              <div style="background:var(--bg3);border-radius:var(--r);padding:8px;text-align:center">
+                <div style="font-size:13px;color:var(--text3)">Health Score</div>
+                <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${hsDelta > 0 ? 'var(--green)' : hsDelta < 0 ? 'var(--red)' : 'var(--text3)'}">${myAssessNow.healthScore} → ${simAssess.healthScore}</div>
+                <div style="font-size:13px;font-weight:700;color:${hsDelta > 0 ? 'var(--green)' : hsDelta < 0 ? 'var(--red)' : 'var(--text3)'}">${hsDelta > 0 ? '+' : ''}${hsDelta}</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:var(--r);padding:8px;text-align:center">
+                <div style="font-size:13px;color:var(--text3)">Elite Players</div>
+                <div style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${eDelta > 0 ? 'var(--green)' : eDelta < 0 ? 'var(--red)' : 'var(--text3)'}">${nowElite} → ${simElite}</div>
+                <div style="font-size:13px;font-weight:700;color:${eDelta > 0 ? 'var(--green)' : eDelta < 0 ? 'var(--red)' : 'var(--text3)'}">${eDelta > 0 ? '+' : ''}${eDelta}</div>
+              </div>
+              <div style="background:var(--bg3);border-radius:var(--r);padding:8px;text-align:center">
+                <div style="font-size:13px;color:var(--text3)">Tier</div>
+                <div style="font-size:16px;font-weight:800;color:${tierChanged ? (simTier === 'ELITE' || simTier === 'CONTENDER' ? 'var(--green)' : 'var(--red)') : 'var(--text3)'}">${nowTier} ${tierChanged ? '→ ' + simTier : ''}</div>
+                <div style="font-size:13px;color:${tierChanged ? 'var(--accent)' : 'var(--text3)'}">${tierChanged ? 'TIER CHANGE' : 'No change'}</div>
+              </div>
+            </div>
+            ${posChanges.length ? '<div style="display:flex;gap:6px;flex-wrap:wrap">' + posChanges.map(pc => {
+              const improved = (pc.after === 'surplus' || pc.after === 'ok') && (pc.before === 'thin' || pc.before === 'deficit');
+              const worsened = (pc.before === 'surplus' || pc.before === 'ok') && (pc.after === 'thin' || pc.after === 'deficit');
+              return '<span style="font-size:13px;padding:2px 8px;border-radius:4px;background:' + (improved ? 'var(--greenL)' : worsened ? 'var(--redL)' : 'var(--bg3)') + ';color:' + (improved ? 'var(--green)' : worsened ? 'var(--red)' : 'var(--text3)') + '">' + pc.pos + ' ' + pc.before + ' → ' + pc.after + '</span>';
+            }).join('') + '</div>' : ''}
+          </div>`;
+        }
+      }
+    }
+  }
+
   // ── PSYCHOLOGICAL FACTORS (elevated) ─────────────────
   if (psychTaxes.length && hasTrade) {
     const topInsights = psychTaxes.slice(0, 3);
