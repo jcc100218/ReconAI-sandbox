@@ -11,7 +11,10 @@ const SLEEPER_BASE = 'https://api.sleeper.app/v1';
 // ── Base fetch with error handling ───────────────────────────────
 async function sleeperFetch(path) {
   const res = await fetch(SLEEPER_BASE + path);
-  if (!res.ok) throw new Error('Sleeper API error: ' + res.status);
+  if (!res.ok) {
+    if (res.status === 404) return null; // Endpoint not found — return null silently
+    throw new Error('Sleeper API error: ' + res.status);
+  }
   return res.json();
 }
 
