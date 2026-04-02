@@ -1516,39 +1516,75 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
     </div>
   </div>`;
 
-  // ── IMPROVE TRADE SUGGESTIONS ───────────────────────
-  if (hasTrade && Math.abs(diff) > 300) {
+  // ── COUNTEROFFER SUGGESTIONS ────────────────────────
+  if (hasTrade && (Math.abs(diff) > 300 || acceptance < 50)) {
     const suggestions = [];
     const myRoster = S.rosters?.find(r => r.roster_id === myRosterId);
     const theirRoster = S.rosters?.find(r => r.roster_id === theirRosterId);
+    const myPids = new Set(_tcBuilderMyAssets.players.map(String));
+    const theirPids = new Set(_tcBuilderTheirAssets.players.map(String));
 
     if (diff > 300) {
-      // You're overpaying — suggest removing or asking for more
+      // ── YOU'RE OVERPAYING — suggest ways to rebalance ──
+      // 1. Remove your smallest asset if it closes the gap
       const mySmallest = _tcBuilderMyAssets.players
-        .map(pid => ({ pid, val: dynastyValue(pid) }))
+        .map(pid => ({ pid, val: dynastyValue(pid), name: pNameShort(pid) }))
         .filter(p => p.val > 0)
         .sort((a, b) => a.val - b.val)[0];
-      if (mySmallest && mySmallest.val <= diff * 1.2) {
-        suggestions.push({ text: 'Remove ' + pNameShort(mySmallest.pid) + ' (' + mySmallest.val.toLocaleString() + ' DHQ) to rebalance', action: "_tcRemoveAsset('my','player','" + mySmallest.pid + "')" });
+      if (mySmallest && mySmallest.val <= diff * 1.3) {
+        suggestions.push({ text: 'Remove ' + mySmallest.name + ' (' + mySmallest.val.toLocaleString() + ' DHQ) — closes the gap', action: "_tcRemoveAsset('my','player','" + mySmallest.pid + "')", type: 'remove' });
       }
-      // Suggest they add a pick
-      suggestions.push({ text: 'Ask for a mid-round pick to close the ~' + Math.abs(diff).toLocaleString() + ' gap', action: null });
+      // 2. Find a specific player on their roster that closes the gap
+      if (theirRoster) {
+        const gapTarget = (theirRoster.players || [])
+          .filter(pid => !theirPids.has(String(pid)))
+          .map(pid => ({ pid, val: dynastyValue(pid), name: pNameShort(pid), pos: pPos(pid) }))
+          .filter(p => p.val > 0 && p.val >= diff * 0.5 && p.val <= diff * 1.5)
+          .sort((a, b) => Math.abs(a.val - diff) - Math.abs(b.val - diff))[0];
+        if (gapTarget) {
+          suggestions.push({ text: 'Ask for ' + gapTarget.name + ' (' + gapTarget.pos + ', ' + gapTarget.val.toLocaleString() + ' DHQ) to close the ~' + diff.toLocaleString() + ' gap', action: null, type: 'add_their' });
+        }
+      }
     } else if (diff < -300) {
-      // You're winning — suggest sweetening
-      const roundNeeded = Math.abs(diff) > 3000 ? '1st' : Math.abs(diff) > 1500 ? '2nd' : '3rd';
-      suggestions.push({ text: 'Add a ' + roundNeeded + ' round pick to improve acceptance', action: null });
-      if (acceptance < 50) {
-        suggestions.push({ text: 'Low acceptance — try adding a depth player they need', action: null });
+      // ── YOU'RE WINNING — suggest sweeteners to boost acceptance ──
+      // 1. Find a depth player on your roster that fills their need
+      if (myAssessment && theirAssessment && myRoster) {
+        const theirNeeds = (theirAssessment.needs || []).map(n => n.pos);
+        const sweetener = (myRoster.players || [])
+          .filter(pid => !myPids.has(String(pid)))
+          .map(pid => ({ pid, val: dynastyValue(pid), name: pNameShort(pid), pos: pPos(pid) }))
+          .filter(p => p.val >= 500 && p.val <= 3000 && theirNeeds.includes(p.pos))
+          .sort((a, b) => a.val - b.val)[0];
+        if (sweetener) {
+          suggestions.push({ text: 'Add ' + sweetener.name + ' (' + sweetener.pos + ', ' + sweetener.val.toLocaleString() + ' DHQ) — fills their ' + sweetener.pos + ' need', action: "_tcAddAsset('my','player','" + sweetener.pid + "')", type: 'add_my' });
+        }
       }
+      // 2. Suggest a specific pick
+      const absDiff = Math.abs(diff);
+      const roundNeeded = absDiff > 4000 ? '1st' : absDiff > 2000 ? '2nd' : '3rd';
+      suggestions.push({ text: 'Add a ' + roundNeeded + ' round pick (~' + absDiff.toLocaleString() + ' value gap)', action: null, type: 'pick' });
+    }
+
+    // 3. If acceptance is low regardless of value, explain why
+    if (acceptance < 40 && suggestions.length < 3) {
+      const dnaKey = _tcDnaMap[theirRosterId] || 'NONE';
+      if (dnaKey === 'STALWART') suggestions.push({ text: 'This owner prefers near-fair trades — get within 5% value difference', action: null, type: 'tip' });
+      else if (dnaKey === 'FLEECER') suggestions.push({ text: 'This owner only accepts trades heavily in their favor — overpay or find another partner', action: null, type: 'tip' });
+      else if (dnaKey === 'DOMINATOR') suggestions.push({ text: 'This owner wants to feel like they won — add a "name" player even if value is lower', action: null, type: 'tip' });
     }
 
     if (suggestions.length) {
       html += `<div style="margin-bottom:12px">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Improve This Trade</div>
-        ${suggestions.map(s => `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:4px;cursor:${s.action ? 'pointer' : 'default'};transition:background .12s;-webkit-tap-highlight-color:transparent" ${s.action ? 'onclick="' + s.action + '"' : ''}>
-          <span style="color:var(--accent);font-weight:700;font-size:14px;flex-shrink:0">→</span>
-          <span style="font-size:13px;color:var(--text2)">${s.text}</span>
-        </div>`).join('')}
+        <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${diff > 300 ? 'Rebalance Options' : 'Sweeten the Deal'}</div>
+        ${suggestions.map(s => {
+          const icon = s.type === 'remove' ? '✂' : s.type === 'add_my' ? '+' : s.type === 'add_their' ? '←' : s.type === 'tip' ? '💡' : '→';
+          const bg = s.type === 'tip' ? 'var(--accentL)' : 'var(--bg2)';
+          return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${bg};border:1px solid var(--border);border-radius:var(--r);margin-bottom:4px;cursor:${s.action ? 'pointer' : 'default'};transition:background .12s" ${s.action ? 'onclick="' + s.action + '"' : ''}>
+            <span style="color:var(--accent);font-weight:700;font-size:14px;flex-shrink:0">${icon}</span>
+            <span style="font-size:13px;color:var(--text2)">${s.text}</span>
+            ${s.action ? '<span style="font-size:13px;color:var(--accent);margin-left:auto;flex-shrink:0">Apply →</span>' : ''}
+          </div>`;
+        }).join('')}
       </div>`;
     }
   }
@@ -1717,6 +1753,15 @@ function _tcSetFaab(side, val) {
   _tcRefreshBuilder();
 }
 window._tcSetFaab = _tcSetFaab;
+
+function _tcAddAsset(side, type, pid) {
+  const assets = side === 'my' ? _tcBuilderMyAssets : _tcBuilderTheirAssets;
+  if (type === 'player' && !assets.players.includes(pid)) {
+    assets.players.push(pid);
+  }
+  _tcRefreshBuilder();
+}
+window._tcAddAsset = _tcAddAsset;
 
 function _tcRemoveAsset(side, type, idxOrPid) {
   const assets = side === 'my' ? _tcBuilderMyAssets : _tcBuilderTheirAssets;
