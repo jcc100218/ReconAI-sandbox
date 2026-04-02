@@ -32,21 +32,41 @@ function updateSettingsStatus(){
   const aiDot=$('st-ai-dot');const aiLabel=$('st-ai-label');
   const aiBadge=$('ai-setup-badge');
   if(aiDot&&aiLabel){
-    const hasAI2=typeof hasAnyAI==='function'&&hasAnyAI(false);
-    const providerName=S.aiProvider==='anthropic'?'Claude':S.aiProvider==='gemini'?'Gemini':S.aiProvider||'None';
+    const hasServer=typeof hasServerAI==='function'&&hasServerAI();
+    const hasKey=!!S.apiKey;
+    const hasAI2=hasServer||hasKey;
+    const providerName=hasServer?'Server AI':S.aiProvider==='anthropic'?'Claude':S.aiProvider==='gemini'?'Gemini':'None';
     if(hasAI2){
       aiDot.style.background='var(--green)';
       aiLabel.style.color='var(--green)';
       aiLabel.textContent='Connected ('+providerName+')';
       if(aiBadge)aiBadge.textContent=providerName;
-      // Collapse AI section if already set up
       const det=$('ai-setup-details');
-      if(det&&S.apiKey)det.removeAttribute('open');
+      if(det)det.removeAttribute('open');
     }else{
       aiDot.style.background='var(--red)';
       aiLabel.style.color='var(--red)';
       aiLabel.textContent='Not connected — some features limited';
       if(aiBadge)aiBadge.textContent='Not set';
+    }
+  }
+  // Server AI status indicator
+  const sDot=$('ai-server-dot');const sLabel=$('ai-server-label');const sDetail=$('ai-server-detail');
+  if(sDot){
+    const hasServer=typeof hasServerAI==='function'&&hasServerAI();
+    const hasKey=!!S.apiKey;
+    if(hasServer){
+      sDot.style.background='var(--green)';
+      if(sLabel)sLabel.textContent='AI Active — Server';
+      if(sDetail)sDetail.textContent='Powered by your account. No API key needed.';
+    }else if(hasKey){
+      sDot.style.background='var(--green)';
+      if(sLabel)sLabel.textContent='AI Active — Your Key';
+      if(sDetail)sDetail.textContent='Using your '+(S.aiProvider==='anthropic'?'Claude':'Gemini')+' API key.';
+    }else{
+      sDot.style.background='var(--amber)';
+      if(sLabel)sLabel.textContent='AI Not Connected';
+      if(sDetail)sDetail.textContent='Connect your account or add an API key below to enable AI features.';
     }
   }
   // League status

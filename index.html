@@ -540,27 +540,38 @@
           <span id="ai-setup-badge" style="font-size:13px;color:var(--text3);font-weight:400"></span>
         </summary>
         <div style="padding:12px 0 4px">
-          <div style="font-size:13px;color:var(--text3);margin-bottom:10px;line-height:1.5">Your AI powers trade, waiver, and draft recommendations. <strong style="color:var(--green)">Gemini is free.</strong></div>
-          <div style="margin-bottom:8px">
-            <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Provider</div>
-            <select id="ai-provider-sel" style="width:100%;font-size:14px;padding:10px 12px" onchange="updateProviderHint()">
-              <option value="gemini">Gemini Flash — Free (Google)</option>
-              <option value="anthropic">Claude (Anthropic) — Premium</option>
-            </select>
-          </div>
-          <div id="provider-hint" style="font-size:13px;color:var(--text3);margin-bottom:8px;line-height:1.5"></div>
-          <div style="display:flex;gap:8px;margin-bottom:8px">
-            <input type="password" id="api-key-in" placeholder="Paste API key..." style="font-family:monospace;font-size:14px;flex:1;padding:10px 12px"/>
-            <button class="btn" onclick="saveKey()" style="padding:10px 18px">Save</button>
-          </div>
-          <div id="key-status" class="status-txt"></div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-            <input type="text" id="ai-model-in" placeholder="Model (auto)" style="font-size:13px;flex:1;padding:8px 10px"/>
-            <button class="btn btn-ghost btn-sm" onclick="clearKey()">Clear key</button>
+          <!-- Server-side AI status -->
+          <div id="ai-server-status" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);margin-bottom:12px">
+            <div id="ai-server-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0"></div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;color:var(--text)" id="ai-server-label">Checking AI...</div>
+              <div style="font-size:13px;color:var(--text3);margin-top:2px" id="ai-server-detail">AI is powered by your account — no API key needed.</div>
+            </div>
           </div>
 
-          <!-- xAI News — disabled until API is available -->
-
+          <!-- Advanced: bring your own key (collapsed by default) -->
+          <details style="margin-top:6px">
+            <summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0">Advanced: use your own API key</summary>
+            <div style="padding:8px 0">
+              <div style="font-size:13px;color:var(--text3);margin-bottom:8px;line-height:1.5">Bring your own key for unlimited usage. <strong style="color:var(--green)">Gemini is free.</strong></div>
+              <div style="margin-bottom:8px">
+                <select id="ai-provider-sel" style="width:100%;font-size:14px;padding:10px 12px" onchange="updateProviderHint()">
+                  <option value="gemini">Gemini Flash — Free (Google)</option>
+                  <option value="anthropic">Claude (Anthropic) — Premium</option>
+                </select>
+              </div>
+              <div id="provider-hint" style="font-size:13px;color:var(--text3);margin-bottom:8px;line-height:1.5"></div>
+              <div style="display:flex;gap:8px;margin-bottom:8px">
+                <input type="password" id="api-key-in" placeholder="Paste API key..." style="font-family:monospace;font-size:14px;flex:1;padding:10px 12px"/>
+                <button class="btn" onclick="saveKey()" style="padding:10px 18px">Save</button>
+              </div>
+              <div id="key-status" class="status-txt"></div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                <input type="text" id="ai-model-in" placeholder="Model (auto)" style="font-size:13px;flex:1;padding:8px 10px"/>
+                <button class="btn btn-ghost btn-sm" onclick="clearKey()">Clear key</button>
+              </div>
+            </div>
+          </details>
         </div>
       </details>
 
