@@ -1145,10 +1145,22 @@ async function loadLeagueIntel(){
                 if(dist<bestDist){bestDist=dist;anchorDHQ=m.dhqVal;}
               }
             }
-            // Fallback to scaled value if no good anchor
-            const baseDHQ=anchorDHQ!==null?anchorDHQ:Math.round(val*scaleFactor);
-            // Tiered discount: elite picks get minimal discount, late picks more
+            const fcScaledVal=Math.round(val*scaleFactor);
             const fcRank=d.overallRank||999;
+            let baseDHQ;
+            if(fcRank<=10&&anchorDHQ!==null){
+              // Top-10 prospects: use the anchor (market-equivalent veteran DHQ)
+              // but floor at 80% of the #1 DHQ player to prevent compression
+              const topDHQ=Math.max(...Object.values(playerScores),1);
+              const fcTopVal=Math.max(...fcData.filter(d2=>d2.player?.sleeperId&&d2.value>0).map(d2=>d2.value),1);
+              const directMap=Math.round((val/fcTopVal)*topDHQ);
+              baseDHQ=Math.max(anchorDHQ,directMap);
+            }else if(fcRank<=30){
+              baseDHQ=Math.max(anchorDHQ||0,fcScaledVal);
+            }else{
+              baseDHQ=anchorDHQ!==null?anchorDHQ:fcScaledVal;
+            }
+            // Tiered discount: elite picks get minimal discount, late picks more
             const discount=fcRank<=5?0.97:fcRank<=15?0.93:fcRank<=30?0.90:fcRank<=60?0.87:0.82;
             let rookieDHQ=Math.round(baseDHQ*discount);
 
