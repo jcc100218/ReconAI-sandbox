@@ -46,7 +46,7 @@ function _fwFPUrl(name) {
 }
 
 // ── Helper: peak years ────────────────────────────────────────
-const _fwPeaks = {QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+const _fwPeaks = {QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
 function _fwPeakYears(pos, age) {
   const [lo,hi] = _fwPeaks[pos] || [24,29];
   if (!age) return {label:'\u2014',desc:'',lo,hi};

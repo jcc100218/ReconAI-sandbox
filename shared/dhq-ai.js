@@ -302,7 +302,7 @@ function dhqBuildRosterContext(compact) {
   const pM = window.pM || window.App?.pM || (p => p);
   const dynastyValue = window.dynastyValue || window.App?.dynastyValue || (() => 0);
   const playerStats = S.playerStats || {};
-  const peakWindows = window.App?.peakWindows || { QB: [24, 34], RB: [22, 27], WR: [22, 30], TE: [23, 30], DL: [23, 29], LB: [23, 28], DB: [23, 29] };
+  const peakWindows = window.App?.peakWindows || { QB: [23, 39], RB: [21, 31], WR: [21, 33], TE: [21, 34], DL: [26, 33], LB: [26, 32], DB: [21, 34] };
   const s = my.settings || {};
   const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
   const sc = league?.scoring_settings || {};

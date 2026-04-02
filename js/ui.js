@@ -180,7 +180,7 @@ async function renderRoster(){
 function peakYears(pid){
   const pos=pPos(pid);const age=pAge(pid)||0;
   // Research-backed peak ranges (EPA study 2014-2024)
-  const peaks={QB:[28,33],RB:[25,27],WR:[26,30],TE:[27,30],DL:[25,29],LB:[24,28],DB:[25,29]};
+  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
   const [lo,hi]=peaks[pos]||[25,29];
   if(!age)return{label:'—',desc:'',cls:'',color:'var(--text3)'};
   const yrsToPeak=lo-age;
@@ -1111,7 +1111,7 @@ function renderDailyBriefing(){
   const my=myR();if(!my)return;
   const myPids=my.players||[];
   const mySet=new Set(myPids);
-  const peaks=window.App?.peakWindows||{QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const faab=getFAAB();
   const trending=S.trending||{};
@@ -2011,7 +2011,7 @@ function renderHeroAction(){
   const my=myR();if(!my)return;
   const myPids=my.players||[];
   const mySet=new Set(myPids);
-  const peaks=window.App?.peakWindows||{QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const faab=getFAAB();
   const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
@@ -2083,7 +2083,7 @@ function renderPrepareCards(){
   if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
   const my=myR();if(!my)return;
   const myPids=my.players||[];
-  const peaks=window.App?.peakWindows||{QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]};
+  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const items=[];
 
@@ -2483,8 +2483,8 @@ function openPlayerModal(playerId){
   window._pmPid=playerId;
   const pos=p.position||'?';const age=p.age||26;const val=dynastyValue(playerId);
   const exp=p.years_exp??0;
-  const peakMap={QB:[27,31],RB:[23,26],WR:[25,29],TE:[25,29],DL:[24,29],LB:[24,28],DB:[24,28]};
-  const [pLo,pHi]=(()=>{ const pos=pPos(playerId); const peaks={QB:[27,33],RB:[22,26],WR:[24,29],TE:[25,30],DL:[24,29],LB:[23,28],DB:[24,29]}; return peaks[pos]||[24,29]; })();
+  const peakMap=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+  const [pLo,pHi]=(()=>{ const pos=pPos(playerId); const peaks={QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]}; return peaks[pos]||[24,29]; })();
   const peak=Math.round((pLo+pHi)/2);
   const onMyTeam=(myR()?.players||[]).includes(String(playerId));
   const stats=S.playerStats?.[playerId]||{};
@@ -2947,7 +2947,7 @@ function renderDraftNeeds(){
   const activePositions=Object.keys(starterSlots).filter(p=>starterSlots[p]>0);
 
   const avgThresh=LI_LOADED&&LI.avgThresh?LI.avgThresh:{};
-  const peaks=LI_LOADED&&LI.peakWindows?LI.peakWindows:{QB:[24,33],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
+  const peaks=LI_LOADED&&LI.peakWindows?LI.peakWindows:{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
 
   const posAnalysis=activePositions.map(pos=>{
     const posPlayers=allPlayers.filter(pid=>posMapD(pPos(pid))===pos);
@@ -3199,7 +3199,7 @@ function renderRookieProfiles(){
   const el=$('rookie-profiles');if(!el)return;
   if(!S.players||!LI_LOADED){el.innerHTML='';return;}
 
-  const peaks=LI.peakWindows||{QB:[24,33],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
+  const peaks=LI.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
   const posMapR=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S','FS','SS'].includes(p))return'DB';return p;};
   const idpSet=new Set(['DL','LB','DB','DE','DT','CB','S','FS','SS']);
   const filterGroup=pos=>{const m=posMapR(pos);return idpSet.has(m)?'IDP':m;};

@@ -523,7 +523,7 @@ function projectRoster(rosterId, yearsAhead) {
   if (!roster) return [];
 
   const currentYear = parseInt(S.season) || new Date().getFullYear();
-  const peakWindows = window.App.peakWindows || { QB: [24, 34], RB: [22, 27], WR: [22, 30], TE: [23, 30], DL: [23, 29], LB: [23, 28], DB: [23, 29] };
+  const peakWindows = window.App.peakWindows || { QB: [23, 39], RB: [21, 31], WR: [21, 33], TE: [21, 34], DL: [26, 33], LB: [26, 32], DB: [21, 34] };
   const decayRates = window.App.decayRates || { QB: 0.06, RB: 0.25, WR: 0.14, TE: 0.12, DL: 0.15, LB: 0.15, DB: 0.14 };
   const players = roster.players || [];
   const totalTeams = S.rosters.length || 12;
