@@ -113,7 +113,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       caches.match(event.request).then(cached =>
         cached || fetch(event.request).then(response => {
-          if (response.ok) caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+          if (response.ok) {
+            const cloned = response.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, cloned));
+          }
           return response;
         })
       )
@@ -126,7 +129,10 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       caches.match(event.request).then(cached =>
         cached || fetch(event.request).then(response => {
-          if (response.ok) caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+          if (response.ok) {
+            const cloned = response.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, cloned));
+          }
           return response;
         }).catch(() => new Response('', { status: 404 }))
       )

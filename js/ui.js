@@ -3493,8 +3493,6 @@ Object.assign(window.App, {
   // Mobile nav
   mobileTab,
 
-  // Stats stub
-  statsData,
 });
 
 // Also expose key functions directly on window for inline onclick handlers
