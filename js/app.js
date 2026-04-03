@@ -250,7 +250,7 @@ async function selectLeague(leagueId,userId){
   const league=S.leagues.find(l=>l.league_id===leagueId);
   const leagueName=(league?.name||'League').substring(0,20);
   const isDynasty=league?.settings?.type===2;
-  const lpEl=$('league-pill');if(lpEl)lpEl.textContent=leagueName+(isDynasty?'':' (Redraft)');
+  const lpEl=$('league-pill');if(lpEl)lpEl.innerHTML='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+leagueName+(isDynasty?'':' (Redraft)')+'</span><span style="opacity:.5;font-size:13px;flex-shrink:0">\u21C4</span>';
   const sbEl=$('setup-block');if(sbEl)sbEl.innerHTML=`<div style="text-align:center;padding:20px 0">
     <div style="margin:0 auto 16px;width:52px;height:52px;background:linear-gradient(135deg,#7c6bf8,#5b4cc4);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(124,107,248,0.3)">
       <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#c4b5fd;border-radius:50%;animation:spin .7s linear infinite"></span>

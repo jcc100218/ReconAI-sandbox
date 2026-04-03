@@ -891,7 +891,6 @@ function renderPicks(){
       }).join('')
       +'</div></div>';
   }).join('')
-  +(tradedAway.length?'<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:13px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Traded away</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+tradedAway.map(p=>'<div style="background:var(--redL);border:1px solid rgba(248,113,113,.15);border-radius:8px;padding:6px 10px;font-size:13px;color:var(--red)">'+p.season+' R'+p.round+' → '+p.to+'</div>').join('')+'</div></div>':'')
   +'<div style="font-size:13px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+myPicks.length+' picks · Total value: <strong style="color:var(--accent);font-family:\'JetBrains Mono\',monospace">~'+totalVal.toLocaleString()+'</strong></div>';
 }
 
@@ -1852,68 +1851,7 @@ function renderTeamOverview(){
     </div>
   </div>`;
 
-  // Position grades grid
-  html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
-    <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Position Grades <span class="tip-icon" onclick="toggleTip('tip-grades')">?</span></div>
-    <div class="tip-box" id="tip-grades" style="margin-bottom:8px">
-      <strong>Position Grades (A-F)</strong> compare your total DHQ value at each position vs the league average total at that position.<br><br>
-      <strong>A</strong> = 30%+ above league average — elite depth<br>
-      <strong>B</strong> = 5-30% above — solid<br>
-      <strong>C</strong> = within 15% of average — adequate<br>
-      <strong>D</strong> = 15-35% below — thin<br>
-      <strong>F</strong> = 35%+ below — critical need<br><br>
-      The number shown is your total positional DHQ. More players with value = better grade.
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">`;
-  positions.forEach(pos=>{
-    const g=posGroups[pos];if(!g||!g.count)return;
-    const topP=g.top[0];
-    const topCol=topP?tradeValueTier(topP.val).col:'var(--text2)';
-    html+=`<div style="background:var(--bg3);border-radius:var(--r);padding:8px 10px;min-height:62px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <span style="font-size:13px;font-weight:700">${pos}</span>
-        <span style="font-size:15px;font-weight:800;color:${gradeColor(g.total,pos)}">${gradeLetter(g.total,pos)}</span>
-      </div>
-      <div style="font-size:13px;color:var(--text2)">${g.count}p · ${g.total.toLocaleString()} DHQ</div>
-      ${topP?`<div style="font-size:13px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${topP.name} <span style="color:${topCol};font-family:'JetBrains Mono',monospace;font-size:13px">${topP.val.toLocaleString()}</span></div>`:''}
-    </div>`;
-  });
-  html+=`</div></div>`;
-
-  // Crown jewels
-  const topPlayers=players.map(pid=>({pid,val:dynastyValue(pid),name:pName(pid),pos:pM(pPos(pid)),age:pAge(pid)}))
-    .filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
-  if(topPlayers.length){
-    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-      <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Crown Jewels <span class="tip-icon" onclick="toggleTip('tip-jewels')">?</span></div>
-      <div class="tip-box" id="tip-jewels" style="margin-bottom:6px">
-        <strong>Crown Jewels</strong> are your 5 most valuable dynasty assets ranked by DHQ value. These are the players you should protect in trades — they're the foundation of your roster's long-term strength. Selling a crown jewel should only happen for a massive overpay.
-      </div>`;
-    html+=topPlayers.map((p,i)=>{
-      const {col}=tradeValueTier(p.val);
-      const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
-      const pyLeft=meta?.peakYrsLeft||0;
-      const peakStr=pyLeft>=5?'long peak window':pyLeft>=3?'in prime':pyLeft>=1?'peak closing':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
-      const reasons=[];
-      if(meta?.starterSeasons>=3)reasons.push(meta.starterSeasons+'yr starter');
-      if(meta?.sitMult>=1.20&&p.age<=25)reasons.push('elite young producer');
-      const trend=meta?.trend||0;
-      if(trend>=20)reasons.push('trending up');
-      else if(trend<=-20)reasons.push('declining');
-      const reasonStr=reasons.length?reasons.slice(0,2).join(', '):'';
-      const ini2=(p.name||'??').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0${i<4?';border-bottom:1px solid var(--border)':''};cursor:pointer" onclick="openPlayerModal('${p.pid}')">
-        <span style="font-size:13px;font-weight:700;color:var(--text3);min-width:14px">${i+1}</span>
-        <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:24px;height:24px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:24px;height:24px;font-size:13px>${ini2}</span>')" loading="lazy"/>
-        <div style="flex:1;overflow:hidden">
-          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-          <div style="font-size:13px;color:var(--text2)">${p.pos} · ${p.age} · ${peakStr}${reasonStr?' · '+reasonStr:''}</div>
-        </div>
-        <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
-      </div>`;
-    }).join('');
-    html+=`</div>`;
-  }
+  // Position grades and crown jewels removed from roster tab — available on home tab
 
   el.innerHTML=html;
   recordHealthSnapshot(healthScore,hTier);
@@ -2248,104 +2186,14 @@ function renderTeamSnapshot(){
 }
 
 function renderBiggestNeeds(){
-  const el=$('home-biggest-needs');if(!el)return;
-  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
-  const my=myR();if(!my)return;
-  const players=my.players||[];
-  // Use global pM from app.js
-
-  // Grade each position relative to league average
-  // Only show positions that exist in the league roster config
-  const league2=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  const rp2=league2?.roster_positions||[];
-  const rpNorm=new Set(rp2.map(s=>{if(['DE','DT'].includes(s))return'DL';if(['CB','S'].includes(s))return'DB';return s;}));
-  const positions=['QB','RB','WR','TE','DL','LB','DB','K'].filter(p=>rpNorm.has(p));
-  const posGroups={};
-  positions.forEach(pos=>{posGroups[pos]={total:0,count:0};});
-  players.forEach(pid=>{
-    const pos=pM(pPos(pid));if(!pos||!posGroups[pos])return;
-    posGroups[pos].total+=dynastyValue(pid);posGroups[pos].count++;
-  });
-
-  // Use assessment-based grades (same method as Roster Health bar) for consistency
-  const homeAssess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
-  const statusToGrade=s=>s==='surplus'?'A':s==='ok'?'B':s==='thin'?'C':'D';
-  const statusToCol=s=>s==='surplus'?'var(--green)':s==='ok'?'var(--accent)':s==='thin'?'var(--amber)':'var(--red)';
-
-  // Sort: weakest first
-  const graded=positions.map(pos=>{
-    const g=posGroups[pos];
-    const pa=homeAssess?.posAssessment?.[pos];
-    const status=pa?.status||'ok';
-    const grade=statusToGrade(status);
-    const col=statusToCol(status);
-    return{pos,grade,col,total:g.total,count:g.count};
-  }).sort((a,b)=>{
-    const order={D:0,C:1,B:2,A:3};
-    return (order[a.grade]??4)-(order[b.grade]??4);
-  });
-
-  el.innerHTML=`
-    <div class="needs-section">
-      <div class="home-sec-title">Position Grades <span style="font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;font-size:13px">\u2014 weakest first</span></div>
-      <div class="needs-row">
-        ${graded.map(g=>`
-          <div class="need-chip" onclick="mobileTab('roster')">
-            <span class="need-pos" style="color:var(--text2)">${g.pos}</span>
-            <span class="need-grade" style="color:${g.col}">${g.grade}</span>
-            <span class="need-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
-          </div>`).join('')}
-      </div>
-    </div>`;
+  const el=$('home-biggest-needs');if(el)el.innerHTML='';
 }
 
 function renderCrownJewels(){
-  const el=$('home-crown-jewels');if(!el)return;
-  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
-  const my=myR();if(!my)return;
-  const players=my.players||[];
-  // Use global pM from app.js
-
-  const topPlayers=players.map(pid=>({pid,val:dynastyValue(pid),name:pName(pid),pos:pM(pPos(pid)),age:pAge(pid)}))
-    .filter(p=>p.val>0).sort((a,b)=>b.val-a.val).slice(0,5);
-  if(!topPlayers.length){el.innerHTML='';return;}
-
-  const previewStr=topPlayers.slice(0,3).map(p=>pNameShort(p.pid)).join(', ');
-
-  el.innerHTML=`
-    <div class="jewels-section">
-      <div class="jewels-toggle" id="jewels-toggle" onclick="toggleJewels()">
-        <div><span class="jt-label">Crown Jewels</span><span class="jt-preview">${previewStr}</span></div>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-      <div class="jewels-body" id="jewels-body">
-        ${topPlayers.map((p,i)=>{
-          const {col}=tradeValueTier(p.val);
-          const meta=LI_LOADED?LI.playerMeta?.[p.pid]:null;
-          const peakStr=meta?.peakYrsLeft>0?meta.peakYrsLeft+'yr peak':(p.age<=(LI.peakWindows?.[meta?.pos||p.pos]||[23,29])[1]?'final yr':'past peak');
-          const ini3=(p.name||'??').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase();
-          return`<div class="jewel-row" onclick="openPlayerModal('${p.pid}')">
-            <span style="font-size:14px;font-weight:800;color:var(--text3);min-width:18px">${i+1}</span>
-            <img src="https://sleepercdn.com/content/nfl/players/${p.pid}.jpg" style="width:28px;height:28px;border-radius:50%" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:28px;height:28px;font-size:13px>${ini3}</span>')" loading="lazy"/>
-            <div style="flex:1;min-width:0;overflow:hidden">
-              <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name}</div>
-              <div style="font-size:13px;color:var(--text3)">${p.pos} \u00B7 ${p.age} \u00B7 ${peakStr}</div>
-            </div>
-            <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
+  const el=$('home-crown-jewels');if(el)el.innerHTML='';
 }
 
-function toggleJewels(){
-  const toggle=document.getElementById('jewels-toggle');
-  const body=document.getElementById('jewels-body');
-  if(!toggle||!body)return;
-  toggle.classList.toggle('open');
-  body.classList.toggle('open');
-}
+function toggleJewels(){}
 
 // ── Master home render — calls all new mobile components ──────
 function renderMobileHome(){
@@ -2552,7 +2400,7 @@ function openPlayerModal(playerId){
       if(meta.source==='FC_ROOKIE'){
         blurb=`Incoming rookie with ${meta.peakYrsLeft||'?'} peak years ahead. Value based on DHQ dynasty consensus — no NFL production yet.`;
         blurbColor='var(--green)';
-      }else if(meta.sitMult<=0.45){
+      }else if(meta.sitMult<=0.45&&(!team||team==='FA')){
         blurb=`Not rostered by anyone in the league and no NFL team. ${yrsPast>=2?'Likely retired or out of football.':'Needs a landing spot to have any value.'}`;
         blurbColor='var(--red)';
       }else if(yrsPast>=5){
@@ -2732,18 +2580,8 @@ function openPlayerModal(playerId){
     });
   }
 
-  // News
-  const xaiKey=localStorage.getItem('dynastyhq_xai_key')||(S.aiProvider==='grok'?S.apiKey:'');
-  if(_newsCache[playerId]){
-    $('pm-news').innerHTML=`<div style="font-size:13px;color:var(--text2);line-height:1.5">${_newsCache[playerId].replace(/\n/g,'<br>')}</div><div style="font-size:13px;color:var(--text3);margin-top:4px">via Grok · X/Twitter (cached)</div>`;
-  }else if(xaiKey){
-    $('pm-news').innerHTML=`<div style="display:flex;align-items:center;gap:8px;padding:2px 0">
-      <button class="btn btn-sm" onclick="loadPlayerNewsNow('${playerId}')" style="font-size:13px">Load news from X ↗</button>
-      <span style="font-size:13px;color:var(--text3)">Powered by Grok</span>
-    </div>`;
-  }else{
-    $('pm-news').innerHTML='<div style="color:var(--text3);font-size:13px;padding:4px 0;line-height:1.5">Live player news available once social integrations are enabled in <a onclick="closePlayerModal();switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.</div>';
-  }
+  // News section removed (xAI disabled)
+  const newsEl=$('pm-news');if(newsEl){newsEl.style.display='none';newsEl.innerHTML='';}
   // Load career stats
   const cardWrap=$('pm-card-stats');if(cardWrap)cardWrap.style.display='none';
   loadPlayerCardStats(playerId);
