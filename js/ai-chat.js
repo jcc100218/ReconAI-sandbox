@@ -198,6 +198,21 @@ function expandChat(el){
   el.style.maxHeight='300px';
   el.style.overflow='auto';
   el.style.padding='14px';
+  // Show collapse button for draft chat
+  if(el.id==='draft-msgs'){
+    const btn=$('draft-chat-collapse');
+    if(btn)btn.style.display='block';
+  }
+}
+
+function collapseDraftChat(){
+  const el=$('draft-msgs');
+  if(!el)return;
+  el.style.maxHeight='0';
+  el.style.overflow='hidden';
+  el.style.padding='0 16px';
+  const btn=$('draft-chat-collapse');
+  if(btn)btn.style.display='none';
 }
 
 function homeAsk(text){
@@ -488,6 +503,7 @@ Object.assign(window.App, {
 
   // Chat UI helpers
   expandChat,
+  collapseDraftChat,
   homeAsk,
   goAsk,
 
@@ -697,5 +713,6 @@ window.buildMentalityCtx = buildMentalityCtx;
 window.homeAsk = homeAsk;
 window.goAsk = goAsk;
 window.expandChat = expandChat;
+window.collapseDraftChat = collapseDraftChat;
 window.sendDraftChatMsg = sendDraftChatMsg;
 window.addDraftMsg = addDraftMsg;

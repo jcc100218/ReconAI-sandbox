@@ -2185,8 +2185,45 @@ function renderTeamSnapshot(){
   if(typeof recordHealthSnapshot==='function')recordHealthSnapshot(healthScore,hTier);
 }
 
+function renderHomeSkeletons(){
+  const snap=$('home-team-snapshot');
+  if(snap&&!snap.innerHTML.trim()) snap.innerHTML='<div class="skel-snapshot">'+'<div class="skel-snapshot-card"></div>'.repeat(4)+'</div>';
+  const hero=$('home-hero-action');
+  if(hero&&!hero.innerHTML.trim()) hero.innerHTML='<div class="skel-hero"></div>';
+  const prep=$('home-prepare');
+  if(prep&&!prep.innerHTML.trim()) prep.innerHTML='<div class="skel-prepare"><div class="skel-prepare-card"></div><div class="skel-prepare-card"></div></div>';
+  const needs=$('home-biggest-needs');
+  if(needs&&!needs.innerHTML.trim()) needs.innerHTML='<div class="skel-needs-grid">'+'<div class="skel-needs-item"></div>'.repeat(6)+'</div>';
+}
+
 function renderBiggestNeeds(){
-  const el=$('home-biggest-needs');if(el)el.innerHTML='';
+  const el=$('home-biggest-needs');if(!el)return;
+  if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
+  const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  if(!assess){el.innerHTML='';return;}
+  const pa=assess.posAssessment||{};
+  const entries=Object.entries(pa).sort((a,b)=>{
+    const ord={deficit:0,thin:1,ok:2,surplus:3};
+    return(ord[a[1].status]||2)-(ord[b[1].status]||2);
+  });
+  if(!entries.length){el.innerHTML='';return;}
+  const gradeMap={deficit:{l:'D',c:'var(--red)',bg:'var(--redL)'},thin:{l:'C',c:'var(--amber)',bg:'var(--amberL)'},ok:{l:'B',c:'var(--green)',bg:'var(--greenL)'},surplus:{l:'A',c:'var(--green)',bg:'var(--greenL)'}};
+  el.innerHTML=`
+    <div class="home-sec-title">Position Grades</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      ${entries.map(([pos,d])=>{
+        const g=gradeMap[d.status]||gradeMap.ok;
+        const fill=Math.min(100,Math.round((d.nflStarters/(d.minQuality||1))*100));
+        return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer" onclick="mobileTab('${d.status==='deficit'||d.status==='thin'?'waivers':'roster'}')">
+          <span style="font-size:14px;font-weight:800;color:${g.c};min-width:20px">${g.l}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--text)">${pos}</div>
+            <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:3px"><div style="height:100%;width:${fill}%;background:${g.c};border-radius:2px"></div></div>
+          </div>
+          <span style="font-size:13px;color:var(--text3)">${d.nflStarters}/${d.minQuality||d.startingReq}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
 }
 
 function renderCrownJewels(){
@@ -2197,16 +2234,11 @@ function toggleJewels(){}
 
 // ── Master home render — calls all new mobile components ──────
 function renderMobileHome(){
+  renderHomeSkeletons(); // Show skeletons immediately
+  renderTeamSnapshot();
   renderHeroAction();
   renderPrepareCards();
-  renderTeamSnapshot();
   renderBiggestNeeds();
-  renderCrownJewels();
-  // Also call originals for data they record (health timeline etc)
-  if(typeof renderDailyBriefing==='function')renderDailyBriefing();
-  if(typeof renderInsightCards==='function')renderInsightCards();
-  if(typeof renderTeamOverview==='function')renderTeamOverview();
-  if(typeof renderHealthTimeline==='function')renderHealthTimeline();
   if(typeof renderLeaguePulse==='function')renderLeaguePulse();
 }
 
@@ -2920,48 +2952,36 @@ function renderDraftNeeds(){
     }).join(''):`<span style="color:var(--text3);font-size:13px">No picks for ${year}</span>`;
   }
 
-  // === RENDER: Draft Priority ===
+  // === RENDER: Draft Strategy (bar chart) ===
   const summaryEl=$('draft-summary');
   const summaryContent=$('draft-summary-content');
   if(!summaryEl||!summaryContent)return;
   summaryEl.style.display='block';
 
-  const gradeColorD=ns=>ns>=50?'var(--red)':ns>=20?'var(--amber)':ns>0?'var(--text2)':'var(--green)';
-  const gradeLabelD=ns=>ns>=50?'Critical':ns>=20?'Need':ns>0?'Thin':'Solid';
+  const gradeColorD=ns=>ns>=50?'var(--red)':ns>=30?'var(--amber)':ns>=15?'var(--text3)':'var(--green)';
+  const gradeLetterD=ns=>ns>=50?'!!':ns>=30?'!':ns>=15?'~':'OK';
 
-  // Split into top needs (expanded) and rest (collapsed)
-  const topNeeds=posAnalysis.filter(p=>p.needScore>=20&&p.pos!=='K');
-  const solidPos=posAnalysis.filter(p=>p.needScore<20&&p.pos!=='K');
+  const sortedPos=posAnalysis.filter(p=>p.pos!=='K');
 
   let dhtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
     <div class="home-sec-title" style="margin-bottom:8px">Draft Strategy</div>`;
 
-  // Top needs: expanded
-  if(topNeeds.length){
-    dhtml+=topNeeds.map(p=>{
-      const barCol=gradeColorD(p.needScore);
-      const detail=[];
-      if(p.starterGap>0)detail.push(p.startable+'/'+p.slotsNeeded+' starters');
-      if(p.aging)detail.push(p.aging+' aging');
-      if(p.young)detail.push(p.young+' young');
-      return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:14px;font-weight:800;color:${barCol};min-width:28px">${p.pos}</span>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:700;color:${barCol}">${gradeLabelD(p.needScore)}</div>
-          <div style="font-size:13px;color:var(--text3)">${detail.join(' · ')}</div>
+  if(sortedPos.length){
+    dhtml+=sortedPos.map(p=>{
+      const gradeColor=gradeColorD(p.needScore);
+      const gradeLetter=gradeLetterD(p.needScore);
+      const barColor=p.needScore>=50?'var(--red)':p.needScore>=30?'var(--amber)':p.needScore>=15?'var(--text3)':'var(--green)';
+      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:700;color:${gradeColor};min-width:20px">${gradeLetter}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);min-width:28px">${p.pos}</span>
+        <div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden">
+          <div style="height:100%;width:${Math.min(100,p.needScore)}%;background:${barColor};border-radius:3px;transition:width .4s"></div>
         </div>
-        <div style="width:50px;background:var(--bg4);border-radius:2px;height:4px;overflow:hidden"><div style="width:${Math.min(100,p.needScore*1.5)}%;height:100%;background:${barCol};border-radius:2px"></div></div>
+        <span style="font-size:13px;color:var(--text3);min-width:40px;text-align:right">${p.startable}/${p.slotsNeeded}</span>
       </div>`;
     }).join('');
   } else {
     dhtml+=`<div style="font-size:13px;color:var(--green);padding:6px 0">No critical needs — draft best player available.</div>`;
-  }
-
-  // Solid positions: compressed one-liner
-  if(solidPos.length){
-    dhtml+=`<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;font-size:13px">
-      ${solidPos.map(p=>`<span style="color:var(--text3)">${p.pos}: <span style="color:var(--green)">Solid</span></span>`).join('<span style="color:var(--border)">·</span>')}
-    </div>`;
   }
 
   dhtml+=`</div>`;
@@ -3254,6 +3274,8 @@ function mobileTab(tab, btn) {
     if(navId){const el=$(navId);if(el)el.classList.add('active');}
   }
   switchTab(tab, null);
+  const fab=$('chat-fab');
+  if(fab) fab.style.display=(tab==='digest'?'none':'flex');
 }
 
 // ── Stats stub ─────────────────────────────────────────────────
@@ -3312,6 +3334,7 @@ Object.assign(window.App, {
 
   // Home
   renderHomeSnapshot, renderTeamOverview, recordHealthSnapshot, renderHealthTimeline,
+  renderHomeSkeletons, renderBiggestNeeds,
 
   // Strategy
   STRATEGY_QUESTIONS, startStrategyWalkthrough,
@@ -3364,6 +3387,8 @@ window.renderHomeSnapshot = renderHomeSnapshot;
 window.renderTeamOverview = renderTeamOverview;
 window.recordHealthSnapshot = recordHealthSnapshot;
 window.renderHealthTimeline = renderHealthTimeline;
+window.renderHomeSkeletons = renderHomeSkeletons;
+window.renderBiggestNeeds = renderBiggestNeeds;
 window.startStrategyWalkthrough = startStrategyWalkthrough;
 window.selectStrategyAnswer = selectStrategyAnswer;
 window.loadStrategy = loadStrategy;

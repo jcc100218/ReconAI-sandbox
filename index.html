@@ -113,27 +113,27 @@
       <!-- Home feed — post-connection -->
       <div id="digest-content" style="display:none">
 
-        <!-- Loading banner (conditional) -->
-        <div id="dhq-loading-banner" style="display:none;margin-bottom:12px;padding:12px 16px;background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);text-align:center">
-          <div style="display:flex;align-items:center;justify-content:center;gap:8px">
-            <span style="display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite"></span>
-            <span style="font-size:14px;font-weight:600;color:var(--accent)">Building your league intelligence...</span>
-          </div>
-          <div style="font-size:13px;color:var(--text3);margin-top:6px">Analyzing 5 years of stats, drafts, and transactions. First time takes ~15 seconds, then it's cached.</div>
-        </div>
+        <!-- Progress bar (replaces loading banner) -->
+        <div id="dhq-progress" class="dhq-progress-bar" style="display:none"><div id="dhq-progress-fill" class="dhq-progress-fill" style="width:0%"></div></div>
 
         <!-- API key callout (conditional) -->
         <div id="api-key-callout" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:var(--r)">
           <div style="font-size:13px;color:var(--amber);line-height:1.5"></div>
         </div>
 
-        <!-- 1. HERO: Do This Now -->
+        <!-- 1. Team Snapshot (horizontal scroll) -->
+        <div id="home-team-snapshot"></div>
+
+        <!-- 2. HERO: Do This Now -->
         <div id="home-hero-action"></div>
 
-        <!-- 2. Prepare For This (max 2 compact cards) -->
+        <!-- 3. Prepare For This (max 2 compact cards) -->
         <div id="home-prepare"></div>
 
-        <!-- 3. Chat / Assistant module -->
+        <!-- 4. Biggest Needs / Position Grades -->
+        <div id="home-biggest-needs"></div>
+
+        <!-- 5. Chat / Assistant module -->
         <div class="recon-chat-module" style="margin-bottom:18px">
           <div id="home-chat-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
           <div style="display:flex;gap:10px;padding:12px 16px;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:16px">
@@ -150,12 +150,6 @@
             <button class="chip chip-lg" onclick="homeAsk('Where is my roster weakest heading into the rookie draft?')">Fix roster gaps?</button>
           </div>
         </div>
-
-        <!-- 4. Team Snapshot (horizontal scroll) -->
-        <div id="home-team-snapshot"></div>
-
-        <!-- 5. Biggest Needs -->
-        <div id="home-biggest-needs"></div>
 
         <!-- 6. Crown Jewels (collapsible) -->
         <div id="home-crown-jewels"></div>
@@ -455,10 +449,7 @@
         <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:13px;padding:4px 10px">Scout ↗</button>
       </div>
 
-      <!-- 1. ON THE CLOCK — hero card -->
-      <div id="draft-best-bet"></div>
-
-      <!-- 2. Your picks — interactive -->
+      <!-- 1. Your picks — timeline first -->
       <div id="draft-my-picks-section" style="margin-bottom:14px">
         <div class="home-sec-title">Your Picks</div>
         <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px">
@@ -466,14 +457,15 @@
         </div>
       </div>
 
-      <!-- 3. Draft Strategy (condensed from priority) -->
-      <div id="draft-summary" style="display:none;margin-bottom:14px">
-        <div id="draft-summary-content"></div>
-      </div>
+      <!-- 2. ON THE CLOCK — hero card -->
+      <div id="draft-best-bet"></div>
 
-      <!-- 4. Draft Advisor chat -->
+      <!-- 3. Draft Advisor chat (collapsible messages) -->
       <div class="recon-chat-module" style="margin-bottom:14px">
-        <div id="draft-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
+        <div style="position:relative">
+          <div id="draft-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
+          <button id="draft-chat-collapse" onclick="collapseDraftChat()" style="display:none;position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer;z-index:1" title="Collapse chat">&#9650; Collapse</button>
+        </div>
         <div id="draft-scout-content" style="display:none"></div>
         <div style="display:flex;gap:10px;padding:12px 16px;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:16px">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;opacity:.7"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
@@ -489,12 +481,17 @@
         </div>
       </div>
 
-      <!-- 5. Historical (compressed) -->
-      <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
+      <!-- 4. Draft Strategy -->
+      <div id="draft-summary" style="display:none;margin-bottom:14px">
+        <div id="draft-summary-content"></div>
+      </div>
 
-      <!-- 6. Scouting Board -->
+      <!-- 5. Scouting Board -->
       <div id="draft-needs" style="display:none"></div>
       <div id="rookie-profiles" style="margin-top:0"></div>
+
+      <!-- 6. Historical (bottom) -->
+      <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
 
       <!-- Data quality note (bottom, subtle) -->
       <div style="font-size:13px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-top:14px;line-height:1.5">
@@ -700,6 +697,7 @@
     Draft
   </button>
 </div>
+<button id="chat-fab" onclick="document.getElementById('home-chat-in')?.focus();document.querySelector('.recon-chat-module')?.scrollIntoView({behavior:'smooth',block:'center'})" style="display:none;position:fixed;bottom:72px;right:12px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;box-shadow:0 4px 16px rgba(124,107,248,0.4);z-index:150;cursor:pointer;color:#fff;font-size:18px;align-items:center;justify-content:center" title="Ask Alex">AI</button>
 
 <!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

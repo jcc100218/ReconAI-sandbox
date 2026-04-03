@@ -57,7 +57,7 @@ const pAge=id=>{
 const pExp=id=>S.players[id]?.years_exp??'';
 const getUser=oid=>{const u=S.leagueUsers.find(u=>u.user_id===oid);return u?(u.metadata?.team_name||u.display_name||u.username||'Team'):'Team'};
 const myR=()=>S.rosters.find(r=>r.roster_id===S.myRosterId);
-const prog=pct=>{const el=$('prog-bar');if(el)el.style.width=pct+'%'};
+const prog=pct=>{const el=$('prog-bar');if(el)el.style.width=pct+'%';const dp=$('dhq-progress');const df=$('dhq-progress-fill');if(dp){dp.style.display=pct>0&&pct<100?'block':'none';if(df)df.style.width=pct+'%';}};
 const setAgentStatus=(txt,active)=>{const t=$('agent-txt');const d=$('agent-dot');if(t)t.textContent=txt;if(d)d.className='status-dot'+(active?' thinking':active===false?' active':'')};
 
 // Expose utilities globally (for inline onclick handlers and other modules)
@@ -283,7 +283,8 @@ async function loadAllData(){
   console.log('loadAllData: starting...');
   const t0=Date.now();
   const loadBanner=$('dhq-loading-banner');
-  if(loadBanner)loadBanner.style.display='block';
+  if(loadBanner)loadBanner.style.display='none';
+  prog(5);
   try{
     if(typeof updateSyncStatus==='function')updateSyncStatus();
     await Promise.all([
@@ -293,6 +294,7 @@ async function loadAllData(){
     ]);
     console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys((window.App.LI||{}).playerScores||{}).length);
     if(loadBanner)loadBanner.style.display='none';
+    prog(100);
     if(typeof updateDataFreshness==='function')updateDataFreshness();
     if(typeof updateSyncStatus==='function')updateSyncStatus();
     if(typeof buildRosterTable==='function')buildRosterTable();
