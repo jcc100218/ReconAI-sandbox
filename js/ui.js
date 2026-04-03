@@ -289,7 +289,7 @@ function buildRosterTable(){
   if(countEl)countEl.textContent=rows.length+' player'+(rows.length!==1?'s':'');
 
   const wrap=$('roster-tbody');
-  let html=`<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 6px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;opacity:.6">
+  let html=`<div class="roster-header-sticky" style="display:flex;align-items:center;gap:8px;padding:4px 14px 6px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;opacity:.6">
     <span style="min-width:36px"></span><span style="flex:1">Player</span><span style="min-width:54px;text-align:right">DHQ</span><span style="min-width:44px;text-align:right">PPG</span><span style="min-width:42px;text-align:right">Phase</span>
   </div>`;
   let lastSection='';
@@ -316,7 +316,8 @@ function buildRosterTable(){
 
     // Phase color
     const phaseCol=pk.cls==='peak'?'var(--green)':pk.cls==='rising'?'var(--green)':pk.cls==='seedling'?'var(--blue)':pk.cls==='veteran'?'var(--amber)':'var(--red)';
-    const cardCls='rr-card'+(isStarter?' rr-starter':'')+(isReserve||isTaxi?' rr-reserve':'');
+    const verdictCls=verdict&&(verdict.label==='Sell'||verdict.label==='Sell High')?' roster-sell':verdict&&verdict.label==='Buy'?' roster-buy':'';
+    const cardCls='rr-card'+(isStarter?' rr-starter':'')+(isReserve||isTaxi?' rr-reserve':'')+verdictCls;
 
     html+=`<div class="${cardCls}" onclick="openPlayerModal('${pid}')">
       <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials>${initials}</span>')" loading="lazy"/>
@@ -336,6 +337,13 @@ function buildRosterTable(){
       </div>
       <div class="rr-right">
         <div class="rr-phase" style="color:${phaseCol}">${pk.label}</div>
+        <div style="display:flex;gap:1px;margin-top:2px">
+          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='seedling'?'var(--blue)':'var(--bg4)'}"></div>
+          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='rising'?'var(--green)':'var(--bg4)'}"></div>
+          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='peak'?'var(--green)':'var(--bg4)'}"></div>
+          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='veteran'?'var(--amber)':'var(--bg4)'}"></div>
+          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='declining'?'var(--red)':'var(--bg4)'}"></div>
+        </div>
         <div class="rr-phase-desc">${pk.desc}</div>
       </div>
       <div class="rr-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
@@ -2136,7 +2144,7 @@ function renderTeamSnapshot(){
   el.innerHTML=`
     <div class="home-sec-title">Team Snapshot</div>
     <div class="snapshot-scroll">
-      <div class="snapshot-card" onclick="toggleTip('tip-health')">
+      <div class="snapshot-card glass-card" onclick="toggleTip('tip-health')">
         <div class="snap-label">Health <span class="tip-icon" style="opacity:.5">?</span></div>
         <div class="snap-value" style="color:${hCol}">${healthScore}</div>
         <div class="snap-detail">${hTier}${panic>=3?' \u00B7 Panic '+panic+'/5':''}</div>
@@ -2145,7 +2153,7 @@ function renderTeamSnapshot(){
           Health Score combines scoring potential (starter PPG), roster depth (position coverage), and dynasty value into a 0-100 scale. Higher = more competitive.
         </div>
       </div>
-      <div class="snapshot-card" onclick="toggleTip('tip-contender-snap')">
+      <div class="snapshot-card glass-card" onclick="toggleTip('tip-contender-snap')">
         <div class="snap-label">Contender <span class="tip-icon" style="opacity:.5">?</span></div>
         <div class="snap-value" style="color:${cCol}">#${myContenderRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
         <div class="snap-detail">${myContenderPPG.toFixed(1)} avg starter PPG</div>
@@ -2154,7 +2162,7 @@ function renderTeamSnapshot(){
           Contender rank is based on your optimal starting lineup PPG compared to other teams. Higher PPG = better chance of winning weekly matchups.
         </div>
       </div>
-      <div class="snapshot-card" onclick="toggleTip('tip-dynasty-snap')">
+      <div class="snapshot-card glass-card" onclick="toggleTip('tip-dynasty-snap')">
         <div class="snap-label">Dynasty <span class="tip-icon" style="opacity:.5">?</span></div>
         <div class="snap-value" style="color:${dCol}">#${myValRank}<span style="font-size:13px;color:var(--text3);font-weight:500">/${teams}</span></div>
         <div class="snap-detail">${totalVal.toLocaleString()} DHQ</div>
@@ -2163,7 +2171,7 @@ function renderTeamSnapshot(){
           Dynasty rank is based on your total roster DHQ value. Higher = more long-term dynasty capital across all players and picks.
         </div>
       </div>
-      <div class="snapshot-card" onclick="mobileTab('draftroom')">
+      <div class="snapshot-card glass-card" onclick="mobileTab('draftroom')">
         <div class="snap-label">Draft Capital</div>
         <div class="snap-value" style="color:var(--text)">${totalPicks}<span style="font-size:13px;color:var(--text3);font-weight:500"> picks</span></div>
         <div class="snap-detail">${pickYears.join(' \u00B7 ')}</div>
@@ -2207,18 +2215,19 @@ function renderBiggestNeeds(){
     return(ord[a[1].status]||2)-(ord[b[1].status]||2);
   });
   if(!entries.length){el.innerHTML='';return;}
-  const gradeMap={deficit:{l:'D',c:'var(--red)',bg:'var(--redL)'},thin:{l:'C',c:'var(--amber)',bg:'var(--amberL)'},ok:{l:'B',c:'var(--green)',bg:'var(--greenL)'},surplus:{l:'A',c:'var(--green)',bg:'var(--greenL)'}};
+  const gradeMap={deficit:{l:'D',c:'var(--red)',bg:'var(--redL)',bar:'bar-fill-d'},thin:{l:'C',c:'var(--amber)',bg:'var(--amberL)',bar:'bar-fill-c'},ok:{l:'B',c:'var(--green)',bg:'var(--greenL)',bar:'bar-fill-b'},surplus:{l:'A',c:'var(--green)',bg:'var(--greenL)',bar:'bar-fill-a'}};
   el.innerHTML=`
     <div class="home-sec-title">Position Grades</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       ${entries.map(([pos,d])=>{
         const g=gradeMap[d.status]||gradeMap.ok;
         const fill=Math.min(100,Math.round((d.nflStarters/(d.minQuality||1))*100));
-        return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer" onclick="mobileTab('${d.status==='deficit'||d.status==='thin'?'waivers':'roster'}')">
+        const criticalCls=d.nflStarters===0?' pulse-critical':'';
+        return`<div class="glass-card${criticalCls}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer" onclick="mobileTab('${d.status==='deficit'||d.status==='thin'?'waivers':'roster'}')">
           <span style="font-size:14px;font-weight:800;color:${g.c};min-width:20px">${g.l}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:13px;font-weight:600;color:var(--text)">${pos}</div>
-            <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:3px"><div style="height:100%;width:${fill}%;background:${g.c};border-radius:2px"></div></div>
+            <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:3px"><div class="${g.bar} bar-animated" style="height:100%;--bar-w:${fill}%;border-radius:2px"></div></div>
           </div>
           <span style="font-size:13px;color:var(--text3)">${d.nflStarters}/${d.minQuality||d.startingReq}</span>
         </div>`;

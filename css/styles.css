@@ -1057,3 +1057,50 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 }
 details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg)}
 .settings-section>div{padding-left:16px;padding-right:16px;padding-bottom:14px}
+
+/* ═══════════════════════════════════════════════════════
+   PREMIUM VISUAL EFFECTS
+   ═══════════════════════════════════════════════════════ */
+
+/* Glassmorphism cards */
+.glass-card{background:rgba(17,19,24,0.7);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:var(--rl);transition:transform .2s,box-shadow .2s}
+.glass-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.3)}
+
+/* Animated progress bars */
+.bar-animated{animation:barGrow .6s ease forwards}
+@keyframes barGrow{from{width:0}to{width:var(--bar-w,0%)}}
+
+/* Gradient bar fills by grade */
+.bar-fill-d{background:linear-gradient(90deg,#E74C3C,#F0A500)}
+.bar-fill-c{background:linear-gradient(90deg,#F0A500,#fbbf24)}
+.bar-fill-b{background:linear-gradient(90deg,#34d399,#2ECC71)}
+.bar-fill-a{background:linear-gradient(90deg,#2ECC71,#34d399)}
+
+/* Pulse effect for critical gaps */
+.pulse-critical{animation:pulseCrit 1.5s ease infinite}
+@keyframes pulseCrit{0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,0.3)}50%{box-shadow:0 0 0 6px rgba(231,76,60,0)}}
+
+/* Search bar glow on focus */
+.search-glow:focus-within{box-shadow:0 0 0 2px rgba(124,107,248,0.3),inset 0 0 12px rgba(124,107,248,0.06);border-color:var(--accent)}
+
+/* Roster row status borders */
+.roster-sell{border-left:3px solid var(--amber) !important}
+.roster-buy{border-left:3px solid var(--green) !important}
+
+/* Count-up animation helper */
+.count-up{display:inline-block}
+
+/* War Room button glow */
+.wr-glow{box-shadow:0 0 8px rgba(251,191,36,0.3);border-color:rgba(251,191,36,0.4) !important}
+
+/* Modal slide-up on mobile */
+@media(max-width:599px){
+  .pm-sheet{animation:slideUp .3s cubic-bezier(0.32,0.72,0,1) !important}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+}
+
+/* Sparkline inline */
+.sparkline-mini{display:inline-block;vertical-align:middle;margin-left:4px}
+
+/* Sticky roster header */
+.roster-header-sticky{position:sticky;top:0;z-index:2;background:var(--bg)}
