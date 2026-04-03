@@ -335,8 +335,9 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
 
   // DHQ value
   const val = (typeof dynastyValue === 'function') ? dynastyValue(pid) : (LI.playerScores?.[pid] || 0);
-  const tier = val >= 7000 ? 'Elite' : val >= 4000 ? 'Starter' : val >= 2000 ? 'Depth' : val > 0 ? 'Stash' : '\u2014';
-  const tierCol = val >= 7000 ? _wr.green : val >= 4000 ? _wr.gold : val >= 2000 ? _wr.text2 : _wr.text3;
+  const _isElite = typeof window.App?.isElitePlayer === 'function' ? window.App.isElitePlayer(pid) : val >= 7000;
+  const tier = _isElite ? 'Elite' : val >= 4000 ? 'Starter' : val >= 2000 ? 'Depth' : val > 0 ? 'Stash' : '\u2014';
+  const tierCol = _isElite ? _wr.green : val >= 4000 ? _wr.gold : val >= 2000 ? _wr.text2 : _wr.text3;
 
   // Position rank from DHQ engine
   const fcRankData = (typeof getPlayerRank === 'function') ? getPlayerRank(pid) : null;

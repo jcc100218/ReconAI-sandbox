@@ -115,11 +115,12 @@ const POSTURES = {
   LOCKED:    { key: 'LOCKED',    label: 'Locked In',     color: '#7F8C8D', desc: 'Satisfied roster, high attachment. Very hard to move.' },
 };
 
-// Local position normalization (fallback if pM is unavailable)
+// Local position normalization — complete version matching shared/utils.js
 const normPos = p => {
   if (!p) return '';
-  if (['DE', 'DT'].includes(p)) return 'DL';
-  if (['CB', 'S'].includes(p)) return 'DB';
+  if (['DB', 'CB', 'S', 'SS', 'FS'].includes(p))          return 'DB';
+  if (['DL', 'DE', 'DT', 'NT', 'IDL', 'EDGE'].includes(p)) return 'DL';
+  if (['LB', 'OLB', 'ILB', 'MLB'].includes(p))            return 'LB';
   return p;
 };
 
@@ -379,9 +380,14 @@ function assessTeam(roster, nflStarterSet, ownerPicks, dynamicConfig) {
   const projBonus   = weeklyPts > WEEKLY_TARGET + 10 ? 3 : weeklyPts >= WEEKLY_TARGET ? 1 : 0;
   const healthScore = Math.min(100, Math.round(scoringScore + coverageScore + projBonus));
 
-  // Tier classification — driven by weekly scoring vs target
+  // Tier classification — delegate to shared assessTeamFromGlobal if available
   let tier, tierColor, tierBg;
-  if (weeklyPts > 0) {
+  const _sharedAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(roster.roster_id) : null;
+  if (_sharedAssess?.tier) {
+    tier = _sharedAssess.tier;
+    tierColor = _sharedAssess.tierColor || '#95A5A6';
+    tierBg = _sharedAssess.tierBg || 'transparent';
+  } else if (weeklyPts > 0) {
     if      (weeklyPts > WEEKLY_TARGET + 10)   { tier = 'ELITE';      tierColor = '#D4AF37'; tierBg = 'rgba(212,175,55,0.15)'; }
     else if (weeklyPts >= WEEKLY_TARGET - 15)   { tier = 'CONTENDER';  tierColor = '#2ECC71'; tierBg = 'rgba(46,204,113,0.12)'; }
     else if (weeklyPts >= WEEKLY_TARGET * 0.85) { tier = 'CROSSROADS'; tierColor = '#F0A500'; tierBg = 'rgba(240,165,0,0.12)'; }
@@ -1436,8 +1442,8 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
 
         if (simAssess) {
           const hsDelta = simAssess.healthScore - myAssessNow.healthScore;
-          const nowElite = (myRosterObj.players || []).filter(pid => (dynastyValue(pid) || 0) >= 7000).length;
-          const simElite = simPlayers.filter(pid => (dynastyValue(pid) || 0) >= 7000).length;
+          const nowElite = window.App.countElitePlayers(myRosterObj.players || []);
+          const simElite = window.App.countElitePlayers(simPlayers);
           const eDelta = simElite - nowElite;
           const nowTier = myAssessNow.tier;
           const simTier = simAssess.tier;

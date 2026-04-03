@@ -85,11 +85,12 @@ window.App = window.App || {};
   // Helpers
   // ─────────────────────────────────────────────────────────────
 
-  /** Normalize position string (DE/DT -> DL, CB/S -> DB) */
+  /** Normalize position string — complete version matching shared/utils.js */
   function normPos(p) {
     if (!p) return '';
-    if (p === 'DE' || p === 'DT') return 'DL';
-    if (p === 'CB' || p === 'S') return 'DB';
+    if (['DB', 'CB', 'S', 'SS', 'FS'].includes(p))          return 'DB';
+    if (['DL', 'DE', 'DT', 'NT', 'IDL', 'EDGE'].includes(p)) return 'DL';
+    if (['LB', 'OLB', 'ILB', 'MLB'].includes(p))            return 'LB';
     return p;
   }
 
@@ -619,7 +620,8 @@ window.App = window.App || {};
     if (meta.source === 'FC_ROOKIE') return { action: 'STASH', label: 'Stash', reason: 'Incoming rookie — hold and develop', col: 'var(--blue)', bg: 'var(--blueL)' };
 
     // Elite cornerstone
-    if (val >= 7000 && peakYrsLeft >= 3) return { action: 'CORE', label: 'Build Around', reason: 'Elite value with ' + peakYrsLeft + ' peak years left', col: 'var(--green)', bg: 'var(--greenL)' };
+    const _isElite = typeof window.App?.isElitePlayer === 'function' ? window.App.isElitePlayer(pid) : val >= 7000;
+    if (_isElite && peakYrsLeft >= 3) return { action: 'CORE', label: 'Build Around', reason: 'Elite value with ' + peakYrsLeft + ' peak years left', col: 'var(--green)', bg: 'var(--greenL)' };
 
     // Rising buy target
     if (peakYrsLeft >= 4 && trend >= 10 && !isOwned) return { action: 'BUY', label: 'Buy', reason: 'Trending up (+' + trend + '%) with ' + peakYrsLeft + ' peak years ahead', col: 'var(--green)', bg: 'var(--greenL)' };

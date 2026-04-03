@@ -471,7 +471,7 @@ function getAvailablePlayers(){
       const meta=LI.playerMeta?.[id];
       if(meta?.source==='FC_ROOKIE')return;
       if((p.years_exp||0)===0&&!meta?.starterSeasons)return;
-      const val=LI.playerScores[id]||0;
+      const val=dynastyValue(id);
       if(val<=0)return;
       results.push({id,p,val,isIDP:idpPos.includes(p.position),rank:S.posRanks?.[id],proj:S.playerProj?.[id]});
     });
@@ -2373,7 +2373,7 @@ function openPlayerModal(playerId){
   const pos=p.position||'?';const age=p.age||26;const val=dynastyValue(playerId);
   const exp=p.years_exp??0;
   const peakMap=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
-  const [pLo,pHi]=(()=>{ const pos=pPos(playerId); const peaks={QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]}; return peaks[pos]||[24,29]; })();
+  const [pLo,pHi]=peakMap[pPos(playerId)]||[24,29];
   const peak=Math.round((pLo+pHi)/2);
   const onMyTeam=(myR()?.players||[]).includes(String(playerId));
   const stats=S.playerStats?.[playerId]||{};
@@ -2848,7 +2848,7 @@ function renderDraftNeeds(){
     });
     const starterPPG=avgThresh[pos]?+(avgThresh[pos].starterLine/17).toFixed(1):{QB:12,RB:8,WR:8,TE:6,DL:4,LB:4,DB:3}[pos]||6;
     const startable=withData.filter(p=>p.ppg>=starterPPG);
-    const elite=withData.filter(p=>p.dhqVal>=7000);
+    const elite=withData.filter(p=>window.App.isElitePlayer(p.pid));
     const [,peakEnd]=peaks[pos]||[23,29];
     const aging=withData.filter(p=>p.age>peakEnd);
     const young=withData.filter(p=>p.age<=25);
@@ -2879,8 +2879,8 @@ function renderDraftNeeds(){
 
       // Find top rookie targets at this position
       const rookieTargets=Object.entries(S.players)
-        .filter(([id,p])=>p.years_exp===0&&LI.playerScores?.[id]>0&&posMapD(p.position)===bestEarlyNeed.pos)
-        .map(([id,p])=>({id,name:p.first_name+' '+p.last_name,val:LI.playerScores[id],pos:posMapD(p.position)}))
+        .filter(([id,p])=>p.years_exp===0&&dynastyValue(id)>0&&posMapD(p.position)===bestEarlyNeed.pos)
+        .map(([id,p])=>({id,name:p.first_name+' '+p.last_name,val:dynastyValue(id),pos:posMapD(p.position)}))
         .sort((a,b)=>b.val-a.val).slice(0,3);
 
       const reasons=[];

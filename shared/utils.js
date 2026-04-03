@@ -56,16 +56,38 @@ function calcRawPts(stats, scoring) {
     return p !== null ? Number(p) : null;
 }
 
+// ── Elite player detection (top-5-at-position) ─────────────────
+function isElitePlayer(pid) {
+  const scores = window.App?.LI?.playerScores || {};
+  const meta = window.App?.LI?.playerMeta || {};
+  const pos = meta[pid]?.pos || '';
+  if (!pos || !scores[pid]) return false;
+  // Get all players at this position, sorted by DHQ
+  const atPos = Object.entries(scores)
+    .filter(([p]) => (meta[p]?.pos || '') === pos)
+    .sort((a, b) => b[1] - a[1]);
+  const rank = atPos.findIndex(([p]) => p === String(pid));
+  return rank >= 0 && rank < 5;
+}
+
+function countElitePlayers(pids) {
+  return (pids || []).filter(pid => isElitePlayer(String(pid))).length;
+}
+
 // ── Expose on App namespace ─────────────────────────────────────
-window.App.normPos         = normPos;
-window.App.posColor        = posColor;
-window.App.POS_ORDER       = POS_ORDER;
-window.App.DEPTH_POSITIONS = DEPTH_POSITIONS;
-window.App.calcRawPts      = calcRawPts;
+window.App.normPos            = normPos;
+window.App.posColor           = posColor;
+window.App.POS_ORDER          = POS_ORDER;
+window.App.DEPTH_POSITIONS    = DEPTH_POSITIONS;
+window.App.calcRawPts         = calcRawPts;
+window.App.isElitePlayer      = isElitePlayer;
+window.App.countElitePlayers  = countElitePlayers;
 
 // ── Expose as bare globals for inline handlers / legacy code ────
-window.normPos         = normPos;
-window.posColor        = posColor;
-window.POS_ORDER       = POS_ORDER;
-window.DEPTH_POSITIONS = DEPTH_POSITIONS;
-window.calcRawPts      = calcRawPts;
+window.normPos            = normPos;
+window.posColor           = posColor;
+window.POS_ORDER          = POS_ORDER;
+window.DEPTH_POSITIONS    = DEPTH_POSITIONS;
+window.calcRawPts         = calcRawPts;
+window.isElitePlayer      = isElitePlayer;
+window.countElitePlayers  = countElitePlayers;

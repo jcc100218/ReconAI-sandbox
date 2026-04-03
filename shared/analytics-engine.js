@@ -303,8 +303,8 @@ function analyzeRosterConstruction(winners, losers, rosters) {
       let rosterTotal = scored.reduce((s, p) => s + p.dhq, 0);
       totalDHQ += rosterTotal;
 
-      // Elite = DHQ 7000+
-      const eliteCount = scored.filter(p => p.dhq >= 7000).length;
+      // Elite = top 5 at position
+      const eliteCount = scored.filter(p => window.App.isElitePlayer(p.pid)).length;
       totalElite += eliteCount;
 
       // Starter = DHQ 4000+
@@ -373,7 +373,7 @@ function analyzeRosterConstruction(winners, losers, rosters) {
   }
 
   // Key gaps
-  addGap('Elite players (7000+)', myProfile.avgEliteCount, winnerProfile.avgEliteCount, 'players');
+  addGap('Elite players (top 5 at position)', myProfile.avgEliteCount, winnerProfile.avgEliteCount, 'players');
   addGap('Starter-quality players (4000+)', myProfile.avgStarterCount, winnerProfile.avgStarterCount, 'players');
   addGap('Total roster DHQ', myProfile.avgTotalDHQ, winnerProfile.avgTotalDHQ, 'DHQ');
   addGap('Average age', myProfile.avgAge, winnerProfile.avgAge, 'years', true);
@@ -658,12 +658,12 @@ function generateGapAnalysis(myProfile, winnerProfile) {
     });
   }
 
-  // Elite talent: 7000+ DHQ cornerstones
+  // Elite talent: top 5 at position cornerstones
   if (myProfile.avgEliteCount < winnerProfile.avgEliteCount - 0.3) {
     const deficit = +(winnerProfile.avgEliteCount - myProfile.avgEliteCount).toFixed(1);
     actions.push({
       priority: 'critical',
-      action: 'Acquire ' + deficit + ' elite player(s) — 7000+ DHQ cornerstones win championships',
+      action: 'Acquire ' + deficit + ' elite player(s) — top 5 at position cornerstones win championships',
       detail: 'Champions average ' + winnerProfile.avgEliteCount + ' elite assets. You have ' + myProfile.avgEliteCount + '.',
       yours: myProfile.avgEliteCount, winners: winnerProfile.avgEliteCount, dhqGap: Math.round(deficit * 7500), unit: 'players',
     });

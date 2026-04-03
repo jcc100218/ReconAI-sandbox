@@ -33,7 +33,7 @@ async function main() {
   const fcTop = Math.max(...fc.map(d => d.value || 0));
   const scaleFactor = 9200 / fcTop;
 
-  const peakWindows = {QB:[24,34],RB:[22,27],WR:[22,30],TE:[23,30],DL:[23,29],LB:[23,28],DB:[23,29]};
+  const peakWindows = {QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
   const posMap = p => { if (['DE','DT','OLB'].includes(p)) return 'DL'; if (['CB','S','FS','SS'].includes(p)) return 'DB'; return p; };
 
   let rookieCount = 0;

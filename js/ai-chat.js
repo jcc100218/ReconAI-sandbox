@@ -150,7 +150,7 @@ function buildCtx(){
     surpluses.length?'SURPLUS:'+surpluses.join(','):'',
     picks?'PICKS:'+picks:'',
     'IDP:sack='+((sc.idp_sack)||4)+',INT='+((sc.idp_int)||5)+',PD='+((sc.idp_pass_def)||3)+',TKL='+((sc.idp_tkl_solo)||0.5),
-    'Trade values=DHQ(0-10000 scale, league-derived, NOT dollars). Higher=better. 7000+=elite, 4000+=starter, 2000+=depth.',
+    'Trade values=DHQ(0-10000 scale, league-derived, NOT dollars). Higher=better. Top 5 at position=elite, 4000+=starter, 2000+=depth.',
     trendingCtx,
     memCtx||'',
   ].filter(Boolean).join('\n');
@@ -180,7 +180,7 @@ function buildCtxCompact(){
     'TOP5:'+topStarters,
     picks?'PICKS:'+picks:'',
     mentalityStr||'',
-    'DHQ scale 0-10000. 7000+=elite 4000+=starter. ALWAYS refer to values as "DHQ" not "FC" or "FantasyCalc".'
+    'DHQ scale 0-10000. Top 5 at position=elite, 4000+=starter. ALWAYS refer to values as "DHQ" not "FC" or "FantasyCalc".'
   ].filter(Boolean).join('\n');
 }
 
@@ -341,9 +341,9 @@ async function sendTradeChat(){
 4. Only propose trades where the OTHER owner benefits too — explain what THEY gain
 5. Draft a short Sleeper DM message to copy-paste
 6. If user wants to win now, propose getting better players. If rebuilding, propose getting picks/youth.
-7. NEVER suggest selling a top-10 DHQ player for a player ranked 50+ lower. Elite players (DHQ 7000+) should only be traded for elite returns.
+7. NEVER suggest selling a top-10 DHQ player for a player ranked 50+ lower. Elite players (top 5 at position) should only be traded for elite returns.
 8. NEVER suggest a trade where one side has 30%+ more DHQ than the other. That is a robbery, not a trade.
-DHQ scale: 0-10000 (7000+=elite, 4000+=starter, 2000+=depth). ${pickStr}. Always say "DHQ" not "FC".
+DHQ scale: 0-10000 (top 5 at position=elite, 4000+=starter, 2000+=depth). ${pickStr}. Always say "DHQ" not "FC".
 ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
       }
       if(m.role==='assistant'&&m.content.length>400)return{role:'assistant',content:m.content.substring(0,400)+'...'};

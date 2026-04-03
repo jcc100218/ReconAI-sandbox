@@ -40,7 +40,7 @@ const posLabel=(slot,pid)=>{const mapped=window.App.posMap[slot];if(mapped&&mapp
 function removeLoading(id){const e=$('ld-'+id);if(e)e.remove();}
 const pName=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;if(p.position==='DEF')return(p.full_name||id)+' D/ST';return p.full_name||`${p.first_name||''} ${p.last_name||''}`.trim()||id};
 const pNameShort=id=>{if(!id)return'—';const p=S.players[id];if(!p)return id;const f=p.first_name||'';const l=p.last_name||'';if(!f||!l)return pName(id);return f[0]+'. '+l;};
-const pM=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+const pM=p=>{if(!p)return'';if(['DB','CB','S','SS','FS'].includes(p))return'DB';if(['DL','DE','DT','NT','IDL','EDGE'].includes(p))return'DL';if(['LB','OLB','ILB','MLB'].includes(p))return'LB';return p;};
 const pTeam=id=>S.players[id]?.team||'';
 const pPos=id=>S.players[id]?.position||'';
 const pAge=id=>{
@@ -56,7 +56,7 @@ const pAge=id=>{
 };
 const pExp=id=>S.players[id]?.years_exp??'';
 const getUser=oid=>{const u=S.leagueUsers.find(u=>u.user_id===oid);return u?(u.metadata?.team_name||u.display_name||u.username||'Team'):'Team'};
-const myR=()=>S.rosters.find(r=>r.roster_id===S.myRosterId);
+const myR=()=>S.rosters?.find(r=>r.roster_id===S.myRosterId||(r.co_owners||[]).includes(S.myUserId));
 const prog=pct=>{const el=$('prog-bar');if(el)el.style.width=pct+'%';const dp=$('dhq-progress');const df=$('dhq-progress-fill');if(dp){dp.style.display=pct>0&&pct<100?'block':'none';if(df)df.style.width=pct+'%';}};
 const setAgentStatus=(txt,active)=>{const t=$('agent-txt');const d=$('agent-dot');if(t)t.textContent=txt;if(d)d.className='status-dot'+(active?' thinking':active===false?' active':'')};
 
