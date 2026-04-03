@@ -3,11 +3,14 @@
   "short_name": "ReconAI",
   "description": "Dynasty fantasy football intelligence — DHQ valuations, AI advisor, trade finder, waiver wire, draft scouting",
   "start_url": "./index.html",
+  "scope": "./",
+  "id": "reconai",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#08090b",
   "theme_color": "#08090b",
   "categories": ["sports", "entertainment"],
+  "screenshots": [],
   "icons": [
     {
       "src": "icons/icon-192.svg",
