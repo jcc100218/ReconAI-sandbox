@@ -293,6 +293,10 @@ async function loadAllData(){
       fetchTrending().catch(e=>{console.warn('Trending error:',e);return null;}),
     ]);
     console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys((window.App.LI||{}).playerScores||{}).length);
+    // Validate core functions loaded
+    const coreDeps = ['dynastyValue','assessTeamFromGlobal','getPlayerAction','buildRosterTable','renderMobileHome'];
+    const missing = coreDeps.filter(fn => typeof window[fn] !== 'function');
+    if (missing.length) console.warn('[ReconAI] Missing functions:', missing.join(', '));
     if(loadBanner)loadBanner.style.display='none';
     prog(100);
     if(typeof updateDataFreshness==='function')updateDataFreshness();

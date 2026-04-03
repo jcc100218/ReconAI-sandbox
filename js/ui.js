@@ -180,7 +180,7 @@ async function renderRoster(){
 function peakYears(pid){
   const pos=pPos(pid);const age=pAge(pid)||0;
   // Research-backed peak ranges (EPA study 2014-2024)
-  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+  const peaks=window.App.peakWindows;
   const [lo,hi]=peaks[pos]||[25,29];
   if(!age)return{label:'—',desc:'',cls:'',color:'var(--text3)'};
   const yrsToPeak=lo-age;
@@ -1118,7 +1118,7 @@ function renderDailyBriefing(){
   const my=myR();if(!my)return;
   const myPids=my.players||[];
   const mySet=new Set(myPids);
-  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+  const peaks=window.App.peakWindows;
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const faab=getFAAB();
   const trending=S.trending||{};
@@ -1957,7 +1957,7 @@ function renderHeroAction(){
   const my=myR();if(!my)return;
   const myPids=my.players||[];
   const mySet=new Set(myPids);
-  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+  const peaks=window.App.peakWindows;
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const faab=getFAAB();
   const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
@@ -2029,7 +2029,7 @@ function renderPrepareCards(){
   if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
   const my=myR();if(!my)return;
   const myPids=my.players||[];
-  const peaks=window.App?.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+  const peaks=window.App.peakWindows;
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const items=[];
 
@@ -2836,7 +2836,7 @@ function renderDraftNeeds(){
   const activePositions=Object.keys(starterSlots).filter(p=>starterSlots[p]>0);
 
   const avgThresh=LI_LOADED&&LI.avgThresh?LI.avgThresh:{};
-  const peaks=LI_LOADED&&LI.peakWindows?LI.peakWindows:{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+  const peaks=LI_LOADED&&LI.peakWindows?LI.peakWindows:window.App.peakWindows;
 
   const posAnalysis=activePositions.map(pos=>{
     const posPlayers=allPlayers.filter(pid=>posMapD(pPos(pid))===pos);

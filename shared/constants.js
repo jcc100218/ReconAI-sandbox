@@ -4,6 +4,15 @@
 
 window.App = window.App || {};
 
+// Version for cache invalidation — bump on deploy
+window.App.VERSION = '2026.04.02';
+
+// Tier thresholds (healthScore-based)
+window.App.TIER_THRESHOLDS = { ELITE: 85, CONTENDER: 72, CROSSROADS: 60 };
+
+// Position colors (used across both apps)
+window.App.POS_COLORS = {QB:'#E74C3C',RB:'#2ECC71',WR:'#3498DB',TE:'#F0A500',K:'#9B59B6',DL:'#E67E22',LB:'#1ABC9C',DB:'#E91E63'};
+
 window.App.posMap={QB:'QB',RB:'RB',WR:'WR',TE:'TE',FLEX:'FLEX',SUPER_FLEX:'SF',K:'K',DEF:'DEF',BN:'BN',IDP_FLEX:'IDP',DL:'DL',LB:'LB',DB:'DB',REC_FLEX:'FLEX',WR_RB_FLEX:'FLEX',WR_TE:'FLEX'};
 
 window.App.posClass=s=>{const p=window.App.posMap[s]||s||'FLEX';return{QB:'pQB',RB:'pRB',WR:'pWR',TE:'pTE',K:'pK',DEF:'pDEF',FLEX:'pFLEX',SF:'pSF',BN:'pBN',DL:'pDL',LB:'pLB',DB:'pDB',IDP:'pIDP'}[p]||'pFLEX'};
