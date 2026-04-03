@@ -8,7 +8,7 @@
 // CACHE VERSION — bump this on every deploy, or use CI to inject a hash.
 // When this changes, the SW re-installs, wipes old caches, and tells
 // the page to refresh. Users get the new code within seconds.
-const CACHE_NAME = 'reconai-v3';
+const CACHE_NAME = 'reconai-v4';
 
 const APP_SHELL = [
   './',
