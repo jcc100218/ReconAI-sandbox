@@ -2785,6 +2785,16 @@ const idealDepth=window.idealDepth||{QB:3,RB:6,WR:7,TE:3,K:1,DL:5,LB:5,DB:5};
 // ── Draft Room ─────────────────────────────────────────────────
 // draftChatHistory declared in ai-chat.js
 
+function _radialProgress(pct,color){
+  const r=18,c=2*Math.PI*r;
+  const offset=c-(pct/100)*c;
+  return`<div class="radial-progress">
+    <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="${r}" fill="none" stroke="var(--bg4)" stroke-width="3"/>
+    <circle cx="22" cy="22" r="${r}" fill="none" stroke="${color}" stroke-width="3" stroke-dasharray="${c}" stroke-dashoffset="${offset}" stroke-linecap="round" style="transition:stroke-dashoffset .8s ease"/></svg>
+    <span class="rp-val" style="color:${color}">${pct}%</span>
+  </div>`;
+}
+
 function renderDraftNeeds(){
   const needsEl=$('draft-needs');if(!needsEl)return;
   if(!S.myRosterId)return;
@@ -2944,6 +2954,7 @@ function renderDraftNeeds(){
       return posAnalysis.find(p=>p.needScore>0&&['DL','LB','DB'].includes(p.pos))?.pos||'BPA';
     };
 
+    let _pickIdx=0;
     pickEl.innerHTML=ownedPicks.length?ownedPicks.map(p=>{
       const fromRoster=p.own?S.myRosterId:p.fromRosterId;
       const estPos=getPickPos(fromRoster);
@@ -2951,7 +2962,10 @@ function renderDraftNeeds(){
       const pickLabel=p.round+'.'+String(estPos).padStart(2,'0');
       const fromName=p.own?'':'via '+p.from;
       const target=roundTarget(p.round);
-      return`<div style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(124,107,248,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(124,107,248,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
+      const isFirst=_pickIdx===0;
+      _pickIdx++;
+      return`<div class="${isFirst?'pick-next':''}" style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(124,107,248,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(124,107,248,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s;position:relative" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
+        ${isFirst?'<span style="position:absolute;top:-8px;left:8px;font-size:9px;font-weight:800;color:rgba(212,175,55,0.9);letter-spacing:.06em;text-transform:uppercase;background:var(--bg);padding:0 4px">UP NEXT</span>':''}
         <div>
           <div style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</div>
           <div style="font-size:13px;color:var(--text3)">${fromName?fromName:'~'+val.toLocaleString()}</div>
@@ -2976,11 +2990,16 @@ function renderDraftNeeds(){
     <div class="home-sec-title" style="margin-bottom:8px">Draft Strategy</div>`;
 
   if(sortedPos.length){
+    dhtml+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${sortedPos.map(p=>{
+      const chipClass=p.needScore>=50?'strat-chip-critical':p.needScore>=30?'strat-chip-need':'strat-chip-ok';
+      const gradeLetter=gradeLetterD(p.needScore);
+      return`<span class="strat-chip ${chipClass}" onclick="_rookieFilter('${p.pos}')">${gradeLetter} ${p.pos} · ${p.startable}/${p.slotsNeeded} starters</span>`;
+    }).join('')}</div>`;
     dhtml+=sortedPos.map(p=>{
       const gradeColor=gradeColorD(p.needScore);
       const gradeLetter=gradeLetterD(p.needScore);
       const barColor=p.needScore>=50?'var(--red)':p.needScore>=30?'var(--amber)':p.needScore>=15?'var(--text3)':'var(--green)';
-      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+      return`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="_rookieFilter('${p.pos}')">
         <span style="font-size:13px;font-weight:700;color:${gradeColor};min-width:20px">${gradeLetter}</span>
         <span style="font-size:13px;font-weight:600;color:var(--text);min-width:28px">${p.pos}</span>
         <div style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden">
@@ -3016,16 +3035,18 @@ function renderDraftNeeds(){
     let hHtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
       <div class="home-sec-title" style="margin-bottom:8px">Draft History · ${LI.draftMeta?.length||0} drafts</div>`;
 
-    // Show key insights as compact lines
+    // Show key insights with radial progress
     if(keyInsights.length){
+      hHtml+=`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:4px">`;
       hHtml+=keyInsights.map(k=>{
-        const hitCol=k.rate>=50?'var(--green)':k.rate>=25?'var(--amber)':'var(--text3)';
+        const hitCol=k.rate>=50?'var(--green)':k.rate>=25?'var(--amber)':'var(--red)';
         return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">
           <span style="font-weight:700;color:var(--accent);min-width:24px">R${k.rd}</span>
-          <span style="color:${hitCol};font-weight:700">${k.rate}% hit rate</span>
-          ${k.bestPos?`<span style="color:var(--text3)">— best at ${k.bestPos}</span>`:''}
+          ${_radialProgress(k.rate,hitCol)}
+          ${k.bestPos?`<span style="color:var(--text3);font-size:13px">best at ${k.bestPos}</span>`:''}
         </div>`;
       }).join('');
+      hHtml+=`</div>`;
     }
 
     // Full grid below (collapsed by default)
@@ -3124,19 +3145,18 @@ function renderRookieBoard(){
       ${posFilters.map(pos=>`<button class="chip${_rookiePosFilter===pos?' chip-active':''}" onclick="_rookieFilter('${pos}')" style="padding:4px 10px;font-size:13px;border-radius:14px;cursor:pointer;border:1px solid ${_rookiePosFilter===pos?'var(--accent)':'var(--border2)'};background:${_rookiePosFilter===pos?'var(--accentL)':'transparent'};color:${_rookiePosFilter===pos?'var(--accent)':'var(--text3)'}">${pos||'All'}</button>`).join('')}
     </div>
     <!-- Table header -->
-    <div style="display:flex;align-items:center;padding:4px 8px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border2)">
+    <div class="rb-header-sticky" style="display:flex;align-items:center;padding:4px 8px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border2)">
       <span style="width:28px;text-align:center">#</span>
       <span style="flex:1;cursor:pointer" onclick="_rookieSortBy('name')">Player${sortInd('name')}</span>
       <span style="width:36px;text-align:center;cursor:pointer" onclick="_rookieSortBy('pos')">Pos${sortInd('pos')}</span>
       <span style="width:32px;text-align:center;cursor:pointer" onclick="_rookieSortBy('age')">Age${sortInd('age')}</span>
       <span style="width:54px;text-align:right;cursor:pointer" onclick="_rookieSortBy('dhq')">DHQ${sortInd('dhq')}</span>
-      <span style="width:32px;text-align:center;cursor:pointer" onclick="_rookieSortBy('fit')">Fit${sortInd('fit')}</span>
+      <span style="width:40px;text-align:center;cursor:pointer" onclick="_rookieSortBy('fit')">Fit${sortInd('fit')}</span>
     </div>
     <!-- Rows -->
     ${rookies.map((r,i)=>{
       const dhqCol=r.dhq>=7000?'var(--green)':r.dhq>=4000?'var(--blue)':r.dhq>=2000?'var(--text2)':'var(--text3)';
-      const fitCol=r.fit==='high'?'var(--green)':r.fit==='med'?'var(--amber)':'var(--text3)';
-      const fitDot=r.fit==='high'?'\u25CF':r.fit==='med'?'\u25D0':'\u25CB';
+      const fitBadge=r.fit==='high'?'<span class="fit-high">FIT</span>':r.fit==='med'?'<span class="fit-med">VAL</span>':'<span class="fit-low">\u2014</span>';
       const isExp=_rookieExpanded===r.pid;
       const posStyle=getPosBadgeStyle?getPosBadgeStyle(r.pos):'';
       return`<div>
@@ -3152,7 +3172,7 @@ function renderRookieBoard(){
           <span style="width:36px;text-align:center"><span class="rr-pos" style="${posStyle};font-size:13px;padding:1px 4px">${r.pos}</span></span>
           <span style="width:32px;text-align:center;font-size:13px;color:var(--text3)">${r.age||'\u2014'}</span>
           <span style="width:54px;text-align:right;font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${dhqCol}">${r.dhq>0?r.dhq.toLocaleString():'\u2014'}</span>
-          <span style="width:32px;text-align:center;font-size:13px;color:${fitCol}">${fitDot}</span>
+          <span style="width:40px;text-align:center">${fitBadge}</span>
         </div>
         ${isExp?`<div style="padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-bottom:4px;animation:panelIn .2s ease">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
