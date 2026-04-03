@@ -3047,123 +3047,142 @@ function renderDraftNeeds(){
     histEl.innerHTML=hHtml;
   }
 
-  renderRookieProfiles();
+  renderRookieBoard();
 }
 
-// ── Rookie Scouting Profiles ───────────────────────────────────
-window._rookieFilter='All';
-function setRookieFilter(f){window._rookieFilter=f;renderRookieProfiles();}
-function renderRookieProfiles(){
+// ── Rookie Scouting Board (sortable compact table) ────────────
+let _rookieSort={key:'dhq',dir:-1};
+let _rookiePosFilter='';
+let _rookieExpanded=null;
+
+function renderRookieBoard(){
   const el=$('rookie-profiles');if(!el)return;
-  if(!S.players||!LI_LOADED){el.innerHTML='';return;}
+  if(!LI_LOADED){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">Loading rookie data...</div>';return;}
 
-  const peaks=LI.peakWindows||{QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
-  const posMapR=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S','FS','SS'].includes(p))return'DB';return p;};
-  const idpSet=new Set(['DL','LB','DB','DE','DT','CB','S','FS','SS']);
-  const filterGroup=pos=>{const m=posMapR(pos);return idpSet.has(m)?'IDP':m;};
-
-  // 1. Find all rookies with DHQ value
-  const rookies=Object.entries(S.players)
-    .filter(([id,p])=>p.years_exp===0&&LI.playerScores?.[id]>0)
-    .map(([id,p])=>{
-      const val=LI.playerScores[id]||0;
-      const meta=LI.playerMeta?.[id]||{};
-      const pos=posMapR(p.position||'');
-      const grp=filterGroup(p.position||'');
-      const age=pAge(id)||21;
-      const [peakStart]=peaks[pos]||[24,30];
-      const yrsToPeak=Math.max(0,peakStart-age);
-      return{id,p,val,meta,pos,grp,age,yrsToPeak};
+  // Get rookies from player database
+  let rookies=Object.entries(S.players||{})
+    .filter(([pid,p])=>p.years_exp===0&&p.status!=='Inactive'&&p.position&&!['HC','OC','DC','GM'].includes(p.position))
+    .map(([pid,p])=>{
+      const dhq=dynastyValue(pid)||0;
+      const pos=pPos(pid)||p.position;
+      if(dhq<=0&&!p.team)return null;
+      // Check IDP filtering
+      const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+      const rp=league?.roster_positions||[];
+      const isIDP=['DL','DE','DT','LB','OLB','ILB','DB','CB','S'].includes(p.position);
+      const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+      if(isIDP&&!leagueHasIDP)return null;
+      const meta=LI?.playerMeta?.[pid]||{};
+      const college=p.college||'';
+      const age=p.age||'';
+      // Fit score based on team needs
+      const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+      const needPos=assess?.needs?.map(n=>n.pos)||[];
+      const fit=needPos.includes(pos)?'high':needPos.length&&!assess?.strengths?.includes(pos)?'med':'low';
+      return{pid,p,dhq,pos,college,age,meta,fit};
     })
-    .sort((a,b)=>b.val-a.val);
+    .filter(Boolean);
 
-  if(!rookies.length){el.innerHTML='';return;}
+  // Apply position filter
+  if(_rookiePosFilter)rookies=rookies.filter(r=>r.pos===_rookiePosFilter);
 
-  // 2. Position filter tabs
-  const tabs=['All','QB','RB','WR','TE','IDP'];
-  const filtered=window._rookieFilter==='All'?rookies:rookies.filter(r=>r.grp===window._rookieFilter);
-
-  // 3. Profile text generator
-  const profileText=(r)=>{
-    const {pos,val,p}=r;
-    const wt=+(p.weight)||210;const ht=+(p.height?.replace?.(/"/,''))||72;
-    if(pos==='QB') return val>=6000?'Day 1 starter projection — elite arm talent':'Developmental — needs time behind a veteran';
-    if(pos==='RB'){
-      if(wt>=220&&val>=5000) return '3-down back — size + production profile';
-      if(wt<200) return 'Satellite back — receiving specialist';
-      return 'Change of pace — committee upside';
-    }
-    if(pos==='WR'){
-      if(ht>=74&&val>=6000) return 'Alpha WR1 — size/speed/production trifecta';
-      if(ht<72) return 'Slot specialist — quick-twitch separator';
-      return 'Deep threat — vertical stretch ability';
-    }
-    if(pos==='TE'){
-      if(val>=5500) return 'Move TE — mismatched receiving weapon';
-      if(val>=3500) return 'Receiving TE — route-running upside';
-      return 'Blocking TE — run-game asset with catch upside';
-    }
-    if(['DE','DT','DL'].includes(pos)) return val>=5000?'Pass rusher — high-motor edge':'Run stuffer — anchor at the point of attack';
-    if(pos==='LB') return val>=5000?'Ball hawk — sideline-to-sideline range':'Run stuffer — downhill thumper';
-    return val>=4500?'Ball hawk — playmaker in coverage':'Run stuffer — reliable tackler';
-  };
-
-  // 4. Render
-  let html=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <span style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Rookie Scouting Board</span>
-      <span style="font-size:13px;color:var(--text3)">${filtered.length} prospect${filtered.length!==1?'s':''}</span>
-      <div style="margin-left:auto;display:flex;gap:4px">
-        ${tabs.map(t=>`<button class="chip${window._rookieFilter===t?' active':''}" onclick="setRookieFilter('${t}')" style="font-size:13px;padding:2px 8px${window._rookieFilter===t?';background:var(--accent);color:#000':''}">${t}</button>`).join('')}
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">`;
-
-  filtered.slice(0,30).forEach((r,i)=>{
-    const {id,p,val,meta,pos,age,yrsToPeak}=r;
-    const name=p.first_name+' '+p.last_name;
-    const initials=(p.first_name?.[0]||'')+(p.last_name?.[0]||'');
-    const college=p.college||'—';
-    const ht=p.height||'—';const wt=p.weight?p.weight+'lb':'—';
-    const fcRank=meta.fcRank?`FC #${meta.fcRank} overall`:'';
-    const valStr=val.toLocaleString();
-    const {col}=tradeValueTier(val);
-    const pc=posClass(pos);
-    const profile=profileText(r);
-
-    html+=`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:12px;cursor:pointer;transition:border-color .15s" onclick="openPlayerModal('${id}')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--bg4);flex-shrink:0;display:flex;align-items:center;justify-content:center">
-          <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:36px;height:36px;border-radius:50%" onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,var(--bg4),var(--bg3))';this.parentElement.style.border='1px solid var(--border2)';this.parentElement.innerHTML='<span style=\\'font-size:13px;font-weight:800;color:var(--text2);letter-spacing:.02em\\'>${initials}</span>'" loading="lazy"/>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-          <div style="font-size:13px;color:var(--text3)">${college} · ${ht} · ${wt}</div>
-        </div>
-        <span class="pos ${pc}" style="font-size:13px;padding:1px 5px">${pos}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px">
-        <span style="font-weight:700;color:${col};font-family:'JetBrains Mono',monospace">DHQ ${valStr}</span>
-        ${fcRank?`<span style="color:var(--text3)">·</span><span style="color:var(--amber);font-weight:600">${fcRank}</span>`:''}
-      </div>
-      <div style="font-size:13px;color:var(--text3);margin-bottom:6px">Age ${age} · ${yrsToPeak>0?yrsToPeak+'yr to peak':'At peak window'}</div>
-      ${(()=>{
-        // Fit tags
-        const assess3=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
-        const needPos3=assess3?.needs?.map(n=>n.pos)||[];
-        const isFit=needPos3.includes(pos);
-        const isTopTarget=isFit&&i<5;
-        return(isTopTarget?`<div style="font-size:13px;font-weight:700;color:var(--green);padding:2px 6px;background:var(--greenL);border-radius:4px;display:inline-block;margin-bottom:6px">Target at your pick</div>`:isFit?`<div style="font-size:13px;font-weight:700;color:var(--accent);padding:2px 6px;background:var(--accentL);border-radius:4px;display:inline-block;margin-bottom:6px">Fits your team</div>`:'');
-      })()}
-      <div style="font-size:13px;color:var(--text2);padding:6px 8px;background:var(--bg2);border-radius:6px;line-height:1.4">
-        ${profile}
-      </div>
-    </div>`;
+  // Apply sort
+  rookies.sort((a,b)=>{
+    const k=_rookieSort.key,d=_rookieSort.dir;
+    if(k==='dhq')return(b.dhq-a.dhq)*d;
+    if(k==='name')return d*((a.p.full_name||'').localeCompare(b.p.full_name||''));
+    if(k==='pos')return d*((a.pos||'').localeCompare(b.pos||''));
+    if(k==='age')return d*((a.age||99)-(b.age||99));
+    if(k==='fit'){const fo={high:0,med:1,low:2};return d*((fo[a.fit]||2)-(fo[b.fit]||2));}
+    return 0;
   });
 
-  html+=`</div></div>`;
-  el.innerHTML=html;
+  rookies=rookies.slice(0,50);
+
+  const sortInd=k=>_rookieSort.key===k?(_rookieSort.dir===-1?' \u25BC':' \u25B2'):'';
+  const posFilters=['','QB','RB','WR','TE'];
+
+  // Check if league has IDP
+  const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+  const rp=league?.roster_positions||[];
+  const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+  if(leagueHasIDP)posFilters.push('DL','LB','DB');
+
+  el.innerHTML=`
+    <div class="home-sec-title" style="margin-bottom:8px">Rookie Board</div>
+    <!-- Position filters -->
+    <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
+      ${posFilters.map(pos=>`<button class="chip${_rookiePosFilter===pos?' chip-active':''}" onclick="_rookieFilter('${pos}')" style="padding:4px 10px;font-size:13px;border-radius:14px;cursor:pointer;border:1px solid ${_rookiePosFilter===pos?'var(--accent)':'var(--border2)'};background:${_rookiePosFilter===pos?'var(--accentL)':'transparent'};color:${_rookiePosFilter===pos?'var(--accent)':'var(--text3)'}">${pos||'All'}</button>`).join('')}
+    </div>
+    <!-- Table header -->
+    <div style="display:flex;align-items:center;padding:4px 8px;font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--border2)">
+      <span style="width:28px;text-align:center">#</span>
+      <span style="flex:1;cursor:pointer" onclick="_rookieSortBy('name')">Player${sortInd('name')}</span>
+      <span style="width:36px;text-align:center;cursor:pointer" onclick="_rookieSortBy('pos')">Pos${sortInd('pos')}</span>
+      <span style="width:32px;text-align:center;cursor:pointer" onclick="_rookieSortBy('age')">Age${sortInd('age')}</span>
+      <span style="width:54px;text-align:right;cursor:pointer" onclick="_rookieSortBy('dhq')">DHQ${sortInd('dhq')}</span>
+      <span style="width:32px;text-align:center;cursor:pointer" onclick="_rookieSortBy('fit')">Fit${sortInd('fit')}</span>
+    </div>
+    <!-- Rows -->
+    ${rookies.map((r,i)=>{
+      const dhqCol=r.dhq>=7000?'var(--green)':r.dhq>=4000?'var(--blue)':r.dhq>=2000?'var(--text2)':'var(--text3)';
+      const fitCol=r.fit==='high'?'var(--green)':r.fit==='med'?'var(--amber)':'var(--text3)';
+      const fitDot=r.fit==='high'?'\u25CF':r.fit==='med'?'\u25D0':'\u25CB';
+      const isExp=_rookieExpanded===r.pid;
+      const posStyle=getPosBadgeStyle?getPosBadgeStyle(r.pos):'';
+      return`<div>
+        <div onclick="_rookieToggle('${r.pid}')" style="display:flex;align-items:center;padding:6px 8px;cursor:pointer;border-bottom:1px solid ${isExp?'transparent':'var(--border)'};background:${isExp?'var(--accentL2)':'transparent'};transition:background .12s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='${isExp?'var(--accentL2)':'transparent'}'">
+          <span style="width:28px;text-align:center;font-size:13px;font-weight:700;color:${i<3?'var(--accent)':'var(--text3)'}">${i+1}</span>
+          <div style="flex:1;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden">
+            <img src="https://sleepercdn.com/content/nfl/players/${r.pid}.jpg" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'" loading="lazy"/>
+            <div style="min-width:0;overflow:hidden">
+              <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.p.full_name||'Unknown'}</div>
+              <div style="font-size:13px;color:var(--text3)">${r.college||r.p.team||''}</div>
+            </div>
+          </div>
+          <span style="width:36px;text-align:center"><span class="rr-pos" style="${posStyle};font-size:13px;padding:1px 4px">${r.pos}</span></span>
+          <span style="width:32px;text-align:center;font-size:13px;color:var(--text3)">${r.age||'\u2014'}</span>
+          <span style="width:54px;text-align:right;font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${dhqCol}">${r.dhq>0?r.dhq.toLocaleString():'\u2014'}</span>
+          <span style="width:32px;text-align:center;font-size:13px;color:${fitCol}">${fitDot}</span>
+        </div>
+        ${isExp?`<div style="padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-bottom:4px;animation:panelIn .2s ease">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font-size:13px;color:var(--text2)">${r.pos} \u00B7 ${r.p.team||'TBD'} \u00B7 Age ${r.age||'?'}${r.p.height?' \u00B7 '+Math.floor(r.p.height/12)+"'"+r.p.height%12+'"':''}${r.p.weight?' \u00B7 '+r.p.weight+'lbs':''}</span>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="sendDraftChatMsg('Full scouting report on ${(r.p.full_name||'').replace(/'/g,"\\'")} (${r.pos}, ${r.college||'Unknown'}). Include strengths, weaknesses, NFL comparison, and where I should draft them.')">Scout Report</button>
+            <button class="btn btn-sm btn-ghost" onclick="openPlayerModal('${r.pid}')">Player Card</button>
+            <button class="btn btn-sm btn-ghost" onclick="sendDraftChatMsg('Should I draft ${(r.p.full_name||'').replace(/'/g,"\\'")} at my next pick?')">Ask Alex</button>
+          </div>
+        </div>`:''}
+      </div>`;
+    }).join('')}
+    ${rookies.length===0?'<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">No rookies match this filter</div>':''}
+  `;
 }
+
+// Helper functions for rookie board
+function _rookieSortBy(key){
+  if(_rookieSort.key===key)_rookieSort.dir*=-1;
+  else{_rookieSort.key=key;_rookieSort.dir=-1;}
+  renderRookieBoard();
+}
+function _rookieFilter(pos){
+  _rookiePosFilter=pos;
+  renderRookieBoard();
+}
+function _rookieToggle(pid){
+  _rookieExpanded=_rookieExpanded===pid?null:pid;
+  renderRookieBoard();
+}
+
+// Legacy alias
+function renderRookieProfiles(){renderRookieBoard();}
+
+window._rookieSortBy=_rookieSortBy;
+window._rookieFilter=_rookieFilter;
+window._rookieToggle=_rookieToggle;
+window.renderRookieBoard=renderRookieBoard;
 
 async function runDraftScouting(){
   if(!hasAnyAI()){switchTab('settings');return;}
@@ -3349,7 +3368,7 @@ Object.assign(window.App, {
   idealDepth,
 
   // Draft Room
-  renderDraftNeeds, runDraftScouting, renderRookieProfiles,
+  renderDraftNeeds, runDraftScouting, renderRookieBoard, renderRookieProfiles,
 
   // Mobile nav
   mobileTab,
@@ -3401,7 +3420,7 @@ window.closePlayerModal = closePlayerModal;
 window.getPlayerFullCard = getPlayerFullCard;
 window.renderDraftNeeds = renderDraftNeeds;
 window.renderRookieProfiles = renderRookieProfiles;
-window.setRookieFilter = setRookieFilter;
+window.renderRookieBoard = renderRookieBoard;
 window.runDraftScouting = runDraftScouting;
 window.mobileTab = mobileTab;
 window.checkApiKeyCallout = checkApiKeyCallout;
