@@ -1076,9 +1076,8 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 .bar-fill-b{background:linear-gradient(90deg,#34d399,#2ECC71)}
 .bar-fill-a{background:linear-gradient(90deg,#2ECC71,#34d399)}
 
-/* Pulse effect for critical gaps */
-.pulse-critical{animation:pulseCrit 1.5s ease infinite}
-@keyframes pulseCrit{0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,0.3)}50%{box-shadow:0 0 0 6px rgba(231,76,60,0)}}
+/* Static accent for critical gaps (no animation) */
+.pulse-critical{box-shadow:0 0 0 2px rgba(231,76,60,0.25)}
 
 /* Search bar glow on focus */
 .search-glow:focus-within{box-shadow:0 0 0 2px rgba(124,107,248,0.3),inset 0 0 12px rgba(124,107,248,0.06);border-color:var(--accent)}
@@ -1105,9 +1104,8 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 /* Sticky roster header */
 .roster-header-sticky{position:sticky;top:0;z-index:2;background:var(--bg)}
 
-/* Draft pick pulse for "up next" */
-.pick-next{animation:pickPulse 2s ease infinite;border-color:rgba(212,175,55,0.5) !important}
-@keyframes pickPulse{0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,0.3)}50%{box-shadow:0 0 0 8px rgba(212,175,55,0)}}
+/* Draft pick "up next" highlight (static) */
+.pick-next{border-color:rgba(212,175,55,0.5) !important;box-shadow:0 0 0 2px rgba(212,175,55,0.2)}
 
 /* Fit badges */
 .fit-high{background:rgba(46,204,113,0.12);color:#2ECC71;border:1px solid rgba(46,204,113,0.25);padding:1px 6px;border-radius:10px;font-size:13px;font-weight:700}
