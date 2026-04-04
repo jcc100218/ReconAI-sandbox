@@ -326,6 +326,7 @@ function buildRosterTable(){
           <span class="rr-pos" style="${getPosBadgeStyle(pos)}">${pos}</span>
           ${inj?'<span class="rr-inj">'+inj+'</span>':''}
           ${isRookie?'<span style="font-size:13px;color:var(--blue);font-weight:700">R</span>':''}
+          ${(()=>{const playerTag=window._playerTags?.[pid];return playerTag?'<span style="font-size:13px;padding:1px 5px;border-radius:4px;font-weight:700;background:'+(playerTag==='trade'?'var(--amberL)':playerTag==='cut'?'var(--redL)':playerTag==='untouchable'?'var(--greenL)':'var(--blueL)')+';color:'+(playerTag==='trade'?'var(--amber)':playerTag==='cut'?'var(--red)':playerTag==='untouchable'?'var(--green)':'var(--blue)')+'">'+( playerTag==='trade'?'TB':playerTag==='cut'?'CUT':playerTag==='untouchable'?'UT':'W')+'</span>':'';})()}
         </div>
         <div class="rr-bottom">
           <span>Age ${age||'?'}</span>
@@ -2770,11 +2771,19 @@ function closePlayerModal(){const el=$('player-modal');if(el)el.style.display='n
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePlayerModal();});
 
 function tagPlayer(pid,tag){
-  const key='player_tags_'+(S.currentLeagueId||'');
+  const leagueId=S.currentLeagueId||'';
+  const key='player_tags_'+leagueId;
   const tags=JSON.parse(localStorage.getItem(key)||'{}');
   if(tags[pid]===tag)delete tags[pid];
   else tags[pid]=tag;
   localStorage.setItem(key,JSON.stringify(tags));
+
+  // Sync to Supabase (non-blocking)
+  if(window.OD?.savePlayerTags)window.OD.savePlayerTags(leagueId,tags);
+
+  // Update global tags cache
+  window._playerTags=tags;
+
   document.querySelectorAll('#pm-tag-section .chip').forEach(btn=>{
     const t=btn.textContent.trim().toLowerCase().replace(/\s+/g,'');
     const isActive=tags[pid]===(t==='tradeblock'?'trade':t);

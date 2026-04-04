@@ -518,6 +518,74 @@ window.OD.updatePassword = async function(username, newPassword) {
     if (!resp.ok) throw new Error(result.error || 'Failed to update password');
 };
 
+// ══════════════════════════════════════════════════════════════════
+// PLAYER TAGS (Trade Block, Cut, Untouchable, Watch)
+// Syncs between ReconAI and War Room via Supabase
+// Falls back to localStorage when Supabase is unavailable
+// ══════════════════════════════════════════════════════════════════
+
+// Run this SQL in Supabase to create the player_tags table:
+// create table if not exists public.player_tags (
+//   id uuid primary key default gen_random_uuid(),
+//   username text not null references public.users(sleeper_username) on delete cascade,
+//   league_id text not null,
+//   tags jsonb not null default '{}'::jsonb,
+//   updated_at timestamptz default now(),
+//   unique(username, league_id)
+// );
+
+const TAGS_LS_KEY = (leagueId) => 'player_tags_' + (leagueId || '');
+
+window.OD.savePlayerTags = async function(leagueId, tags) {
+    // Always save to localStorage first (instant)
+    try { localStorage.setItem(TAGS_LS_KEY(leagueId), JSON.stringify(tags)); } catch {}
+
+    // Then sync to Supabase (async, non-blocking)
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return;
+    try {
+        await ensureUser(username);
+        const { error } = await db.from('player_tags').upsert({
+            username,
+            league_id: leagueId,
+            tags: tags, // JSON object: { "pid": "trade"|"cut"|"untouchable"|"watch" }
+            updated_at: new Date().toISOString(),
+        }, { onConflict: 'username,league_id' });
+        if (error) console.warn('[FW] player_tags save error', error);
+    } catch (e) { console.warn('[FW] player_tags save failed:', e); }
+};
+
+window.OD.loadPlayerTags = async function(leagueId) {
+    // Try localStorage first (fast)
+    let local = {};
+    try {
+        const raw = localStorage.getItem(TAGS_LS_KEY(leagueId));
+        if (raw) local = JSON.parse(raw);
+    } catch {}
+
+    // Try Supabase (may have newer data from the other app)
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (db && isConfigured() && username) {
+        try {
+            const { data, error } = await db
+                .from('player_tags')
+                .select('tags, updated_at')
+                .eq('username', username)
+                .eq('league_id', leagueId)
+                .maybeSingle();
+            if (!error && data?.tags) {
+                // Merge: Supabase wins for conflicts (it's the sync source)
+                const merged = { ...local, ...data.tags };
+                try { localStorage.setItem(TAGS_LS_KEY(leagueId), JSON.stringify(merged)); } catch {}
+                return merged;
+            }
+        } catch (e) { console.warn('[FW] player_tags load failed:', e); }
+    }
+    return local;
+};
+
 // Expose on App namespace too
 window.App.OD = window.OD;
 window.App.SUPABASE_URL = SUPABASE_URL;

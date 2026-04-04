@@ -320,6 +320,14 @@ async function loadAllData(){
       setTimeout(()=>{if(typeof startStrategyWalkthrough==='function')startStrategyWalkthrough();},500);
     }
     try{if(typeof runMemoryCapture==='function')runMemoryCapture(S.currentLeagueId);}catch(e){}
+    // Load player tags (syncs with War Room)
+    if(window.OD?.loadPlayerTags){
+      window.OD.loadPlayerTags(S.currentLeagueId).then(tags=>{
+        window._playerTags=tags||{};
+        // Re-render roster to show tags
+        if(typeof buildRosterTable==='function')buildRosterTable();
+      }).catch(()=>{});
+    }
   }catch(e){
     console.warn('loadAllData error:',e);
     if(loadBanner)loadBanner.style.display='none';
