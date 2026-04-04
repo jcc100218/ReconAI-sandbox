@@ -534,6 +534,17 @@ function renderAvailable(){
   const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
   filtered=filtered.filter(a=>a.val>=1500);
+
+  // Team mode gate: rebuilding teams skip old low-value players
+  const _avMyAssess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
+  const _avIsRebuilding=_avMyAssess?.tier==='REBUILDING'||_avMyAssess?.window==='REBUILDING';
+  if(_avIsRebuilding){
+    filtered=filtered.filter(a=>{
+      const age=S.players[a.id]?.age||25;
+      const dhq=dynastyValue(a.id)||0;
+      return age<=25||dhq>=2000; // Only young or valuable
+    });
+  }
   filtered=[...filtered].sort((a,b)=>{
     const sc2=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const getPPG=(x)=>{

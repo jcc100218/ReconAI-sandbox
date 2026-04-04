@@ -109,6 +109,12 @@ IDP NOTE: Use the league's actual IDP scoring settings (sack/INT/PD values provi
 DBs with INT/PD potential are premium. Edge rushers with sack upside too.
 Be specific — name actual players from the available list. 3-5 sentences max.
 
+FAAB DISCIPLINE:
+- If the free agent pool is weak (all targets DHQ < 1500), say "Hold your FAAB."
+- Rebuilding teams: only bid on age 25 or younger with upside.
+- Contending teams: only bid on players who would START for you.
+- Never recommend spending FAAB just to fill a roster spot with a replacement-level player.
+
 EXAMPLE OF AN IDEAL RESPONSE:
 User: "Who should I pick up this week?"
 Assistant: "Top 3 waiver adds:
@@ -908,8 +914,8 @@ function dhqContext(includeOwners) {
   if (gmStrat && (gmStrat.mode !== 'balanced' || gmStrat.riskTolerance !== 'moderate' || gmStrat.untouchable?.length || gmStrat.targets?.length || gmStrat.notes)) {
     const stratParts = [`Mode: ${gmStrat.mode}`, `Risk: ${gmStrat.riskTolerance}`];
     if (gmStrat.untouchable?.length) {
-      const S = window.S || {};
-      const names = gmStrat.untouchable.map(pid => S.players?.[pid]?.full_name || pid).join(', ');
+      const S2 = window.S || {};
+      const names = gmStrat.untouchable.map(pid => S2.players?.[pid]?.full_name || pid).join(', ');
       stratParts.push(`Untouchable players: ${names}`);
     }
     if (gmStrat.targets?.length) stratParts.push(`Targeting in trades: ${gmStrat.targets.join(', ')}`);
@@ -918,6 +924,64 @@ function dhqContext(includeOwners) {
     if (gmStrat.notes) stratParts.push(`Owner notes: "${gmStrat.notes}"`);
     parts.push('[GM_STRATEGY]\nThe owner has set the following strategic preferences. IMPORTANT: Honor these when making recommendations.\n' + stratParts.join('\n'));
   }
+
+  // ── League format detection ──────────────────────────────────
+  const _S = window.S || window.App?.S || {};
+  const _league = _S.leagues?.find(l => l.league_id === _S.currentLeagueId);
+  const sc = _league?.scoring_settings || {};
+  const rp = _league?.roster_positions || [];
+  const isSF = rp.includes('SUPER_FLEX');
+  const isTEP = (sc.rec_bonus_te || 0) >= 0.5 || (sc.bonus_rec_te || 0) >= 0.5;
+  const hasIDP = rp.some(s => ['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+  const rbSlots = rp.filter(s => s === 'RB').length + rp.filter(s => s === 'FLEX').length * 0.4;
+  const scoringType = (sc.rec || 0) >= 0.9 ? 'Full PPR' : (sc.rec || 0) >= 0.4 ? 'Half PPR' : 'Standard';
+
+  let formatBlock = '[LEAGUE_FORMAT]\n';
+  formatBlock += 'Scoring: ' + scoringType + (isSF ? ' | SUPERFLEX' : ' | 1QB') + (isTEP ? ' | TE Premium' : '') + (hasIDP ? ' | IDP' : '') + '\n';
+  if (isSF) formatBlock += 'CRITICAL: Superflex league — QBs are 1.8x more valuable. If team has <2 startable QBs, QB is #1 priority ABOVE ALL ELSE.\n';
+  if (isTEP) formatBlock += 'TE Premium league — elite TEs (top 5) are premium assets worth 1.5x normal value.\n';
+  if (rbSlots >= 2.5) formatBlock += 'League requires 2+ RBs — RB depth matters, value RBs at 1.3x.\n';
+  parts.push(formatBlock);
+
+  // ── Team mode context ────────────────────────────────────────
+  const myAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(_S.myRosterId) : null;
+  const tier = myAssess?.tier || '';
+  const teamWindow = myAssess?.window || '';
+
+  let modeBlock = '[TEAM_MODE]\n';
+  if (tier === 'REBUILDING' || teamWindow === 'REBUILDING') {
+    modeBlock += 'Mode: REBUILD\n';
+    modeBlock += 'Rules:\n';
+    modeBlock += '- ONLY recommend youth (age 25 or younger) and draft picks\n';
+    modeBlock += '- Sell aging veterans (27+ with declining production) for picks/youth\n';
+    modeBlock += '- FAAB: only bid on young upside or emergency injury replacements\n';
+    modeBlock += '- Never recommend "depth" pickups of veterans\n';
+    modeBlock += '- Patience is a strategy — don\'t make moves just to make moves\n';
+  } else if (tier === 'ELITE' || tier === 'CONTENDER' || teamWindow === 'CONTENDING') {
+    modeBlock += 'Mode: CONTEND (win now)\n';
+    modeBlock += 'Rules:\n';
+    modeBlock += '- Recommend proven starters who produce THIS season\n';
+    modeBlock += '- Trade future picks for upgrades at weak spots\n';
+    modeBlock += '- FAAB: bid aggressively on difference-makers who would start\n';
+    modeBlock += '- Don\'t recommend speculative youth projects that won\'t help now\n';
+  } else {
+    modeBlock += 'Mode: CROSSROADS (must commit to a direction)\n';
+    modeBlock += 'Rules:\n';
+    modeBlock += '- Team must pick: push for contention or begin rebuild\n';
+    modeBlock += '- No half-measures — don\'t recommend generic "add depth"\n';
+    modeBlock += '- Analyze which direction makes more sense given age profile and picks\n';
+  }
+  parts.push(modeBlock);
+
+  // ── Quality thresholds ───────────────────────────────────────
+  let qualityBlock = '[QUALITY_RULES]\n';
+  qualityBlock += '- NEVER recommend players with DHQ below 500 — not worth a roster spot\n';
+  qualityBlock += '- NEVER recommend players averaging below 5.0 PPG with 6+ games — below replacement\n';
+  qualityBlock += '- NEVER recommend "depth for depth\'s sake" — a bad player wastes a roster spot\n';
+  qualityBlock += '- If no quality free agents exist, say "HOLD YOUR FAAB — no impactful targets available"\n';
+  qualityBlock += '- Remaining FAAB is a weapon for mid-season breakouts and injuries — preserve it\n';
+  parts.push(qualityBlock);
+
   return parts.join('\n\n');
 }
 
@@ -928,6 +992,18 @@ function dhqCompactContext() {
   if (roster) parts.push('[ROSTER_CONTEXT]\n' + roster);
   const mentality = dhqBuildMentalityContext();
   if (mentality) parts.push('[MENTALITY]\n' + mentality);
+
+  // Compact league format for chat context
+  const _S2 = window.S || window.App?.S || {};
+  const _lg = _S2.leagues?.find(l => l.league_id === _S2.currentLeagueId);
+  if (_lg) {
+    const _sc = _lg.scoring_settings || {};
+    const _rp = _lg.roster_positions || [];
+    const _isSF = _rp.includes('SUPER_FLEX');
+    const _scoringType = (_sc.rec || 0) >= 0.9 ? 'Full PPR' : (_sc.rec || 0) >= 0.4 ? 'Half PPR' : 'Standard';
+    parts.push('[LEAGUE_FORMAT]\nScoring: ' + _scoringType + (_isSF ? ' | SUPERFLEX' : ' | 1QB'));
+  }
+
   return parts.join('\n\n');
 }
 

@@ -265,10 +265,13 @@ async function sendHomeChat(){
       if(homeChatHistory.length>4)homeChatHistory=homeChatHistory.slice(-4);
       // Build compact context — attach to latest message only
       const ctxStr=dhqCompactContext();
+      // Supplement with league format data for contextual valuations
+      const _hcLeague=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+      const _hcExtra=_hcLeague?'\nROSTER_POSITIONS:'+(_hcLeague.roster_positions||[]).join(',')+'\nSCORING:'+JSON.stringify(_hcLeague.scoring_settings||{}).substring(0,200):'';
       const msgs=homeChatHistory.map((m,i)=>{
         // Attach context to the LAST user message only
         if(m.role==='user'&&i===homeChatHistory.length-1){
-          return{role:'user',content:ctxStr+'\n\n'+m.content};
+          return{role:'user',content:ctxStr+_hcExtra+'\n\n'+m.content};
         }
         // Trim old assistant messages to save tokens
         if(m.role==='assistant'&&m.content.length>400){
