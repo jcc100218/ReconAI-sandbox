@@ -165,10 +165,10 @@ function getDcLabel(pid){
   const dc=S.depthCharts[team]||{};
   for(const[dpos,dplayers] of Object.entries(dc)){
     for(const[order,plObj] of Object.entries(dplayers||{})){
-      if(String(plObj?.player_id||plObj)===String(pid))return`#${order} ${dpos}`;
+      if(String(plObj?.player_id||plObj)===String(pid))return`${dpos}${order}`;
     }
   }
-  return p?.depth_chart_order?`#${p.depth_chart_order} ${p.depth_chart_position||''}`.trim():'';
+  return p?.depth_chart_order!=null?`${p.depth_chart_position||p.position||''}${p.depth_chart_order+1}`:'';
 }
 
 async function renderRoster(){
@@ -2507,7 +2507,10 @@ function openPlayerModal(playerId){
   const tags=[];
   if(p.injury_status)tags.push(`<span style="background:var(--redL);color:var(--red);font-size:13px;font-weight:700;padding:2px 7px;border-radius:20px">${p.injury_status}</span>`);
   if(dcLbl)tags.push(`<span style="background:var(--bg4);color:var(--text2);font-size:13px;padding:2px 7px;border-radius:20px">${dcLbl}</span>`);
-  if(posRank)tags.push(`<span style="background:var(--accentL);color:var(--accent);font-size:13px;font-weight:700;padding:2px 7px;border-radius:20px">${pos}${posRank} in league</span>`);
+  if(posRank){
+    const _allRostered=[];S.rosters.forEach(r=>(r.players||[]).forEach(p=>{const m=window.App?.LI?.playerMeta?.[p];if(m?.pos===pos&&(window.App?.LI?.playerScores?.[p]||0)>0)_allRostered.push(p);}));
+    tags.push(`<span style="background:var(--accentL);color:var(--accent);font-size:13px;font-weight:700;padding:2px 7px;border-radius:20px" title="${posRank} of ${_allRostered.length} rostered ${pos}s in league">${pos}${posRank}</span>`);
+  }
   if(p.height||p.weight)tags.push(`<span style="background:var(--bg4);color:var(--text3);font-size:13px;padding:2px 7px;border-radius:20px">${[(p.height?Math.floor((p.height||0)/12)+"'"+(( p.height||0)%12)+'"':''),p.weight?p.weight+'lbs':''].filter(Boolean).join(' · ')}</span>`);
   $('pm-tags').innerHTML=tags.join('');
 
@@ -2531,12 +2534,15 @@ function openPlayerModal(playerId){
       {val:pos==='DB'?(intsTotal+'/'+(rawModal?.idp_pass_def||0)):sacksTotal,lbl:pos==='DB'?'INT/PD':'Sacks',col:'var(--text)'},
     ];
   }else{
+    const _gp=stats.prevGP||stats.gp||'—';
+    const _dcLbl2=getDcLabel(playerId);
     statBoxes=[
       {val:val>0?val.toLocaleString():'—',lbl:'DHQ Value',col:col},
       {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
       {val:stats.prevAvg?.toFixed(1)||stats.seasonAvg?.toFixed(1)||'—',lbl:`'${prevYr} PPG`,col:stats.prevAvg>15?'var(--green)':stats.prevAvg&&stats.prevAvg<8?'var(--red)':'var(--text)'},
-      {val:stats.prevTotal?Math.round(stats.prevTotal):'—',lbl:`'${prevYr} Total`,col:'var(--text2)'},
+      {val:typeof _gp==='number'?_gp:'—',lbl:'GP',col:_gp>=14?'var(--green)':_gp>=10?'var(--text)':'var(--red)'},
       {val:trendLabel,lbl:'30d Trend',col:trendCol},
+      {val:_dcLbl2||'—',lbl:'NFL Depth',col:_dcLbl2&&/[12]$/.test(_dcLbl2)?'var(--green)':'var(--text3)'},
     ];
   }
   $('pm-stats-bar').innerHTML=statBoxes.map(s=>`<div class="pm-stat-box"><div class="pm-stat-box-val" style="color:${s.col}">${s.val}</div><div class="pm-stat-box-lbl">${s.lbl}</div></div>`).join('');

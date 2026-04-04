@@ -444,7 +444,11 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
   if (S.rosters) {
     const myRoster = S.rosters?.find(r => r.owner_id === S.myUserId || (r.co_owners||[]).includes(S.myUserId));
     const posRank = _fwLeaguePosRank(pid, pos, S);
-    if (posRank) tags.push(`<span style="background:rgba(46,204,113,.1);color:${_wr.green};font-size:13px;font-weight:700;padding:2px 8px;border-radius:20px">${pos}${posRank} in league</span>`);
+    const allRostered = [];
+    if (posRank) {
+      S.rosters.forEach(r => (r.players || []).forEach(p => { const m = window.App?.LI?.playerMeta?.[p]; if (m?.pos === pos && (window.App?.LI?.playerScores?.[p]||0) > 0) allRostered.push(p); }));
+      tags.push(`<span style="background:rgba(46,204,113,.1);color:${_wr.green};font-size:13px;font-weight:700;padding:2px 8px;border-radius:20px" title="${posRank} of ${allRostered.length} rostered ${pos}s in league">${pos}${posRank}</span>`);
+    }
   }
   if (p.height || p.weight) {
     const ht = p.height ? Math.floor(p.height/12)+"'"+(p.height%12)+'"' : '';
