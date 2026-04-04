@@ -26,7 +26,7 @@
     <div class="spacer"></div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow:hidden">
       <span class="pill pd" id="league-pill" style="font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:140px;padding:4px 10px;display:flex;align-items:center;gap:4px" onclick="switchLeagueMode()" title="Click to switch league"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Not connected</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span></span>
-      <span class="pill pd header-hide-sm" id="week-pill" style="font-size:13px;padding:4px 10px">—</span>
+      <span class="pill pd header-hide-sm" id="week-pill" style="display:none;font-size:13px;padding:4px 10px">—</span>
       <div class="agent-status" id="agent-status" style="font-size:13px;display:none">
         <div class="status-dot" id="agent-dot"></div>
         <span id="agent-txt" class="header-hide-sm">idle</span>
@@ -428,11 +428,13 @@
           <div class="tip-box" id="tip-trade-profile" style="display:none"></div>
         </div>
 
+        <!-- Tag section -->
+        <div id="pm-tag-section" style="margin:0 16px 8px;display:none"></div>
+
         <!-- Sticky action bar -->
         <div class="pm-action-bar">
           <button class="pm-action-btn pm-action-primary" id="pm-ask-btn">Scout Report</button>
           <button class="pm-action-btn" id="pm-trade-btn">Trade Finder</button>
-          <button class="pm-action-btn" onclick="getPlayerFullCard(window._pmPid)">News ↺</button>
         </div>
       </div>
     </div>

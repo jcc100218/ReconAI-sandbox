@@ -525,7 +525,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 /* Tooltips */
 .tip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--bg4);color:var(--text3);font-size:13px;font-weight:700;cursor:pointer;margin-left:4px;transition:all .15s;flex-shrink:0;vertical-align:middle;line-height:1}
 .tip-icon:hover{background:var(--accent);color:#fff}
-.tip-box{display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:13px;color:var(--text2);line-height:1.6;margin-top:6px;animation:tipIn .2s ease}
+.tip-box{display:none;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;font-size:13px;color:var(--text2);line-height:1.6;margin-top:6px;animation:tipIn .2s ease;max-width:280px;word-wrap:break-word}
 .tip-box.show{display:block}
 @keyframes tipIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 .tip-box strong{color:var(--text);font-weight:600}
@@ -543,7 +543,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .skel-hero{height:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:10px;position:relative;overflow:hidden}
 .skel-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.03),transparent);animation:shimmer 1.5s infinite}
 .skel-snapshot{display:flex;gap:10px;overflow:hidden;margin-bottom:10px}
-.skel-snapshot-card{min-width:130px;height:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);flex-shrink:0}
+.skel-snapshot-card{min-width:110px;height:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);flex-shrink:0}
 .skel-snapshot-card::after{content:'';display:block;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.03),transparent);animation:shimmer 1.5s infinite}
 .skel-prepare{display:flex;gap:8px;margin-bottom:10px}
 .skel-prepare-card{flex:1;height:70px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);position:relative;overflow:hidden}
@@ -631,7 +631,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 }
 .snapshot-scroll::-webkit-scrollbar{display:none}
 .snapshot-card{
-  flex:0 0 auto;min-width:140px;
+  flex:0 0 auto;min-width:110px;
   background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);
   padding:12px 14px;cursor:pointer;
   transition:border-color .2s,transform .15s;
@@ -1082,9 +1082,7 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 /* Search bar glow on focus */
 .search-glow:focus-within{box-shadow:0 0 0 2px rgba(124,107,248,0.3),inset 0 0 12px rgba(124,107,248,0.06);border-color:var(--accent)}
 
-/* Roster row status borders */
-.roster-sell{border-left:3px solid var(--amber) !important}
-.roster-buy{border-left:3px solid var(--green) !important}
+/* Roster row status borders — removed, verdict chip is sufficient */
 
 /* Count-up animation helper */
 .count-up{display:inline-block}

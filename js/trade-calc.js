@@ -931,7 +931,6 @@ function _renderTradeCalcShell(el) {
     <div style="margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">
         <button class="btn btn-sm ${_tcActiveView === 'overview' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('overview')">Overview</button>
-        <button class="btn btn-sm ${_tcActiveView === 'finder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('finder')">Trade Finder</button>
         <button class="btn btn-sm ${_tcActiveView === 'partners' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('partners')">Partners</button>
         <button class="btn btn-sm ${_tcActiveView === 'builder' ? '' : 'btn-ghost'}" onclick="_tcSwitchView('builder')">Builder</button>
         <div style="position:relative;margin-left:auto;flex-shrink:0">

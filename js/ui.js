@@ -316,8 +316,7 @@ function buildRosterTable(){
 
     // Phase color
     const phaseCol=pk.cls==='peak'?'var(--green)':pk.cls==='rising'?'var(--green)':pk.cls==='seedling'?'var(--blue)':pk.cls==='veteran'?'var(--amber)':'var(--red)';
-    const verdictCls=verdict&&(verdict.label==='Sell'||verdict.label==='Sell High')?' roster-sell':verdict&&verdict.label==='Buy'?' roster-buy':'';
-    const cardCls='rr-card'+(isStarter?' rr-starter':'')+(isReserve||isTaxi?' rr-reserve':'')+verdictCls;
+    const cardCls='rr-card'+(isStarter?' rr-starter':'')+(isReserve||isTaxi?' rr-reserve':'');
 
     html+=`<div class="${cardCls}" onclick="openPlayerModal('${pid}')">
       <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials>${initials}</span>')" loading="lazy"/>
@@ -330,7 +329,7 @@ function buildRosterTable(){
         </div>
         <div class="rr-bottom">
           <span>Age ${age||'?'}</span>
-          <span class="rr-val" style="color:${col}">${val>0?val.toLocaleString():'—'}${trendHtml}</span>
+          <span class="rr-val" style="color:${col};font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}${trendHtml}</span>
           ${ppg?'<span>'+ppg.toFixed(1)+' PPG</span>':''}
           ${verdict?`<span class="rr-verdict-chip" style="color:${verdict.col};background:${verdict.bg}"${verdict.label==='Sell'||verdict.label==='Sell High'?' onclick="event.stopPropagation();mobileTab(\'trades\')"':''}">${verdict.label}</span>`:''}
         </div>
@@ -533,6 +532,7 @@ function renderAvailable(){
   const posFilter=$('avail-pos-sel')?.value||'';
   const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
+  filtered=filtered.filter(a=>a.val>=1500);
   filtered=[...filtered].sort((a,b)=>{
     const sc2=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
     const getPPG=(x)=>{
@@ -624,13 +624,14 @@ function renderTopPickupHero(){
   const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
   const posMapF=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 
-  // Find best pickup — prefer needs, then highest value
+  // Find best pickup — prefer needs, then highest value (min 1500 DHQ)
+  const qualAvail=avail.filter(a=>a.val>=1500);
   let best=null;
   if(assess?.needs?.length){
     const need=assess.needs[0];
-    best=avail.find(a=>posMapF(a.p.position)===need.pos);
+    best=qualAvail.find(a=>posMapF(a.p.position)===need.pos);
   }
-  if(!best)best=avail[0];
+  if(!best)best=qualAvail[0];
   if(!best){el.innerHTML='';return;}
 
   const p=best.p;const pid=best.id;const pos=posMapF(p.position);
@@ -701,7 +702,7 @@ function renderWaivers(){
     if(ctxLine){
       if(faab.isFAAB&&faab.budget>0){
         const pct=Math.round((faab.remaining/faab.budget)*100);
-        const tone=pct>70?'Aggressive buying window':pct>40?'Healthy budget remaining':pct>15?'Budget getting tight':'Low budget — be selective';
+        const tone=pct>70?'Healthy budget — be strategic':pct>40?'Solid budget remaining':pct>15?'Budget getting tight':'Low budget — be selective';
         ctxLine.innerHTML=`$${faab.remaining} FAAB <span style="color:var(--text3);font-weight:400">(${pct}%)</span> — <span style="color:${pct>50?'var(--green)':pct>25?'var(--amber)':'var(--red)'}">${tone}</span>`;
       }else{
         ctxLine.textContent='Waiver priority: #'+(myR()?.settings?.waiver_position||'?');
@@ -2012,7 +2013,6 @@ function renderHeroAction(){
   const reasonsHtml=hero.reasons.filter(Boolean).map(r=>'<li>'+r+'</li>').join('');
   el.innerHTML=`
     <div class="hero-action-card" onclick="openPlayerModal('${hero.pid}')">
-      <div class="hero-chevron"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
       ${_strategyContextLine()?'<div style="margin-bottom:6px">'+_strategyContextLine()+'</div>':''}
       <div class="hero-title">${hero.title}</div>
       <div class="hero-subtitle">${hero.subtitle}</div>
@@ -2216,6 +2216,7 @@ function renderBiggestNeeds(){
   });
   if(!entries.length){el.innerHTML='';return;}
   const gradeMap={deficit:{l:'D',c:'var(--red)',bg:'var(--redL)',bar:'bar-fill-d'},thin:{l:'C',c:'var(--amber)',bg:'var(--amberL)',bar:'bar-fill-c'},ok:{l:'B',c:'var(--green)',bg:'var(--greenL)',bar:'bar-fill-b'},surplus:{l:'A',c:'var(--green)',bg:'var(--greenL)',bar:'bar-fill-a'}};
+  const myPlayers=(myR()?.players||[]);
   el.innerHTML=`
     <div class="home-sec-title">Position Grades</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -2223,13 +2224,28 @@ function renderBiggestNeeds(){
         const g=gradeMap[d.status]||gradeMap.ok;
         const fill=Math.min(100,Math.round((d.nflStarters/(d.minQuality||1))*100));
         const criticalCls=d.nflStarters===0?' pulse-critical':'';
-        return`<div class="glass-card${criticalCls}" style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer" onclick="mobileTab('${d.status==='deficit'||d.status==='thin'?'waivers':'roster'}')">
-          <span style="font-size:14px;font-weight:800;color:${g.c};min-width:20px">${g.l}</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:var(--text)">${pos}</div>
-            <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:3px"><div class="${g.bar} bar-animated" style="height:100%;--bar-w:${fill}%;border-radius:2px"></div></div>
+        const atPos=myPlayers.filter(pid=>{const p=S.players[pid];return p&&(pPos(pid)===pos);})
+          .map(pid=>({pid,name:pNameShort(pid),dhq:dynastyValue(pid),peakYrs:(LI.playerMeta?.[pid]?.peakYrsLeft||0)}))
+          .sort((a,b)=>b.dhq-a.dhq).slice(0,4);
+        const playersHtml=atPos.length?atPos.map(pl=>{
+          const dhqCol=pl.dhq>=7000?'var(--green)':pl.dhq>=4000?'var(--accent)':pl.dhq>=2000?'var(--text2)':'var(--text3)';
+          return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px;cursor:pointer" onclick="event.stopPropagation();openPlayerModal('${pl.pid}')">
+            <span style="flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pl.name}</span>
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${dhqCol};font-size:13px">${pl.dhq>0?pl.dhq.toLocaleString():'—'}</span>
+            ${pl.peakYrs>0?'<span style="font-size:13px;color:var(--text3)">'+pl.peakYrs+'yr</span>':''}
+          </div>`;
+        }).join(''):'<div style="font-size:13px;color:var(--text3);padding:3px 0">No players</div>';
+        const cardId='pos-grade-'+pos;
+        return`<div class="glass-card${criticalCls}" id="${cardId}" style="padding:8px 10px;cursor:pointer" onclick="(function(e){var det=document.getElementById('${cardId}-detail');if(det){det.style.display=det.style.display==='none'?'block':'none';}e.stopPropagation();})(event)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:14px;font-weight:800;color:${g.c};min-width:20px">${g.l}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${pos}</div>
+              <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-top:3px"><div class="${g.bar} bar-animated" style="height:100%;--bar-w:${fill}%;border-radius:2px"></div></div>
+            </div>
+            <span style="font-size:13px;color:var(--text3)">${d.nflStarters}/${d.minQuality||d.startingReq}</span>
           </div>
-          <span style="font-size:13px;color:var(--text3)">${d.nflStarters}/${d.minQuality||d.startingReq}</span>
+          <div id="${cardId}-detail" style="display:none;margin-top:6px;border-top:1px solid var(--border);padding-top:6px">${playersHtml}</div>
         </div>`;
       }).join('')}
     </div>`;
@@ -2573,6 +2589,21 @@ function openPlayerModal(playerId){
       <div style="font-size:13px;color:var(--text3);margin-top:4px">${pa.reason}</div>`;
   }
 
+  // Tag section
+  const tagSec=$('pm-tag-section');
+  if(tagSec){
+    tagSec.style.display='block';
+    const tagKey='player_tags_'+(S.currentLeagueId||'');
+    const curTags=JSON.parse(localStorage.getItem(tagKey)||'{}');
+    const curTag=curTags[playerId]||'';
+    const tagOpts=[{key:'trade',label:'Trade Block'},{key:'cut',label:'Cut'},{key:'untouchable',label:'Untouchable'},{key:'watch',label:'Watch'}];
+    tagSec.innerHTML=`<div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:4px">TAG</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap">${tagOpts.map(t=>{
+        const isActive=curTag===t.key;
+        return`<button class="chip" onclick="tagPlayer('${playerId}','${t.key}')" style="${isActive?'background:var(--accentL);color:var(--accent);border-color:var(--accent)':''}">${t.label}</button>`;
+      }).join('')}</div>`;
+  }
+
   // Action buttons
   $('pm-ask-btn').textContent='Scout Report ↗';
   $('pm-ask-btn').onclick=()=>goAsk(`SEARCH FOR CURRENT INFO FIRST: Look up ${pName(playerId)} ${pos} ${fullTeam(p.team)} current situation, depth chart, and dynasty outlook for 2026. Then give a dynasty buy/sell/hold recommendation with current team context, role, and trade value. DHQ value: ${dynastyValue(playerId).toLocaleString()}.`);
@@ -2737,6 +2768,23 @@ async function loadPlayerCardStats(playerId){
 
 function closePlayerModal(){const el=$('player-modal');if(el)el.style.display='none';}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePlayerModal();});
+
+function tagPlayer(pid,tag){
+  const key='player_tags_'+(S.currentLeagueId||'');
+  const tags=JSON.parse(localStorage.getItem(key)||'{}');
+  if(tags[pid]===tag)delete tags[pid];
+  else tags[pid]=tag;
+  localStorage.setItem(key,JSON.stringify(tags));
+  document.querySelectorAll('#pm-tag-section .chip').forEach(btn=>{
+    const t=btn.textContent.trim().toLowerCase().replace(/\s+/g,'');
+    const isActive=tags[pid]===(t==='tradeblock'?'trade':t);
+    btn.style.background=isActive?'var(--accentL)':'';
+    btn.style.color=isActive?'var(--accent)':'';
+    btn.style.borderColor=isActive?'var(--accent)':'';
+  });
+  if(typeof showToast==='function')showToast(tags[pid]===tag?'Tagged':'Tag removed');
+}
+window.tagPlayer=tagPlayer;
 
 async function getPlayerFullCard(playerId){
   if(!hasAnyAI())return;
@@ -3095,7 +3143,8 @@ function renderRookieBoard(){
     .map(([pid,p])=>{
       const dhq=dynastyValue(pid)||0;
       const pos=pPos(pid)||p.position;
-      if(dhq<=0&&!p.team)return null;
+      const rookieMeta=LI?.playerMeta?.[pid];
+      if(dhq<=0&&!p.team&&rookieMeta?.source!=='FC_ROOKIE')return null;
       // Check IDP filtering
       const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
       const rp=league?.roster_positions||[];
