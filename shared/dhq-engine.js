@@ -830,7 +830,14 @@ async function loadLeagueIntel(){
       }
 
       // Peak years remaining bonus (5%): ~120 per year, capped at 1000
-      const peakBonus=Math.min(1000,p.peakYrsLeft*120);
+      // GATED: only players with starter-level production get the full bonus
+      // Backups get a reduced bonus — youth alone isn't enough
+      const productionPct = p.wPPG / Math.max(1, (avgThresh[p.pos]?.avgStarter || 100) / 17);
+      const peakMult = productionPct >= 0.70 ? 1.0 :   // Starter-level: full peak bonus
+                       productionPct >= 0.40 ? 0.40 :  // Fringe: reduced bonus
+                       productionPct >= 0.20 ? 0.15 :  // Backup: minimal bonus
+                       0.0;                             // Deep backup: no peak bonus
+      const peakBonus = Math.min(1000, p.peakYrsLeft * 120 * peakMult);
 
       // Consistency bonus — but NOT for unrostered players (nobody wants them)
       const isUnrostered=!rosteredSet.has(p.pid);
@@ -839,8 +846,12 @@ async function loadLeagueIntel(){
       // Durability micro-bonus (not for unrostered)
       const durabilityBonus=isUnrostered?0:(p.recentGP>=16?100:p.recentGP>=13?50:0);
 
-      // Scarcity doesn't apply to unrostered players either
-      const scarcityFinal=isUnrostered?0:scarcityScore;
+      // Scarcity doesn't apply to unrostered players
+      // ALSO reduced for players below starter threshold — backups don't create scarcity
+      const scarcityFinal = isUnrostered ? 0 : 
+                           productionPct >= 0.50 ? scarcityScore :
+                           productionPct >= 0.30 ? Math.round(scarcityScore * 0.25) :
+                           0; // Deep backups get zero scarcity premium
 
       // Trend modifier — in-season only, capped at ±8%
       // A +30% trending player gets ~+5% DHQ boost; -30% gets ~-5% penalty
