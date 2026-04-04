@@ -2911,7 +2911,7 @@ function renderDraftNeeds(){
     });
     const starterPPG=avgThresh[pos]?+(avgThresh[pos].starterLine/17).toFixed(1):{QB:12,RB:8,WR:8,TE:6,DL:4,LB:4,DB:3}[pos]||6;
     const startable=withData.filter(p=>p.ppg>=starterPPG);
-    const elite=withData.filter(p=>window.App.isElitePlayer(p.pid));
+    const elite=withData.filter(p=>typeof window.App?.isElitePlayer==='function'?window.App.isElitePlayer(p.pid):dynastyValue(p.pid)>=7000);
     const [,peakEnd]=peaks[pos]||[23,29];
     const aging=withData.filter(p=>p.age>peakEnd);
     const young=withData.filter(p=>p.age<=25);
@@ -3524,4 +3524,4 @@ if(typeof loadConvMemory==='function')window.loadConvMemory = loadConvMemory;
 if(typeof addConvMemory==='function')window.addConvMemory = addConvMemory;
 if(typeof autoSaveMemory==='function')window.autoSaveMemory = autoSaveMemory;
 window.buildMemoryCtx = buildMemoryCtx;
-window.renderStatsTable = renderStatsTable;
+// renderStatsTable removed — function does not exist
