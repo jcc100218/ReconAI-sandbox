@@ -184,7 +184,13 @@ async function loadLeagueIntel(){
               fetch(`${SLEEPER}/draft/${d.draft_id}/picks`).then(r=>r.ok?r.json():[]).catch(()=>[])
                 .then(picks=>{
                   const rounds=d.settings?.rounds||picks.reduce((m,p)=>Math.max(m,p.round),0);
-                  if(rounds>=20)return; // skip startup
+                  if(rounds>=20)return; // obvious startup (20+ rounds)
+                  // Also detect startups with normal round counts but veteran-heavy picks
+                  const veteranCount = picks.filter(p => {
+                    const player = S.players[p.player_id];
+                    return player && (player.years_exp || 0) >= 2;
+                  }).length;
+                  if(veteranCount > picks.length * 0.5) return; // >50% veterans = startup draft
                   draftMeta.push({season:chain[i].season,rounds,picks:picks.length,draft_id:d.draft_id});
                   picks.forEach(p=>{
                     if(!p.metadata?.position)return;
@@ -479,42 +485,33 @@ async function loadLeagueIntel(){
     const industryWeight = 1 - leagueWeight;
     console.log(`DHQ Pick Blend: ${leagueSeasons} seasons → ${Math.round(leagueWeight*100)}% league / ${Math.round(industryWeight*100)}% industry`);
 
-    // Industry consensus: FC 16-team SF 0.5PPR pick values (March 2026)
-    // R1: 1.01=7043, 1.04=3806, 1.06=3046, 1.08=2543, 1.12=2126
-    // R2: 2.01=1892  |  Generic: 2027 1st=3041, 2028 1st=2192
-    // These are BASE values for a 12-team league; adjusted below for league size.
-    const INDUSTRY_PICK_START = {1:7200, 2:1950, 3:1200, 4:850, 5:500, 6:250, 7:125};
-    const INDUSTRY_PICK_END   = {1:2100, 2:1200, 3:850,  4:650, 5:300, 6:150, 7:75};
-    // Convex decay steepness per round (higher = steeper early drop)
-    const DECAY_RATE = {1:2.8, 2:1.8, 3:1.5, 4:1.2, 5:1.0, 6:1.0, 7:1.0};
-    // League size adjustment: more teams = faster value decay within a round
-    // 12-team=1.0 baseline, 16-team=~1.15 (15% steeper), 10-team=~0.90
-    const sizeAdj = 1 + (totalTeams - 12) * 0.04;
+    // Industry pick values now come from the universal pick value model
+    // (shared/pick-value-model.js — calibrated to KTC April 2026 market data)
 
     for(let pick=1;pick<=maxPicks;pick++){
       if(!dhqPickValues[pick])continue;
       const rd=Math.ceil(pick/totalTeams);
       const posInRound=((pick-1)%totalTeams)+1;
-      const pickPct=(posInRound-1)/Math.max(1,totalTeams-1); // 0-1 within round (1.01=0, last pick=1)
 
       // League-derived value (from actual draft outcomes in THIS league)
-      // Lowered to be closer to market reality; hit rate adjusts ±15%
       const roundBase={1:7200,2:2000,3:1200,4:850,5:400,6:200,7:100};
       const roundEnd={1:2100,2:1200,3:850,4:400,5:200,6:100,7:50};
       const lBase=roundBase[rd]||50;
       const lEnd=roundEnd[rd]||25;
-      const lDecay=DECAY_RATE[rd]||1.5;
-      // Convex decay: value = end + (base-end) * exp(-decay * pct * sizeAdj)
-      const leagueVal=lEnd+(lBase-lEnd)*Math.exp(-lDecay*pickPct*sizeAdj);
+      const lDecay=2.5; // Matches the new model's decay constant
+      const pickPct=(posInRound-1)/Math.max(1,totalTeams-1);
+      const rawPct=1-Math.exp(-lDecay*pickPct);
+      const maxPct=1-Math.exp(-lDecay*1.0);
+      const normPct=rawPct/maxPct;
+      const leagueVal=lEnd+(lBase-lEnd)*(1-normPct);
       const hitBonus=dhqPickValues[pick].starterRate>0?
         Math.min(0.15,Math.max(-0.15,(dhqPickValues[pick].starterRate-50)/333)):0;
       const leagueFinal=leagueVal*(1+hitBonus);
 
-      // Industry consensus value (convex decay, league-size adjusted)
-      const iBase=INDUSTRY_PICK_START[rd]||50;
-      const iEnd=INDUSTRY_PICK_END[rd]||25;
-      const iDecay=DECAY_RATE[rd]||1.5;
-      const industryVal=iEnd+(iBase-iEnd)*Math.exp(-iDecay*pickPct*sizeAdj);
+      // Industry consensus value from universal model
+      const industryVal = typeof getIndustryPickValue === 'function'
+        ? getIndustryPickValue(rd, posInRound, totalTeams)
+        : (lEnd+(lBase-lEnd)*(1-normPct)); // fallback if model not loaded
 
       // Blend: weighted average
       const blended = (leagueFinal * leagueWeight) + (industryVal * industryWeight);
@@ -537,6 +534,14 @@ async function loadLeagueIntel(){
           dhqPickValues[pick].value=prevVal;
         }
         prevVal=dhqPickValues[pick].value;
+      }
+    }
+
+    // Cross-round monotonic: last pick of round N must be >= first pick of round N+1
+    for(let pick=2;pick<=maxPicks;pick++){
+      if(!dhqPickValues[pick]||!dhqPickValues[pick-1])continue;
+      if(dhqPickValues[pick].value>dhqPickValues[pick-1].value){
+        dhqPickValues[pick].value=dhqPickValues[pick-1].value;
       }
     }
 
