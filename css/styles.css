@@ -418,7 +418,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .wl-drop{color:var(--red)}
 
 /* ── Mobile ─────────────────────────────────────────────────── */
-.mobile-nav{display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:680px;height:64px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-top:1px solid var(--glass-border);z-index:200;padding:0 4px;padding-bottom:env(safe-area-inset-bottom, 0px);align-items:stretch}
+.mobile-nav{display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:680px;height:64px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-top:1px solid var(--glass-border);z-index:200;padding:0 4px;padding-bottom:env(safe-area-inset-bottom,0px);align-items:stretch}
 .mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:none;border:none;color:var(--text3);font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.02em;padding:6px 4px;min-height:48px;transition:color .2s;position:relative}
 .mobile-nav-item.active{color:var(--accent);text-shadow:0 0 8px rgba(124,107,248,0.3)}
 /* Active indicator pill above icon */
@@ -461,7 +461,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
   .header-hide-sm{display:none!important}
   .header button[title="Settings"]{padding:6px;min-width:36px;min-height:36px}
   #league-pill{max-width:110px!important;padding:3px 8px!important}
-  .content{padding:10px;padding-bottom:76px}
+  .content{padding:12px;padding-bottom:76px}
   .setup{padding:18px 14px}
   .setup h3{font-size:16px}
   .setup p{font-size:13px}
@@ -481,10 +481,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
   .header .feedback-link{display:none!important}
   #league-pill{max-width:90px!important;font-size:13px!important}
 }
-/* Bottom nav: icons only on very narrow screens */
+/* Bottom nav: smaller labels on very narrow screens */
 @media(max-width:399px){
-  .mobile-nav-item{font-size:0!important;gap:0!important}
-  .mobile-nav-item svg{width:22px;height:22px}
+  .mobile-nav-item{font-size:10px!important;gap:2px!important}
+  .mobile-nav-item svg{width:22px!important;height:22px!important;min-width:22px;min-height:22px}
 }
 @media(min-width:769px){
   .mobile-nav{display:flex!important}
@@ -540,10 +540,10 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .skel-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:10px}
 
 /* Skeleton composites for premium loading */
-.skel-hero{height:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:10px;position:relative;overflow:hidden}
+.skel-hero{height:120px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:10px;position:relative;overflow:hidden}
 .skel-hero::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.03),transparent);animation:shimmer 1.5s infinite}
 .skel-snapshot{display:flex;gap:10px;overflow:hidden;margin-bottom:10px}
-.skel-snapshot-card{min-width:110px;height:100px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);flex-shrink:0}
+.skel-snapshot-card{min-width:110px;height:85px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);flex-shrink:0}
 .skel-snapshot-card::after{content:'';display:block;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.03),transparent);animation:shimmer 1.5s infinite}
 .skel-prepare{display:flex;gap:8px;margin-bottom:10px}
 .skel-prepare-card{flex:1;height:70px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);position:relative;overflow:hidden}
@@ -697,7 +697,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .chip-lg{font-size:14px;padding:10px 16px;border-radius:12px;min-height:44px;display:inline-flex;align-items:center}
 
 /* Section title helper */
-.home-sec-title{font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.home-sec-title{font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;margin-top:16px;display:flex;align-items:center;gap:6px}
 .home-sec-title .sec-line{flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
 
 /* ═══════════════════════════════════════════════════════

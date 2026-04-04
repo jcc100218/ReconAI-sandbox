@@ -2220,7 +2220,7 @@ function renderBiggestNeeds(){
   const myPlayers=(myR()?.players||[]);
   el.innerHTML=`
     <div class="home-sec-title">Position Grades</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       ${entries.map(([pos,d])=>{
         const g=gradeMap[d.status]||gradeMap.ok;
         const fill=Math.min(100,Math.round((d.nflStarters/(d.minQuality||1))*100));
@@ -2262,6 +2262,9 @@ function toggleJewels(){}
 function renderMobileHome(){
   renderHomeSkeletons(); // Show skeletons immediately
   renderTeamSnapshot();
+  // Small spacer between snapshot and hero action
+  const spacer=document.createElement('div');spacer.style.height='8px';
+  const heroEl=$('home-hero-action');if(heroEl&&heroEl.parentNode)heroEl.parentNode.insertBefore(spacer,heroEl);
   renderHeroAction();
   renderPrepareCards();
   renderBiggestNeeds();
@@ -3150,7 +3153,7 @@ let _rookieExpanded=null;
 
 function renderRookieBoard(){
   const el=$('rookie-profiles');if(!el)return;
-  if(!LI_LOADED){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">Loading rookie data...</div>';return;}
+  // Don't block on LI_LOADED — show what we have from Sleeper data
 
   // Get rookies from player database
   let rookies=Object.entries(S.players||{})
