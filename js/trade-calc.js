@@ -33,8 +33,23 @@ const DNA_TYPES = {
   DESPERATE: { label: 'Desperate',     color: '#F0A500',      mult: 1.3,  desc: 'Overpays for immediate help' },
 };
 
-// Fallback pick values (mid-round avg from FantasyCalc SF March 2026)
-const TRADE_PICK_VALUES = { 1: 4545, 2: 1585, 3: 1015, 4: 750, 5: 400, 6: 200, 7: 100 };
+// Pick value resolution: DHQ engine → getIndustryPickValue → hardcoded fallback
+function getPickDHQ(round, totalTeams) {
+  // Use DHQ engine pick values if available
+  if (window.App?.LI?.dhqPickValues) {
+    const pick = (round - 1) * (totalTeams || 16) + Math.ceil((totalTeams || 16) / 2); // mid-round estimate
+    return window.App.LI.dhqPickValues[pick]?.value || 0;
+  }
+  // Fallback to universal model
+  if (typeof getIndustryPickValue === 'function') {
+    return getIndustryPickValue(round, Math.ceil((totalTeams || 16) / 2), totalTeams || 16);
+  }
+  // Last resort hardcoded fallback
+  return {1:7500, 2:3000, 3:1000, 4:300, 5:80, 6:30, 7:10}[round] || 50;
+}
+// Legacy constant — now dynamically resolved via getPickDHQ at call sites.
+// Kept as static object for backward compat with Object.assign exports.
+const TRADE_PICK_VALUES = { 1: 7500, 2: 3000, 3: 1000, 4: 300, 5: 80, 6: 30, 7: 10 };
 
 const DEPTH_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
 
@@ -772,7 +787,7 @@ function calcTradeValue(playerIds, picks, faab) {
     if (typeof pickValue === 'function') {
       return sum + pickValue(pk.year || S.season, pk.round, teams, pk.pickInRound);
     }
-    return sum + (TRADE_PICK_VALUES[pk.round] || 100);
+    return sum + getPickDHQ(pk.round, teams);
   }, 0);
   return playerSum + pickSum + Math.round((faab || 0) * FAAB_RATE);
 }
@@ -1665,7 +1680,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
   }).join('');
 
   const selectedPickHtml = assets.picks.map((pk, idx) => {
-    const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
+    const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
       <span style="font-size:13px;font-weight:800;padding:1px 4px;border-radius:4px;background:var(--amberL);color:var(--amber)">PICK</span>
       <span style="font-size:13px;font-weight:600;flex:1">${pk.year} Rd ${pk.round}</span>
@@ -1692,7 +1707,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
   availPicks.forEach((pk, idx) => {
     const alreadySelected = assets.picks.some(ap => ap.year === pk.year && ap.round === pk.round && ap.originalOwnerRid === pk.originalOwnerRid);
     if (alreadySelected) return;
-    const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
+    const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
     const origLabel = pk.originalOwnerRid !== assessment.rosterId ? ` (via ${getUser(S.rosters?.find(r => r.roster_id === pk.originalOwnerRid)?.owner_id) || 'R' + pk.originalOwnerRid})` : '';
     pickOptions += `<option value="${pk.year}-${pk.round}-${pk.originalOwnerRid}">${pk.year} Rd ${pk.round}${origLabel} (${val.toLocaleString()})</option>`;
   });
@@ -1906,6 +1921,7 @@ Object.assign(window.App, {
   // Constants & builders
   DNA_TYPES,
   TRADE_PICK_VALUES,
+  getPickDHQ,
   POSTURES,
   FAAB_RATE,
   buildIdealRoster,
@@ -1967,7 +1983,7 @@ function renderValueChart(container) {
     const curSeason = parseInt(S.season) || new Date().getFullYear();
     for (let yr = curSeason; yr <= curSeason + 2; yr++) {
       for (let rd = 1; rd <= (S.leagues?.find(l=>l.league_id===S.currentLeagueId)?.settings?.draft_rounds || 5); rd++) {
-        const val = (typeof pickValue === 'function') ? pickValue(yr, rd, teams, Math.ceil(teams/2)) : (TRADE_PICK_VALUES[rd] || 100);
+        const val = (typeof pickValue === 'function') ? pickValue(yr, rd, teams, Math.ceil(teams/2)) : getPickDHQ(rd, teams);
         if (val > 0) {
           const ordinal = ['','1st','2nd','3rd','4th','5th','6th','7th'][rd] || rd+'th';
           players.push({ pid: `PICK-${yr}-${rd}`, name: `${yr} ${ordinal} Round Pick`, team: 'Mid', pos: 'PICK', age: 0, val, isPick: true });
@@ -2357,7 +2373,7 @@ function _finderGenerate(pid) {
         if (tp.val >= val) return;
         const gap = val - tp.val;
         const bestPick = theirPicks.find(pk => {
-          const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
+          const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
           return Math.abs(pv - gap) <= val * tolerance;
         });
         if (bestPick) {
@@ -2417,7 +2433,7 @@ function _finderGenerate(pid) {
       if (mp.val >= val) return;
       const gap = val - mp.val;
       const bestPick = myPicks.find(pk => {
-        const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : (TRADE_PICK_VALUES[pk.round] || 100);
+        const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
         return Math.abs(pv - gap) <= val * tolerance;
       });
       if (bestPick) {
