@@ -1,70 +1,84 @@
 // ═══════════════════════════════════════════════════════════════
-// UNIVERSAL DYNASTY PICK VALUE MODEL
-// Every pick from 1.01 to 7.last gets a specific, consistent value
-// 
+// UNIVERSAL DYNASTY PICK VALUE MODEL v5
+// Continuous curve — no artificial cliffs at round boundaries
+//
 // Calibrated to: Rich Hill NFL Draft Chart (curve shape),
-// KeepTradeCut (April 2026 market data), theScore/Justin Boone,
-// FantasyCalc, DynastyProcess
+// KeepTradeCut (April 2026, 25M+ crowdsourced data points),
+// theScore/Justin Boone dynasty trade values, FantasyCalc
 //
-// This is the INDUSTRY BASELINE used in the blended pick value
-// formula. League-specific data adjusts from this baseline.
+// Key design: TWO-PHASE continuous exponential decay
+//   Phase 1 (R1-R2): Premium territory — gentler decay
+//   Phase 2 (R3+):   Lottery territory — steeper decay
+//   Smooth 5-6% transition between phases (no cliff)
 //
-// Usage: const value = getIndustryPickValue(round, posInRound, totalTeams);
+// Works for any league size (8-32 teams) and any draft length
 // ═══════════════════════════════════════════════════════════════
 
 /**
  * Calculate the industry consensus value for any dynasty draft pick.
  * Returns a value on the DHQ 0-10000 scale.
  * 
- * @param {number} round - Draft round (1-7)
- * @param {number} posInRound - Position within round (1 to totalTeams)
+ * Uses a continuous exponential curve — NO round boundary cliffs.
+ * Pick 2.01 is worth slightly less than 1.last (5-6% drop),
+ * not a massive cliff like piecewise models produce.
+ *
+ * @param {number} pickNumber - Overall pick number (1-indexed)
  * @param {number} totalTeams - League size (8-32)
+ * @param {number} draftRounds - Number of draft rounds (typically 4-10)
  * @returns {number} DHQ value (1-7500)
  */
-function getIndustryPickValue(round, posInRound, totalTeams) {
-  // Round anchor values (start and end of each round)
-  // Calibrated to KTC Superflex April 2026 market data
-  const ROUND_START = { 1: 7500, 2: 3000, 3: 1000, 4: 300, 5: 80, 6: 30, 7: 10 };
-  const ROUND_END   = { 1: 4200, 2: 1400, 3: 400,  4: 100, 5: 40, 6: 15, 7: 1  };
+function getIndustryPickValue(pickNumber, totalTeams, draftRounds) {
+  const TOP = 7500;    // Pick 1 value
+  const FLOOR = 1;     // Minimum value
+  const transition = totalTeams * 2; // Phase shift at end of R2
 
-  const start = ROUND_START[round] || 10;
-  const end = ROUND_END[round] || 1;
+  // Phase 1 decay: calibrated so end of R2 ≈ 1400-1600
+  // 7500 * exp(-0.052 * 31) ≈ 1500 for 16-team
+  const k1 = 0.052;
 
-  // Convex interpolation using exponential decay (Hill chart shape)
-  // Early picks in each round are worth disproportionately more
-  const pct = (posInRound - 1) / Math.max(1, totalTeams - 1); // 0 to 1
-  const decay = 2.5; // Controls front-loading within each round
-  const rawPct = 1 - Math.exp(-decay * pct);
-  const maxPct = 1 - Math.exp(-decay * 1.0);
-  const normPct = rawPct / maxPct;
+  // Phase 2 decay: steeper — R3 decays to ~500 by end, R4+ to ~150
+  const k2 = 0.065;
 
-  return Math.max(1, Math.round(start - (start - end) * normPct));
+  let value;
+  if (pickNumber <= transition) {
+    // Phase 1: Premium picks (R1-R2 territory)
+    value = FLOOR + (TOP - FLOOR) * Math.exp(-k1 * (pickNumber - 1));
+  } else {
+    // Phase 2: Lottery picks (R3+ territory)
+    // Start from where Phase 1 ends — smooth handoff
+    const transVal = FLOOR + (TOP - FLOOR) * Math.exp(-k1 * (transition - 1));
+    value = FLOOR + (transVal - FLOOR) * Math.exp(-k2 * (pickNumber - transition));
+  }
+
+  return Math.max(1, Math.round(value));
+}
+
+/**
+ * Convenience: get value using round + slot instead of pick number
+ */
+function getPickValueBySlot(round, posInRound, totalTeams, draftRounds) {
+  const pickNumber = (round - 1) * totalTeams + posInRound;
+  return getIndustryPickValue(pickNumber, totalTeams, draftRounds || 7);
 }
 
 /**
  * Generate a complete pick value table for a league.
  * Returns an object keyed by pick number (1-indexed).
- * 
- * @param {number} totalTeams - League size (8-32)
- * @param {number} draftRounds - Number of draft rounds (typically 4-7)
- * @returns {Object} Pick values keyed by pick number
  */
 function buildIndustryPickTable(totalTeams, draftRounds) {
   const table = {};
   for (let pick = 1; pick <= totalTeams * draftRounds; pick++) {
-    const rd = Math.ceil(pick / totalTeams);
-    const pos = ((pick - 1) % totalTeams) + 1;
-    table[pick] = getIndustryPickValue(rd, pos, totalTeams);
+    table[pick] = getIndustryPickValue(pick, totalTeams, draftRounds);
   }
   return table;
 }
 
-// Export for use in DHQ engine
+// Export for use in DHQ engine and Node.js tests
 if (typeof window !== 'undefined') {
   window.getIndustryPickValue = getIndustryPickValue;
+  window.getPickValueBySlot = getPickValueBySlot;
   window.buildIndustryPickTable = buildIndustryPickTable;
 }
 if (typeof module !== 'undefined') {
-  module.exports = { getIndustryPickValue, buildIndustryPickTable };
+  module.exports = { getIndustryPickValue, getPickValueBySlot, buildIndustryPickTable };
 }
-
