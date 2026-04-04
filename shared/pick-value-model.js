@@ -50,7 +50,7 @@ function getIndustryPickValue(pickNumber, totalTeams, draftRounds) {
     value = FLOOR + (transVal - FLOOR) * Math.exp(-k2 * (pickNumber - transition));
   }
 
-  return Math.max(1, Math.round(value));
+  return Math.max(50, Math.round(value));
 }
 
 /**
