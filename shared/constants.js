@@ -8,7 +8,7 @@ window.App = window.App || {};
 window.App.VERSION = '2026.04.02';
 
 // Tier thresholds (healthScore-based)
-window.App.TIER_THRESHOLDS = { ELITE: 85, CONTENDER: 72, CROSSROADS: 60 };
+window.App.TIER_THRESHOLDS = { ELITE: 90, CONTENDER: 80, CROSSROADS: 70 };
 
 // Position colors (used across both apps)
 window.App.POS_COLORS = {QB:'#E74C3C',RB:'#2ECC71',WR:'#3498DB',TE:'#F0A500',K:'#9B59B6',DL:'#E67E22',LB:'#1ABC9C',DB:'#E91E63'};

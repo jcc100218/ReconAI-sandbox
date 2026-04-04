@@ -420,9 +420,9 @@ window.App = window.App || {};
 
     // Tier classification — driven by health score for balanced distribution
     let tier, tierColor, tierBg;
-    if (healthScore >= 85) { tier = 'ELITE';      tierColor = '#D4AF37'; tierBg = 'rgba(212,175,55,0.15)'; }
-    else if (healthScore >= 72) { tier = 'CONTENDER';  tierColor = '#2ECC71'; tierBg = 'rgba(46,204,113,0.12)'; }
-    else if (healthScore >= 60) { tier = 'CROSSROADS'; tierColor = '#F0A500'; tierBg = 'rgba(240,165,0,0.12)'; }
+    if (healthScore >= 90) { tier = 'ELITE';      tierColor = '#D4AF37'; tierBg = 'rgba(212,175,55,0.15)'; }
+    else if (healthScore >= 80) { tier = 'CONTENDER';  tierColor = '#2ECC71'; tierBg = 'rgba(46,204,113,0.12)'; }
+    else if (healthScore >= 70) { tier = 'CROSSROADS'; tierColor = '#F0A500'; tierBg = 'rgba(240,165,0,0.12)'; }
     else                         { tier = 'REBUILDING'; tierColor = '#E74C3C'; tierBg = 'rgba(231,76,60,0.12)'; }
 
     // Panic meter (0-5)

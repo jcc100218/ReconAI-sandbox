@@ -287,12 +287,13 @@ function analyzeRosterConstruction(winners, losers, rosters) {
   function buildProfile(rosterList) {
     if (!rosterList || !rosterList.length) {
       return { avgEliteCount: 0, avgStarterCount: 0, topPlayerConcentration: 0, avgAge: 26,
-        posInvestment: {}, avgBenchQuality: 0, avgTotalDHQ: 0 };
+        posInvestment: {}, posStartable: {}, avgBenchQuality: 0, avgTotalDHQ: 0 };
     }
 
     let totalElite = 0, totalStarters = 0, totalConc = 0, totalAge = 0, totalAgeCount = 0;
     let totalBench = 0, benchCount = 0, totalDHQ = 0;
     const posInvTotals = {};
+    const posStartableTotals = {};
     let posInvDenom = 0;
 
     rosterList.forEach(r => {
@@ -321,11 +322,12 @@ function analyzeRosterConstruction(winners, losers, rosters) {
         if (age && age > 18 && age < 45) { totalAge += age; totalAgeCount++; }
       });
 
-      // Position investment
+      // Position investment + startable count per position (DHQ >= 3000)
       scored.forEach(p => {
         const pos = p.meta?.pos || 'UNK';
         posInvTotals[pos] = (posInvTotals[pos] || 0) + p.dhq;
         posInvDenom += p.dhq;
+        if (p.dhq >= 3000) posStartableTotals[pos] = (posStartableTotals[pos] || 0) + 1;
       });
 
       // Bench quality: players outside top starterCount
@@ -339,12 +341,18 @@ function analyzeRosterConstruction(winners, losers, rosters) {
       posInvestment[pos] = posInvDenom > 0 ? +(val / posInvDenom).toFixed(2) : 0;
     });
 
+    const posStartable = {};
+    Object.entries(posStartableTotals).forEach(([pos, count]) => {
+      posStartable[pos] = +(count / n).toFixed(1);
+    });
+
     return {
       avgEliteCount: +(totalElite / n).toFixed(1),
       avgStarterCount: +(totalStarters / n).toFixed(1),
       topPlayerConcentration: +(totalConc / n).toFixed(2),
       avgAge: totalAgeCount > 0 ? +(totalAge / totalAgeCount).toFixed(1) : 26,
       posInvestment,
+      posStartable,
       avgBenchQuality: benchCount > 0 ? Math.round(totalBench / benchCount) : 0,
       avgTotalDHQ: Math.round(totalDHQ / n),
     };
@@ -638,10 +646,17 @@ function generateGapAnalysis(myProfile, winnerProfile) {
     const gap = winDHQAtPos - myDHQAtPos;
     if (gap > 2000) {
       const severity = gap > 8000 ? 'critical' : gap > 4000 ? 'high' : 'medium';
+      // Count startable players (DHQ >= 3000) at this position for human-readable text
+      const myStartable = myProfile.posStartable?.[pos] || 0;
+      const winStartable = winnerProfile.posStartable?.[pos] || 0;
+      const startableDiff = Math.max(0, Math.round(winStartable - myStartable));
+      const humanDetail = startableDiff > 0
+        ? 'You need ' + (startableDiff === 1 ? 'another' : startableDiff + ' more') + ' starting-caliber ' + pos + '. Contending teams typically roster ' + Math.round(winStartable) + ' startable ' + pos + 's, you have ' + Math.round(myStartable) + '.'
+        : 'You have ' + myDHQAtPos.toLocaleString() + ' DHQ at ' + pos + '. Champions average ' + winDHQAtPos.toLocaleString() + '.';
       actions.push({
         priority: severity,
-        action: 'Upgrade ' + pos + ' — ' + gap.toLocaleString() + ' DHQ behind winners',
-        detail: 'You have ' + myDHQAtPos.toLocaleString() + ' DHQ at ' + pos + '. Champions average ' + winDHQAtPos.toLocaleString() + '.',
+        action: 'Upgrade ' + pos + ' — ' + (startableDiff > 0 ? startableDiff + ' starter' + (startableDiff > 1 ? 's' : '') + ' short' : gap.toLocaleString() + ' DHQ behind winners'),
+        detail: humanDetail,
         yours: myDHQAtPos, winners: winDHQAtPos, dhqGap: gap, pos, unit: 'DHQ',
       });
     }
