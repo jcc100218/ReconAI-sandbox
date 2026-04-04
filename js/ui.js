@@ -3380,8 +3380,6 @@ function mobileTab(tab, btn) {
     if(navId){const el=$(navId);if(el)el.classList.add('active');}
   }
   switchTab(tab, null);
-  const fab=$('chat-fab');
-  if(fab) fab.style.display=(tab==='digest'?'none':'flex');
 }
 
 // ── Stats stub ─────────────────────────────────────────────────

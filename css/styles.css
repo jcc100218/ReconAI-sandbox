@@ -61,7 +61,7 @@ body{font-family:'DM Sans',system-ui,-apple-system,sans-serif;background:var(--b
 .tab-badge{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:700;margin-left:4px;vertical-align:middle;box-shadow:0 0 8px rgba(124,107,248,0.4)}
 
 /* Content */
-.content{flex:1;overflow-y:auto;padding:16px;background:var(--bg);padding-bottom:80px;scroll-behavior:smooth}
+.content{flex:1;overflow-y:auto;padding:16px;background:var(--bg);padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));scroll-behavior:smooth}
 .panel{display:none}
 .panel.active{display:block}
 
@@ -418,7 +418,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .wl-drop{color:var(--red)}
 
 /* ── Mobile ─────────────────────────────────────────────────── */
-.mobile-nav{display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:680px;height:64px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-top:1px solid var(--glass-border);z-index:200;padding:0 4px;align-items:stretch}
+.mobile-nav{display:flex;position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:680px;height:64px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-top:1px solid var(--glass-border);z-index:200;padding:0 4px;padding-bottom:env(safe-area-inset-bottom, 0px);align-items:stretch}
 .mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:none;border:none;color:var(--text3);font-family:inherit;font-size:13px;font-weight:600;letter-spacing:.02em;padding:6px 4px;min-height:48px;transition:color .2s;position:relative}
 .mobile-nav-item.active{color:var(--accent);text-shadow:0 0 8px rgba(124,107,248,0.3)}
 /* Active indicator pill above icon */
@@ -435,7 +435,7 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
   body{padding-bottom:68px}
   .mobile-nav{display:flex!important}
   .header{padding:0 12px;height:48px}
-  .content{padding:12px;padding-bottom:80px}
+  .content{padding:12px;padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px))}
   .metrics{grid-template-columns:repeat(2,1fr)}
   .tv-grid{grid-template-columns:1fr}
   .qgrid{grid-template-columns:repeat(2,1fr)}
