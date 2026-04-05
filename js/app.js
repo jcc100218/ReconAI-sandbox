@@ -816,7 +816,55 @@ window.checkForAlerts = checkForAlerts;
     // Restore notification button state
     if('Notification' in window&&Notification.permission==='granted'){const nb=$('notif-btn');if(nb)nb.textContent='Enabled \u2713';}
     const savedUser = DhqStorage.getStr(STORAGE_KEYS.USERNAME);
-    if(savedUser){
+
+    // ── ESPN session restore ───────────────────────────────────────
+    // If a previous ESPN session exists, reconnect it instead of Sleeper.
+    // Uses a 500ms delay so all modules (including window.ESPN) are loaded.
+    const _espnSavedId   = localStorage.getItem('espn_league_id');
+    const _espnSavedTeam = localStorage.getItem('espn_my_team');
+    if (_espnSavedId && _espnSavedTeam) {
+      setTimeout(async () => {
+        if (S.user) return; // Already connected via another path
+        try {
+          const _yr   = parseInt(localStorage.getItem('espn_year') || String(new Date().getFullYear()));
+          const _s2   = localStorage.getItem('espn_s2')   || '';
+          const _sw   = localStorage.getItem('espn_swid') || '';
+          if (!window.ESPN) {
+            console.warn('[ESPN] window.ESPN not loaded — falling back to Sleeper');
+            if (savedUser) { const ui=$('u-input');if(ui)ui.value=savedUser; connect(); }
+            return;
+          }
+          ss('conn-status','Reconnecting to ESPN...');
+          const _pEl=$('prog');if(_pEl)_pEl.style.display='block'; prog(5);
+          // Load Sleeper player DB for crosswalk (best-effort)
+          if(!S.players||Object.keys(S.players).length<100){
+            try{ S.players=await window.App.sf('/players/nfl'); }catch(e){ S.players=S.players||{}; }
+          }
+          prog(30);
+          const _res=await window.ESPN.connectLeague(_espnSavedId,_yr,_s2||null,_sw||null);
+          S.myRosterId=String(_espnSavedTeam);
+          if(!S.user) S.user={user_id:'espn_user',display_name:_res.league.name,username:'espn_user'};
+          S.myUserId='espn_user';
+          _updateLeaguePillESPN(_res.league.name);
+          const _sb=$('setup-block');if(_sb)_sb.style.display='none';
+          const _dc=$('digest-content');if(_dc)_dc.style.display='block';
+          switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
+          prog(100);ss('conn-status','');
+          try{renderHomeSnapshot();}catch(e){}
+          try{checkApiKeyCallout();}catch(e){}
+          if(typeof updateSettingsStatus==='function')try{updateSettingsStatus();}catch(e){}
+          Promise.resolve().then(()=>loadAllData());
+        } catch(e) {
+          console.warn('[ESPN] Auto-restore failed:',e.message);
+          ss('conn-status',''); prog(0);
+          const _pF=$('prog');if(_pF)_pF.style.display='none';
+          // Clear bad session so Sleeper connect shows next time
+          localStorage.removeItem('espn_league_id');
+          localStorage.removeItem('espn_my_team');
+          if(savedUser){const ui=$('u-input');if(ui)ui.value=savedUser;connect();}
+        }
+      }, 500);
+    } else if(savedUser){
       const uInput = $('u-input');
       if(uInput) uInput.value = savedUser;
       setTimeout(()=>{if(!S.user)connect();},500);
