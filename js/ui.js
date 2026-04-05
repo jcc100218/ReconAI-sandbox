@@ -976,24 +976,24 @@ function updateSyncStatus(){
   if(fcEl){
     const dot=fcEl.querySelector('span');
     if(LI_LOADED){
-      dot.style.background='var(--green)';fcEl.style.color='var(--text2)';
-      fcEl.lastChild.textContent=' DHQ ✓ ('+Object.keys(LI.playerScores||{}).length+')';
-    } else{dot.style.background='var(--text3)';fcEl.style.color='var(--text3)';fcEl.lastChild.textContent=' DHQ...';}
+      if(dot)dot.style.background='var(--green)';fcEl.style.color='var(--text2)';
+      if(fcEl.lastChild)fcEl.lastChild.textContent=' DHQ ✓ ('+Object.keys(LI.playerScores||{}).length+')';
+    } else{if(dot)dot.style.background='var(--text3)';fcEl.style.color='var(--text3)';if(fcEl.lastChild)fcEl.lastChild.textContent=' DHQ...';}
   }
   if(statsEl){
     const dot=statsEl.querySelector('span');
     const count=Object.keys(S.playerStats||{}).length;
-    if(count>0){dot.style.background='var(--green)';statsEl.style.color='var(--text2)';statsEl.lastChild.textContent=' Stats ✓ ('+count+')';}
-    else{dot.style.background='var(--amber)';statsEl.style.color='var(--amber)';statsEl.lastChild.textContent=' Stats...';}
+    if(count>0){if(dot)dot.style.background='var(--green)';statsEl.style.color='var(--text2)';if(statsEl.lastChild)statsEl.lastChild.textContent=' Stats ✓ ('+count+')';}
+    else{if(dot)dot.style.background='var(--amber)';statsEl.style.color='var(--amber)';if(statsEl.lastChild)statsEl.lastChild.textContent=' Stats...';}
   }
   if(liEl){
     const dot=liEl.querySelector('span');
     if(LI_LOADED){
       const dCount=LI.totalPicks||0;
-      dot.style.background='var(--green)';liEl.style.color='var(--text2)';
-      liEl.lastChild.textContent=` Intel ✓ (${dCount} picks, ${LI.leagueYears?.length||0}yr${LI.rookieCount?' + '+LI.rookieCount+' rookies':''})`;
+      if(dot)dot.style.background='var(--green)';liEl.style.color='var(--text2)';
+      if(liEl.lastChild)liEl.lastChild.textContent=` Intel ✓ (${dCount} picks, ${LI.leagueYears?.length||0}yr${LI.rookieCount?' + '+LI.rookieCount+' rookies':''})`;
     }
-    else{dot.style.background='var(--text3)';liEl.lastChild.textContent=' Intel...';}
+    else{if(dot)dot.style.background='var(--text3)';if(liEl.lastChild)liEl.lastChild.textContent=' Intel...';}
   }
 }
 
