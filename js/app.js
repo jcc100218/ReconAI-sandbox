@@ -340,6 +340,7 @@ async function selectESPNTeam(rosterId,leagueId,year,espnS2,swid){
     _updateLeaguePillESPN(S_ref.leagues[0]?.name||'ESPN League');
 
     // Show the main dashboard
+    const hubElE=$('league-hub');if(hubElE)hubElE.style.display='none';
     const sb=$('setup-block');if(sb)sb.style.display='none';
     const dc=$('digest-content');if(dc)dc.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
@@ -458,6 +459,7 @@ async function selectMFLTeam(rosterId,leagueId,year,apiKey){
 
     _updateLeaguePillMFL(S_ref.leagues[0]?.name||'MFL League');
 
+    const hubElM=$('league-hub');if(hubElM)hubElM.style.display='none';
     const sb=$('setup-block');if(sb)sb.style.display='none';
     const dc=$('digest-content');if(dc)dc.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
@@ -626,6 +628,7 @@ async function selectYahooTeam(teamId,leagueKey){
 
     _updateLeaguePillYahoo(S_ref.leagues[0]?.name||'Yahoo League');
 
+    const hubElY=$('league-hub');if(hubElY)hubElY.style.display='none';
     const sb=$('setup-block');if(sb)sb.style.display='none';
     const dc=$('digest-content');if(dc)dc.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
@@ -1046,9 +1049,15 @@ window.showLeagueUpgradePrompt = showLeagueUpgradePrompt;
 window.App.showLeagueUpgradePrompt = showLeagueUpgradePrompt;
 
 function switchLeagueMode(){
-  $('setup-block').style.display='block';
   const dc=$('digest-content');if(dc)dc.style.display='none';
-  if(getLeagueRegistry().length>0){renderLeagueHub();}else{showLeaguePicker(S.leagues,S.user?.user_id||'');}
+  if(getLeagueRegistry().length>0){
+    // Show hub if we have a registry; renderLeagueHub hides setup-block itself
+    $('setup-block').style.display='none';
+    renderLeagueHub();
+  }else{
+    $('setup-block').style.display='block';
+    showLeaguePicker(S.leagues,S.user?.user_id||'');
+  }
   switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
 }
 window.switchLeagueMode = switchLeagueMode;
@@ -1069,6 +1078,7 @@ async function selectLeague(leagueId,userId){
   </div>`;
   try{
     await loadLeague(leagueId,userId);
+    const hubEl=$('league-hub');if(hubEl)hubEl.style.display='none';
     const sb2=$('setup-block');if(sb2)sb2.style.display='none';
     const dc2=$('digest-content');if(dc2)dc2.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
@@ -1211,6 +1221,7 @@ function reconnect(){
   if(LI_ref){LI_ref.LI_LOADED=false;LI_ref.LI={};window._liLoading=false;}
   DhqStorage.remove('dhq_leagueintel_v10'); // old v10 key — clear on reconnect
   DhqStorage.removeByPrefix(STORAGE_KEYS.HIST_PREFIX);
+  const hubEl=$('league-hub');if(hubEl)hubEl.style.display='none';
   const sb=$('setup-block');
   if(sb){
     sb.style.display='block';
@@ -1345,6 +1356,365 @@ function checkForAlerts(){
   DhqStorage.set(STORAGE_KEYS.LAST_ALERTS, now);
 }
 window.checkForAlerts = checkForAlerts;
+
+// ══════════════════════════════════════════════════════════════
+// LEAGUE HUB — "save slot" style league selector
+// Registry stores all connected leagues with credentials for
+// 1-tap reconnection. Populated by loadAllData() after connect.
+// ══════════════════════════════════════════════════════════════
+
+const _REGISTRY_KEY = 'dhq_league_registry';
+const _REGISTRY_KPI_PREFIX = 'dhq_kpi_';
+
+const _HUB_PLATFORM_CFG = {
+  sleeper:{ label:'Sleeper', badgeClass:'hub-badge-sleeper' },
+  espn:   { label:'ESPN',    badgeClass:'hub-badge-espn' },
+  mfl:    { label:'MFL',     badgeClass:'hub-badge-mfl' },
+  yahoo:  { label:'Yahoo',   badgeClass:'hub-badge-yahoo' }
+};
+
+// Capture the original setup-block HTML on first load so showAddPlatformForm
+// can always restore the connect forms even after they've been replaced by
+// a spinner or league picker.
+let _originalSetupHTML = '';
+document.addEventListener('DOMContentLoaded', () => {
+  const _sb = document.getElementById('setup-block');
+  if (_sb) _originalSetupHTML = _sb.innerHTML;
+}, { once: true });
+
+// ── Registry API ──────────────────────────────────────────────
+
+function getLeagueRegistry() {
+  try {
+    const raw = localStorage.getItem(_REGISTRY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(e) { return []; }
+}
+window.getLeagueRegistry = getLeagueRegistry;
+window.App.getLeagueRegistry = getLeagueRegistry;
+
+function saveLeagueToRegistry(entry) {
+  if (!entry?.leagueId) return;
+  try {
+    const registry = getLeagueRegistry();
+    const idx = registry.findIndex(r => r.leagueId === entry.leagueId && r.platform === entry.platform);
+    if (idx >= 0) registry[idx] = { ...registry[idx], ...entry, lastSync: Date.now() };
+    else registry.push({ ...entry, lastSync: Date.now() });
+    localStorage.setItem(_REGISTRY_KEY, JSON.stringify(registry));
+  } catch(e) {}
+}
+window.saveLeagueToRegistry = saveLeagueToRegistry;
+window.App.saveLeagueToRegistry = saveLeagueToRegistry;
+
+// Update cached KPI values for a league (called after loadAllData completes)
+function updateRegistryKPIs(leagueId) {
+  if (!leagueId) return;
+  try {
+    const LI = window.App.LI || {};
+    const ownerProfiles = LI.ownerProfiles || LI.profiles || {};
+    const powerRankings = LI.powerRankings || LI.rankings || [];
+    const myRoster = myR();
+    const myOwnerId = myRoster?.owner_id || S.myUserId;
+
+    // Health score from owner profile
+    const myProfile = ownerProfiles[myRoster?.roster_id] || ownerProfiles[myOwnerId] || null;
+    const healthScore = myProfile?.healthScore ?? myProfile?.health_score ?? null;
+
+    // Power rank — find my team in rankings
+    let powerRank = null, totalTeams = S.rosters?.length || 12;
+    if (Array.isArray(powerRankings) && powerRankings.length) {
+      const myEntry = powerRankings.find(r =>
+        String(r.roster_id) === String(S.myRosterId) ||
+        String(r.owner_id) === String(myOwnerId)
+      );
+      if (myEntry) {
+        powerRank = myEntry.rank ?? (powerRankings.indexOf(myEntry) + 1);
+        totalTeams = powerRankings.length;
+      }
+    }
+
+    const kpiObj = {
+      healthScore: healthScore !== null ? Math.round(healthScore) : null,
+      powerRank,
+      totalTeams,
+      ts: Date.now()
+    };
+    localStorage.setItem(_REGISTRY_KPI_PREFIX + leagueId, JSON.stringify(kpiObj));
+
+    // Also update lastSync in registry entry
+    const registry = getLeagueRegistry();
+    const idx = registry.findIndex(r => r.leagueId === leagueId);
+    if (idx >= 0) { registry[idx].lastSync = Date.now(); localStorage.setItem(_REGISTRY_KEY, JSON.stringify(registry)); }
+  } catch(e) {}
+}
+window.updateRegistryKPIs = updateRegistryKPIs;
+window.App.updateRegistryKPIs = updateRegistryKPIs;
+
+function _regGetKPI(leagueId) {
+  try { return JSON.parse(localStorage.getItem(_REGISTRY_KPI_PREFIX + leagueId) || 'null'); } catch(e) { return null; }
+}
+
+function _regTimeAgo(ts) {
+  if (!ts) return null;
+  const d = Date.now() - ts;
+  const m = Math.floor(d / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h / 24) + 'd ago';
+}
+
+// ── Hub render ────────────────────────────────────────────────
+
+function renderLeagueHub() {
+  const hub = $('league-hub');
+  if (!hub) return;
+
+  const registry = getLeagueRegistry();
+  window._hubRegistry = registry; // referenced in onclick handlers
+
+  if (!registry.length) {
+    // Empty state — no connected leagues
+    hub.innerHTML = `
+      <div class="hub-wrap">
+        <div class="hub-section-title">War Room Scout</div>
+        <div class="hub-empty">
+          <div class="hub-empty-icon">🏈</div>
+          <div class="hub-empty-title">Connect your first platform</div>
+          <div class="hub-empty-sub">Your leagues appear here as cards — tap one to jump straight into your dashboard.</div>
+          <div class="hub-platform-btns">
+            <button class="hub-platform-btn hub-btn-sleeper" onclick="showAddPlatformForm('sleeper')">Sleeper</button>
+            <button class="hub-platform-btn hub-btn-espn" onclick="showAddPlatformForm('espn')">ESPN</button>
+            <button class="hub-platform-btn hub-btn-mfl" onclick="showAddPlatformForm('mfl')">MFL</button>
+            <button class="hub-platform-btn hub-btn-yahoo" onclick="showAddPlatformForm('yahoo')">Yahoo</button>
+          </div>
+        </div>
+      </div>`;
+    hub.style.display = 'block';
+    const sb = $('setup-block'); if (sb) sb.style.display = 'none';
+    return;
+  }
+
+  // Connected platforms badge row
+  const connectedPlatforms = [...new Set(registry.map(r => r.platform))];
+  const platformBadges = connectedPlatforms.map(p => {
+    const cfg = _HUB_PLATFORM_CFG[p] || { label: p.toUpperCase(), badgeClass: '' };
+    return `<span class="hub-platform-badge ${cfg.badgeClass}">${cfg.label}</span>`;
+  }).join('');
+  const sleeperUser = DhqStorage.getStr(STORAGE_KEYS.USERNAME);
+
+  // Free-tier: only first league (or currently active one) is unlocked
+  const isFree = typeof getTier === 'function' ? getTier() === 'free' : false;
+  const savedId = DhqStorage.getStr(STORAGE_KEYS.LEAGUE) || S.currentLeagueId || '';
+  const unlockedId = isFree ? (savedId && registry.find(e => e.leagueId === savedId) ? savedId : registry[0]?.leagueId) : null;
+
+  // League cards
+  const cards = registry.map((entry, i) => {
+    const cfg = _HUB_PLATFORM_CFG[entry.platform] || { label: entry.platform?.toUpperCase() || '?', badgeClass: '' };
+    const locked = isFree && entry.leagueId !== unlockedId;
+    const kpi = locked ? null : _regGetKPI(entry.leagueId);
+    const syncStr = _regTimeAgo(entry.lastSync);
+    const hs = kpi?.healthScore ?? null;
+    const pr = kpi?.powerRank ?? (entry.powerRank ?? null);
+    const tt = kpi?.totalTeams ?? entry.totalRosters ?? 12;
+    const healthColor = hs !== null ? (hs >= 70 ? 'var(--green)' : hs >= 40 ? 'var(--amber)' : 'var(--red)') : 'var(--text3)';
+    const rankColor  = pr !== null ? (pr <= 3 ? 'var(--accent)' : pr >= tt - 2 ? 'var(--red)' : 'var(--text2)') : 'var(--text3)';
+    const safeId = (entry.leagueId || '').replace(/'/g, "\\'");
+    const safeName = (entry.leagueName || '').replace(/'/g, "\\'");
+    const action = locked
+      ? `showLeagueUpgradeFromHub('${safeId}','${safeName}')`
+      : `loadRegistryLeague(window._hubRegistry[${i}])`;
+
+    return `
+      <div class="hub-card${locked ? ' locked' : ''}" onclick="${action}" style="animation-delay:${i*0.07}s${locked ? ';opacity:.65' : ''}"
+           ${!locked ? `onmouseover="this.style.borderColor='var(--accent)';this.style.boxShadow='0 6px 24px rgba(212,175,55,.18)';this.style.transform='translateY(-2px)'"
+           onmouseout="this.style.borderColor='rgba(212,175,55,.18)';this.style.boxShadow='none';this.style.transform='none'"` : ''}>
+        <div class="hub-card-top">
+          <div class="hub-card-name">${escHtml(entry.leagueName || 'League')}</div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            <span class="hub-platform-badge ${cfg.badgeClass}">${cfg.label}</span>
+            ${locked ? '<span style="font-size:15px">🔒</span>' : ''}
+          </div>
+        </div>
+        <div class="hub-card-mid">
+          ${entry.teamName ? `<span class="hub-card-team">${escHtml(entry.teamName)}</span>` : ''}
+          <span class="hub-card-season">${escHtml(entry.season || String(new Date().getFullYear()))}</span>
+          ${entry.isDynasty ? '<span class="hub-card-season" style="background:var(--accentL);color:var(--accent)">Dynasty</span>' : ''}
+        </div>
+        <div class="hub-card-bot">
+          ${locked ? `<div style="font-size:12px;color:var(--accent)">Upgrade to sync more leagues</div>` : `
+          <div class="hub-kpi-group">
+            <div class="hub-kpi-badge" style="color:${healthColor}">
+              <span class="hub-kpi-lbl">Health</span>
+              <span class="hub-kpi-num">${hs !== null ? hs : '—'}</span>
+            </div>
+            <div class="hub-kpi-badge" style="color:${rankColor}">
+              <span class="hub-kpi-lbl">Power</span>
+              <span class="hub-kpi-num">${pr !== null ? '#' + pr : '—'}</span>
+            </div>
+          </div>
+          <div class="hub-sync-str ${syncStr ? '' : 'hub-sync-never'}">${syncStr ? 'Synced ' + syncStr : 'Tap to sync'}</div>`}
+        </div>
+      </div>`;
+  }).join('');
+
+  hub.innerHTML = `
+    <div class="hub-wrap">
+      <div class="hub-top-bar">
+        <div>
+          <div class="hub-section-title">Your Leagues</div>
+          <div class="hub-platforms-row">
+            ${platformBadges}
+            ${sleeperUser ? `<span class="hub-username">@${escHtml(sleeperUser)}</span>` : ''}
+          </div>
+        </div>
+        <button class="hub-add-btn" onclick="showAddPlatformForm()">+ Add Platform</button>
+      </div>
+      <div class="hub-cards">${cards}</div>
+    </div>`;
+
+  hub.style.display = 'block';
+  const sb = $('setup-block'); if (sb) sb.style.display = 'none';
+}
+window.renderLeagueHub = renderLeagueHub;
+window.App.renderLeagueHub = renderLeagueHub;
+
+// Show original platform connect forms
+function showAddPlatformForm(platform) {
+  const hub = $('league-hub'); if (hub) hub.style.display = 'none';
+  const sb = $('setup-block');
+  if (sb) {
+    // Restore original form HTML if it was replaced by a spinner/picker
+    if (!sb.querySelector('#form-sleeper') && _originalSetupHTML) sb.innerHTML = _originalSetupHTML;
+    sb.style.display = 'block';
+  }
+  if (platform) showPlatformTab(platform);
+}
+window.showAddPlatformForm = showAddPlatformForm;
+
+// Show hub loading state while connecting
+function _hubShowLoading(msg) {
+  const hub = $('league-hub');
+  if (!hub) return;
+  hub.style.display = 'block';
+  hub.innerHTML = `
+    <div class="hub-wrap" style="display:flex;align-items:center;justify-content:center;min-height:220px;flex-direction:column;gap:14px">
+      <span class="hub-spinner"></span>
+      <div style="font-size:14px;color:var(--text2)">${escHtml(msg || 'Loading league...')}</div>
+      <button class="btn btn-ghost btn-sm" onclick="renderLeagueHub()">← Back</button>
+    </div>`;
+}
+
+// 1-tap connect from a registry entry
+async function loadRegistryLeague(entry) {
+  if (!entry) return;
+  const { platform, leagueId, leagueName, username, myRosterId: savedRosterId,
+          espnLeagueId, espnYear, espnMyTeam, espnS2, espnSwid,
+          yahooLeagueKey, yahooMyTeam, mflLeagueId, mflYear, mflApiKey,
+          season } = entry;
+
+  const _finish = (leagueName) => {
+    const hub = $('league-hub'); if (hub) hub.style.display = 'none';
+    const sb  = $('setup-block'); if (sb) sb.style.display = 'none';
+    const dc  = $('digest-content'); if (dc) dc.style.display = 'block';
+    switchTab('digest', document.querySelector('.tab[onclick*="digest"]'));
+    prog(100);
+    try { renderHomeSnapshot(); } catch(e) {}
+    try { checkApiKeyCallout(); } catch(e) {}
+    if (typeof updateSettingsStatus === 'function') updateSettingsStatus();
+    Promise.resolve().then(() => loadAllData());
+  };
+
+  const _error = (msg) => {
+    const hub = $('league-hub');
+    if (hub) hub.innerHTML = `<div class="hub-wrap" style="text-align:center;padding:40px 20px"><div style="color:var(--red);margin-bottom:16px">${escHtml(msg)}</div><button class="btn btn-ghost btn-sm" onclick="renderLeagueHub()">← Back</button></div>`;
+  };
+
+  switch (platform) {
+
+    case 'sleeper': {
+      _hubShowLoading('Loading ' + escHtml(leagueName || 'league') + '...');
+      // Pre-set saved league so showLeaguePicker auto-selects it without showing picker UI
+      if (leagueId) DhqStorage.setStr(STORAGE_KEYS.LEAGUE, leagueId);
+      const uInput = $('u-input');
+      if (uInput) uInput.value = username || '';
+      setTimeout(() => connect(), 50);
+      break;
+    }
+
+    case 'espn': {
+      _hubShowLoading('Loading ESPN league...');
+      if (!window.ESPN) { showToast('ESPN connector not loaded — refresh page.'); renderLeagueHub(); return; }
+      try {
+        const yr  = parseInt(espnYear || String(new Date().getFullYear()));
+        const s2  = espnS2   || localStorage.getItem('espn_s2')   || '';
+        const sw  = espnSwid || localStorage.getItem('espn_swid') || '';
+        if (!S.players || Object.keys(S.players).length < 100) {
+          try { S.players = await window.App.sf('/players/nfl'); } catch(e) { S.players = S.players || {}; }
+        }
+        const res = await window.ESPN.connectLeague(espnLeagueId || leagueId, yr, s2 || null, sw || null);
+        S.myRosterId = String(espnMyTeam || savedRosterId);
+        S.myUserId = 'espn_user';
+        if (!S.user) S.user = { user_id: 'espn_user', display_name: res.league.name, username: 'espn_user' };
+        _updateLeaguePillESPN(res.league.name);
+        _finish(res.league.name);
+      } catch(e) {
+        _error(e.message);
+      }
+      break;
+    }
+
+    case 'mfl': {
+      _hubShowLoading('Loading MFL league...');
+      if (!window.MFL) { showToast('MFL connector not loaded — refresh page.'); renderLeagueHub(); return; }
+      try {
+        const yr = parseInt(mflYear || String(new Date().getFullYear()));
+        const ak = mflApiKey || localStorage.getItem('mfl_api_key') || '';
+        if (!S.players || Object.keys(S.players).length < 100) {
+          try { S.players = await window.App.sf('/players/nfl'); } catch(e) { S.players = S.players || {}; }
+        }
+        const res = await window.MFL.connectLeague(mflLeagueId || leagueId, yr, ak);
+        S.myRosterId = String(entry.myRosterId || savedRosterId);
+        if (!S.user) S.user = { user_id: 'mfl_user', display_name: res.league.name, username: 'mfl_user' };
+        _updateLeaguePillMFL(res.league.name);
+        _finish(res.league.name);
+      } catch(e) {
+        _error(e.message);
+      }
+      break;
+    }
+
+    case 'yahoo': {
+      const ySession = localStorage.getItem('yahoo_session_id');
+      if (!ySession) { showToast('Yahoo session expired — reconnect via Add Platform.'); showAddPlatformForm('yahoo'); return; }
+      _hubShowLoading('Loading Yahoo league...');
+      if (!window.Yahoo) { showToast('Yahoo connector not loaded — refresh page.'); renderLeagueHub(); return; }
+      try {
+        if (!S.players || Object.keys(S.players).length < 100) {
+          try { S.players = await window.App.sf('/players/nfl'); } catch(e) { S.players = S.players || {}; }
+        }
+        const lKey = yahooLeagueKey || leagueId;
+        const tKey = yahooMyTeam ? lKey + '.t.' + yahooMyTeam : null;
+        const res = await window.Yahoo.connectLeague(lKey, tKey);
+        S.myRosterId = String(yahooMyTeam || savedRosterId);
+        if (!S.user) S.user = { user_id: 'yahoo_user', display_name: res.league.name, username: 'yahoo_user' };
+        _updateLeaguePillYahoo(res.league.name);
+        _finish(res.league.name);
+      } catch(e) {
+        localStorage.removeItem('yahoo_session_id');
+        _error(e.message + ' — Yahoo session may have expired.');
+      }
+      break;
+    }
+
+    default:
+      renderLeagueHub();
+  }
+}
+window.loadRegistryLeague = loadRegistryLeague;
 
 // ── Boot: Restore API key + auto-connect ───────────────────────
 (function restoreApiKey(){

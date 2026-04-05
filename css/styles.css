@@ -1329,6 +1329,8 @@ h1,h2,h3,
   pointer-events:none;
 }
 .hub-card:active{transform:scale(.98)}
+.hub-card.locked{cursor:default}
+.hub-card.locked:hover{border-color:rgba(212,175,55,.18)!important;box-shadow:none!important;transform:none!important}
 
 /* Card rows */
 .hub-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
