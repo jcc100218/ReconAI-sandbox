@@ -50,10 +50,13 @@ function getIndustryPickValue(pickNumber, totalTeams, draftRounds) {
     value = FLOOR + (transVal - FLOOR) * Math.exp(-k2 * (pickNumber - transition));
   }
 
-  // R1 recalibration: picks 1.04–1.12 overstated by consensus; reduce 15–20%
-  // Keep 1.01 as-is; ramp discount linearly from 15% at pick 4 to 20% at pick 12
-  if (pickNumber >= 4 && pickNumber <= 12) {
-    const reduction = 0.15 + (pickNumber - 4) * (0.05 / 8);
+  // R1 recalibration: picks 1.04–1.12 overstated by consensus; reduce 15–20%.
+  // Taper continues into R2 (picks 13–24) to avoid a value inversion at the round boundary.
+  // Keep 1.01–1.03 as-is; ramp 15%→20% over picks 4–12; taper 20%→0% over picks 13–24.
+  if (pickNumber >= 4 && pickNumber <= 24) {
+    const reduction = pickNumber <= 12
+      ? 0.15 + (pickNumber - 4) * (0.05 / 8)   // 15% at pick 4 → 20% at pick 12
+      : 0.20 * (1 - (pickNumber - 12) / 12);    // 20% at pick 13 → 0% at pick 24
     value *= (1 - reduction);
   }
 

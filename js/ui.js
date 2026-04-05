@@ -534,8 +534,8 @@ function renderAvailable(){
   const posFilter=$('avail-pos-sel')?.value||'';
   const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
-  const _wFloorTeams=S.rosters?.length||16;
-  const _wFloor=Math.max(500,Math.round(1500*(_wFloorTeams/16)));
+  const _wFloorTeams=S.rosters?.length||12;
+  const _wFloor=_wFloorTeams>=14?1800:_wFloorTeams>=12?1500:_wFloorTeams>=10?1200:800;
   filtered=filtered.filter(a=>a.val>=_wFloor);
 
   // Team mode gate: rebuilding teams skip old low-value players
@@ -646,7 +646,8 @@ function renderTopPickupHero(){
   const posMapF=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 
   // Find best pickup — prefer needs, then highest value (floor scales with league size)
-  const _heroFloor=Math.max(500,Math.round(1500*(Math.max(8,S.rosters?.length||16)/16)));
+  const _heroFloorTeams=S.rosters?.length||12;
+  const _heroFloor=_heroFloorTeams>=14?1800:_heroFloorTeams>=12?1500:_heroFloorTeams>=10?1200:800;
   const qualAvail=avail.filter(a=>a.val>=_heroFloor);
   let best=null;
   if(assess?.needs?.length){
