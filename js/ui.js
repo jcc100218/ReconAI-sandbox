@@ -777,7 +777,7 @@ function renderTrades(){
     const sideArr=rids.map(id=>({name:S.rosters.find(r=>r.roster_id===id)?getUser(S.rosters.find(r=>r.roster_id===id).owner_id):`T${id}`,gets:[...(sides[id]?.players||[]),...(sides[id]?.picks||[])]}));
     const isMe=rids.includes(S.myRosterId);
     const sidesTxt=sideArr.map(s=>s.name+' gets: '+s.gets.join(', ')).join('. ');
-    return`<div class="card-sm" style="${isMe?'border-color:rgba(108,99,245,.3)':''}">
+    return`<div class="card-sm" style="${isMe?'border-color:rgba(212,175,55,.3)':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
         <span style="font-size:13px;font-weight:500">${names.join(' ↔ ')}</span>
         <span class="tag tag-t">Trade</span>
@@ -915,7 +915,7 @@ function renderPicks(){
       +byYear[yr].map(p=>{
         const val=pickValue(p.season,p.round,teams);
         const valCol=val>4000?'var(--green)':val>2000?'var(--amber)':val>800?'var(--text2)':'var(--text3)';
-        return'<div style="background:var(--bg3);border:1px solid '+(p.original?'var(--border2)':'rgba(124,107,248,.25)')+';border-radius:8px;padding:8px 12px;min-width:100px">'
+        return'<div style="background:var(--bg3);border:1px solid '+(p.original?'var(--border2)':'rgba(212,175,55,.25)')+';border-radius:8px;padding:8px 12px;min-width:100px">'
           +'<div style="font-size:14px;font-weight:700;color:var(--accent)">Round '+p.round+'</div>'
           +'<div style="font-size:13px;color:'+(p.original?'var(--text3)':'var(--accent)')+';margin-top:2px">'+(p.original?'Own pick':'from '+p.from)+'</div>'
           +'<div style="font-size:13px;font-weight:600;color:'+valCol+';margin-top:4px;font-family:\'JetBrains Mono\',monospace">~'+val.toLocaleString()+'</div>'
@@ -950,7 +950,7 @@ Analyze my pick portfolio and give me:
 
 Be specific with round and year for each recommendation.`}]);
     $('picks-ai-content').innerHTML=`
-      <div class="card" style="border-color:rgba(108,99,245,.2)">
+      <div class="card" style="border-color:rgba(212,175,55,.2)">
         <div style="font-size:13px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">AI Pick Analysis</div>
         <div style="font-size:14px;color:var(--text2);line-height:1.7">${reply.replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/\n/g,'<br>')}</div>
       </div>`;
@@ -1122,7 +1122,7 @@ function renderHomeSnapshot(){
         </div>`:''}
       </div>
     </div>
-    ${lastSession?`<div style="background:rgba(124,107,248,.06);border:1px solid rgba(124,107,248,.15);border-radius:var(--r);padding:10px 14px;font-size:13px;color:var(--text3);line-height:1.5">
+    ${lastSession?`<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.15);border-radius:var(--r);padding:10px 14px;font-size:13px;color:var(--text3);line-height:1.5">
       <span style="color:var(--accent);font-weight:700">Last session (${lastSession.date}):</span> ${lastSession.text}
     </div>`:''}`;
 }

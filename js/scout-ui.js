@@ -462,7 +462,7 @@ function renderFieldLogPanel() {
   const syncBtn = _syncGated
     ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="font-size:12px;color:var(--text3)">Local only — sync requires War Room Scout</div>
-        <button onclick="showUpgradePrompt('${_syncFeat}')" style="padding:6px 14px;background:linear-gradient(135deg,#7c6bf8,#9b8afb);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Unlock Sync</button>
+        <button onclick="showUpgradePrompt('${_syncFeat}')" style="padding:6px 14px;background:linear-gradient(135deg,#D4AF37,#e8cc6c);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Unlock Sync</button>
       </div>`
     : `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="font-size:12px;color:var(--text3)">${pendingCount > 0 ? `${pendingCount} entries pending sync` : 'All entries synced to War Room'}</div>

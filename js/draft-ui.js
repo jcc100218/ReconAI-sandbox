@@ -140,8 +140,8 @@ function renderDraftNeeds(){
         :nextPickRound>=3&&nextPickRound<=5?'Trade up: move into R1–2 range for elite '+bestEarlyNeed.pos+' talent':'';
 
       bestBetEl.innerHTML=`
-        <div class="hero-action-card" style="margin-bottom:14px;border-color:rgba(124,107,248,.2)">
-          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#9b8afb,var(--accent));background-size:200% 100%;animation:progGlow 3s ease-in-out infinite"></div>
+        <div class="hero-action-card" style="margin-bottom:14px;border-color:rgba(212,175,55,.2)">
+          <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#b8941f,var(--accent));background-size:200% 100%;animation:progGlow 3s ease-in-out infinite"></div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
             <span style="font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
             ${_strategyContextLine()||''}
@@ -165,7 +165,7 @@ function renderDraftNeeds(){
           </ul>
           ${tradeHint?`<div style="font-size:13px;color:var(--amber);padding:6px 10px;background:var(--amberL);border-radius:6px;margin-bottom:10px">${tradeHint}</div>`:''}
           <div style="display:flex;gap:8px">
-            <button class="hero-cta" style="flex:1;background:linear-gradient(135deg,var(--accent),#9b8afb);box-shadow:0 2px 8px rgba(124,107,248,.25)" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel2}? My biggest need is ${bestEarlyNeed.pos}.')">Draft Advice</button>
+            <button class="hero-cta" style="flex:1;background:linear-gradient(135deg,var(--accent),#b8941f);box-shadow:0 2px 8px rgba(212,175,55,.25)" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel2}? My biggest need is ${bestEarlyNeed.pos}.')">Draft Advice</button>
             <button class="pm-action-btn" style="flex:0 0 auto;padding:12px 14px" onclick="sendDraftChatMsg('Should I trade pick ${pickLabel2}? What could I get for it?')">Trade Pick</button>
           </div>
         </div>`;
@@ -209,7 +209,7 @@ function renderDraftNeeds(){
       const target=roundTarget(p.round);
       const isFirst=_pickIdx===0;
       _pickIdx++;
-      return`<div class="${isFirst?'pick-next':''}" style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(124,107,248,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(124,107,248,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s;position:relative" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
+      return`<div class="${isFirst?'pick-next':''}" style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(212,175,55,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(212,175,55,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s;position:relative" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
         ${isFirst?'<span style="position:absolute;top:-8px;left:8px;font-size:9px;font-weight:800;color:rgba(212,175,55,0.9);letter-spacing:.06em;text-transform:uppercase;background:var(--bg);padding:0 4px">UP NEXT</span>':''}
         <div>
           <div style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</div>
@@ -543,7 +543,7 @@ Search the web for current ${year} rookie rankings. Be specific with prospect na
 
     const reply=await callClaude([{role:'user',content:prompt}],true,2,1200);
     $('draft-scout-content').innerHTML=`
-      <div class="card" style="border-color:rgba(108,99,245,.2)">
+      <div class="card" style="border-color:rgba(212,175,55,.2)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <div style="font-size:15px;font-weight:600">${year} Draft Scouting Report</div>
           <button class="copy-btn" style="margin-left:auto" onclick="copyText(${JSON.stringify(reply)},this)">Copy</button>

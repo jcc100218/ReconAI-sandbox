@@ -1020,7 +1020,7 @@ function renderLeagueOverview(assessments, container) {
       : `<div style="width:32px;height:32px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3);flex-shrink:0">${_ini}</div>`;
 
     html += `
-      <div class="card" style="cursor:pointer;${isMe ? 'border-color:rgba(124,107,248,.35);box-shadow:0 0 12px rgba(124,107,248,.1)' : ''}" onclick="_tcScoutTeam(${a.rosterId})">
+      <div class="card" style="cursor:pointer;${isMe ? 'border-color:rgba(212,175,55,.35);box-shadow:0 0 12px rgba(212,175,55,.1)' : ''}" onclick="_tcScoutTeam(${a.rosterId})">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           ${avatarHtml}
           <div style="flex:1;min-width:0">
@@ -1187,7 +1187,7 @@ function renderTeamScout(assessment, container) {
 
   // Compatibility with MY team
   if (compat !== null) {
-    html += `<div class="card" style="margin-bottom:14px;border-color:rgba(124,107,248,.2)">
+    html += `<div class="card" style="margin-bottom:14px;border-color:rgba(212,175,55,.2)">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <span style="font-size:13px;font-weight:700">Trade Compatibility with You</span>
         <span style="font-size:20px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${compat >= 60 ? 'var(--green)' : compat >= 30 ? 'var(--amber)' : 'var(--text3)'}">${compat}</span>
@@ -1699,7 +1699,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
     pickOptions += `<option value="${pk.year}-${pk.round}-${pk.originalOwnerRid}">${pk.year} Rd ${pk.round}${origLabel} (${val.toLocaleString()})</option>`;
   });
 
-  return `<div style="background:var(--bg2);border:1px solid ${isMySide ? 'rgba(124,107,248,.2)' : 'var(--border)'};border-radius:var(--rl);padding:12px">
+  return `<div style="background:var(--bg2);border:1px solid ${isMySide ? 'rgba(212,175,55,.2)' : 'var(--border)'};border-radius:var(--rl);padding:12px">
     <div style="font-size:13px;font-weight:700;color:${isMySide ? 'var(--accent)' : 'var(--text2)'};text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">${isMySide ? 'You Give' : assessment.ownerName + ' Gives'}</div>
 
     <!-- Selected assets -->
@@ -1842,7 +1842,7 @@ function renderDNAPanel(assessments, container) {
     const confColor = confPct >= 75 ? 'var(--green)' : confPct >= 50 ? 'var(--amber)' : 'var(--text3)';
 
     html += `
-      <div class="card" style="margin-bottom:8px;${isMe ? 'border-color:rgba(124,107,248,.3)' : ''}">
+      <div class="card" style="margin-bottom:8px;${isMe ? 'border-color:rgba(212,175,55,.3)' : ''}">
         <div style="display:flex;align-items:flex-start;gap:10px">
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
