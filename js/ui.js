@@ -112,7 +112,7 @@ function checkApiKeyCallout(){
     el.style.display='block';
     // Core features (briefing, lineup, insights) work without AI.
     // AI chat is the only feature that needs a key or subscription.
-    el.innerHTML='<div style="font-size:13px;color:var(--text2);line-height:1.5">Your GM Briefing, lineup optimizer, and trade tools work without AI. To unlock <strong style="color:var(--accent)">AI chat and scouting</strong>, subscribe or add a free API key in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.</div>';
+    el.innerHTML='<div style="font-size:13px;color:var(--text2);line-height:1.5">Your GM Briefing, lineup optimizer, and trade tools work without AI. To unlock <strong style="color:var(--accent)">AI chat and scouting</strong>, sign in or subscribe — <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">set up your account in Settings</a>.</div>';
   }
 }
 

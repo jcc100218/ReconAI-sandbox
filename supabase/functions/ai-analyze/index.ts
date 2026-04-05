@@ -17,7 +17,7 @@ const corsHeaders = {
 
 // ── Tier config ─────────────────────────────────────────────────
 const TIER_LIMITS: Record<string, number> = {
-  free: 0,           // Must use BYOK
+  free: 5,           // 5 calls/day for authenticated free users
   scout: 50,         // 50 calls/day
   warroom: 100,      // 100 calls/day
   commissioner: -1,  // Unlimited
@@ -120,13 +120,6 @@ serve(async (req: Request) => {
 
     const tier = user?.tier || "free";
 
-    if (tier === "free") {
-      return new Response(
-        JSON.stringify({ error: "AI features require a subscription. Upgrade at fantasywars.app or add your own API key in Settings." }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // ── 4. Rate limit check ──
     const limit = TIER_LIMITS[tier] ?? 0;
     if (limit !== -1) {
@@ -141,7 +134,7 @@ serve(async (req: Request) => {
       } else if (rlResult && !rlResult.allowed) {
         return new Response(
           JSON.stringify({
-            error: `Daily limit reached (${rlResult.count}/${rlResult.limit}). Resets at midnight UTC. Add your own API key in Settings for unlimited access.`,
+            error: `Daily limit reached (${rlResult.count}/${rlResult.limit}). Resets at midnight UTC. Upgrade your plan for more daily AI calls.`,
             limit: rlResult.limit,
             used: rlResult.count,
           }),

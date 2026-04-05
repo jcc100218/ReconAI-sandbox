@@ -215,7 +215,7 @@ function collapseDraftChat(){
 
 function homeAsk(text){
   if(!hasAnyAI(false)){
-    if(typeof showToast==='function')showToast('Add an API key in Settings to enable AI chat');
+    if(typeof showToast==='function')showToast('Sign in or subscribe to enable AI chat');
   }
   const input=$('home-chat-in');
   if(input)input.value=text;
@@ -242,8 +242,9 @@ function _updateChatPlaceholder() {
   const inp = $('home-chat-in');
   if (!inp) return;
   const S = window.S;
-  // Only show limit hint if user has no BYOK key and is on free tier
+  // Only show limit hint if user has no BYOK key, no server AI, and is on free tier
   if (S?.apiKey) return;
+  if (typeof hasServerAI === 'function' && hasServerAI()) return;
   if (typeof getTier === 'function' && getTier() === 'free') {
     const remaining = typeof getDailyChatRemaining === 'function' ? getDailyChatRemaining() : 0;
     const lim = window.FREE_CHAT_DAILY_LIMIT || 3;
@@ -257,13 +258,13 @@ window._updateChatPlaceholder = _updateChatPlaceholder;
 async function sendHomeChat(){
   if(!hasAnyAI(false)){
     const msgs=$('home-chat-msgs');
-    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='War Room Scout chat requires AI. Enable a free Gemini key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='AI chat requires a subscription. <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Sign in or subscribe in Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
     return;
   }
 
-  // Daily chat limit for free (post-trial) users without a BYOK key
+  // Daily chat limit for free (post-trial) users without BYOK key or server AI
   const _S = window.S;
-  if (!_S?.apiKey && typeof getTier === 'function' && getTier() === 'free') {
+  if (!_S?.apiKey && !(typeof hasServerAI === 'function' && hasServerAI()) && typeof getTier === 'function' && getTier() === 'free') {
     const lim = window.FREE_CHAT_DAILY_LIMIT || 3;
     const remaining = typeof getDailyChatRemaining === 'function' ? getDailyChatRemaining() : lim;
     if (remaining <= 0) {
@@ -330,7 +331,7 @@ async function sendHomeChat(){
 // ── Trade Chat ─────────────────────────────────────────────────
 function sendTradeChatMsg(text){
   if(!hasAnyAI(false)){
-    if(typeof showToast==='function')showToast('Add an API key in Settings to enable AI chat');
+    if(typeof showToast==='function')showToast('Sign in or subscribe to enable AI chat');
   }
   const inp=$('trade-chat-in');if(inp)inp.value=text;
   sendTradeChat();
@@ -339,7 +340,7 @@ function sendTradeChatMsg(text){
 async function sendTradeChat(){
   if(!hasAnyAI(false)){
     const msgs=$('trade-chat-msgs');
-    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='Trade advisor requires AI. Enable an API key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='Trade advisor requires a subscription. <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Sign in or subscribe in Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
     return;
   }
   const input=$('trade-chat-in');const text=(input&&input.value||'').trim();if(!text)return;
@@ -404,7 +405,7 @@ ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
 // ── Waiver Chat ────────────────────────────────────────────────
 function sendWaiverChatMsg(text){
   if(!hasAnyAI(false)){
-    if(typeof showToast==='function')showToast('Add an API key in Settings to enable AI chat');
+    if(typeof showToast==='function')showToast('Sign in or subscribe to enable AI chat');
   }
   const input=$('wq-chat-in');
   if(input){input.value=text;}
@@ -424,7 +425,7 @@ async function sendWaiverChat(){
       expandChat(msgs);
       const m=document.createElement('div');
       m.className='hc-msg-a';m.style.fontSize='13px';
-      m.innerHTML='Waiver assistant requires AI. Enable an API key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';
+      m.innerHTML='Waiver assistant requires a subscription. <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Sign in or subscribe in Settings</a>.';
       msgs.appendChild(m);msgs.scrollTop=99999;
     }
     return;
@@ -470,7 +471,7 @@ function sendDraftChatMsg(text){const inp=$('draft-chat-in');if(inp)inp.value=te
 async function sendDraftChat(){
   if(!hasAnyAI(false)){
     const msgs=$('draft-msgs');
-    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='Draft advisor requires AI. Enable an API key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='Draft advisor requires a subscription. <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Sign in or subscribe in Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
     return;
   }
   const input=$('draft-chat-in');const text=input.value.trim();if(!text)return;
