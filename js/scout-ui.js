@@ -149,6 +149,26 @@ function renderTeamBar() {
 }
 window.renderTeamBar = renderTeamBar;
 
+let _tbarExpanded = null;
+
+function _tbarToggle(pid) {
+  // Collapse previous
+  if (_tbarExpanded && _tbarExpanded !== pid) {
+    const prev = document.getElementById('tbar-expand-' + _tbarExpanded);
+    if (prev) prev.style.maxHeight = '0';
+  }
+  const el = document.getElementById('tbar-expand-' + pid);
+  if (!el) return;
+  if (_tbarExpanded === pid) {
+    el.style.maxHeight = '0';
+    _tbarExpanded = null;
+  } else {
+    el.style.maxHeight = el.scrollHeight + 'px';
+    _tbarExpanded = pid;
+  }
+}
+window._tbarToggle = _tbarToggle;
+
 function renderTeamBarRoster() {
   const S = window.S;
   const container = document.getElementById('team-bar-roster');
@@ -180,21 +200,73 @@ function renderTeamBarRoster() {
   let html = '';
   Object.entries(groups).forEach(([pos, players]) => {
     if (!players.length) return;
-    html += `<div class="tbar-pos-group">
-      <div class="tbar-pos-label">${pos}</div>`;
+    html += `<div class="tbar-pos-group"><div class="tbar-pos-label">${pos}</div>`;
     players.forEach(pid => {
-      const name  = typeof pName  === 'function' ? pName(pid)  : pid;
-      const team  = typeof pTeam  === 'function' ? pTeam(pid)  : '';
-      const total = S.playerStats?.[pid]?.pts_ppr;
-      const ppg   = total != null ? (total / weeksDone).toFixed(1) : '—';
-      html += `<div class="tbar-player-row">
-        <span class="pos p${pos}" style="font-size:11px;padding:1px 5px">${pos}</span>
-        <span class="tbar-pname">${_esc(name)}</span>
+      const name     = typeof pName === 'function' ? pName(pid) : pid;
+      const team     = typeof pTeam === 'function' ? pTeam(pid) : '';
+      const total    = S.playerStats?.[pid]?.pts_ppr;
+      const ppg      = total != null ? (total / weeksDone).toFixed(1) : '—';
+      const dhq      = typeof dynastyValue === 'function' ? dynastyValue(pid) : 0;
+      const dhqStr   = dhq > 0 ? dhq.toLocaleString() : '—';
+      const safeName = _esc(name).replace(/'/g, "\\'");
+
+      // Inline card data
+      const p         = S.players?.[pid] || {};
+      const age       = p.age || '—';
+      const prevAvg   = S.playerStats?.[pid]?.prevAvg;
+      const prevPpg   = prevAvg != null ? prevAvg.toFixed(1) : '—';
+      const pk        = typeof peakYears === 'function' ? peakYears(pid) : null;
+      const pkLabel   = pk ? pk.label : '—';
+      const pkDesc    = pk ? pk.desc : '';
+      const pkColor   = pk ? pk.color : 'var(--text3)';
+      const trend     = (typeof LI !== 'undefined' ? LI?.playerMeta?.[pid]?.trend : 0) || 0;
+      const trendStr  = trend > 5 ? `↑ ${trend}%` : trend < -5 ? `↓ ${Math.abs(trend)}%` : '—';
+      const trendCol  = trend > 5 ? 'var(--green)' : trend < -5 ? 'var(--red)' : 'var(--text3)';
+
+      html += `
+      <div class="tbar-player-row" id="tbar-row-${pid}">
+        <span class="pos p${pos}" style="font-size:11px;padding:1px 5px;flex-shrink:0">${pos}</span>
+        <button class="tbar-pname tbar-name-btn" onclick="event.stopPropagation();_tbarToggle('${pid}')">${_esc(name)}</button>
         <span class="tbar-pteam">${_esc(team)}</span>
-        <span class="tbar-ppg">${ppg}</span>
-        <div class="tbar-action-btns">
-          <button class="tbar-action-btn hold" onclick="event.stopPropagation();fillGlobalChat('Should I hold ${_esc(name).replace(/'/g,"\\'")}?')">Hold</button>
-          <button class="tbar-action-btn trade" onclick="event.stopPropagation();fillGlobalChat('Trade value for ${_esc(name).replace(/'/g,"\\'")}?')">Trade</button>
+        <div class="tbar-ppg-col">
+          <span class="tbar-ppg">${ppg}</span>
+          <span class="tbar-dhq">${dhqStr}</span>
+        </div>
+      </div>
+      <div class="tbar-expand" id="tbar-expand-${pid}">
+        <div class="tbar-expand-inner">
+          <div class="tbar-card-stats">
+            <div class="tbar-card-stat">
+              <div class="tbar-card-stat-val" style="color:var(--accent)">${dhqStr}</div>
+              <div class="tbar-card-stat-lbl">DHQ</div>
+            </div>
+            <div class="tbar-card-stat">
+              <div class="tbar-card-stat-val">${ppg}</div>
+              <div class="tbar-card-stat-lbl">PPG</div>
+            </div>
+            <div class="tbar-card-stat">
+              <div class="tbar-card-stat-val">${prevPpg}</div>
+              <div class="tbar-card-stat-lbl">Prev PPG</div>
+            </div>
+            <div class="tbar-card-stat">
+              <div class="tbar-card-stat-val">${age}</div>
+              <div class="tbar-card-stat-lbl">Age</div>
+            </div>
+            <div class="tbar-card-stat">
+              <div class="tbar-card-stat-val" style="color:${trendCol}">${trendStr}</div>
+              <div class="tbar-card-stat-lbl">30d</div>
+            </div>
+            <div class="tbar-card-stat">
+              <div class="tbar-card-stat-val" style="color:${pkColor};font-size:11px;line-height:1.2">${pkLabel}</div>
+              <div class="tbar-card-stat-lbl">${pkDesc || 'Peak'}</div>
+            </div>
+          </div>
+          <div class="tbar-card-actions">
+            <button class="tbar-card-btn tbar-card-hold" onclick="event.stopPropagation();fillGlobalChat('Should I hold ${safeName}?')">Hold</button>
+            <button class="tbar-card-btn tbar-card-trade" onclick="event.stopPropagation();fillGlobalChat('What can I get for ${safeName} in a trade?')">Trade</button>
+            <button class="tbar-card-btn tbar-card-sell" onclick="event.stopPropagation();fillGlobalChat('Is now a good time to sell ${safeName}?')">Sell High</button>
+            <button class="tbar-card-btn tbar-card-replace" onclick="event.stopPropagation();fillGlobalChat('Who can replace ${safeName} on waivers?')">Replace</button>
+          </div>
         </div>
       </div>`;
     });
@@ -202,6 +274,12 @@ function renderTeamBarRoster() {
   });
 
   container.innerHTML = html || '<div style="padding:12px;font-size:13px;color:var(--text3)">No players found.</div>';
+
+  // Restore expanded state after re-render
+  if (_tbarExpanded) {
+    const el = document.getElementById('tbar-expand-' + _tbarExpanded);
+    if (el) el.style.maxHeight = el.scrollHeight + 'px';
+  }
 }
 
 // ════════════════════════════════════════════════════════════════

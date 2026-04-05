@@ -1266,3 +1266,31 @@ h1,h2,h3,
 .metric-val,.tv-total,.pr-score-big,
 .snapshot-card .snap-value,
 .lu-score,.lineup-total-proj{font-family:'Oswald','JetBrains Mono',monospace;font-weight:600}
+
+/* ── Team Bar v2: DHQ + Expandable Player Cards ─────────────────── */
+/* Tappable name button */
+.tbar-name-btn{flex:1;background:none;border:none;padding:0;margin:0;font-size:13px;color:var(--text);text-align:left;cursor:pointer;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:color .15s}
+.tbar-name-btn:hover{color:var(--accent)}
+/* PPG + DHQ stacked column */
+.tbar-ppg-col{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;min-width:42px;gap:1px}
+.tbar-dhq{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;line-height:1}
+/* Expandable card */
+.tbar-expand{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.4,0,.2,1)}
+.tbar-expand-inner{padding:8px 0 10px 0}
+/* Stats grid: 3 cols on narrow, up to 6 inline */
+.tbar-card-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.tbar-card-stat{background:var(--bg3);border-radius:7px;padding:7px 8px;text-align:center;border:1px solid var(--border)}
+.tbar-card-stat-val{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2;font-family:'Oswald',monospace}
+.tbar-card-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+/* Action buttons row */
+.tbar-card-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.tbar-card-btn{font-size:12px;font-weight:600;padding:7px 4px;border-radius:7px;border:1px solid var(--border2);background:none;cursor:pointer;font-family:inherit;color:var(--text2);transition:all .15s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+.tbar-card-btn:active{transform:scale(.96)}
+.tbar-card-hold{color:var(--green);border-color:rgba(46,204,113,.3)}
+.tbar-card-hold:hover{background:var(--greenL)}
+.tbar-card-trade{color:var(--accent);border-color:rgba(212,175,55,.3)}
+.tbar-card-trade:hover{background:var(--accentL)}
+.tbar-card-sell{color:var(--amber);border-color:rgba(240,165,0,.3)}
+.tbar-card-sell:hover{background:var(--amberL)}
+.tbar-card-replace{color:var(--text2);border-color:var(--border2)}
+.tbar-card-replace:hover{background:var(--bg3);color:var(--text)}
