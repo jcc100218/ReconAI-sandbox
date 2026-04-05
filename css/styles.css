@@ -38,7 +38,7 @@ body{font-family:'Oswald',system-ui,-apple-system,sans-serif;background:var(--bg
 /* Layout */
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden;max-width:680px;margin:0 auto;position:relative}
 .header{display:flex;align-items:center;gap:8px;padding:0 16px;height:50px;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:2px solid var(--accent);box-shadow:0 2px 12px rgba(212,175,55,0.15);flex-shrink:0;position:relative;z-index:10}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.05em;background:linear-gradient(135deg,#D4AF37 0%,#ffffff 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:logoShimmer 3s linear infinite} logoShimmer{0%{background-position:0% center}100%{background-position:200% center}}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:.05em;background:linear-gradient(135deg,#D4AF37 0%,#ffffff 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:logoShimmer 3s linear infinite}@keyframes logoShimmer{0%{background-position:0% center}100%{background-position:200% center}}
 .header-pills{display:flex;gap:6px;align-items:center}
 .pill{font-size:13px;padding:3px 10px;border-radius:20px;border:1px solid;white-space:nowrap;font-weight:500;letter-spacing:.01em}
 .pa{background:var(--accentL);color:var(--accent);border-color:rgba(212,175,55,.2)}
@@ -1120,14 +1120,14 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 
 /* ── v4 color palette ─────────────────────────────────────────── */
 :root{
-  --bg:#0a0a0a;--bg2:#1a1a1a;--bg3:#242424;--bg4:#2a2a2a;
-  --accent:#d4af37;--accent2:#b8941f;
+  --bg:#0a0a0a;--bg2:#141414;--bg3:#1a1a1a;--bg4:#222222;
+  --accent:#D4AF37;--accent2:#B8941E;
   --accentL:rgba(212,175,55,0.10);--accentL2:rgba(212,175,55,0.06);
-  --accent-blue:#d4af37;--blueL:rgba(96,165,250,0.08);
-  --green:#2ecc71;--red:#e74c3c;--amber:#f0a500;--blue:#60a5fa;
+  --accent-blue:#4a7cff;--blueL:rgba(74,124,255,0.08);
+  --green:#2ecc71;--red:#e74c3c;--amber:#f0a500;--blue:#4a7cff;
   --greenL:rgba(46,204,113,0.08);--redL:rgba(231,76,60,0.08);--amberL:rgba(240,165,0,0.08);
   --glow:0 0 20px rgba(212,175,55,0.15);
-  --glass:rgba(10,10,10,0.88);--glass-border:rgba(255,255,255,0.07);
+  --glass:rgba(10,10,10,0.88);--glass-border:rgba(212,175,55,0.10);
 }
 
 /* ── Content extra bottom padding for fixed chat overlay ─────── */
