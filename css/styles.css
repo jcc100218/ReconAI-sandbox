@@ -199,25 +199,17 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
 .nt-waiver{background:var(--greenL);color:var(--green)}
 .nt-trade{background:var(--accentL);color:var(--accent)}
 .nt-news{background:var(--blueL);color:var(--blue)}
-/* Chat */
-.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - 150px)}
+/* Chat bubbles — used in home-chat-msgs, wq-chat-msgs, trade-chat-msgs, draft-msgs */
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;flex-shrink:0}
 .chip{font-size:13px;padding:6px 14px;border:1px solid var(--border2);border-radius:20px;cursor:pointer;background:var(--bg2);color:var(--text2);transition:all .2s;font-family:inherit}
 .chip:hover{border-color:rgba(124,107,248,.4);color:var(--accent);background:var(--accentL);transform:translateY(-1px)}
 .chip:active{transform:translateY(0)}
-.chat-msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
 .msg{max-width:84%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.7;animation:msgIn .25s ease}
 @keyframes msgIn{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
 .msg-u{align-self:flex-end;background:rgba(124,107,248,.12);border:1px solid rgba(124,107,248,.18);color:var(--text);border-radius:14px 4px 14px 14px}
 .msg-a{align-self:flex-start;background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:4px 14px 14px 14px}
 .msg-a strong{font-weight:600;color:var(--text)}
 .msg-sys{align-self:center;background:var(--bg3);border:1px solid var(--border);color:var(--text3);font-size:13px;border-radius:20px;padding:4px 12px}
-.chat-in-row{display:flex;gap:8px;flex-shrink:0}
-.chat-in{flex:1;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--text);font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s}
-.chat-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,107,248,0.08)}
-.chat-in::placeholder{color:var(--text3)}
-.send-btn{padding:10px 18px;background:linear-gradient(135deg,var(--accent),#9b8afb);color:#fff;border:none;border-radius:12px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;transition:all .2s;box-shadow:0 2px 8px rgba(124,107,248,0.3)}
-.send-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(124,107,248,0.4)}
 
 /* Loading */
 .ld span{display:inline-block;animation:bounce 1.4s infinite;color:var(--accent);font-size:16px;font-weight:700}
@@ -441,7 +433,6 @@ textarea{resize:vertical;min-height:80px;line-height:1.5}
   .qgrid{grid-template-columns:repeat(2,1fr)}
   .scout-roster-grid{grid-template-columns:1fr 1fr}
   .msg{max-width:92%}
-  .chat-wrap{height:calc(100vh - 130px)}
   .btn{padding:10px 16px;-webkit-tap-highlight-color:transparent}
   input[type=text],input[type=password],select,textarea{padding:11px 14px;font-size:16px}
   .tab-badge{display:none}
