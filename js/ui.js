@@ -1267,6 +1267,7 @@ function renderDailyBriefing(){
   wrap.innerHTML=renderSection('Do This Now','var(--green)','\u26A1',doNow)
     +renderSection('Monitor This','var(--amber)','\uD83D\uDC41',monitorCapped)
     +renderSection('Prepare For This','var(--accent)','\uD83C\uDFAF',prepareCapped);
+  if(typeof trackUsage==='function')trackUsage('briefings_received');
 }
 
 // ═══════════════════════════════════════════════════════════════

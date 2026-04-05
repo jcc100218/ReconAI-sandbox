@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// trade-calc.js — Full Trade Calculator Module for ReconAI
+// trade-calc.js — Full Trade Calculator Module for War Room Scout
 // Ported from War Room's trade-calculator.html into vanilla JS
 // Uses window.App global namespace (Plan B)
 // ═══════════════════════════════════════════════════════════════
@@ -40,18 +40,14 @@ function getPickDHQ(round, totalTeams) {
     const pick = (round - 1) * (totalTeams || 16) + Math.ceil((totalTeams || 16) / 2); // mid-round estimate
     return window.App.LI.dhqPickValues[pick]?.value || 0;
   }
-  // Fallback to universal model
-  if (typeof getIndustryPickValue === 'function') {
-    return getIndustryPickValue(round, Math.ceil((totalTeams || 16) / 2), totalTeams || 16);
-  }
-  // Last resort hardcoded fallback
-  return {1:7500, 2:3000, 3:1000, 4:300, 5:80, 6:30, 7:10}[round] || 50;
+  // Fallback to universal model (pick-value-model.js, always loaded)
+  return getIndustryPickValue(round, Math.ceil((totalTeams || 16) / 2), totalTeams || 16);
 }
 // Legacy constant — now dynamically resolved via getPickDHQ at call sites.
 // Kept as static object for backward compat with Object.assign exports.
 const TRADE_PICK_VALUES = { 1: 7500, 2: 3000, 3: 1000, 4: 300, 5: 80, 6: 30, 7: 10 };
 
-const DEPTH_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
+// DEPTH_POSITIONS — defined in shared/utils.js (window.DEPTH_POSITIONS)
 
 // ── Dynamic builders — derive from league roster_positions ──
 
@@ -130,15 +126,7 @@ const POSTURES = {
   LOCKED:    { key: 'LOCKED',    label: 'Locked In',     color: '#7F8C8D', desc: 'Satisfied roster, high attachment. Very hard to move.' },
 };
 
-// Local position normalization — complete version matching shared/utils.js
-const normPos = p => {
-  if (!p) return '';
-  if (['DB', 'CB', 'S', 'SS', 'FS'].includes(p))          return 'DB';
-  if (['DL', 'DE', 'DT', 'NT', 'IDL', 'EDGE'].includes(p)) return 'DL';
-  if (['LB', 'OLB', 'ILB', 'MLB'].includes(p))            return 'LB';
-  return p;
-};
-
+// normPos — defined in shared/utils.js (window.normPos), returns null for unknown positions
 
 // ═══════════════════════════════════════════════════════════════
 // SECTION 2: Team Assessment
@@ -395,9 +383,9 @@ function assessTeam(roster, nflStarterSet, ownerPicks, dynamicConfig) {
   const projBonus   = weeklyPts > WEEKLY_TARGET + 10 ? 3 : weeklyPts >= WEEKLY_TARGET ? 1 : 0;
   const healthScore = Math.min(100, Math.round(scoringScore + coverageScore + projBonus));
 
-  // Tier classification — delegate to shared assessTeamFromGlobal if available
+  // Tier classification — delegate to shared assessTeamFromGlobal (team-assess.js, always loaded)
   let tier, tierColor, tierBg;
-  const _sharedAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(roster.roster_id) : null;
+  const _sharedAssess = assessTeamFromGlobal(roster.roster_id);
   if (_sharedAssess?.tier) {
     tier = _sharedAssess.tier;
     tierColor = _sharedAssess.tierColor || '#95A5A6';
@@ -734,7 +722,7 @@ function deriveDNAFromHistory(rosterId) {
 
 // ── DNA Persistence ──────────────────────────────────────────
 
-const DNA_LOCAL_KEY = lid => `od_owner_dna_v1_${lid}`;
+const DNA_LOCAL_KEY = lid => STORAGE_KEYS.OWNER_DNA(lid);
 
 /**
  * Load DNA profiles for a league. Returns { rosterId: dnaKey }
@@ -749,11 +737,7 @@ async function loadDNAProfiles(leagueId) {
     }
   }
   // localStorage fallback
-  try {
-    return JSON.parse(localStorage.getItem(DNA_LOCAL_KEY(leagueId)) || '{}');
-  } catch (e) {
-    return {};
-  }
+  return DhqStorage.get(DNA_LOCAL_KEY(leagueId), {});
 }
 
 /**
@@ -761,12 +745,11 @@ async function loadDNAProfiles(leagueId) {
  */
 function saveDNAProfile(leagueId, rosterId, dnaKey) {
   // Load existing, merge, save
-  let map = {};
-  try { map = JSON.parse(localStorage.getItem(DNA_LOCAL_KEY(leagueId)) || '{}'); } catch (e) { /* ignore */ }
+  const map = DhqStorage.get(DNA_LOCAL_KEY(leagueId), {});
   map[rosterId] = dnaKey;
-  localStorage.setItem(DNA_LOCAL_KEY(leagueId), JSON.stringify(map));
+  DhqStorage.set(DNA_LOCAL_KEY(leagueId), map);
   if (window.OD?.saveDNA) {
-    try { window.OD.saveDNA(leagueId, map); } catch (e) { /* ignore */ }
+    try { window.OD.saveDNA(leagueId, map); } catch (e) { dhqLog('trade-calc.saveDNA',e); }
   }
 }
 
@@ -784,10 +767,7 @@ function calcTradeValue(playerIds, picks, faab) {
   const teams = S.rosters?.length || 12;
   const playerSum = (playerIds || []).reduce((sum, pid) => sum + (dynastyValue(pid) || 0), 0);
   const pickSum = (picks || []).reduce((sum, pk) => {
-    if (typeof pickValue === 'function') {
-      return sum + pickValue(pk.year || S.season, pk.round, teams, pk.pickInRound);
-    }
-    return sum + getPickDHQ(pk.round, teams);
+    return sum + pickValue(pk.year || S.season, pk.round, teams, pk.pickInRound);
   }, 0);
   return playerSum + pickSum + Math.round((faab || 0) * FAAB_RATE);
 }
@@ -1006,6 +986,7 @@ function _tcStartTrade(theirRosterId) {
   _tcBuilderMyAssets = { players: [], picks: [], faab: 0 };
   _tcBuilderTheirAssets = { players: [], picks: [], faab: 0 };
   _tcActiveView = 'builder';
+  if (typeof trackUsage === 'function') trackUsage('trade_scenarios_explored');
   const el = $('trade-calc-container');
   if (el) _renderTradeCalcShell(el);
 }
@@ -1312,6 +1293,14 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   if (!container) container = $('tc-view-content');
   if (!container) return;
 
+  // Tier gate — Trade Scenarios require trial or paid
+  if (typeof canAccess === 'function' && !canAccess(FEATURES?.TRADE_SCENARIOS || 'trade_scenarios')) {
+    container.innerHTML = typeof _tierGatePlaceholder === 'function'
+      ? _tierGatePlaceholder('Trade Scenario Builder', FEATURES?.TRADE_SCENARIOS || 'trade_scenarios')
+      : '<div style="padding:24px;text-align:center;color:var(--text3)">Upgrade to unlock the Trade Scenario Builder.</div>';
+    return;
+  }
+
   const myAssessment = _tcAssessments.find(a => a.rosterId === myRosterId);
   const theirAssessment = theirRosterId ? _tcAssessments.find(a => a.rosterId === theirRosterId) : null;
 
@@ -1436,7 +1425,7 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
   }
 
   // ── TRADE IMPACT SIMULATOR ─────────────────────────────
-  if (hasTrade && typeof assessTeamFromGlobal === 'function') {
+  if (hasTrade) {
     // Get current assessments
     const myAssessNow = assessTeamFromGlobal(myRosterId);
     const theirAssessNow = theirRosterId ? assessTeamFromGlobal(theirRosterId) : null;
@@ -1450,9 +1439,9 @@ function renderTradeBuilder(myRosterId, theirRosterId, container) {
         const simPlayers = (myRosterObj.players || []).filter(pid => !myGivePids.includes(String(pid))).concat(myGetPids);
         const simRoster = { ...myRosterObj, players: simPlayers };
         const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
-        const nflStarterSet = typeof buildNflStarterSetFromGlobal === 'function' ? buildNflStarterSetFromGlobal() : {};
-        const picksByOwner = typeof window.App?.buildPicksByOwner === 'function' ? window.App.buildPicksByOwner(S.rosters, league, S.tradedPicks) : {};
-        const simAssess = typeof assessTeam === 'function' ? assessTeam(simRoster, S.players, S.playerStats, league, S.leagueUsers, nflStarterSet, picksByOwner[myRosterId] || []) : null;
+        const nflStarterSet = buildNflStarterSetFromGlobal();
+        const picksByOwner = window.App.buildPicksByOwner(S.rosters, league, S.tradedPicks);
+        const simAssess = assessTeam(simRoster, S.players, S.playerStats, league, S.leagueUsers, nflStarterSet, picksByOwner[myRosterId] || []);
 
         if (simAssess) {
           const hsDelta = simAssess.healthScore - myAssessNow.healthScore;
@@ -1680,7 +1669,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
   }).join('');
 
   const selectedPickHtml = assets.picks.map((pk, idx) => {
-    const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
+    const val = pickValue(pk.year, pk.round, teams);
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;margin-bottom:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
       <span style="font-size:13px;font-weight:800;padding:1px 4px;border-radius:4px;background:var(--amberL);color:var(--amber)">PICK</span>
       <span style="font-size:13px;font-weight:600;flex:1">${pk.year} Rd ${pk.round}</span>
@@ -1707,7 +1696,7 @@ function _renderTradeSide(assessment, assets, side, isMySide) {
   availPicks.forEach((pk, idx) => {
     const alreadySelected = assets.picks.some(ap => ap.year === pk.year && ap.round === pk.round && ap.originalOwnerRid === pk.originalOwnerRid);
     if (alreadySelected) return;
-    const val = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
+    const val = pickValue(pk.year, pk.round, teams);
     const origLabel = pk.originalOwnerRid !== assessment.rosterId ? ` (via ${getUser(S.rosters?.find(r => r.roster_id === pk.originalOwnerRid)?.owner_id) || 'R' + pk.originalOwnerRid})` : '';
     pickOptions += `<option value="${pk.year}-${pk.round}-${pk.originalOwnerRid}">${pk.year} Rd ${pk.round}${origLabel} (${val.toLocaleString()})</option>`;
   });
@@ -1809,6 +1798,15 @@ function _tcRefreshBuilder() {
 function renderDNAPanel(assessments, container) {
   if (!container) container = $('tc-view-content');
   if (!container) return;
+
+  // Tier gate — Owner DNA requires trial or paid
+  if (typeof canAccess === 'function' && !canAccess(FEATURES?.OWNER_DNA || 'owner_dna')) {
+    container.innerHTML = typeof _tierGatePlaceholder === 'function'
+      ? _tierGatePlaceholder('Owner DNA Profiles', FEATURES?.OWNER_DNA || 'owner_dna')
+      : '<div style="padding:24px;text-align:center;color:var(--text3)">Upgrade to unlock Owner DNA Profiles.</div>';
+    return;
+  }
+  if (typeof trackUsage === 'function') trackUsage('owner_dna_views');
 
   let html = `<div class="sec">Owner DNA Profiles <span class="sec-line"></span></div>
     <div style="font-size:13px;color:var(--text3);margin-bottom:12px;line-height:1.5">
@@ -1983,7 +1981,7 @@ function renderValueChart(container) {
     const curSeason = parseInt(S.season) || new Date().getFullYear();
     for (let yr = curSeason; yr <= curSeason + 2; yr++) {
       for (let rd = 1; rd <= (S.leagues?.find(l=>l.league_id===S.currentLeagueId)?.settings?.draft_rounds || 5); rd++) {
-        const val = (typeof pickValue === 'function') ? pickValue(yr, rd, teams, Math.ceil(teams/2)) : getPickDHQ(rd, teams);
+        const val = pickValue(yr, rd, teams, Math.ceil(teams/2));
         if (val > 0) {
           const ordinal = ['','1st','2nd','3rd','4th','5th','6th','7th'][rd] || rd+'th';
           players.push({ pid: `PICK-${yr}-${rd}`, name: `${yr} ${ordinal} Round Pick`, team: 'Mid', pos: 'PICK', age: 0, val, isPick: true });
@@ -2373,11 +2371,11 @@ function _finderGenerate(pid) {
         if (tp.val >= val) return;
         const gap = val - tp.val;
         const bestPick = theirPicks.find(pk => {
-          const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
+          const pv = pickValue(pk.year, pk.round, teams);
           return Math.abs(pv - gap) <= val * tolerance;
         });
         if (bestPick) {
-          const pv = typeof pickValue === 'function' ? pickValue(bestPick.year, bestPick.round, teams) : (TRADE_PICK_VALUES[bestPick.round] || 100);
+          const pv = pickValue(bestPick.year, bestPick.round, teams);
           const total = tp.val + pv;
           const taxes = calcPsychTaxes(myAssess, a, dnaKey, theirPosture);
           const likelihood = calcAcceptanceLikelihood(val, total, dnaKey, taxes, myAssess, a);
@@ -2386,7 +2384,7 @@ function _finderGenerate(pid) {
       });
 
       trades.sort((b,c) => c.likelihood - b.likelihood);
-      if (trades.length) results.push({ assessment: a, dnaKey, trades: trades.slice(0, 1) }); // 1 best per team for ReconAI
+      if (trades.length) results.push({ assessment: a, dnaKey, trades: trades.slice(0, 1) }); // 1 best per team for War Room Scout
     });
   } else {
     // Acquiring a player — find what I can offer
@@ -2433,11 +2431,11 @@ function _finderGenerate(pid) {
       if (mp.val >= val) return;
       const gap = val - mp.val;
       const bestPick = myPicks.find(pk => {
-        const pv = typeof pickValue === 'function' ? pickValue(pk.year, pk.round, teams) : getPickDHQ(pk.round, teams);
+        const pv = pickValue(pk.year, pk.round, teams);
         return Math.abs(pv - gap) <= val * tolerance;
       });
       if (bestPick) {
-        const pv = typeof pickValue === 'function' ? pickValue(bestPick.year, bestPick.round, teams) : (TRADE_PICK_VALUES[bestPick.round] || 100);
+        const pv = pickValue(bestPick.year, bestPick.round, teams);
         const total = mp.val + pv;
         if (total >= minVal && total <= maxVal) {
           const taxes = calcPsychTaxes(myAssess, theirAssess, dnaKey, theirPosture);

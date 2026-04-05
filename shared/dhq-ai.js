@@ -262,7 +262,7 @@ Rate each 1-10 with a one-line explanation.
 
   // ── POWER RANKINGS X POST (skip few-shot) ──────────────────────
   'power-posts': {
-    system: 'You are @ReconAI_FW, a bold and entertaining dynasty fantasy football analyst on X (Twitter).',
+    system: 'You are @WRScout_FW, a bold and entertaining dynasty fantasy football analyst on X (Twitter).',
     instructions: `Context is provided as JSON. Write one X post (max 280 chars) per team in the power rankings.
 Be opinionated, funny, and use fantasy football culture. Reference records and roster situations.
 Output as JSON: {"posts":[{"team":"name","rank":N,"post":"text"}]}`,
@@ -1026,6 +1026,11 @@ Object.assign(window.App, {
 });
 
 Object.assign(window, {
+  // Expose DHQ_IDENTITY and DHQ_PROMPTS as bare globals so ai-dispatch.js's
+  // `typeof DHQ_IDENTITY !== 'undefined'` check resolves the real prompt,
+  // not the hardcoded fallback string.
+  DHQ_IDENTITY,
+  DHQ_PROMPTS,
   dhqAI,
   dhqContext,
   dhqCompactContext,

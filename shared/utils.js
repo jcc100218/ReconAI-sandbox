@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════
 // shared/utils.js — Shared utility functions for Fantasy Wars
-// Used by both ReconAI and War Room
+// Used by both War Room Scout and War Room
 // Requires: shared/constants.js loaded first
 // ══════════════════════════════════════════════════════════════════
 
@@ -74,6 +74,18 @@ function countElitePlayers(pids) {
   return (pids || []).filter(pid => isElitePlayer(String(pid))).length;
 }
 
+// ── dhqLog — structured error logging ────────────────────────────
+// Replaces empty catch(e){} blocks with visible, filterable output.
+// Always uses console.warn so errors surface in DevTools without crashing.
+function dhqLog(context, err, extra) {
+  const tag = `[DHQ:${context}]`;
+  if (err instanceof Error) {
+    console.warn(tag, err.message, extra !== undefined ? extra : '');
+  } else {
+    console.warn(tag, err !== undefined ? err : '', extra !== undefined ? extra : '');
+  }
+}
+
 // ── Expose on App namespace ─────────────────────────────────────
 window.App.normPos            = normPos;
 window.App.posColor           = posColor;
@@ -91,3 +103,5 @@ window.DEPTH_POSITIONS    = DEPTH_POSITIONS;
 window.calcRawPts         = calcRawPts;
 window.isElitePlayer      = isElitePlayer;
 window.countElitePlayers  = countElitePlayers;
+window.dhqLog             = dhqLog;
+window.App.dhqLog         = dhqLog;

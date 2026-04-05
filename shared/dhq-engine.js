@@ -1,5 +1,5 @@
 // shared/dhq-engine.js — DHQ Dynasty Valuation Engine
-// Extracted from ReconAI — shared by ReconAI + War Room
+// Extracted from War Room Scout — shared by War Room Scout + War Room
 window.App = window.App || {};
 
 // ══════════════════════════════════════════════════════════════════
@@ -13,27 +13,24 @@ let LI={}; // LeagueIntel data object — populated async after connect
 let LI_LOADED=false;
 
 function loadLICache(){
-  try{
-    const raw=localStorage.getItem(LI_CACHE_KEY);
-    if(!raw)return false;
-    const d=JSON.parse(raw);
-    if(Date.now()-d.ts>LI_TTL)return false;
-    const S=window.App.S||window.S;
-    if(!S||d.leagueId!==S.currentLeagueId)return false;
-    LI=d.data;LI_LOADED=true;
-    console.log('LeagueIntel loaded from cache');
-    return true;
-  }catch(e){return false;}
+  const d=DhqStorage.get(LI_CACHE_KEY,null);
+  if(!d)return false;
+  if(Date.now()-d.ts>LI_TTL)return false;
+  const S=window.App.S||window.S;
+  if(!S||d.leagueId!==S.currentLeagueId)return false;
+  LI=d.data;LI_LOADED=true;
+  console.log('LeagueIntel loaded from cache');
+  // Emit after current call stack clears — ensures UI listeners are registered first
+  setTimeout(()=>{if(window.DhqEvents)window.DhqEvents.emit('li:loaded',{source:'cache'});},0);
+  return true;
 }
 
 function saveLICache(){
-  try{
-    const S=window.App.S||window.S;
-    // Strip non-serializable functions before caching
-    const cacheable={...LI};
-    delete cacheable.dhqPickValueFn;
-    localStorage.setItem(LI_CACHE_KEY,JSON.stringify({ts:Date.now(),leagueId:S.currentLeagueId,data:cacheable}));
-  }catch(e){console.warn('LI cache save failed:',e);}
+  const S=window.App.S||window.S;
+  // Strip non-serializable functions before caching
+  const cacheable={...LI};
+  delete cacheable.dhqPickValueFn;
+  DhqStorage.set(LI_CACHE_KEY,{ts:Date.now(),leagueId:S.currentLeagueId,data:cacheable});
 }
 
 // Get LeagueIntel value for a player (replaces dynastyValue for IDP)
@@ -46,7 +43,7 @@ function livScore(pid){
 function livFAABRange(pos){
   if(!LI_LOADED||!pos)return null;
   const market=LI.faabByPos?.[pos];
-  if(!market||market.count<3)return null;
+  if(!market||market.count<3||!market.avg)return null;
   return{low:Math.round(market.avg*0.7),high:Math.round(market.avg*1.3),avg:Math.round(market.avg),count:market.count};
 }
 
@@ -64,7 +61,7 @@ async function loadLeagueIntel(){
   if(window._liLoading)return; // already in progress
   window._liLoading=true;
   const S=window.App.S||window.S;
-  if(!S){console.warn('[DHQ] No state object found (window.App.S or window.S)');window._liLoading=false;return;}
+  if(!S){console.warn('[Scout] No state object found (window.App.S or window.S)');window._liLoading=false;return;}
   const posMap=window.App.posMap||window.posMap;
   const pName=window.App.pName||window.pName||(id=>{const p=S.players?.[id];return p?(p.full_name||((p.first_name||'')+' '+(p.last_name||'')).trim()||id):id;});
   const pPos=window.App.pPos||window.pPos||(id=>S.players?.[id]?.position||'');
@@ -124,9 +121,8 @@ async function loadLeagueIntel(){
     // STEP 1: Discover league chain (sequential — each season links to previous)
     // But check permanent cache first — chain never changes for completed seasons
     // ═══════════════════════════════════════════════════════════════
-    const HIST_KEY='dhq_hist_'+S.currentLeagueId;
-    let histCache=null;
-    try{const raw=localStorage.getItem(HIST_KEY);if(raw)histCache=JSON.parse(raw);}catch(e){}
+    const HIST_KEY=STORAGE_KEYS.HIST_KEY(S.currentLeagueId);
+    const histCache=DhqStorage.get(HIST_KEY, null);
 
     let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns, tradeTxns, bracketData, leagueUsersHistory;
     const curSeason = parseInt(S.season) || new Date().getFullYear();
@@ -271,7 +267,7 @@ async function loadLeagueIntel(){
               fetch(`${SLEEPER}/league/${c.id}/losers_bracket`).then(r=>r.ok?r.json():[]).catch(()=>[]),
             ]);
             bracketData[c.season]={winners:winners||[],losers:losers||[]};
-          }catch(e){}
+          }catch(e){dhqLog('dhq-engine.bracketFetch',e,{season:c.season});}
         }));
       })();
       fetchPromises.push(bracketPromise);
@@ -287,7 +283,7 @@ async function loadLeagueIntel(){
               display_name:u.display_name||u.username,
               avatar:u.avatar,
             }));
-          }catch(e){}
+          }catch(e){dhqLog('dhq-engine.usersFetch',e,{season:c.season});}
         }));
       })();
       fetchPromises.push(usersPromise);
@@ -296,7 +292,7 @@ async function loadLeagueIntel(){
       await Promise.all(fetchPromises);
 
       // Cache historical data permanently (drafts/chain/faab/trades never change)
-      try{localStorage.setItem(HIST_KEY,JSON.stringify({chain,draftPicks:allDraftPicks,draftMeta,faabTxns,tradeTxns,bracketData,leagueUsersHistory,ts:Date.now()}));}catch(e){}
+      DhqStorage.set(HIST_KEY,{chain,draftPicks:allDraftPicks,draftMeta,faabTxns,tradeTxns,bracketData,leagueUsersHistory,ts:Date.now()});
       console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}), brackets(${Object.keys(bracketData).length}), users(${Object.keys(leagueUsersHistory).length})`);
     }
 
@@ -1264,9 +1260,8 @@ async function loadLeagueIntel(){
   Top player: ${topPlayer?.name} (${topPlayer?.pos}) wPPG=${topPlayer?.wPPG} DHQ=${playerScores[topPlayer?.pid]}
   Pick 1.01 value: ${dhqPickValues[1]?.value}, R7 last pick: ${dhqPickValues[maxPicks]?.value}`);
 
-    // Re-render with new data (if render functions exist in the consuming app)
-    if(typeof renderAvailable==='function')renderAvailable();
-    if(typeof renderDraftNeeds==='function')renderDraftNeeds();
+    // Notify subscribers that LeagueIntel is ready (replaces direct render calls)
+    if(window.DhqEvents)window.DhqEvents.emit('li:loaded',{source:'fresh'});
 
   }catch(e){
     console.warn('LeagueIntel error:',e);

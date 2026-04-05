@@ -244,20 +244,40 @@ function renderScoutBriefing() {
   }
 
   const items = _generateBriefingItems();
+  if (typeof trackUsage === 'function') trackUsage('briefings_received');
 
   if (titleEl) titleEl.textContent = `${items.length} thing${items.length !== 1 ? 's' : ''} worth your attention`;
   if (countEl) { countEl.textContent = items.length; countEl.style.display = ''; }
 
-  itemsEl.innerHTML = items.map(item => `
-    <div class="scout-item">
-      <div class="scout-item-dot ${item.priority}"></div>
-      <div class="scout-item-body">
-        <div class="scout-item-title">${_esc(item.title)}</div>
-        <div class="scout-item-desc">${_esc(item.desc)}</div>
-        ${item.action ? `<button class="scout-item-action" onclick="${_esc(item.actionFn)}">${_esc(item.action)}</button>` : ''}
-      </div>
-    </div>
-  `).join('');
+  // Determine if briefing reasoning (desc + actions) is gated
+  const _reasoningGated = typeof canAccess === 'function'
+    && !canAccess(window.FEATURES?.BRIEFING_REASONING || 'briefing_reasoning');
+  const _feat = window.FEATURES?.BRIEFING_REASONING || 'briefing_reasoning';
+
+  itemsEl.innerHTML = items.map(item => {
+    if (_reasoningGated) {
+      // Show headline and dot, but gate the "why" behind an upgrade tap
+      return `
+        <div class="scout-item">
+          <div class="scout-item-dot ${item.priority}"></div>
+          <div class="scout-item-body">
+            <div class="scout-item-title">${_esc(item.title)}</div>
+            <div style="font-size:13px;color:var(--text3);margin-top:3px">
+              <a onclick="showUpgradePrompt('${_feat}')" style="color:var(--accent);cursor:pointer;text-decoration:none;font-size:13px">Why this matters →</a>
+            </div>
+          </div>
+        </div>`;
+    }
+    return `
+      <div class="scout-item">
+        <div class="scout-item-dot ${item.priority}"></div>
+        <div class="scout-item-body">
+          <div class="scout-item-title">${_esc(item.title)}</div>
+          <div class="scout-item-desc">${_esc(item.desc)}</div>
+          ${item.action ? `<button class="scout-item-action" onclick="${_esc(item.actionFn)}">${_esc(item.action)}</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 }
 window.renderScoutBriefing = renderScoutBriefing;
 
@@ -375,6 +395,11 @@ window.addFieldLogEntry = addFieldLogEntry;
 
 // Bulk sync pending entries; called on app load
 async function syncFieldLog() {
+  // Tier gate — Field Log sync requires paid
+  if (typeof canAccess === 'function' && !canAccess(window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync')) {
+    if (typeof showUpgradePrompt === 'function') showUpgradePrompt(window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync');
+    return;
+  }
   if (!window.OD?.syncPendingFieldLog) return;
   const btn = document.getElementById('fieldlog-sync-btn');
   if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
@@ -431,10 +456,18 @@ function renderFieldLogPanel() {
   const log = getFieldLog();
 
   const pendingCount = log.filter(e => e.syncStatus === 'pending' || e.syncStatus === 'failed').length;
-  const syncBtn = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div style="font-size:12px;color:var(--text3)">${pendingCount > 0 ? `${pendingCount} entries pending sync` : 'All entries synced to War Room'}</div>
-    <button id="fieldlog-sync-btn" onclick="syncFieldLog()" style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;opacity:${pendingCount > 0 ? '1' : '0.5'}">↑ Sync to War Room</button>
-  </div>`;
+  const _syncGated = typeof canAccess === 'function'
+    && !canAccess(window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync');
+  const _syncFeat  = window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync';
+  const syncBtn = _syncGated
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text3)">Local only — sync requires War Room Scout</div>
+        <button onclick="showUpgradePrompt('${_syncFeat}')" style="padding:6px 14px;background:linear-gradient(135deg,#7c6bf8,#9b8afb);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Unlock Sync</button>
+      </div>`
+    : `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--text3)">${pendingCount > 0 ? `${pendingCount} entries pending sync` : 'All entries synced to War Room'}</div>
+        <button id="fieldlog-sync-btn" onclick="syncFieldLog()" style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;opacity:${pendingCount > 0 ? '1' : '0.5'}">↑ Sync to War Room</button>
+      </div>`;
 
   if (!log.length) {
     container.innerHTML = syncBtn + `<div class="fieldlog-empty">
@@ -598,7 +631,7 @@ function _patchMobileTab() {
       if (btn) {
         btn.classList.add('active');
       } else {
-        const newMap = { digest:'mnav-home', draftroom:'mnav-draft', waivers:'mnav-waivers' };
+        const newMap = { digest:'mnav-home', draftroom:'mnav-draft', waivers:'mnav-waivers', trades:'mnav-home', roster:'mnav-home', startsit:'mnav-home', settings:null };
         const navId = newMap[tab];
         if (navId) { const el = document.getElementById(navId); if (el) el.classList.add('active'); }
       }
@@ -618,6 +651,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Patch mobileTab after other scripts have loaded
   _patchMobileTab();
 
+  // Initialize chat placeholder with daily limit hint for free users
+  if (typeof _updateChatPlaceholder === 'function') _updateChatPlaceholder();
+
   // Hook: refresh team bar + briefing after league loads
   // Poll for S.user being set (league connection)
   let _teamBarInterval = null;
@@ -625,6 +661,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTeamBar();
     renderScoutBriefing();
     renderFieldLogCard();
+    if (typeof renderTrialBanner === 'function') renderTrialBanner();
+    if (typeof _updateChatPlaceholder === 'function') _updateChatPlaceholder();
     clearInterval(_teamBarInterval);
     // Re-check every 15 seconds in case data updates
     setInterval(() => {

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // team-assess.js — Shared Team Assessment Module
-// Used by both ReconAI and War Room
+// Used by both War Room Scout and War Room
 // Consolidates duplicated assessTeam() logic from trade-calc.js
 // and the health-score calculation from ui.js
 // ═══════════════════════════════════════════════════════════════
@@ -509,11 +509,11 @@ window.App = window.App || {};
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Convenience wrappers — read from ReconAI globals
+  // Convenience wrappers — read from War Room Scout globals
   // ─────────────────────────────────────────────────────────────
 
   /**
-   * Build NFL starter set from ReconAI globals.
+   * Build NFL starter set from War Room Scout globals.
    */
   function buildNflStarterSetFromGlobal() {
     const S = window.S || window.App?.S;
@@ -524,7 +524,7 @@ window.App = window.App || {};
   }
 
   /**
-   * Assess all teams using ReconAI globals.
+   * Assess all teams using War Room Scout globals.
    * @returns {Array} - array of assessment objects, or [] if data not loaded
    */
   function assessAllTeamsFromGlobal() {
@@ -535,7 +535,7 @@ window.App = window.App || {};
   }
 
   /**
-   * Assess a single team by roster ID using ReconAI globals.
+   * Assess a single team by roster ID using War Room Scout globals.
    * @param {number} rosterId - the roster_id to assess
    * @returns {Object|null}   - assessment object or null
    */
@@ -674,7 +674,7 @@ window.App = window.App || {};
   window.App.assessAllTeams     = assessAllTeams;
   window.App.buildPicksByOwner  = buildPicksByOwner;
 
-  // Convenience wrappers (read from ReconAI globals)
+  // Convenience wrappers (read from War Room Scout globals)
   window.App.buildNflStarterSetFromGlobal = buildNflStarterSetFromGlobal;
   window.App.assessAllTeamsFromGlobal     = assessAllTeamsFromGlobal;
   window.App.assessTeamFromGlobal         = assessTeamFromGlobal;

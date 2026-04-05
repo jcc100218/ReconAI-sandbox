@@ -27,13 +27,11 @@ let tradeBuilderAssets={mine:[],theirs:[]};
 let draftChatHistory=[];
 
 // ── Persistent Conversation Memory ──────────────────────────────
-const CONV_MEM_KEY='dhq_sessions';
-
 function loadConvMemory(){
-  try{return JSON.parse(localStorage.getItem(CONV_MEM_KEY)||'[]');}catch(e){return[];}
+  return DhqStorage.get(STORAGE_KEYS.CONV_SESSIONS, []);
 }
 function saveConvMemory(arr){
-  try{localStorage.setItem(CONV_MEM_KEY,JSON.stringify(arr.slice(-6)));}catch(e){}
+  DhqStorage.set(STORAGE_KEYS.CONV_SESSIONS, arr.slice(-6));
 }
 function addConvMemory(summary){
   if(!summary||summary.length<10)return;
@@ -52,7 +50,7 @@ async function autoSaveMemory(history,label){
     const recent=history.slice(-4).map(m=>m.role.toUpperCase()+': '+String(m.content).slice(0,150)).join('\n');
     const reply=await dhqAI('memory-summary', recent);
     if(reply&&reply.length>5)addConvMemory((label?label+': ':'')+reply.trim().replace(/^["']/,'').replace(/["']$/,''));
-  }catch(e){}
+  }catch(e){dhqLog('autoSaveMemory',e);}
 }
 function buildMentalityCtx(){
   const m=loadMentality();
@@ -239,14 +237,55 @@ function goAsk(text){
 }
 
 // ── Home Chat ─────────────────────────────────────────────────
+// Update the home chat input placeholder based on daily limit (free users only)
+function _updateChatPlaceholder() {
+  const inp = $('home-chat-in');
+  if (!inp) return;
+  const S = window.S;
+  // Only show limit hint if user has no BYOK key and is on free tier
+  if (S?.apiKey) return;
+  if (typeof getTier === 'function' && getTier() === 'free') {
+    const remaining = typeof getDailyChatRemaining === 'function' ? getDailyChatRemaining() : 0;
+    const lim = window.FREE_CHAT_DAILY_LIMIT || 3;
+    inp.placeholder = remaining > 0
+      ? `Ask your advisor... (${remaining}/${lim} today)`
+      : 'Daily limit reached — upgrade for unlimited';
+  }
+}
+window._updateChatPlaceholder = _updateChatPlaceholder;
+
 async function sendHomeChat(){
   if(!hasAnyAI(false)){
     const msgs=$('home-chat-msgs');
-    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='ReconAI chat requires AI. Enable a free Gemini key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='War Room Scout chat requires AI. Enable a free Gemini key or subscription in <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
     return;
   }
+
+  // Daily chat limit for free (post-trial) users without a BYOK key
+  const _S = window.S;
+  if (!_S?.apiKey && typeof getTier === 'function' && getTier() === 'free') {
+    const lim = window.FREE_CHAT_DAILY_LIMIT || 3;
+    const remaining = typeof getDailyChatRemaining === 'function' ? getDailyChatRemaining() : lim;
+    if (remaining <= 0) {
+      const msgs = $('home-chat-msgs');
+      if (msgs) {
+        expandChat(msgs);
+        const m = document.createElement('div');
+        m.className = 'hc-msg-a';
+        m.style.fontSize = '13px';
+        m.innerHTML = `You've used your ${lim} free messages today. <a onclick="showUpgradePrompt('${FEATURES?.UNLIMITED_CHAT || 'unlimited_chat'}')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Upgrade for unlimited →</a>`;
+        msgs.appendChild(m);
+        msgs.scrollTop = 99999;
+      }
+      return;
+    }
+    if (typeof incrementDailyChat === 'function') incrementDailyChat();
+    if (typeof _updateChatPlaceholder === 'function') _updateChatPlaceholder();
+  }
+
   const input=$('home-chat-in');const text=(input?.value||'').trim();if(!text)return;
   if(input)input.value='';
+  if(typeof trackUsage==='function')trackUsage('ai_chats_sent');
 
   const msgsEl=$('home-chat-msgs');
   expandChat(msgsEl);
@@ -283,7 +322,7 @@ async function sendHomeChat(){
       const reply=await callClaude(msgs,needsSearch,2,500);
       homeChatHistory.push({role:'assistant',content:reply});
       lm.innerHTML=_sanitizeAIResponse(reply);
-    }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
+    }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${escHtml(e.message)}</span>`;}
     msgsEl.scrollTop=99999;
   }
 }
@@ -358,7 +397,7 @@ ${ctx}${ownerCtx}${tradeStats}\n\n${m.content}`};
     lm.innerHTML=_sanitizeAIResponse(reply);
     // Auto-save every 3rd message
     if(tradeChatHistory.length%6===0)autoSaveMemory(tradeChatHistory,'Trades');
-  }catch(e){lm.innerHTML='<span style="color:var(--red)">Error: '+e.message+'</span>';}
+  }catch(e){lm.innerHTML='<span style="color:var(--red)">Error: '+escHtml(e.message)+'</span>';}
   msgsEl.scrollTop=99999;
 }
 
@@ -421,7 +460,7 @@ async function sendWaiverChat(){
     const ctx='MY TEAM:\n'+dhqContext(false)+'\n'+dhqBuildMentalityContext()+'\n'+(faab.isFAAB?'FAAB:$'+faab.remaining:'Waiver priority #'+(myR()?.settings?.waiver_position||'?'))+' | Open slots:'+slots.openBench+'\n\nAVAILABLE FREE AGENTS (IDP shown with real PPG from your scoring settings):\n'+availStr;
     const reply=await callClaude([{role:'user',content:'Dynasty waiver wire advisor. Answer based ONLY on the actual available players listed.\n\n'+ctx+'\n\nIDP NOTE: In this league sacks='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_sack)??4)+'pts, INT='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_int)??5)+'pts, PassDef='+((S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings?.idp_pass_def)??3)+'pts. DBs with INT/PD potential are premium. Edge rushers with sack upside too.\n\nQuestion: '+text+'\n\nBe specific — name actual players. 3-5 sentences max.'}]);
     lm.innerHTML=_sanitizeAIResponse(reply);
-  }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
+  }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${escHtml(e.message)}</span>`;}
   msgs.scrollTop=99999;
 }
 
@@ -470,7 +509,7 @@ NOTE: Sleeper's rookie data improves as the NFL draft approaches. Pre-NFL draft 
     const reply=await callClaude(msgs,needsSearch,2,500);
     draftChatHistory.push({role:'assistant',content:reply});
     loading.innerHTML=_sanitizeAIResponse(reply);
-  }catch(e){loading.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`;}
+  }catch(e){loading.innerHTML=`<span style="color:var(--red)">Error: ${escHtml(e.message)}</span>`;}
   $('draft-msgs').scrollTop=99999;
 }
 
@@ -707,9 +746,16 @@ Recommend ${slotsToFill} adds from the AVAILABLE list above. JSON only:
           </div>
         </div>`;}).join('')
       :'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>'}`;
-  }catch(e){$('wq-list').innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${e.message}</div></div>`;}
+  }catch(e){$('wq-list').innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${escHtml(e.message)}</div></div>`;}
   btn.textContent='Generate';btn.disabled=false;
 }
+
+// Expose chat state on window.App so they're reachable via the canonical namespace
+// (see State Registry in app.js for the full inventory)
+window.App.homeChatHistory    = homeChatHistory;
+window.App.tradeChatHistory   = tradeChatHistory;
+window.App.draftChatHistory   = draftChatHistory;
+window.App.tradeBuilderAssets = tradeBuilderAssets;
 
 // Bare window globals for inline handlers / cross-module access
 window.buildMentalityCtx = buildMentalityCtx;

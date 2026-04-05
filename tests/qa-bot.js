@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// ReconAI Automated QA Bot
+// War Room Scout Automated QA Bot
 // Paste this entire script into the browser console at:
 // https://jcc100218.github.io/ReconAI/
 // Wait for DHQ engine to load first (green dots in status bar)
@@ -13,7 +13,7 @@
   const w = (t, d) => { const msg = t + (d ? ': ' + d : ''); R.warn.push(msg); console.log(`  ⚠️  WARN: ${msg}`); };
 
   console.log('\n' + '═'.repeat(60));
-  console.log('  🔍 RECONAI QA BOT — Automated Bug Finder');
+  console.log('  🔍 WAR ROOM SCOUT QA BOT — Automated Bug Finder');
   console.log('  ' + new Date().toLocaleString());
   console.log('═'.repeat(60));
 

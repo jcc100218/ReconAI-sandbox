@@ -1,6 +1,6 @@
 // ── Shared Sleeper API Layer ──────────────────────────────────────
-// Base fetch helpers for both ReconAI and War Room.
-// Each app may wrap these with its own orchestration (e.g. ReconAI's
+// Base fetch helpers for both War Room Scout and War Room.
+// Each app may wrap these with its own orchestration (e.g. War Room Scout's
 // loadLeague calls render functions after fetching), but the raw API
 // calls live here once.
 
@@ -107,39 +107,40 @@ async function fetchLosersBracket(leagueId) {
 function calcFantasyPts(stats, sc) {
   if (!stats) return 0;
   let pts = 0;
-  var add = function (stat, mult) { pts += (stats[stat] || 0) * (mult || 0); };
+  // Use ?? so leagues that explicitly set a scoring value to 0 aren't overridden by defaults
+  var add = function (stat, mult) { pts += (stats[stat] || 0) * (mult ?? 0); };
 
   // Offense — passing
-  add('pass_yd',   sc.pass_yd   || 0);
-  add('pass_td',   sc.pass_td   || 4);
-  add('pass_int',  sc.pass_int  || -1);
-  add('pass_2pt',  sc.pass_2pt  || 0);
-  add('pass_sack', sc.pass_sack || 0);
+  add('pass_yd',   sc.pass_yd   ?? 0);
+  add('pass_td',   sc.pass_td   ?? 4);
+  add('pass_int',  sc.pass_int  ?? -1);
+  add('pass_2pt',  sc.pass_2pt  ?? 0);
+  add('pass_sack', sc.pass_sack ?? 0);
 
   // Offense — rushing
-  add('rush_yd',  sc.rush_yd  || 0.1);
-  add('rush_td',  sc.rush_td  || 6);
-  add('rush_2pt', sc.rush_2pt || 0);
-  add('rush_fd',  sc.rush_fd  || 0);
+  add('rush_yd',  sc.rush_yd  ?? 0.1);
+  add('rush_td',  sc.rush_td  ?? 6);
+  add('rush_2pt', sc.rush_2pt ?? 0);
+  add('rush_fd',  sc.rush_fd  ?? 0);
 
   // Offense — receiving
-  add('rec',     sc.rec     || 0.5);
-  add('rec_yd',  sc.rec_yd  || 0.1);
-  add('rec_td',  sc.rec_td  || 6);
-  add('rec_2pt', sc.rec_2pt || 0);
-  add('rec_fd',  sc.rec_fd  || 0);
+  add('rec',     sc.rec     ?? 0.5);
+  add('rec_yd',  sc.rec_yd  ?? 0.1);
+  add('rec_td',  sc.rec_td  ?? 6);
+  add('rec_2pt', sc.rec_2pt ?? 0);
+  add('rec_fd',  sc.rec_fd  ?? 0);
 
   // Fumbles
-  add('fum_lost',   sc.fum_lost   || -0.5);
-  add('fum_rec_td', sc.fum_rec_td || 0);
+  add('fum_lost',   sc.fum_lost   ?? -0.5);
+  add('fum_rec_td', sc.fum_rec_td ?? 0);
 
   // Kicking
-  add('xpm',          sc.xpm          || 0);
-  add('xpmiss',       sc.xpmiss       || 0);
-  add('fgm_yds',      sc.fgm_yds      || 0);
-  add('fgmiss',       sc.fgmiss       || 0);
-  add('fgmiss_0_19',  sc.fgmiss_0_19  || 0);
-  add('fgmiss_20_29', sc.fgmiss_20_29 || 0);
+  add('xpm',          sc.xpm          ?? 0);
+  add('xpmiss',       sc.xpmiss       ?? 0);
+  add('fgm_yds',      sc.fgm_yds      ?? 0);
+  add('fgmiss',       sc.fgmiss       ?? 0);
+  add('fgmiss_0_19',  sc.fgmiss_0_19  ?? 0);
+  add('fgmiss_20_29', sc.fgmiss_20_29 ?? 0);
 
   // IDP — try both idp-prefixed and non-prefixed field names (Sleeper uses both)
   var idpFields = [
@@ -162,7 +163,7 @@ function calcFantasyPts(stats, sc) {
   ];
   idpFields.forEach(function (names) {
     var scKey = names[0]; // scoring setting key is always idp_ prefixed
-    var mult = sc[scKey] || 0;
+    var mult = sc[scKey] ?? 0;
     if (!mult) return;
     // Try each field name variant, use first non-zero
     var val = 0;
@@ -173,12 +174,12 @@ function calcFantasyPts(stats, sc) {
   });
 
   // Special teams
-  add('st_td',       sc.st_td       || 0);
-  add('st_ff',       sc.st_ff       || 0);
-  add('st_fum_rec',  sc.st_fum_rec  || 0);
-  add('st_tkl_solo', sc.st_tkl_solo || 0);
-  add('kr_yd',       sc.kr_yd       || 0);
-  add('pr_yd',       sc.pr_yd       || 0);
+  add('st_td',       sc.st_td       ?? 0);
+  add('st_ff',       sc.st_ff       ?? 0);
+  add('st_fum_rec',  sc.st_fum_rec  ?? 0);
+  add('st_tkl_solo', sc.st_tkl_solo ?? 0);
+  add('kr_yd',       sc.kr_yd       ?? 0);
+  add('pr_yd',       sc.pr_yd       ?? 0);
 
   return Math.round(pts * 10) / 10;
 }
@@ -212,3 +213,5 @@ window.Sleeper     = SleeperAPI;
 window.App.sf = sleeperFetch;
 window.sf = sleeperFetch;
 window.App.SLEEPER = SLEEPER_BASE;
+// Expose calcFantasyPts as a bare global so js/sleeper-api.js callers can use it without the Sleeper prefix
+window.calcFantasyPts = calcFantasyPts;

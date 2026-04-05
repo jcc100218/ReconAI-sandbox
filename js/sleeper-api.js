@@ -9,11 +9,13 @@ const SLEEPER='https://api.sleeper.app/v1';
 
 const sf=path=>fetch(SLEEPER+path).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()});
 
+// Thin wrapper: delegates to shared API, stores result in War Room Scout state S.trending.
+// shared/sleeper-api.js owns the raw fetch; this owns the state assignment.
 async function fetchTrending(){
   try{
     const [adds,drops]=await Promise.all([
-      fetch('https://api.sleeper.app/v1/players/trending/nfl/add?lookback_hours=24&limit=20').then(r=>r.ok?r.json():[]).catch(()=>[]),
-      fetch('https://api.sleeper.app/v1/players/trending/nfl/drop?lookback_hours=24&limit=20').then(r=>r.ok?r.json():[]).catch(()=>[]),
+      window.Sleeper.fetchTrending('add',24,20).catch(()=>[]),
+      window.Sleeper.fetchTrending('drop',24,20).catch(()=>[]),
     ]);
     S.trending={adds:adds||[],drops:drops||[],fetchedAt:Date.now()};
     console.log('Trending loaded: '+adds.length+' adds, '+drops.length+' drops');
@@ -144,38 +146,8 @@ async function loadRosterStats(){
 }
 
 
-function calcFantasyPts(stats,sc){
-  if(!stats)return 0;
-  let pts=0;
-  const add=(stat,mult)=>{pts+=(stats[stat]||0)*(mult||0);};
-  // Offense
-  add('pass_yd',sc.pass_yd??0);add('pass_td',sc.pass_td??4);add('pass_int',sc.pass_int??-1);
-  add('pass_2pt',sc.pass_2pt??0);add('pass_sack',sc.pass_sack??0);
-  add('rush_yd',sc.rush_yd??0.1);add('rush_td',sc.rush_td??6);add('rush_2pt',sc.rush_2pt??0);add('rush_fd',sc.rush_fd??0);
-  add('rec',sc.rec??0.5);add('rec_yd',sc.rec_yd??0.1);add('rec_td',sc.rec_td??6);add('rec_2pt',sc.rec_2pt??0);add('rec_fd',sc.rec_fd??0);
-  add('fum_lost',sc.fum_lost??-0.5);add('fum_rec_td',sc.fum_rec_td??0);
-  // Kicking
-  add('xpm',sc.xpm??0);add('xpmiss',sc.xpmiss??0);add('fgm_yds',sc.fgm_yds??0);
-  add('fgmiss',sc.fgmiss??0);add('fgmiss_0_19',sc.fgmiss_0_19??0);add('fgmiss_20_29',sc.fgmiss_20_29??0);
-  // IDP — try both prefixed and non-prefixed field names (Sleeper uses both)
-  const idpFields=[['idp_tkl_solo','tkl_solo'],['idp_tkl_ast','tkl_ast'],['idp_tkl_loss','tkl_loss'],
-    ['idp_sack','sack'],['idp_qb_hit','qb_hit'],['idp_int','int'],['idp_ff','ff'],
-    ['idp_fum_rec'],['idp_pass_def','pass_def'],['idp_pass_def_3p'],
-    ['idp_def_td','def_td'],['idp_blk_kick'],['idp_safe'],['idp_sack_yd'],['idp_int_ret_yd'],['idp_fum_ret_yd']];
-  idpFields.forEach(names=>{
-    const scKey=names[0]; // scoring setting key is always idp_ prefixed
-    const mult=sc[scKey]??0;
-    if(!mult)return;
-    // Try each field name variant, use first non-zero
-    let val=0;
-    for(const n of names){if(stats[n]){val=stats[n];break;}}
-    pts+=val*mult;
-  });
-  // Special teams
-  add('st_td',sc.st_td??0);add('st_ff',sc.st_ff??0);add('st_fum_rec',sc.st_fum_rec??0);
-  add('st_tkl_solo',sc.st_tkl_solo??0);add('kr_yd',sc.kr_yd??0);add('pr_yd',sc.pr_yd??0);
-  return Math.round(pts*10)/10;
-}
+// calcFantasyPts lives in shared/sleeper-api.js (window.calcFantasyPts / window.Sleeper.calcFantasyPts).
+// Calls in loadRosterStats and ui.js resolve via the window global set there.
 
 // ── Expose on window.App ────────────────────────────────────────
 Object.assign(window.App, {
@@ -185,5 +157,4 @@ Object.assign(window.App, {
   loadLeague,
   loadOwnership,
   loadRosterStats,
-  calcFantasyPts,
 });

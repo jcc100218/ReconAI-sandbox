@@ -51,6 +51,15 @@
     <div class="team-bar-roster" id="team-bar-roster"></div>
   </div>
 
+  <!-- Trial Banner — shown during 30-day trial, dismissible daily -->
+  <div id="trial-banner" class="trial-banner" style="display:none">
+    <span id="trial-banner-text" class="trial-banner-text">
+      <span id="trial-banner-days">30 days</span> left of full access
+    </span>
+    <button onclick="switchTab('settings')" class="trial-banner-upgrade">Upgrade</button>
+    <button onclick="dismissTrialBanner()" class="trial-banner-dismiss" aria-label="Dismiss">&times;</button>
+  </div>
+
   <div class="content">
 
     <!-- DAILY DIGEST / HOME -->
@@ -548,6 +557,18 @@
     <!-- SETTINGS -->
     <div class="panel" id="panel-settings">
 
+      <!-- Trial / Subscription -->
+      <details class="settings-section" id="trial-settings-section">
+        <summary class="settings-summary">
+          <span>Scout Trial</span>
+          <span id="trial-settings-badge" style="font-size:13px;color:var(--accent);font-weight:600"></span>
+        </summary>
+        <div style="padding:12px 0 4px">
+          <div id="trial-settings-info"></div>
+          <button class="btn" style="padding:10px 18px;width:100%;font-size:14px;font-weight:700;background:linear-gradient(135deg,#7c6bf8,#9b8afb);box-shadow:0 4px 16px rgba(124,107,248,.25)" onclick="window.open('https://warroom.fantasy-dynasty-hq.com','_blank')">Upgrade — $4.99/mo</button>
+        </div>
+      </details>
+
       <!-- 1. System Status -->
       <div id="settings-status" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px">
         <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px">War Room Scout Status</div>
@@ -788,6 +809,7 @@
 <script src="shared/storage.js"></script>
 <script src="shared/event-bus.js"></script>
 <script src="shared/supabase-client.js"></script>
+<script src="shared/tier.js"></script>
 <script src="shared/pick-value-model.js"></script>
 <script src="shared/dhq-engine.js"></script>
 <script src="shared/team-assess.js"></script>
@@ -889,4 +911,31 @@ window.addEventListener('appinstalled', () => {
   _deferredPrompt = null;
 });
 </script>
+
+<!-- Trial Expiration Modal — shown once on next load after 30-day trial ends -->
+<div id="trial-expired-modal" class="trial-expired-overlay" style="display:none">
+  <div class="trial-expired-sheet">
+    <div class="trial-expired-header">
+      <div style="font-size:36px;margin-bottom:12px">⏱</div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.03em;margin-bottom:8px">Your trial has ended</div>
+      <div style="font-size:14px;color:var(--text3);line-height:1.5">Upgrade to keep AI trade analysis, Owner DNA, draft intelligence, and daily briefings.</div>
+    </div>
+    <div class="trial-expired-recap">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your 30-day recap</div>
+      <div id="trial-expired-stats"></div>
+    </div>
+    <div style="margin-bottom:20px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">After trial</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)"><span style="color:var(--red);font-size:11px;font-weight:700">✕</span> AI trade analysis &amp; Scout chat</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)"><span style="color:var(--red);font-size:11px;font-weight:700">✕</span> Owner DNA profiles</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)"><span style="color:var(--red);font-size:11px;font-weight:700">✕</span> Draft room intelligence</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)"><span style="color:var(--red);font-size:11px;font-weight:700">✕</span> Daily briefings</div>
+      </div>
+    </div>
+    <button class="btn" style="width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;margin-bottom:8px;background:linear-gradient(135deg,#7c6bf8,#9b8afb);box-shadow:0 4px 16px rgba(124,107,248,.3)" onclick="switchTab('settings');closeTrialExpiredModal()">Upgrade now — $4.99/mo</button>
+    <button class="btn btn-ghost" style="width:100%;padding:11px;font-size:14px;border-radius:12px" onclick="closeTrialExpiredModal()">Continue with free</button>
+  </div>
+</div>
+
 </body></html>

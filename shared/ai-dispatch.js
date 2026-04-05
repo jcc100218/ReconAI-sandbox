@@ -1,5 +1,5 @@
 /*  ai-dispatch.js  — Multi-provider AI dispatcher (shared)
- *  Extracted from js/ai-chat.js so both ReconAI and War Room can use it.
+ *  Extracted from js/ai-chat.js so both War Room Scout and War Room can use it.
  *  Exposes: PROVIDERS, updateProviderHint, hasServerAI, hasAnyAI,
  *           callClaude, callGrokNews
  *  Globals expected: window.S (state), window.OD (Supabase/server-side),

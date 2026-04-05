@@ -18,14 +18,14 @@ const corsHeaders = {
 // ── Tier config ─────────────────────────────────────────────────
 const TIER_LIMITS: Record<string, number> = {
   free: 0,           // Must use BYOK
-  reconai: 50,       // 50 calls/day
+  scout: 50,         // 50 calls/day
   warroom: 100,      // 100 calls/day
   commissioner: -1,  // Unlimited
 };
 
 const TIER_RANK: Record<string, number> = {
   free: 0,
-  reconai: 1,
+  scout: 1,
   warroom: 2,
   commissioner: 3,
 };
@@ -41,20 +41,20 @@ interface Route {
 
 const MODEL_ROUTING: Record<string, Route> = {
   // Complex reasoning -> Claude Sonnet
-  "trade-chat":        { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "reconai" },
-  "trade-scout":       { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "reconai" },
-  "draft-scout":       { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "reconai" },
-  "pick-analysis":     { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "reconai" },
-  "player-scout":      { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "reconai" },
+  "trade-chat":        { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "scout" },
+  "trade-scout":       { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "scout" },
+  "draft-scout":       { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "scout" },
+  "pick-analysis":     { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "scout" },
+  "player-scout":      { provider: "anthropic", model: "claude-sonnet-4-20250514", tierMin: "scout" },
   // Simple tasks -> Gemini Flash
-  "home-chat":         { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "waiver-chat":       { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "waiver-agent":      { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "draft-chat":        { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "strategy-analysis": { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "memory-summary":    { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "power-posts":       { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
-  "recon-chat":        { provider: "gemini", model: "gemini-2.0-flash", tierMin: "reconai" },
+  "home-chat":         { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "waiver-chat":       { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "waiver-agent":      { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "draft-chat":        { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "strategy-analysis": { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "memory-summary":    { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "power-posts":       { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
+  "recon-chat":        { provider: "gemini", model: "gemini-2.0-flash", tierMin: "scout" },
   // Commissioner-only -> Claude Opus for deep analysis
   "deep-analysis":     { provider: "anthropic", model: "claude-opus-4-20250514", tierMin: "commissioner" },
   "league-report":     { provider: "anthropic", model: "claude-opus-4-20250514", tierMin: "commissioner" },

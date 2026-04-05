@@ -152,6 +152,7 @@ function switchTab(tab,btn){
     else if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();
   }
   if(tab==='settings'&&typeof updateSettingsStatus==='function')updateSettingsStatus();
+  if(tab==='settings'&&typeof updateTrialSettingsSection==='function')updateTrialSettingsSection();
   if(tab==='roster'&&typeof buildRosterTable==='function')buildRosterTable();
   if(tab==='startsit'&&typeof renderStartSit==='function')renderStartSit();
   if(tab==='trades'){

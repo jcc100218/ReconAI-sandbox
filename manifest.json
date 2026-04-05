@@ -1,10 +1,10 @@
 {
-  "name": "ReconAI — Dynasty Intelligence",
-  "short_name": "ReconAI",
+  "name": "War Room Scout — Dynasty Intelligence",
+  "short_name": "War Room Scout",
   "description": "Dynasty fantasy football intelligence — DHQ valuations, AI advisor, trade finder, waiver wire, draft scouting",
   "start_url": "./index.html",
   "scope": "./",
-  "id": "reconai",
+  "id": "warroom-scout",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#08090b",
