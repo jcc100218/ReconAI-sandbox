@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>ReconAI — Dynasty Intelligence</title>
+<title>War Room Scout — Dynasty Intelligence</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
 <link rel="apple-touch-icon" href="icons/icon-192.svg">
@@ -22,7 +22,7 @@
 
 <div class="app">
   <div class="header">
-    <div class="logo" style="font-size:16px;font-weight:800;letter-spacing:-.03em">Recon<span style="-webkit-text-fill-color:var(--accent)">AI</span></div>
+    <div class="logo" style="font-size:16px;font-weight:800;letter-spacing:-.03em">War Room <span style="-webkit-text-fill-color:var(--accent)">Scout</span></div>
     <div class="spacer"></div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow:hidden">
       <span class="pill pd" id="league-pill" style="font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:140px;padding:4px 10px;display:flex;align-items:center;gap:4px" onclick="switchLeagueMode()" title="Click to switch league"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Not connected</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span></span>
@@ -35,6 +35,20 @@
       <a href="https://github.com/jcc100218/ReconAI/issues" target="_blank" class="header-hide-sm" style="color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.5" title="Send Feedback"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></a>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:10px;transition:color .15s;flex-shrink:0;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
+  </div>
+
+  <!-- Team Bar — slim always-visible roster strip -->
+  <div class="team-bar" id="team-bar">
+    <div class="team-bar-header" onclick="toggleTeamBar()">
+      <span class="tbar-name" id="tbar-name">— Connect to see your team —</span>
+      <span class="tbar-record" id="tbar-record"></span>
+      <span class="tbar-rank" id="tbar-rank" style="display:none"></span>
+      <span class="tbar-alerts" id="tbar-alerts" style="display:none"></span>
+      <span class="tbar-chevron">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </span>
+    </div>
+    <div class="team-bar-roster" id="team-bar-roster"></div>
   </div>
 
   <div class="content">
@@ -122,6 +136,29 @@
           <div style="font-size:13px;color:var(--amber);line-height:1.5"></div>
         </div>
 
+        <!-- ── SCOUT BRIEFING ── -->
+        <div class="scout-briefing" id="scout-briefing">
+          <div class="scout-briefing-header" onclick="toggleScoutBriefing()">
+            <span class="scout-briefing-icon">⚡</span>
+            <span class="scout-briefing-title" id="scout-briefing-title">Loading your briefing...</span>
+            <span class="scout-briefing-count" id="scout-briefing-count" style="display:none">0</span>
+            <span class="scout-briefing-chevron">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+          </div>
+          <div class="scout-briefing-items" id="scout-briefing-items" style="display:none"></div>
+        </div>
+
+        <!-- ── FIELD LOG CARD ── -->
+        <div class="field-log-card" id="field-log-card-home">
+          <div class="field-log-card-header">
+            <span class="field-log-card-title">Notes from the Front</span>
+            <span class="field-log-sync-badge">Synced to War Room</span>
+          </div>
+          <div id="field-log-entries-home"></div>
+          <button onclick="mobileTab('fieldlog')" class="field-log-see-all">View full log →</button>
+        </div>
+
         <!-- 1. Team Snapshot (horizontal scroll) -->
         <div id="home-team-snapshot"></div>
 
@@ -139,7 +176,7 @@
           <div id="home-chat-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
           <div style="display:flex;gap:10px;padding:12px 16px;align-items:center;background:var(--bg2);border:1px solid var(--border2);border-radius:16px">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2" style="flex-shrink:0;opacity:.7"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-            <input type="text" id="home-chat-in" placeholder="Ask ReconAI anything..." style="flex:1;font-size:15px;background:transparent;border:none;outline:none;color:var(--text);padding:4px 0" onkeydown="if(event.key==='Enter')sendHomeChat()"/>
+            <input type="text" id="home-chat-in" placeholder="Ask Scout anything..." style="flex:1;font-size:15px;background:transparent;border:none;outline:none;color:var(--text);padding:4px 0" onkeydown="if(event.key==='Enter')sendHomeChat()"/>
             <button onclick="sendHomeChat()" style="background:linear-gradient(135deg,var(--accent),#9b8afb);border:none;border-radius:12px;width:38px;height:38px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(124,107,248,0.3)">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -513,7 +550,7 @@
 
       <!-- 1. System Status -->
       <div id="settings-status" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px">ReconAI Status</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:10px">War Room Scout Status</div>
         <div id="settings-status-lines" style="display:flex;flex-direction:column;gap:6px;font-size:13px">
           <div style="display:flex;align-items:center;gap:8px">
             <span id="st-ai-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text3);flex-shrink:0"></span>
@@ -670,6 +707,50 @@
       </div>
     </div>
 
+    <!-- ── LEAGUE PANEL ── -->
+    <div class="panel" id="panel-league">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:-.03em">League Intel</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:2px">Owner profiles · standings · trade targets</div>
+        </div>
+        <button onclick="sendGlobalChat('Which owner in my league is the best trade partner for me right now?')" style="font-size:13px;padding:6px 12px;background:var(--accentL);border:1px solid rgba(107,92,231,.2);border-radius:8px;color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600">Ask Scout</button>
+      </div>
+      <div id="panel-league-content">
+        <div style="text-align:center;padding:40px 20px;color:var(--text3)">
+          <div style="font-size:32px;margin-bottom:10px">🏈</div>
+          <div style="font-size:14px">Connect your league to see owner intelligence.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FIELD LOG PANEL ── -->
+    <div class="panel" id="panel-fieldlog">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div style="font-size:18px;font-weight:800;letter-spacing:-.03em">Field Log</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:2px">Your moves · marks · decisions</div>
+        </div>
+        <span style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:5px;font-weight:600;padding:4px 10px;background:var(--greenL);border-radius:20px;border:1px solid rgba(46,204,113,.2)">
+          <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>Synced
+        </span>
+      </div>
+      <div id="panel-fieldlog-content"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Global Chat Overlay (persistent chat bar + context chips) -->
+<div class="global-chat-overlay" id="global-chat-overlay">
+  <div class="ctx-chips-row" id="ctx-chips-row">
+    <!-- populated by scout-ui.js -->
+  </div>
+  <div class="global-chat-row">
+    <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Ask Scout anything..." autocomplete="off" onkeydown="if(event.key==='Enter')sendGlobalChat()"/>
+    <button class="global-chat-send" onclick="sendGlobalChat()" aria-label="Send">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
   </div>
 </div>
 
@@ -679,25 +760,21 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     Home
   </button>
-  <button class="mobile-nav-item" id="mnav-startsit" onclick="mobileTab('startsit',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-    Lineup
-  </button>
-  <button class="mobile-nav-item" id="mnav-roster" onclick="mobileTab('roster',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-    Roster
-  </button>
-  <button class="mobile-nav-item" id="mnav-waivers" onclick="mobileTab('waivers',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-    Waivers
-  </button>
-  <button class="mobile-nav-item" id="mnav-trades" onclick="mobileTab('trades',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-    Trades
+  <button class="mobile-nav-item" id="mnav-league" onclick="mobileTab('league',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    League
   </button>
   <button class="mobile-nav-item" id="mnav-draft" onclick="mobileTab('draftroom',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     Draft
+  </button>
+  <button class="mobile-nav-item" id="mnav-waivers" onclick="mobileTab('waivers',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Waivers
+  </button>
+  <button class="mobile-nav-item" id="mnav-fieldlog" onclick="mobileTab('fieldlog',this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    Field Log
   </button>
 </div>
 
@@ -707,6 +784,9 @@
 <!-- Shared modules -->
 <script src="shared/data-cache.js"></script>
 <script src="shared/constants.js"></script>
+<script src="shared/utils.js"></script>
+<script src="shared/storage.js"></script>
+<script src="shared/event-bus.js"></script>
 <script src="shared/supabase-client.js"></script>
 <script src="shared/pick-value-model.js"></script>
 <script src="shared/dhq-engine.js"></script>
@@ -715,20 +795,24 @@
 <script src="shared/dhq-ai.js"></script>
 <script src="shared/league-memory.js"></script>
 <script src="shared/ai-dispatch.js"></script>
+<script src="shared/sleeper-api.js"></script>
 
-<!-- ReconAI modules -->
+<!-- War Room Scout modules -->
 <script src="js/app.js"></script>
 <script src="js/sleeper-api.js"></script>
 <script src="js/ai-chat.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/player-modal.js"></script>
+<script src="js/draft-ui.js"></script>
 <script src="js/trade-calc.js"></script>
+<script src="js/scout-ui.js"></script>
 
 <!-- Service Worker registration -->
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').then(reg=>{
-      console.log('[ReconAI] SW registered, scope:',reg.scope);
+      console.log('[Scout] SW registered, scope:',reg.scope);
       // Check for updates every 30 minutes
       setInterval(()=>reg.update(),30*60*1000);
       // When a new SW is waiting, tell it to activate
@@ -736,17 +820,17 @@ if('serviceWorker' in navigator){
         const nw=reg.installing;
         if(nw)nw.addEventListener('statechange',()=>{
           if(nw.state==='installed'&&navigator.serviceWorker.controller){
-            console.log('[ReconAI] New version available');
+            console.log('[Scout] New version available');
           }
         });
       });
-    }).catch(e=>console.warn('[ReconAI] SW registration failed:',e));
+    }).catch(e=>console.warn('[Scout] SW registration failed:',e));
     // Listen for the SW telling us it updated — show refresh banner
     navigator.serviceWorker.addEventListener('message',e=>{
       if(e.data?.type==='SW_UPDATED'){
         const banner=document.createElement('div');
         banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#7c6bf8,#9b8afb);color:white;padding:12px 16px;font-size:14px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;font-family:system-ui,sans-serif';
-        banner.innerHTML='ReconAI has been updated. <button onclick="location.reload()" style="background:white;color:#7c6bf8;border:none;border-radius:6px;padding:6px 16px;font-weight:700;cursor:pointer;font-size:13px">Refresh Now</button>';
+        banner.innerHTML='War Room Scout has been updated. <button onclick="location.reload()" style="background:white;color:#7c6bf8;border:none;border-radius:6px;padding:6px 16px;font-weight:700;cursor:pointer;font-size:13px">Refresh Now</button>';
         document.body.prepend(banner);
       }
     });
@@ -759,7 +843,7 @@ if('serviceWorker' in navigator){
   <div style="display:flex;align-items:center;gap:10px">
     <img src="icons/icon-192.svg" style="width:36px;height:36px;border-radius:8px" alt=""/>
     <div style="flex:1">
-      <div style="font-size:14px;font-weight:700;color:var(--text)">Install ReconAI</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text)">Install War Room Scout</div>
       <div style="font-size:13px;color:var(--text3)">Add to your home screen for quick access</div>
     </div>
     <button id="pwa-install-btn" style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">Install</button>

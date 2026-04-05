@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════
-// reconai/js/app.js — State, utilities, connect flow, boot
+// warroom-scout/js/app.js — State, utilities, connect flow, boot
 // Loaded FIRST — sets up window.App namespace for all modules
 // ══════════════════════════════════════════════════════════════════
 
@@ -33,7 +33,25 @@ let S={
 window.App.S = S;
 window.S = S; // global access for inline handlers
 
+// ── State Registry ──────────────────────────────────────────────
+// All global state containers — canonical access is always window.App.*
+// Never add new state containers without registering them here.
+//
+//  window.App.S / window.S             Primary app state: players, rosters, leagues, stats, etc.
+//  window.App.LI / window.LI           League Intel: DHQ player scores, owner profiles, peak windows.
+//                                      Set by shared/dhq-engine.js; loads asynchronously.
+//  window.LI_LOADED                    Boolean: LI has finished loading (dhq-engine.js)
+//  window._liLoading                   Boolean: LI load in progress (dhq-engine.js)
+//  window._playerTags                  { [pid]: tag } — player tag overrides (ui.js / player-modal.js)
+//
+// Chat state — in ai-chat.js, added to window.App after that module loads:
+//  window.App.homeChatHistory          Home tab chat messages array
+//  window.App.tradeChatHistory         Trade tab chat messages array
+//  window.App.draftChatHistory         Draft tab chat messages array
+//  window.App.tradeBuilderAssets       { mine:[], theirs:[] } trade builder working state
+
 // ── Utilities ──────────────────────────────────────────────────
+const escHtml=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const $=id=>document.getElementById(id);
 const ss=(id,msg,err)=>{const e=$(id);if(e){e.textContent=msg;e.className='status-txt'+(err?' err':'')}};
 const posLabel=(slot,pid)=>{const mapped=window.App.posMap[slot];if(mapped&&mapped!=='BN'&&mapped!=='FLEX')return mapped;return pPos(pid)||slot||'?';};
@@ -61,8 +79,8 @@ const prog=pct=>{const el=$('prog-bar');if(el)el.style.width=pct+'%';const dp=$(
 const setAgentStatus=(txt,active)=>{const t=$('agent-txt');const d=$('agent-dot');if(t)t.textContent=txt;if(d)d.className='status-dot'+(active?' thinking':active===false?' active':'')};
 
 // Expose utilities globally (for inline onclick handlers and other modules)
-Object.assign(window, {$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
-Object.assign(window.App, {$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
+Object.assign(window, {escHtml,$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
+Object.assign(window.App, {escHtml,$,ss,posLabel,removeLoading,pName,pNameShort,pM,pTeam,pPos,pAge,pExp,getUser,myR,prog,setAgentStatus});
 
 // ── Season detection & Lineup tab visibility ──────────────────
 function isNFLInSeason() {
@@ -99,8 +117,8 @@ document.addEventListener('DOMContentLoaded', updateLineupTabVisibility);
 
 // ── Tab switching ──────────────────────────────────────────────
 function switchTab(tab,btn){
-  // Guard: redirect to home if not connected (except settings)
-  if(!S.user && tab!=='digest' && tab!=='settings'){
+  // Guard: redirect to home if not connected (except settings, league, fieldlog)
+  if(!S.user && tab!=='digest' && tab!=='settings' && tab!=='league' && tab!=='fieldlog'){
     tab='digest';btn=null;
     showToast('Connect your Sleeper account first');
     // Focus the username input
@@ -156,20 +174,20 @@ async function connect(){
     const user=await sf(`/user/${username}`);
     if(!user?.user_id){ss('conn-status','User not found.',true);if(btn){btn.disabled=false;btn.textContent='Connect my league';}return;}
     S.user=user;const sUser=$('s-user');if(sUser)sUser.textContent=user.display_name||username;
-    try{localStorage.setItem('dynastyhq_username',username);}catch(e){}
+    DhqStorage.setStr(STORAGE_KEYS.USERNAME, username);
     // Acquire Supabase JWT for RLS (non-blocking — don't fail connect if this fails)
     prog(10);ss('conn-status','Authenticating...');
     try{
       if(window.OD?.acquireSessionToken){
         const session=await window.OD.acquireSessionToken(username);
         if(session?.token){
-          console.log('[ReconAI] Supabase session acquired');
+          console.log('[Scout] Supabase session acquired');
           if(window.OD.ensureUser)await window.OD.ensureUser(username);
         }else{
-          console.log('[ReconAI] No Supabase session — localStorage fallback');
+          console.log('[Scout] No Supabase session — localStorage fallback');
         }
       }
-    }catch(e){console.warn('[ReconAI] Auth error (non-fatal):',e);}
+    }catch(e){console.warn('[Scout] Auth error (non-fatal):',e);}
     prog(12);ss('conn-status','Loading NFL state...');
     S.nflState=await sf('/state/nfl');
     S.currentWeek=S.nflState?.display_week||S.nflState?.week||1;
@@ -204,7 +222,7 @@ function showLeaguePicker(leagues,userId){
       selectLeague(urlLeague,userId);
       return;
     }
-    const savedLeague=localStorage.getItem('dynastyhq_league');
+    const savedLeague=DhqStorage.getStr(STORAGE_KEYS.LEAGUE);
     if(savedLeague&&leagues.find(l=>l.league_id===savedLeague)){
       selectLeague(savedLeague,userId);
       return;
@@ -246,11 +264,11 @@ window.switchLeagueMode = switchLeagueMode;
 
 async function selectLeague(leagueId,userId){
   S.currentLeagueId=leagueId;
-  try{localStorage.setItem('dynastyhq_league',leagueId);}catch(e){}
+  DhqStorage.setStr(STORAGE_KEYS.LEAGUE, leagueId);
   const league=S.leagues.find(l=>l.league_id===leagueId);
   const leagueName=(league?.name||'League').substring(0,20);
   const isDynasty=league?.settings?.type===2;
-  const lpEl=$('league-pill');if(lpEl)lpEl.innerHTML='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+leagueName+(isDynasty?'':' (Redraft)')+'</span><span style="opacity:.5;font-size:13px;flex-shrink:0">\u21C4</span>';
+  const lpEl=$('league-pill');if(lpEl)lpEl.innerHTML='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(leagueName)+(isDynasty?'':' (Redraft)')+'</span><span style="opacity:.5;font-size:13px;flex-shrink:0">\u21C4</span>';
   const sbEl=$('setup-block');if(sbEl)sbEl.innerHTML=`<div style="text-align:center;padding:20px 0">
     <div style="margin:0 auto 16px;width:52px;height:52px;background:linear-gradient(135deg,#7c6bf8,#5b4cc4);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(124,107,248,0.3)">
       <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#c4b5fd;border-radius:50%;animation:spin .7s linear infinite"></span>
@@ -264,7 +282,7 @@ async function selectLeague(leagueId,userId){
     const dc2=$('digest-content');if(dc2)dc2.style.display='block';
     switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
     prog(100);
-    try{renderHomeSnapshot();}catch(e){}
+    try{renderHomeSnapshot();}catch(e){dhqLog('selectLeague.renderHomeSnapshot',e);}
     checkApiKeyCallout();
     if(typeof updateSettingsStatus==='function')updateSettingsStatus();
     Promise.resolve().then(()=>{
@@ -273,7 +291,7 @@ async function selectLeague(leagueId,userId){
     });
   }catch(e){
     const sb=$('setup-block');
-    if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:14px">Error: ${e.message}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
+    if(sb)sb.innerHTML=`<div style="color:var(--red);font-size:14px">Error: ${escHtml(e.message)}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connect()">Try again</button>`;
   }
 }
 window.selectLeague = selectLeague;
@@ -296,7 +314,7 @@ async function loadAllData(){
     // Validate core functions loaded
     const coreDeps = ['dynastyValue','assessTeamFromGlobal','getPlayerAction','buildRosterTable','renderMobileHome'];
     const missing = coreDeps.filter(fn => typeof window[fn] !== 'function');
-    if (missing.length) console.warn('[ReconAI] Missing functions:', missing.join(', '));
+    if (missing.length) console.warn('[Scout] Missing functions:', missing.join(', '));
     if(loadBanner)loadBanner.style.display='none';
     prog(100);
     if(typeof updateDataFreshness==='function')updateDataFreshness();
@@ -304,7 +322,7 @@ async function loadAllData(){
     if(typeof buildRosterTable==='function')buildRosterTable();
     try{if(typeof renderAvailable==='function')renderAvailable();}catch(e){console.warn('renderAvailable:',e);}
     try{if(typeof renderDraftNeeds==='function')renderDraftNeeds();}catch(e){console.warn('renderDraftNeeds:',e);}
-    try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
+    try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){dhqLog('loadAllData.renderHomeSnapshot',e);}
     try{if(typeof renderDailyBriefing==='function')renderDailyBriefing();}catch(e){console.warn('renderDailyBriefing:',e);}
     try{if(typeof renderStartSit==='function')renderStartSit();}catch(e){console.warn('renderStartSit:',e);}
     try{if(typeof renderInsightCards==='function')renderInsightCards();}catch(e){console.warn('renderInsightCards:',e);}
@@ -316,10 +334,10 @@ async function loadAllData(){
     try{if(typeof renderTradeIntel==='function')renderTradeIntel();}catch(e){console.warn('renderTradeIntel:',e);}
     try{checkForAlerts();}catch(e){console.warn('checkForAlerts:',e);}
     if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();
-    if(!localStorage.getItem('dhq_strategy_done')&&(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))){
+    if(!DhqStorage.getStr(STORAGE_KEYS.STRATEGY_DONE)&&(S.apiKey||(typeof hasAnyAI==='function'&&hasAnyAI()))){
       setTimeout(()=>{if(typeof startStrategyWalkthrough==='function')startStrategyWalkthrough();},500);
     }
-    try{if(typeof runMemoryCapture==='function')runMemoryCapture(S.currentLeagueId);}catch(e){}
+    try{if(typeof runMemoryCapture==='function')runMemoryCapture(S.currentLeagueId);}catch(e){dhqLog('loadAllData.runMemoryCapture',e);}
     // Load player tags (syncs with War Room)
     if(window.OD?.loadPlayerTags){
       window.OD.loadPlayerTags(S.currentLeagueId).then(tags=>{
@@ -348,11 +366,9 @@ function saveKey(){
   S.apiKey = k;
   S.aiProvider = provider;
   S.aiModel = model || '';
-  try{
-    localStorage.setItem('dynastyhq_apikey', k);
-    localStorage.setItem('dynastyhq_provider', provider);
-    localStorage.setItem('dynastyhq_model', model);
-  }catch(e){}
+  DhqStorage.setStr(STORAGE_KEYS.API_KEY, k);
+  DhqStorage.setStr(STORAGE_KEYS.API_PROVIDER, provider);
+  DhqStorage.setStr(STORAGE_KEYS.API_MODEL, model);
   const label = p?.name || provider;
   ss('key-status', label + ' key saved ✓');
   if(typeof updateSettingsStatus==='function')updateSettingsStatus();
@@ -362,7 +378,9 @@ window.saveKey = saveKey;
 
 function clearKey(){
   S.apiKey=''; S.aiProvider='anthropic'; S.aiModel='';
-  try{localStorage.removeItem('dynastyhq_apikey');localStorage.removeItem('dynastyhq_provider');localStorage.removeItem('dynastyhq_model');}catch(e){}
+  DhqStorage.remove(STORAGE_KEYS.API_KEY);
+  DhqStorage.remove(STORAGE_KEYS.API_PROVIDER);
+  DhqStorage.remove(STORAGE_KEYS.API_MODEL);
   const inp=$('api-key-in');if(inp)inp.value='';
   ss('key-status','Key cleared');
   if(typeof updateSettingsStatus==='function')updateSettingsStatus();
@@ -380,26 +398,25 @@ function reconnect(){
   S.playerStats={};S.posRanks={};
   const LI_ref = window.App;
   if(LI_ref){LI_ref.LI_LOADED=false;LI_ref.LI={};window._liLoading=false;}
-  try{localStorage.removeItem('dhq_leagueintel_v10');
-    Object.keys(localStorage).filter(k=>k.startsWith('dhq_hist_')).forEach(k=>localStorage.removeItem(k));
-  }catch(e){}
+  DhqStorage.remove('dhq_leagueintel_v10'); // old v10 key — clear on reconnect
+  DhqStorage.removeByPrefix(STORAGE_KEYS.HIST_PREFIX);
   const sb=$('setup-block');
   if(sb){
     sb.style.display='block';
     sb.innerHTML=`<div style="text-align:center;margin-bottom:16px">
       <div style="font-size:28px;margin-bottom:8px">🔄</div>
       <div style="font-size:15px;font-weight:700;margin-bottom:4px">Switching account</div>
-      <div style="font-size:13px;color:var(--text3)">Connecting as <strong style="color:var(--accent)">${u}</strong></div>
+      <div style="font-size:13px;color:var(--text3)">Connecting as <strong style="color:var(--accent)">${escHtml(u)}</strong></div>
     </div>
     <div class="row" style="max-width:380px;margin:0 auto">
-      <input type="text" id="u-input" value="${u}" placeholder="Sleeper username" style="font-size:15px;padding:12px 16px;border-radius:12px" onkeydown="if(event.key==='Enter')connect()"/>
+      <input type="text" id="u-input" value="${escHtml(u)}" placeholder="Sleeper username" style="font-size:15px;padding:12px 16px;border-radius:12px" onkeydown="if(event.key==='Enter')connect()"/>
       <button class="btn" id="conn-btn" onclick="connect()" style="padding:12px 24px;font-size:14px;font-weight:700;border-radius:12px">Connect</button>
     </div>
     <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
     <div class="prog" id="prog" style="display:none;max-width:380px;margin:0 auto"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>`;
   }
   const dc=$('digest-content');if(dc)dc.style.display='none';
-  try{localStorage.setItem('dynastyhq_username',u);}catch(e){}
+  DhqStorage.setStr(STORAGE_KEYS.USERNAME, u);
   switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
   setTimeout(()=>connect(),100);
 }
@@ -452,9 +469,8 @@ window.idpTier = idpTier;
 window.App.idpTier = idpTier;
 
 // ── Memory / localStorage ──────────────────────────────────────
-const MEM_KEY='dynastyhq_memory';
-function loadMemory(){try{return JSON.parse(localStorage.getItem(MEM_KEY)||'{}')}catch(e){return{};}}
-function saveMemory(data){try{localStorage.setItem(MEM_KEY,JSON.stringify(data));}catch(e){}}
+function loadMemory(){return DhqStorage.get(STORAGE_KEYS.MEMORY, {});}
+function saveMemory(data){DhqStorage.set(STORAGE_KEYS.MEMORY, data);}
 function getMemory(key,def=[]){return loadMemory()[key]??def;}
 function setMemory(key,val){const d=loadMemory();d[key]=val;saveMemory(d);}
 Object.assign(window, {loadMemory,saveMemory,getMemory,setMemory});
@@ -468,7 +484,7 @@ function enableNotifications(){
   }
   if(!('Notification' in window)){ss('notif-status','Notifications not supported in this browser',true);return;}
   Notification.requestPermission().then(perm=>{
-    localStorage.setItem('dhq_notif_perm',perm);
+    DhqStorage.setStr(STORAGE_KEYS.NOTIF_PERM, perm);
     const btn=$('notif-btn');
     if(perm==='granted'){ss('notif-status','Notifications enabled ✓');if(btn)btn.textContent='Enabled ✓';}
     else if(perm==='denied'){ss('notif-status','Notifications blocked — check browser settings',true);if(btn)btn.textContent='Blocked';}
@@ -480,7 +496,7 @@ window.enableNotifications = enableNotifications;
 function checkForAlerts(){
   if(!('Notification' in window)||Notification.permission!=='granted')return;
   const roster=myR();if(!roster?.players?.length)return;
-  const prev=JSON.parse(localStorage.getItem('dhq_last_alerts')||'{}');
+  const prev=DhqStorage.get(STORAGE_KEYS.LAST_ALERTS, {});
   const now={};const alerts=[];
   // 1. Injury alerts for rostered players
   roster.players.forEach(pid=>{
@@ -515,7 +531,7 @@ function checkForAlerts(){
     if(reg)reg.then(r=>r.showNotification(a.title,{body:a.body,icon:'./icons/icon-192.svg',badge:'./icons/icon-192.svg'}));
     else try{new Notification(a.title,{body:a.body,icon:'./icons/icon-192.svg'});}catch(e){}
   });
-  localStorage.setItem('dhq_last_alerts',JSON.stringify(now));
+  DhqStorage.set(STORAGE_KEYS.LAST_ALERTS, now);
 }
 window.checkForAlerts = checkForAlerts;
 
@@ -524,31 +540,31 @@ window.checkForAlerts = checkForAlerts;
   try{
     // Check for Fantasy Wars email session or profile for Sleeper username
     try {
-      if (!localStorage.getItem('dynastyhq_username')) {
+      if (!DhqStorage.getStr(STORAGE_KEYS.USERNAME)) {
         let fwUsername = null;
         // Try fw_session_v1 first
-        const fwRaw = localStorage.getItem('fw_session_v1');
-        if (fwRaw) { const fw = JSON.parse(fwRaw); fwUsername = fw?.user?.sleeperUsername; }
+        const fw = DhqStorage.get(STORAGE_KEYS.FW_SESSION);
+        if (fw) fwUsername = fw?.user?.sleeperUsername;
         // Fallback: od_profile_v1 (set during War Room onboarding)
         if (!fwUsername) {
-          const profRaw = localStorage.getItem('od_profile_v1');
-          if (profRaw) { const prof = JSON.parse(profRaw); fwUsername = prof?.sleeperUsername; }
+          const prof = DhqStorage.get(STORAGE_KEYS.OD_PROFILE);
+          if (prof) fwUsername = prof?.sleeperUsername;
         }
         // Fallback: od_auth_v1 (legacy War Room login)
         if (!fwUsername) {
-          const authRaw = localStorage.getItem('od_auth_v1');
-          if (authRaw) { const auth = JSON.parse(authRaw); fwUsername = auth?.sleeperUsername || auth?.username; }
+          const auth = DhqStorage.get(STORAGE_KEYS.OD_AUTH);
+          if (auth) fwUsername = auth?.sleeperUsername || auth?.username;
         }
         if (fwUsername) {
-          localStorage.setItem('dynastyhq_username', fwUsername);
-          console.log('[ReconAI] Auto-connected from Fantasy Wars session:', fwUsername);
+          DhqStorage.setStr(STORAGE_KEYS.USERNAME, fwUsername);
+          console.log('[Scout] Auto-connected from Fantasy Wars session:', fwUsername);
         }
       }
     } catch(e) {}
 
-    const k = localStorage.getItem('dynastyhq_apikey');
-    const prov = localStorage.getItem('dynastyhq_provider') || 'anthropic';
-    const model = localStorage.getItem('dynastyhq_model') || '';
+    const k = DhqStorage.getStr(STORAGE_KEYS.API_KEY);
+    const prov = DhqStorage.getStr(STORAGE_KEYS.API_PROVIDER) || 'anthropic';
+    const model = DhqStorage.getStr(STORAGE_KEYS.API_MODEL);
     if(k){
       S.apiKey = k;
       S.aiProvider = prov;
@@ -561,11 +577,11 @@ window.checkForAlerts = checkForAlerts;
       if(mIn) mIn.value = model;
       if(typeof updateProviderHint==='function')updateProviderHint();
     }
-    const xk=localStorage.getItem('dynastyhq_xai_key');
+    const xk=DhqStorage.getStr(STORAGE_KEYS.XAI_KEY);
     if(xk){const xIn=$('xai-key-in');if(xIn)xIn.value=xk;}
     // Restore notification button state
     if('Notification' in window&&Notification.permission==='granted'){const nb=$('notif-btn');if(nb)nb.textContent='Enabled \u2713';}
-    const savedUser = localStorage.getItem('dynastyhq_username');
+    const savedUser = DhqStorage.getStr(STORAGE_KEYS.USERNAME);
     if(savedUser){
       const uInput = $('u-input');
       if(uInput) uInput.value = savedUser;
@@ -583,7 +599,7 @@ window.checkForAlerts = checkForAlerts;
         loadAllData();
       }
     },8000);
-  }catch(e){}
+  }catch(e){dhqLog('restoreApiKey',e);}
 })();
 
 // ── Page unload memory save ────────────────────────────────────
@@ -591,7 +607,7 @@ window.addEventListener('beforeunload',function(){
   try{
     if(typeof homeChatHistory!=='undefined'&&homeChatHistory&&homeChatHistory.length>=4&&typeof autoSaveMemory==='function')autoSaveMemory(homeChatHistory,'Home');
     if(typeof tradeChatHistory!=='undefined'&&tradeChatHistory&&tradeChatHistory.length>=4&&typeof autoSaveMemory==='function')autoSaveMemory(tradeChatHistory,'Trades');
-  }catch(e){}
+  }catch(e){dhqLog('beforeunload.autoSaveMemory',e);}
 });
 
 // ── Keyboard shortcuts ─────────────────────────────────────────
