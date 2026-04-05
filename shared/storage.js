@@ -39,13 +39,10 @@ const STORAGE_KEYS = {
   FW_SESSION:      'fw_session_v1',         // Fantasy Wars email session JWT
   OD_PROFILE:      'od_profile_v1',         // Owner Dashboard onboarding profile
   OD_AUTH:         'od_auth_v1',            // OD legacy auth state
-  OD_DISPLAY_NAME: 'od_display_name',       // Display name cache
   // ── League Intel (owner: dhq-engine.js) ──────────────────────
-  LI_CACHE:        'dhq_leagueintel_v11',   // LeagueIntel JSON blob (TTL: 8h)
   HIST_PREFIX:     'dhq_hist_',             // Prefix used for bulk-clear
   HIST_KEY:        lid => `dhq_hist_${lid}`, // Per-league trade/draft history cache
   OWNER_DNA:       lid => `od_owner_dna_v1_${lid}`, // Owner DNA map from War Room
-  TRADE_DNA:       lid => `dhq_trade_dna_${lid}`,   // Local trade DNA overrides
   // ── Strategy walkthrough (owner: ui.js) ──────────────────────
   STRATEGY:        'dhq_strategy',          // AI-generated strategy blob (JSON)
   STRATEGY_DONE:   'dhq_strategy_done',     // '1' once walkthrough complete
@@ -54,26 +51,10 @@ const STORAGE_KEYS = {
   // ── Notifications (owner: app.js) ────────────────────────────
   NOTIF_PERM:      'dhq_notif_perm',        // Notification permission state string
   LAST_ALERTS:     'dhq_last_alerts',       // { [alertKey]: 1 } last-seen map
-  // ── News cache (owner: dhq-ai.js) ────────────────────────────
-  NEWS_CACHE:      'dhq_news_cache',        // ESPN news JSON (TTL: implicit)
   // ── Conversation memory (owner: app.js) ──────────────────────
   MEMORY:          'dynastyhq_memory',      // AI memory blob (JSON)
-  // ── Chat history (owner: ai-chat.js) ─────────────────────────
+  // ── Conversation sessions (owner: ai-chat.js) ───────────────
   CONV_SESSIONS:   'dhq_sessions',               // Cross-league conversation memory summaries
-  CONV_MEM:        lid => `dhq_conv_mem_${lid}`, // Per-league AI conversation context
-  CHAT_HIST:       lid => `dhq_chat_${lid}`,     // Per-league chat messages (dhq-ai.js)
-  // ── Player tags (owner: player-modal.js + supabase-client.js) ─
-  PLAYER_TAGS:     lid => `dhq_player_tags_${lid}`,
-  // ── League memory snapshots (owner: league-memory.js) ─────────
-  MEMORY_CACHE:    lid => `dhq_memory_cache_${lid}`,
-  ROSTER_SNAP:     lid => `dhq_roster_snap_${lid}`,
-  SEEN_MOVES:      lid => `dhq_seen_moves_${lid}`,
-  OWNER_SNAP:      lid => `dhq_owner_snap_${lid}`,
-  OWNER_PREFS:     lid => `dhq_owner_prefs_${lid}`,
-  // ── Calendar + earnings (owner: supabase-client.js) ──────────
-  CALENDAR:        'dhq_calendar_v1',
-  EARNINGS:        'dhq_earnings_v1',
-  FA_CACHE:        lid => `dhq_fa_cache_${lid}`,
   // ── Tier / Trial (owner: tier.js) ────────────────────────────
   TIER:            'dhq_user_tier_v1',                    // Cached tier string ('free', 'scout', 'warroom', …)
   TRIAL_START:             'dhq_trial_start',                     // Trial start timestamp (ms)

@@ -475,10 +475,6 @@ function clearKey(){
 }
 window.clearKey = clearKey;
 
-// saveXaiKey — disabled until xAI API is available
-function saveXaiKey(){}
-window.saveXaiKey = saveXaiKey;
-
 function reconnect(){
   const u=$('s-user-in')?.value?.trim();
   if(!u){showToast('Enter a username first');return;}
