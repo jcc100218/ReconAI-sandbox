@@ -2404,7 +2404,6 @@ function mobileTab(tab, btn) {
 Object.assign(window.App, {
   // Memory
   loadMemory, saveMemory, getMemory, setMemory,
-  MEM_KEY,
   loadConvMemory: typeof loadConvMemory==='function'?loadConvMemory:()=>[],
   saveConvMemory: typeof saveConvMemory==='function'?saveConvMemory:()=>{},
   addConvMemory: typeof addConvMemory==='function'?addConvMemory:()=>{},

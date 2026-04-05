@@ -137,6 +137,34 @@ async function loadLeagueIntel(){
       tradeTxns=histCache.tradeTxns||[];
       bracketData=histCache.bracketData||{};
       leagueUsersHistory=histCache.leagueUsersHistory||{};
+      // Re-fetch current-season trades if cache is stale (> 6h)
+      // Past seasons don't change; current season accumulates new trades throughout the year
+      const TRADE_REFRESH_TTL=6*60*60*1000;
+      if(!histCache.ts||Date.now()-histCache.ts>TRADE_REFRESH_TTL){
+        const curChain=chain.find(c=>parseInt(c.season)===curSeason);
+        if(curChain){
+          const txnWeeks=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
+          const freshTrades=[];
+          await Promise.all(txnWeeks.map(w=>
+            fetch(`${SLEEPER}/league/${curChain.id}/transactions/${w}`)
+              .then(r=>r.ok?r.json():[])
+              .catch(e=>{console.warn('[DHQ] fast-path trade refresh failed W:'+w,e?.message||e);return[];})
+              .then(txns=>txns.forEach(t=>{
+                if(t.status==='failed'||t.type!=='trade')return;
+                const rids=t.roster_ids||[];
+                const sides={};
+                rids.forEach(rid=>sides[rid]={players:[],picks:[]});
+                Object.entries(t.adds||{}).forEach(([pid,rid])=>{if(sides[rid])sides[rid].players.push(pid);});
+                (t.draft_picks||[]).forEach(pk=>{if(sides[pk.owner_id])sides[pk.owner_id].picks.push({season:pk.season,round:pk.round});});
+                freshTrades.push({season:curChain.season,week:w,roster_ids:rids,sides,ts:t.created||t.status_updated||0});
+              }))
+          ));
+          // Replace current-season trades with fresh data; preserve past seasons from cache
+          tradeTxns=[...tradeTxns.filter(t=>parseInt(t.season)<curSeason),...freshTrades];
+          DhqStorage.set(HIST_KEY,{...histCache,tradeTxns,ts:Date.now()});
+          console.log(`[DHQ] Fast-path trade refresh: ${freshTrades.length} current-season trades`);
+        }
+      }
       // Only fetch stats fresh (they're large but fast from Sleeper CDN)
       seasonStatsRaw={};
       await Promise.all(uniqueYears.map(async yr=>{
@@ -221,7 +249,7 @@ async function loadLeagueIntel(){
           const isFaabSeason=seasonNum>=curSeason-2&&seasonNum<=curSeason;
           txnWeeks.forEach(w=>{
             allTxnFetches.push(
-              fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(()=>[])
+              fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(e=>{console.warn('[DHQ] txn fetch failed L:'+c.id+' W:'+w,e?.message||e);return[];})
                 .then(txns=>txns.forEach(t=>{
                   if(t.status==='failed')return;
                   // Extract FAAB waivers (last 3 seasons only)

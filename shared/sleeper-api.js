@@ -86,7 +86,7 @@ async function fetchNflState()                  { return sleeperFetch('/state/nf
 
 async function fetchTrending(type, hours, limit) {
   try {
-    return await sleeperFetch('/players/trending/nfl/' + type
+    return await sleeperFetch('/players/nfl/trending/' + type
       + '?lookback_hours=' + (hours || 24)
       + '&limit=' + (limit || 25));
   } catch (e) { return []; }

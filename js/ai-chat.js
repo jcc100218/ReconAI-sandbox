@@ -527,7 +527,6 @@ Object.assign(window.App, {
   tradeBuilderAssets,
   draftChatHistory,
   // PROVIDERS, _newsCache already on window.App from shared/ai-dispatch.js
-  CONV_MEM_KEY,
 
   // Conversation memory
   loadConvMemory,
