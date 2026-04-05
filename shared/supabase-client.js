@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════
 // shared/supabase-client.js — Fantasy Wars Supabase Data Layer
-// Shared by ReconAI and War Room
+// Shared by War Room Scout and War Room
 //
 // Requires: Supabase CDN loaded before this script
 //   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -61,7 +61,7 @@ function isConfigured() {
 }
 
 // ── Username helper ───────────────────────────────────────────
-// Works for both War Room (od_auth_v1) and ReconAI (dynastyhq_username)
+// Works for both War Room (od_auth_v1) and War Room Scout (dynastyhq_username)
 function getCurrentUsername() {
     // War Room auth
     try {
@@ -71,7 +71,7 @@ function getCurrentUsername() {
             if (auth?.sleeperUsername || auth?.username) return auth.sleeperUsername || auth.username;
         }
     } catch {}
-    // ReconAI auth
+    // War Room Scout auth
     try {
         return localStorage.getItem('dynastyhq_username') || null;
     } catch { return null; }
@@ -520,7 +520,7 @@ window.OD.updatePassword = async function(username, newPassword) {
 
 // ══════════════════════════════════════════════════════════════════
 // PLAYER TAGS (Trade Block, Cut, Untouchable, Watch)
-// Syncs between ReconAI and War Room via Supabase
+// Syncs between War Room Scout and War Room via Supabase
 // Falls back to localStorage when Supabase is unavailable
 // ══════════════════════════════════════════════════════════════════
 
@@ -584,6 +584,122 @@ window.OD.loadPlayerTags = async function(leagueId) {
         } catch (e) { console.warn('[FW] player_tags load failed:', e); }
     }
     return local;
+};
+
+// ══════════════════════════════════════════════════════════════════
+// FIELD LOG — shared between War Room Scout and War Room
+// Run this SQL in Supabase to create the field_log table:
+//
+// create table if not exists public.field_log (
+//   id uuid primary key default gen_random_uuid(),
+//   client_id text unique,
+//   username text not null references public.users(sleeper_username) on delete cascade,
+//   league_id text,
+//   ts bigint not null,
+//   category text not null default 'note',
+//   action_type text,
+//   players jsonb,
+//   context text,
+//   icon text default '📋',
+//   text text not null,
+//   source text default 'scout',
+//   created_at timestamptz default now()
+// );
+// create index if not exists field_log_username_ts_idx on public.field_log(username, ts desc);
+// ══════════════════════════════════════════════════════════════════
+
+const FL_LS_KEY = 'scout_field_log_v1';
+
+// Save a single entry to Supabase, updating sync status in localStorage
+window.OD.saveFieldLogEntry = async function(entry) {
+    const username = getCurrentUsername();
+    const db = getClient();
+
+    function updateLocalSyncStatus(status) {
+        try {
+            const raw = localStorage.getItem(FL_LS_KEY);
+            const log = raw ? JSON.parse(raw) : [];
+            const idx = log.findIndex(e => e.id === entry.id);
+            if (idx !== -1) { log[idx].syncStatus = status; localStorage.setItem(FL_LS_KEY, JSON.stringify(log)); }
+        } catch {}
+    }
+
+    if (!db || !isConfigured() || !username) {
+        updateLocalSyncStatus('pending');
+        return false;
+    }
+    try {
+        await ensureUser(username);
+        const { error } = await db.from('field_log').upsert({
+            client_id: entry.id,
+            username,
+            league_id: entry.leagueId || null,
+            ts: entry.ts,
+            category: entry.category || 'note',
+            action_type: entry.actionType || null,
+            players: entry.players?.length ? entry.players : null,
+            context: entry.context || null,
+            icon: entry.icon || '📋',
+            text: entry.text,
+            source: 'scout',
+        }, { onConflict: 'client_id' });
+        if (error) { updateLocalSyncStatus('failed'); console.warn('[FW] field_log save error', error); return false; }
+        updateLocalSyncStatus('synced');
+        return true;
+    } catch (e) {
+        updateLocalSyncStatus('failed');
+        console.warn('[FW] field_log save failed:', e);
+        return false;
+    }
+};
+
+// Bulk sync any pending/failed entries from localStorage
+window.OD.syncPendingFieldLog = async function() {
+    try {
+        const raw = localStorage.getItem(FL_LS_KEY);
+        if (!raw) return 0;
+        const log = JSON.parse(raw);
+        const pending = log.filter(e => e.syncStatus === 'pending' || e.syncStatus === 'failed');
+        if (!pending.length) return 0;
+        let synced = 0;
+        for (const entry of pending) {
+            const ok = await window.OD.saveFieldLogEntry(entry);
+            if (ok) synced++;
+        }
+        return synced;
+    } catch (e) { console.warn('[FW] syncPendingFieldLog failed:', e); return 0; }
+};
+
+// Load field log entries from Supabase (used by War Room)
+window.OD.loadFieldLog = async function(leagueId, limit) {
+    limit = limit || 50;
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return null;
+    try {
+        let query = db.from('field_log')
+            .select('id, client_id, league_id, ts, category, action_type, players, context, icon, text, source, created_at')
+            .eq('username', username)
+            .order('ts', { ascending: false })
+            .limit(limit);
+        if (leagueId) query = query.eq('league_id', leagueId);
+        const { data, error } = await query;
+        if (error) { console.warn('[FW] field_log load error', error); return null; }
+        return (data || []).map(row => ({
+            id: row.client_id || row.id,
+            icon: row.icon || '📋',
+            text: row.text,
+            category: row.category || 'note',
+            actionType: row.action_type || null,
+            players: row.players || [],
+            context: row.context || null,
+            leagueId: row.league_id || null,
+            ts: row.ts,
+            syncStatus: 'synced',
+            source: row.source || 'scout',
+            createdAt: row.created_at,
+        }));
+    } catch (e) { console.warn('[FW] field_log load failed:', e); return null; }
 };
 
 // Expose on App namespace too

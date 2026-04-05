@@ -115,6 +115,21 @@ window.isNFLInSeason = isNFLInSeason;
 window.updateLineupTabVisibility = updateLineupTabVisibility;
 document.addEventListener('DOMContentLoaded', updateLineupTabVisibility);
 
+// Bulk sync any pending field log entries on app load
+document.addEventListener('DOMContentLoaded', () => {
+  // Small delay to let Supabase client initialize
+  setTimeout(() => {
+    if (window.OD?.syncPendingFieldLog) {
+      window.OD.syncPendingFieldLog().then(count => {
+        if (count > 0 && typeof renderFieldLogCard === 'function') {
+          renderFieldLogCard();
+          renderFieldLogPanel();
+        }
+      }).catch(() => {});
+    }
+  }, 1500);
+});
+
 // ── Tab switching ──────────────────────────────────────────────
 function switchTab(tab,btn){
   // Guard: redirect to home if not connected (except settings, league, fieldlog)
@@ -234,25 +249,97 @@ function showLeaguePicker(leagues,userId){
   }
   const typeLabel=t=>(['Redraft','Keeper','Dynasty'][t]||'Unknown');
   const statusLabel=s=>({pre_draft:'Pre-draft',drafting:'Drafting',in_season:'In Season',complete:'Complete'}[s]||s||'');
+  // Determine which league is "unlocked" for free users:
+  // the currently active/saved league, or the first in the list if none yet.
+  const isFree=typeof getTier==='function'?getTier()==='free':false;
+  const savedLeagueId=DhqStorage.getStr(STORAGE_KEYS.LEAGUE)||S.currentLeagueId||'';
+  const unlockedId=isFree?(savedLeagueId&&leagues.find(l=>l.league_id===savedLeagueId)?savedLeagueId:leagues[0]?.league_id):null;
   $('setup-block').innerHTML=`
     <h3 style="font-size:18px;text-align:center">Choose your league</h3>
     <p style="font-size:14px;color:var(--text2);margin-bottom:18px;line-height:1.6;text-align:center">Found ${leagues.length} league${leagues.length>1?'s':''} for ${S.season}. Select the one you want to manage.</p>
+    ${isFree?`<div style="max-width:440px;margin:0 auto 14px;padding:10px 14px;background:var(--accentL);border:1px solid var(--accent);border-radius:var(--rl);display:flex;align-items:center;gap:10px;font-size:13px;color:var(--accent)"><span style="font-size:16px">🔒</span><span>Free plan — 1 league. <strong>Upgrade</strong> to access all your leagues.</span></div>`:''}
     <div id="league-pick-list" style="max-width:440px;margin:0 auto">
-      ${leagues.map((l,i)=>`
-        <div onclick="selectLeague('${l.league_id}','${userId}')" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);margin-bottom:8px;cursor:pointer;transition:all .2s;animation:cardIn .3s ease both;animation-delay:${i*0.05}s" onmouseover="this.style.borderColor='var(--accent)';this.style.transform='translateY(-2px)';this.style.boxShadow='0 4px 16px rgba(124,107,248,.15)'" onmouseout="this.style.borderColor='var(--border2)';this.style.transform='none';this.style.boxShadow='none'">
+      ${leagues.map((l,i)=>{
+        const locked=isFree&&l.league_id!==unlockedId;
+        return `
+        <div onclick="trySelectLeague('${l.league_id}','${userId}')" style="position:relative;display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl);margin-bottom:8px;cursor:pointer;transition:all .2s;animation:cardIn .3s ease both;animation-delay:${i*0.05}s;${locked?'opacity:.65;':''}${locked?'filter:grayscale(.3);':''}" onmouseover="this.style.borderColor='${locked?'var(--border2)':'var(--accent)'}';${locked?'':'this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 4px 16px rgba(124,107,248,.15)\'}'}" onmouseout="this.style.borderColor='var(--border2)';this.style.transform='none';this.style.boxShadow='none'">
           ${l.avatar?`<div style="position:relative;width:40px;height:40px;flex-shrink:0"><img src="https://sleepercdn.com/avatars/thumbs/${l.avatar}" style="width:40px;height:40px;border-radius:10px;object-fit:cover" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div style="display:none;width:40px;height:40px;border-radius:10px;background:var(--accentL);align-items:center;justify-content:center;font-size:16px">\u{1F3C8}</div></div>`:`<div style="width:40px;height:40px;border-radius:10px;background:var(--accentL);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">\u{1F3C8}</div>`}
           <div style="flex:1;min-width:0">
             <div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.01em">${l.name||'Unnamed League'}</div>
-            <div style="font-size:13px;color:var(--text3);margin-top:3px">${l.total_rosters} teams · ${typeLabel(l.settings?.type)} · ${statusLabel(l.status)}</div>
+            <div style="font-size:13px;color:var(--text3);margin-top:3px">${locked?`<span style="color:var(--accent);font-weight:600">🔒 Upgrade to unlock</span>`:`${l.total_rosters} teams · ${typeLabel(l.settings?.type)} · ${statusLabel(l.status)}`}</div>
           </div>
           <div style="font-size:13px;color:var(--text3);text-align:right;flex-shrink:0">
             <div style="color:var(--accent);font-weight:600">${l.season}</div>
             <div style="margin-top:2px;font-weight:500">${l.settings?.type===2?'Dynasty':'Redraft'}</div>
           </div>
-        </div>`).join('')}
+        </div>`;
+      }).join('')}
     </div>`;
 }
 window.showLeaguePicker = showLeaguePicker;
+
+// ── League limit enforcement ───────────────────────────────────
+// trySelectLeague — gate for free users. Paid users proceed directly.
+// Free users: if clicking a league that isn't their current one, show
+// the upgrade prompt (with option to switch). Otherwise proceed.
+function trySelectLeague(leagueId,userId){
+  const isFree=typeof getTier==='function'?getTier()==='free':false;
+  if(!isFree){selectLeague(leagueId,userId);return;}
+  const currentId=S.currentLeagueId||DhqStorage.getStr(STORAGE_KEYS.LEAGUE)||'';
+  // No current league yet (first-time picker) — just pick it freely
+  if(!currentId){selectLeague(leagueId,userId);return;}
+  // Same league as currently active — allow (re-selecting same league is fine)
+  if(leagueId===currentId){selectLeague(leagueId,userId);return;}
+  // Free user trying a different league — show upgrade prompt
+  const target=S.leagues.find(l=>l.league_id===leagueId);
+  const current=S.leagues.find(l=>l.league_id===currentId);
+  showLeagueUpgradePrompt(target,current,leagueId,userId);
+}
+window.trySelectLeague = trySelectLeague;
+window.App.trySelectLeague = trySelectLeague;
+
+// showLeagueUpgradePrompt — modal shown when a free user taps a locked league.
+// Lists other available leagues as a teaser and offers upgrade + switch paths.
+function showLeagueUpgradePrompt(targetLeague,currentLeague,leagueId,userId){
+  const existing=document.getElementById('league-limit-modal');
+  if(existing)existing.remove();
+  const connectedName=escHtml(currentLeague?.name||'your league');
+  const otherLeagues=(S.leagues||[]).filter(l=>l.league_id!==(currentLeague?.league_id));
+  const avatarHtml=l=>l.avatar
+    ?`<img src="https://sleepercdn.com/avatars/thumbs/${l.avatar}" style="width:28px;height:28px;border-radius:7px;object-fit:cover" onerror="this.style.display='none'"/>`
+    :`<div style="width:28px;height:28px;border-radius:7px;background:var(--accentL);display:flex;align-items:center;justify-content:center;font-size:11px">\u{1F3C8}</div>`;
+  const teaserHtml=otherLeagues.slice(0,4).map(l=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--rl)">
+      ${avatarHtml(l)}
+      <span style="font-size:13px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)">${escHtml(l.name||'League')}</span>
+      <span style="font-size:12px;color:var(--text3)">🔒</span>
+    </div>`).join('');
+  const modal=document.createElement('div');
+  modal.id='league-limit-modal';
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)';
+  modal.innerHTML=`
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:18px;padding:28px 24px;max-width:400px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,.5)">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:32px;margin-bottom:12px">🔒</div>
+        <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;letter-spacing:-.02em">You're connected to ${connectedName}</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6">Upgrade to add all your leagues and switch between them instantly.</div>
+      </div>
+      ${otherLeagues.length>0?`
+      <div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px">Your other leagues</div>
+        <div style="display:flex;flex-direction:column;gap:6px">${teaserHtml}</div>
+      </div>`:''}
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="document.getElementById('league-limit-modal').remove();if(window.App?.openUpgradeModal)window.App.openUpgradeModal('leagues-multi');else showToast('Upgrade at warroom.fantasy');" style="padding:13px 20px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:-.01em">Upgrade to unlock all leagues →</button>
+        <button onclick="document.getElementById('league-limit-modal').remove();selectLeague('${leagueId}','${userId}')" style="padding:10px 20px;background:transparent;color:var(--text2);border:1px solid var(--border2);border-radius:12px;font-size:13px;font-weight:500;cursor:pointer">Switch to this league instead</button>
+        <button onclick="document.getElementById('league-limit-modal').remove()" style="padding:8px;background:transparent;color:var(--text3);border:none;font-size:13px;cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+window.showLeagueUpgradePrompt = showLeagueUpgradePrompt;
+window.App.showLeagueUpgradePrompt = showLeagueUpgradePrompt;
 
 function switchLeagueMode(){
   $('setup-block').style.display='block';

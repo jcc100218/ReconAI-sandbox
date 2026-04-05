@@ -347,13 +347,43 @@ function getFieldLog() {
   catch (e) { return []; }
 }
 
-function addFieldLogEntry(icon, text, category) {
+// meta = { actionType, players: [{id,name}], context, leagueId }
+function addFieldLogEntry(icon, text, category, meta) {
+  meta = meta || {};
   const log = getFieldLog();
-  log.unshift({ icon: icon || '📋', text, category: category || 'note', ts: Date.now() });
+  const entry = {
+    id: 'fl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    icon: icon || '📋',
+    text,
+    category: category || 'note',
+    ts: Date.now(),
+    actionType: meta.actionType || null,
+    players: meta.players || [],
+    context: meta.context || null,
+    leagueId: meta.leagueId || window.S?.currentLeagueId || null,
+    syncStatus: 'pending',
+  };
+  log.unshift(entry);
   localStorage.setItem(FL_KEY, JSON.stringify(log.slice(0, 50)));
   renderFieldLogCard();
+  // Fire-and-forget sync to Supabase
+  if (window.OD?.saveFieldLogEntry) {
+    window.OD.saveFieldLogEntry(entry).then(() => renderFieldLogCard()).catch(() => {});
+  }
 }
 window.addFieldLogEntry = addFieldLogEntry;
+
+// Bulk sync pending entries; called on app load
+async function syncFieldLog() {
+  if (!window.OD?.syncPendingFieldLog) return;
+  const btn = document.getElementById('fieldlog-sync-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing…'; }
+  await window.OD.syncPendingFieldLog();
+  renderFieldLogCard();
+  renderFieldLogPanel();
+  if (btn) { btn.disabled = false; btn.textContent = '↑ Sync to War Room'; }
+}
+window.syncFieldLog = syncFieldLog;
 
 function _relativeTime(ts) {
   const d = Date.now() - ts;
@@ -374,15 +404,25 @@ function renderFieldLogCard() {
     return;
   }
 
+  const pendingCount = log.filter(e => e.syncStatus === 'pending' || e.syncStatus === 'failed').length;
+  const syncBadge = pendingCount > 0
+    ? `<span style="font-size:11px;color:var(--text3)">${pendingCount} pending sync</span>`
+    : `<span class="field-log-sync-badge">Synced to War Room</span>`;
+
   container.innerHTML = log.slice(0, 3).map(e =>
     `<div class="field-log-entry">
       <span class="field-log-icon">${e.icon}</span>
       <span class="field-log-text">${_esc(e.text)}</span>
       <span class="field-log-time">${_relativeTime(e.ts)}</span>
     </div>`
-  ).join('');
+  ).join('') + `<div style="margin-top:6px">${syncBadge}</div>`;
 }
 window.renderFieldLogCard = renderFieldLogCard;
+
+const FL_CATEGORY_LABELS = {
+  trade: '🔄 Trade', roster: '📋 Roster', draft: '🎯 Draft',
+  waivers: '📡 Waivers', research: '🔍 Research', note: '📝 Note',
+};
 
 // Full panel
 function renderFieldLogPanel() {
@@ -390,26 +430,64 @@ function renderFieldLogPanel() {
   if (!container) return;
   const log = getFieldLog();
 
+  const pendingCount = log.filter(e => e.syncStatus === 'pending' || e.syncStatus === 'failed').length;
+  const syncBtn = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:12px;color:var(--text3)">${pendingCount > 0 ? `${pendingCount} entries pending sync` : 'All entries synced to War Room'}</div>
+    <button id="fieldlog-sync-btn" onclick="syncFieldLog()" style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;opacity:${pendingCount > 0 ? '1' : '0.5'}">↑ Sync to War Room</button>
+  </div>`;
+
   if (!log.length) {
-    container.innerHTML = `<div class="fieldlog-empty">
+    container.innerHTML = syncBtn + `<div class="fieldlog-empty">
       <div class="fieldlog-empty-icon">📋</div>
       <div class="fieldlog-empty-text">Your field log is empty.<br>Moves you make — trade scenarios, waiver bids, draft targets — appear here automatically.</div>
     </div>`;
     return;
   }
 
-  container.innerHTML = log.map(e => {
+  // Group by date
+  const groups = {};
+  log.forEach(e => {
     const d = new Date(e.ts);
-    const dateStr = d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
-    const timeStr = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    return `<div class="fieldlog-entry">
-      <div class="fieldlog-entry-icon">${e.icon}</div>
-      <div class="fieldlog-entry-body">
-        <div class="fieldlog-entry-title">${_esc(e.text)}</div>
-        <div class="fieldlog-entry-meta">${dateStr} · ${timeStr}</div>
-      </div>
-    </div>`;
-  }).join('');
+    const key = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(e);
+  });
+
+  const entriesHtml = Object.entries(groups).map(([date, entries]) =>
+    `<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:8px">${date}</div>
+      ${entries.map(e => {
+        const timeStr = new Date(e.ts).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+        const syncDot = e.syncStatus === 'synced'
+          ? `<span title="Synced to War Room" style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span>`
+          : e.syncStatus === 'failed'
+          ? `<span title="Sync failed" style="width:6px;height:6px;border-radius:50%;background:#E74C3C;display:inline-block;flex-shrink:0"></span>`
+          : `<span title="Pending sync" style="width:6px;height:6px;border-radius:50%;background:var(--text3);display:inline-block;flex-shrink:0"></span>`;
+        const catLabel = FL_CATEGORY_LABELS[e.category] || e.category;
+        const playersHtml = e.players?.length
+          ? `<div style="font-size:11px;color:var(--accent);margin-top:3px">${e.players.map(p => _esc(p.name || p)).join(', ')}</div>`
+          : '';
+        const contextHtml = e.context
+          ? `<div style="font-size:12px;color:var(--text2);margin-top:3px;font-style:italic;line-height:1.4">${_esc(e.context)}</div>`
+          : '';
+        return `<div class="fieldlog-entry">
+          <div class="fieldlog-entry-icon">${e.icon}</div>
+          <div class="fieldlog-entry-body">
+            <div class="fieldlog-entry-title">${_esc(e.text)}</div>
+            ${playersHtml}${contextHtml}
+            <div class="fieldlog-entry-meta" style="display:flex;align-items:center;gap:6px">
+              <span>${catLabel}</span>
+              <span>·</span>
+              <span>${timeStr}</span>
+              ${syncDot}
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`
+  ).join('');
+
+  container.innerHTML = syncBtn + entriesHtml;
 }
 window.renderFieldLogPanel = renderFieldLogPanel;
 
