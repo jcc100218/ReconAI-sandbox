@@ -346,40 +346,48 @@ async function fetchTransactions(leagueId, year, apiKey) {
     const txns = Array.isArray(txnArr) ? txnArr : [txnArr];
     const cw = _crosswalk || {};
 
+    // Helper: parse comma-separated items, skip picks (FP_*, DP_*), resolve player IDs
+    function _parseItems(str) {
+      return (str || '').split(',').map(s => s.trim()).filter(s => s && !s.startsWith('FP_') && !s.startsWith('DP_'));
+    }
+    function _parsePicks(str) {
+      return (str || '').split(',').map(s => s.trim()).filter(s => s.startsWith('FP_') || s.startsWith('DP_'));
+    }
+
     return txns.filter(t => t && t.type).map(t => {
       const type = (t.type || '').toUpperCase();
-      const ts = parseInt(t.timestamp || 0) * 1000; // MFL uses seconds, convert to ms
+      const ts = parseInt(t.timestamp || 0) * 1000;
 
       if (type === 'TRADE') {
-        // Parse traded players: "franchise1_adds|franchise1_drops,franchise2_adds|franchise2_drops"
+        // MFL trade format: franchise1_gave_up / franchise2_gave_up
+        // Items are comma-separated: player IDs, FP_fran_year_round (future picks), DP_unit_pick (draft picks)
         const rids = [t.franchise, t.franchise2].filter(Boolean);
         const adds = {};
         const drops = {};
-        // MFL trade format varies — parse player lists
-        (t.franchise1_gave_up || '').split(',').filter(Boolean).forEach(pid => {
+        // What franchise1 gave up → franchise2 acquired
+        _parseItems(t.franchise1_gave_up).forEach(pid => {
           const sid = cw[pid] || ('mfl_' + pid);
-          adds[sid] = t.franchise2;
-          drops[sid] = t.franchise;
+          adds[sid] = t.franchise2; drops[sid] = t.franchise;
         });
-        (t.franchise2_gave_up || '').split(',').filter(Boolean).forEach(pid => {
+        // What franchise2 gave up → franchise1 acquired
+        _parseItems(t.franchise2_gave_up).forEach(pid => {
           const sid = cw[pid] || ('mfl_' + pid);
-          adds[sid] = t.franchise;
-          drops[sid] = t.franchise2;
+          adds[sid] = t.franchise; drops[sid] = t.franchise2;
         });
-        return { type: 'trade', status: 'complete', created: ts, roster_ids: rids, adds, drops, _source: 'mfl' };
+        // Collect pick info for metadata
+        const picks = [..._parsePicks(t.franchise1_gave_up), ..._parsePicks(t.franchise2_gave_up)];
+        return { type: 'trade', status: 'complete', created: ts, roster_ids: rids, adds, drops, _picks: picks, _source: 'mfl' };
       }
 
       if (type === 'FREE_AGENT' || type === 'BBID_WAIVER' || type === 'WAIVER') {
+        // MFL FA format: transaction field is "|pid1,pid2,pid3," (pipe-delimited, comma-separated player IDs)
         const adds = {};
-        const drops = {};
-        (t.transaction || '').split('|').forEach(part => {
-          const [pid, action] = (part || '').split(',');
-          if (!pid) return;
+        const raw = (t.transaction || '').replace(/^\|/, '');
+        raw.split(',').map(s => s.trim()).filter(Boolean).forEach(pid => {
           const sid = cw[pid] || ('mfl_' + pid);
-          if (action === 'added' || !action) adds[sid] = t.franchise;
-          else if (action === 'dropped') drops[sid] = t.franchise;
+          adds[sid] = t.franchise;
         });
-        return { type: type === 'BBID_WAIVER' ? 'waiver' : 'free_agent', status: 'complete', created: ts, adds, drops, _source: 'mfl' };
+        return { type: type === 'BBID_WAIVER' ? 'waiver' : 'free_agent', status: 'complete', created: ts, adds, drops: {}, _source: 'mfl' };
       }
 
       return { type: type.toLowerCase(), status: 'complete', created: ts, _source: 'mfl' };
