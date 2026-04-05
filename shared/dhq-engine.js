@@ -118,17 +118,19 @@ async function loadLeagueIntel(){
     const t0=performance.now();
 
     // ═══════════════════════════════════════════════════════════════
-    // STEP 1: Discover league chain (sequential — each season links to previous)
-    // But check permanent cache first — chain never changes for completed seasons
+    // STEP 1: Platform-agnostic data loading via DhqProviders
+    // Supports Sleeper, MFL, ESPN, Yahoo through unified interface
     // ═══════════════════════════════════════════════════════════════
     const HIST_KEY=STORAGE_KEYS.HIST_KEY(S.currentLeagueId);
     const histCache=DhqStorage.get(HIST_KEY, null);
+    const platform=S.platform||'sleeper';
+    const provider=window.DhqProviders?window.DhqProviders.getProvider(platform):null;
 
     let chain, allDraftPicks, draftMeta, seasonStatsRaw, faabTxns, tradeTxns, bracketData, leagueUsersHistory;
     const curSeason = parseInt(S.season) || new Date().getFullYear();
-    const uniqueYears = Array.from({length:5}, (_,i) => curSeason - 4 + i); // e.g., [2022,2023,2024,2025,2026]
+    const uniqueYears = Array.from({length:5}, (_,i) => curSeason - 4 + i);
 
-    if(histCache&&histCache.chain?.length>=5&&histCache.draftPicks?.length>0){
+    if(histCache&&histCache.chain?.length>=1&&histCache.draftPicks?.length>0){
       // ── FAST PATH: Use permanent cache for historical data ──
       chain=histCache.chain;
       allDraftPicks=histCache.draftPicks;
@@ -138,190 +140,99 @@ async function loadLeagueIntel(){
       bracketData=histCache.bracketData||{};
       leagueUsersHistory=histCache.leagueUsersHistory||{};
       // Re-fetch current-season trades if cache is stale (> 6h)
-      // Past seasons don't change; current season accumulates new trades throughout the year
       const TRADE_REFRESH_TTL=6*60*60*1000;
-      if(!histCache.ts||Date.now()-histCache.ts>TRADE_REFRESH_TTL){
+      if(provider&&(!histCache.ts||Date.now()-histCache.ts>TRADE_REFRESH_TTL)){
         const curChain=chain.find(c=>parseInt(c.season)===curSeason);
         if(curChain){
-          const txnWeeks=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18];
-          const freshTrades=[];
-          await Promise.all(txnWeeks.map(w=>
-            fetch(`${SLEEPER}/league/${curChain.id}/transactions/${w}`)
-              .then(r=>r.ok?r.json():[])
-              .catch(e=>{console.warn('[DHQ] fast-path trade refresh failed W:'+w,e?.message||e);return[];})
-              .then(txns=>txns.forEach(t=>{
-                if(t.status==='failed'||t.type!=='trade')return;
-                const rids=t.roster_ids||[];
-                const sides={};
-                rids.forEach(rid=>sides[rid]={players:[],picks:[]});
-                Object.entries(t.adds||{}).forEach(([pid,rid])=>{if(sides[rid])sides[rid].players.push(pid);});
-                (t.draft_picks||[]).forEach(pk=>{if(sides[pk.owner_id])sides[pk.owner_id].picks.push({season:pk.season,round:pk.round});});
-                freshTrades.push({season:curChain.season,week:w,roster_ids:rids,sides,ts:t.created||t.status_updated||0});
-              }))
-          ));
-          // Replace current-season trades with fresh data; preserve past seasons from cache
-          tradeTxns=[...tradeTxns.filter(t=>parseInt(t.season)<curSeason),...freshTrades];
-          DhqStorage.set(HIST_KEY,{...histCache,tradeTxns,ts:Date.now()});
-          console.log(`[DHQ] Fast-path trade refresh: ${freshTrades.length} current-season trades`);
+          try{
+            const freshTrades=await provider.refreshTrades(curChain);
+            tradeTxns=[...tradeTxns.filter(t=>parseInt(t.season)<curSeason),...freshTrades];
+            DhqStorage.set(HIST_KEY,{...histCache,tradeTxns,ts:Date.now()});
+            console.log(`[DHQ] Fast-path trade refresh (${platform}): ${freshTrades.length} current-season trades`);
+          }catch(e){console.warn('[DHQ] fast-path trade refresh failed:',e?.message||e);}
         }
       }
-      // Only fetch stats fresh (they're large but fast from Sleeper CDN)
+      // Stats always fresh (universal — Sleeper stats API works for all platforms)
       seasonStatsRaw={};
       await Promise.all(uniqueYears.map(async yr=>{
         seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
       }));
-      console.log(`DHQ FAST PATH: cached chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}) | fresh stats in ${((performance.now()-t0)/1000).toFixed(1)}s`);
+      console.log(`DHQ FAST PATH (${platform}): cached chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}) | fresh stats in ${((performance.now()-t0)/1000).toFixed(1)}s`);
 
     }else{
-      // ── COLD PATH: Discover everything from scratch, then cache ──
-      console.log('DHQ COLD PATH: building from scratch...');
+      // ── COLD PATH: Discover everything via provider ──
+      console.log(`DHQ COLD PATH (${platform}): building from scratch...`);
 
-      // Step 1a: League chain
-      chain=[];
-      let lid=S.currentLeagueId;
-      while(lid){
-        const l=await fetch(`${SLEEPER}/league/${lid}`).then(r=>r.json()).catch(()=>null);
-        if(!l)break;
-        chain.push({id:l.league_id,season:l.season,draft_id:l.draft_id,prev:l.previous_league_id});
-        lid=l.previous_league_id;
+      if(!provider){
+        console.warn('[DHQ] No provider available — falling back to empty data');
+        chain=[{id:S.currentLeagueId,season:S.season}];
+        allDraftPicks=[];draftMeta=[];faabTxns=[];tradeTxns=[];bracketData={};leagueUsersHistory={};
+        seasonStatsRaw={};
+        await Promise.all(uniqueYears.map(async yr=>{seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));}));
+      }else{
+        // Step 1: League chain
+        chain=await provider.getLeagueChain(S.currentLeagueId,curSeason);
+        if(!chain.length)chain=[{id:S.currentLeagueId,season:String(curSeason)}];
+
+        // Step 2: All parallel — drafts + stats + transactions + brackets + users
+        allDraftPicks=[];
+        draftMeta=[];
+        seasonStatsRaw={};
+        faabTxns=[];
+        tradeTxns=[];
+        bracketData={};
+        leagueUsersHistory={};
+
+        const fetchPromises=[];
+
+        // Drafts (per season via provider)
+        fetchPromises.push((async()=>{
+          const results=await Promise.all(chain.map(c=>provider.getDraftPicks(c).catch(()=>[])));
+          results.forEach((picks,i)=>{
+            if(picks.length){
+              const rounds=picks.reduce((m,p)=>Math.max(m,p.round),0);
+              draftMeta.push({season:chain[i].season,rounds,picks:picks.length});
+              allDraftPicks.push(...picks);
+            }
+          });
+        })());
+
+        // Stats (universal — Sleeper stats API)
+        fetchPromises.push(Promise.all(uniqueYears.map(async yr=>{
+          seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
+        })));
+
+        // Transactions (trades + FAAB via provider)
+        fetchPromises.push((async()=>{
+          const results=await Promise.all(chain.map(c=>provider.getTransactions(c,curSeason).catch(()=>({trades:[],faab:[]}))));
+          results.forEach(r=>{
+            tradeTxns.push(...(r.trades||[]));
+            faabTxns.push(...(r.faab||[]));
+          });
+        })());
+
+        // Brackets (via provider — may return null)
+        fetchPromises.push((async()=>{
+          await Promise.all(chain.map(async c=>{
+            const b=await provider.getBracket(c).catch(()=>null);
+            if(b)bracketData[c.season]=b;
+          }));
+        })());
+
+        // League users (via provider)
+        fetchPromises.push((async()=>{
+          await Promise.all(chain.map(async c=>{
+            const users=await provider.getLeagueUsers(c).catch(()=>[]);
+            if(users.length)leagueUsersHistory[c.season]=users;
+          }));
+        })());
+
+        await Promise.all(fetchPromises);
       }
 
-      // Step 1b: ALL parallel — drafts + stats + FAAB at once
-      allDraftPicks=[];
-      draftMeta=[];
-      seasonStatsRaw={};
-      faabTxns=[];
-
-      // Build all fetch promises
-      const fetchPromises=[];
-
-      // Draft picks (one call per league to get draft list, then one per draft for picks)
-      const draftPromise=(async()=>{
-        const draftLists=await Promise.all(chain.map(c=>
-          c.draft_id?fetch(`${SLEEPER}/league/${c.id}/drafts`).then(r=>r.json()).catch(()=>[]):Promise.resolve([])
-        ));
-        const pickFetches=[];
-        draftLists.forEach((drafts,i)=>{
-          drafts.forEach(d=>{
-            if(!d.draft_id||d.status!=='complete')return;
-            pickFetches.push(
-              fetch(`${SLEEPER}/draft/${d.draft_id}/picks`).then(r=>r.ok?r.json():[]).catch(()=>[])
-                .then(picks=>{
-                  const rounds=d.settings?.rounds||picks.reduce((m,p)=>Math.max(m,p.round),0);
-                  if(rounds>=20)return; // obvious startup (20+ rounds)
-                  // Also detect startups with normal round counts but veteran-heavy picks
-                  const veteranCount = picks.filter(p => {
-                    const player = S.players[p.player_id];
-                    return player && (player.years_exp || 0) >= 2;
-                  }).length;
-                  if(veteranCount > picks.length * 0.5) return; // >50% veterans = startup draft
-                  draftMeta.push({season:chain[i].season,rounds,picks:picks.length,draft_id:d.draft_id});
-                  picks.forEach(p=>{
-                    if(!p.metadata?.position)return;
-                    allDraftPicks.push({
-                      season:chain[i].season,round:p.round,pick_no:p.pick_no,roster_id:p.roster_id,
-                      pid:p.player_id,name:(p.metadata.first_name||'')+' '+(p.metadata.last_name||''),
-                      pos:posMapLocal(p.metadata.position),rawPos:p.metadata.position,team:p.metadata.team
-                    });
-                  });
-                })
-            );
-          });
-        });
-        await Promise.all(pickFetches);
-      })();
-      fetchPromises.push(draftPromise);
-
-      // Stats (all 5 years in parallel)
-      fetchPromises.push(Promise.all(uniqueYears.map(async yr=>{
-        seasonStatsRaw[yr]=await sf(`/stats/nfl/regular/${yr}`).catch(()=>({}));
-      })));
-
-      // COMBINED: FAAB + TRADE HISTORY in single pass
-      // Fetches transactions ONCE per league per week, extracts both FAAB and trades
-      // Reduced from 117 fetches to ~55 (5 seasons × 11 key weeks)
-      const tradeTxns=[];
-      const txnPromise=(async()=>{
-        const txnWeeks=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18]; // include offseason (0) and full season
-        const allTxnFetches=[];
-        chain.forEach(c=>{
-          const seasonNum=parseInt(c.season);
-          const isFaabSeason=seasonNum>=curSeason-2&&seasonNum<=curSeason;
-          txnWeeks.forEach(w=>{
-            allTxnFetches.push(
-              fetch(`${SLEEPER}/league/${c.id}/transactions/${w}`).then(r=>r.ok?r.json():[]).catch(e=>{console.warn('[DHQ] txn fetch failed L:'+c.id+' W:'+w,e?.message||e);return[];})
-                .then(txns=>txns.forEach(t=>{
-                  if(t.status==='failed')return;
-                  // Extract FAAB waivers (last 3 seasons only)
-                  if(isFaabSeason&&t.type==='waiver'&&(t.settings?.waiver_bid||0)>0){
-                    Object.keys(t.adds||{}).forEach(pid=>{
-                      const pos=posMapLocal(pPos(pid)||S.players?.[pid]?.position||'');
-                      if(positions.includes(pos))faabTxns.push({season:c.season,pid,pos,bid:t.settings.waiver_bid});
-                    });
-                  }
-                  // Extract trades (all seasons)
-                  if(t.type==='trade'){
-                    const rids=t.roster_ids||[];
-                    const sides={};
-                    rids.forEach(rid=>sides[rid]={players:[],picks:[]});
-                    Object.entries(t.adds||{}).forEach(([pid,rid])=>{
-                      if(sides[rid])sides[rid].players.push(pid);
-                    });
-                    (t.draft_picks||[]).forEach(pk=>{
-                      if(sides[pk.owner_id])sides[pk.owner_id].picks.push({season:pk.season,round:pk.round});
-                    });
-                    tradeTxns.push({
-                      season:c.season,week:w,
-                      roster_ids:rids,
-                      sides,
-                      ts:t.created||t.status_updated||0
-                    });
-                  }
-                }))
-            );
-          });
-        });
-        await Promise.all(allTxnFetches);
-      })();
-      fetchPromises.push(txnPromise);
-
-      // BRACKETS (all seasons — championship data)
-      bracketData={}; // { season: { winners: [], losers: [] } }
-      const bracketPromise=(async()=>{
-        await Promise.all(chain.map(async c=>{
-          try{
-            const [winners,losers]=await Promise.all([
-              fetch(`${SLEEPER}/league/${c.id}/winners_bracket`).then(r=>r.ok?r.json():[]).catch(()=>[]),
-              fetch(`${SLEEPER}/league/${c.id}/losers_bracket`).then(r=>r.ok?r.json():[]).catch(()=>[]),
-            ]);
-            bracketData[c.season]={winners:winners||[],losers:losers||[]};
-          }catch(e){dhqLog('dhq-engine.bracketFetch',e,{season:c.season});}
-        }));
-      })();
-      fetchPromises.push(bracketPromise);
-
-      // LEAGUE USERS (per season — track owner changes)
-      leagueUsersHistory={}; // { season: [{ user_id, display_name, ... }] }
-      const usersPromise=(async()=>{
-        await Promise.all(chain.map(async c=>{
-          try{
-            const users=await fetch(`${SLEEPER}/league/${c.id}/users`).then(r=>r.ok?r.json():[]).catch(()=>[]);
-            leagueUsersHistory[c.season]=(users||[]).map(u=>({
-              user_id:u.user_id,
-              display_name:u.display_name||u.username,
-              avatar:u.avatar,
-            }));
-          }catch(e){dhqLog('dhq-engine.usersFetch',e,{season:c.season});}
-        }));
-      })();
-      fetchPromises.push(usersPromise);
-
-      // Fire everything at once
-      await Promise.all(fetchPromises);
-
-      // Cache historical data permanently (drafts/chain/faab/trades never change)
+      // Cache historical data
       DhqStorage.set(HIST_KEY,{chain,draftPicks:allDraftPicks,draftMeta,faabTxns,tradeTxns,bracketData,leagueUsersHistory,ts:Date.now()});
-      console.log(`DHQ COLD PATH complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}), brackets(${Object.keys(bracketData).length}), users(${Object.keys(leagueUsersHistory).length})`);
+      console.log(`DHQ COLD PATH (${platform}) complete in ${((performance.now()-t0)/1000).toFixed(1)}s: chain(${chain.length}), drafts(${allDraftPicks.length}), faab(${faabTxns.length}), trades(${tradeTxns.length}), brackets(${Object.keys(bracketData).length}), users(${Object.keys(leagueUsersHistory).length})`);
     }
 
     console.log('Stats:',Object.entries(seasonStatsRaw).map(([y,s])=>y+':'+Object.keys(s).length+'p').join(' '));
