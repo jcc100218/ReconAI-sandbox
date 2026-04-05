@@ -28,18 +28,18 @@ CORE KNOWLEDGE:
 - IDP scoring matters: sacks, INTs, pass deflections are premium stats. Edge rushers and ball-hawk DBs are the IDP cornerstones.
 
 PEAK AGE WINDOWS:
-- QB: 24-34 (longest window, most valuable in SF)
-- RB: 22-27 (shortest window, sell before 27)
-- WR: 22-30 (second longest, prime assets)
-- TE: 23-30 (late bloomers, patience pays)
-- DL: 23-29 (sack production peaks early)
-- LB: 23-28 (tackle machines, shorter peak)
-- DB: 23-29 (INTs are volatile, PDs more stable)
+- QB: 23-39 (longest window, most valuable in SF — hold elite QBs deep into their 30s)
+- RB: 21-31 (cliff starts around 29-31, sell before decline sets in)
+- WR: 21-33 (second longest, prime window is 23-30 but tail extends to 33)
+- TE: 21-34 (late bloomers, patience pays — peak production often 25-30)
+- DL: 26-33 (sack production peaks early, edge rushers age better than interior)
+- LB: 26-32 (tackle machines, shorter peak)
+- DB: 21-34 (INTs are volatile, PDs more stable)
 
 DYNASTY PRINCIPLES:
 - Youth + production = dynasty gold. Under-25 starters are the most valuable assets.
-- Age 30+ players in dynasty are depreciating assets — sell before the cliff.
-- RBs decline fastest. QBs hold longest. Plan accordingly.
+- RBs decline fastest (cliff typically 29-31). QBs hold longest (elite QBs productive into late 30s). Plan accordingly.
+- Sell RBs approaching 29-30 before the cliff. WRs and TEs carry value into their early 30s. QBs rarely need selling before 37.
 - In Superflex, starting QBs are 2-3x more valuable than 1QB leagues.
 - IDP leagues: DL/LB/DB depth matters. Late-round IDP picks hit more often than offensive ones.
 - Roster construction > individual talent. A team with 2 elite + 8 starters beats 1 elite + 5 starters + 4 scrubs.
@@ -230,7 +230,7 @@ Give a dynasty buy/sell/hold recommendation with:
 Keep it to 4-6 sentences. Be definitive — give a clear recommendation.
 
 EXAMPLE OF AN IDEAL RESPONSE:
-Assistant: "**Amon-Ra St. Brown (WR, age 25, DHQ 7,400) — HOLD.** Elite WR1 locked in as Detroit's target leader. At 25 he's entering his prime (22-30 for WRs) with 5+ elite years ahead. DHQ 7,400 is fair — you'd need a top-3 pick + a starter to replace this production. Only sell for 8,000+ DHQ in return value."`,
+Assistant: "**Amon-Ra St. Brown (WR, age 25, DHQ 7,400) — HOLD.** Elite WR1 locked in as Detroit's target leader. At 25 he's entering his prime (21-33 for WRs) with 8+ elite years ahead. DHQ 7,400 is fair — you'd need a top-3 pick + a starter to replace this production. Only sell for 8,000+ DHQ in return value."`,
     maxTokens: 500,
     useWebSearch: true,
   },

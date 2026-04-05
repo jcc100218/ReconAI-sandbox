@@ -534,7 +534,9 @@ function renderAvailable(){
   const posFilter=$('avail-pos-sel')?.value||'';
   const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
-  filtered=filtered.filter(a=>a.val>=1500);
+  const _wFloorTeams=S.rosters?.length||16;
+  const _wFloor=Math.max(500,Math.round(1500*(_wFloorTeams/16)));
+  filtered=filtered.filter(a=>a.val>=_wFloor);
 
   // Team mode gate: rebuilding teams skip old low-value players
   const _avMyAssess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
@@ -560,7 +562,7 @@ function renderAvailable(){
     if(availSortKey==='faab'){
       const fm=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
       const fb=typeof getFAAB==='function'?getFAAB():{remaining:0,budget:0};
-      const getFaab=(x)=>{const mP2=posMapFilter(x.p.position);const mk=fm[mP2];if(!mk||mk.count<3||!fb.budget)return 0;const fl=fb.minBid||1;return Math.max(fl,Math.min(Math.round(fb.remaining*0.15),Math.round(mk.avg*(x.val/4000))));};
+      const getFaab=(x)=>{const mP2=posMapFilter(x.p.position);const mk=fm[mP2];if(!mk||mk.count<3||!fb.budget)return 0;const fl=fb.minBid||1;return Math.max(fl,Math.min(Math.round(fb.remaining*0.25),Math.round(mk.avg*(x.val/4000))));};
       return(getFaab(b)-getFaab(a))*availSortDir;
     }
     return(b.val-a.val)*availSortDir;
@@ -587,12 +589,18 @@ function renderAvailable(){
     if(market&&market.count>=3&&faab.budget>0){
       const baseB=Math.round(market.avg*(val/4000));
       const fl=faab.minBid||1;
-      const sug=Math.max(fl,Math.min(Math.round(faab.remaining*0.15),baseB));
+      const sug=Math.max(fl,Math.min(Math.round(faab.remaining*0.25),baseB));
       const lo=Math.max(fl,Math.round(sug*0.7));
       const hi=Math.min(faab.remaining,Math.round(sug*1.3));
       faabStr=`$${lo}–${hi}`;
       conf=val>=4000?'High':val>=2000?'Med':'Low';
       confCol=conf==='High'?'var(--green)':conf==='Med'?'var(--amber)':'var(--text3)';
+    } else if(faab.budget>0&&val>0){
+      // No FAAB history — estimated from dynasty value
+      const fl=faab.minBid||1;
+      const est=Math.max(fl,Math.round(val/500));
+      faabStr=`~$${est}`;
+      conf='No FAAB history — estimated from dynasty value';confCol='var(--text3)';
     }
 
     // Priority tag
@@ -637,8 +645,9 @@ function renderTopPickupHero(){
   const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
   const posMapF=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 
-  // Find best pickup — prefer needs, then highest value (min 1500 DHQ)
-  const qualAvail=avail.filter(a=>a.val>=1500);
+  // Find best pickup — prefer needs, then highest value (floor scales with league size)
+  const _heroFloor=Math.max(500,Math.round(1500*(Math.max(8,S.rosters?.length||16)/16)));
+  const qualAvail=avail.filter(a=>a.val>=_heroFloor);
   let best=null;
   if(assess?.needs?.length){
     const need=assess.needs[0];

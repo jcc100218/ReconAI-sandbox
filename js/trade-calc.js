@@ -826,10 +826,8 @@ function calcAcceptanceLikelihood(myValue, theirValue, theirDnaKey, psychTaxes, 
         ? Math.min(90, 50 + needBonus + Math.round(nd * 80))
         : Math.max(5, 35 + needBonus + Math.round(nd * 120));
     } else {
-      // NONE / default — rational opponent
-      likelihood = nd >= 0
-        ? Math.min(82, 48 + Math.round(nd * 120))    // I overpay = rises
-        : Math.max(5, 40 + Math.round(nd * 150));    // I'm winning = drops faster
+      // NONE / default — smooth sigmoid centered at 50% for fair trades (nd=0 → 50%)
+      likelihood = Math.round(5 + 90 / (1 + Math.exp(-7 * nd)));
     }
 
     // Apply psych tax total — CAPPED at +/- 15 to prevent runaway inflation
