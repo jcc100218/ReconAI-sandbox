@@ -24,18 +24,7 @@ async function fetchTrending(){
 
 async function loadLeague(leagueId,userId){
   // Non-Sleeper platforms: data already populated by their connector — skip Sleeper API calls
-  if(S.platform==='mfl'){
-    const uid=userId||S.myRosterId;
-    if(!S.myRosterId&&uid){
-      S.myRosterId=S.rosters.find(r=>r.owner_id===uid)?.roster_id||S.rosters[0]?.roster_id;
-    }
-    try{renderRoster();}catch(e){}
-    try{renderWaivers();}catch(e){}
-    try{renderTrades();}catch(e){}
-    try{renderPicks();}catch(e){}
-    return;
-  }
-  if(S.platform==='espn'){
+  if(S.platform&&S.platform!=='sleeper'){
     const uid=userId||S.myRosterId;
     if(!S.myRosterId&&uid){
       S.myRosterId=S.rosters.find(r=>r.owner_id===uid)?.roster_id||S.rosters[0]?.roster_id;

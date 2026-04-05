@@ -220,22 +220,16 @@ window.App.connect = connect;
 
 // ── Platform tab toggle ────────────────────────────────────────
 function showPlatformTab(platform){
-  const sleeper=$('form-sleeper');const espn=$('form-espn');const mfl=$('form-mfl');
-  const tabS=$('tab-sleeper');const tabE=$('tab-espn');const tabM=$('tab-mfl');
-  [sleeper,espn,mfl].forEach(el=>{if(el)el.style.display='none';});
-  [tabS,tabE,tabM].forEach(el=>{if(el){el.style.background='transparent';el.style.color='var(--text3)';}});
-  if(platform==='espn'){
-    if(espn)espn.style.display='block';
-    if(tabE){tabE.style.background='var(--bg)';tabE.style.color='var(--text)';}
-  }else if(platform==='mfl'){
-    if(mfl)mfl.style.display='block';
-    if(tabM){tabM.style.background='var(--bg)';tabM.style.color='var(--text)';}
-    // Pre-fill year if empty
-    const yrEl=$('mfl-year');if(yrEl&&!yrEl.value)yrEl.value=String(new Date().getFullYear());
-  }else{
-    if(sleeper)sleeper.style.display='block';
-    if(tabS){tabS.style.background='var(--bg)';tabS.style.color='var(--text)';}
-  }
+  const forms={sleeper:'form-sleeper',espn:'form-espn',mfl:'form-mfl',yahoo:'form-yahoo'};
+  const tabs={sleeper:'tab-sleeper',espn:'tab-espn',mfl:'tab-mfl',yahoo:'tab-yahoo'};
+  Object.values(forms).forEach(id=>{const el=$(id);if(el)el.style.display='none';});
+  Object.values(tabs).forEach(id=>{const el=$(id);if(el){el.style.background='transparent';el.style.color='var(--text3)';}});
+  const formEl=$(forms[platform]||forms.sleeper);
+  const tabEl=$(tabs[platform]||tabs.sleeper);
+  if(formEl)formEl.style.display='block';
+  if(tabEl){tabEl.style.background='var(--bg)';tabEl.style.color='var(--text)';}
+  // Platform-specific init
+  if(platform==='mfl'){const yrEl=$('mfl-year');if(yrEl&&!yrEl.value)yrEl.value=String(new Date().getFullYear());}
 }
 window.showPlatformTab = showPlatformTab;
 
@@ -485,6 +479,199 @@ window.selectMFLTeam = selectMFLTeam;
 function _updateLeaguePillMFL(leagueName){
   const lp=$('league-pill');
   if(lp)lp.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#0057b8;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">MFL</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
+}
+
+// ── Yahoo Connect ──────────────────────────────────────────────
+async function connectYahoo(){
+  if(!window.Yahoo){ss('conn-status','Yahoo connector not loaded — refresh and try again.',true);return;}
+
+  const btn=$('yahoo-conn-btn');
+  if(btn){btn.disabled=true;btn.textContent='Connecting...';}
+  const progEl=$('prog');if(progEl)progEl.style.display='block';
+  prog(5);ss('conn-status','Opening Yahoo sign-in...');
+
+  try{
+    const tokens=await window.Yahoo.startAuth();
+    prog(30);ss('conn-status','Loading your leagues...');
+
+    // Load Sleeper player DB for crosswalk
+    if(!S.players||Object.keys(S.players).length<100){
+      try{S.players=await window.App.sf('/players/nfl');}
+      catch(e){S.players=S.players||{};}
+    }
+
+    prog(50);
+    const leagues=await window.Yahoo.fetchUserLeagues(tokens);
+    if(btn){btn.disabled=false;btn.textContent='Connect with Yahoo';}
+    prog(70);
+
+    if(!leagues.length){
+      ss('conn-status','No NFL leagues found for your Yahoo account.',true);
+      if(progEl)progEl.style.display='none';
+      return;
+    }
+
+    // If only one league, skip picker
+    if(leagues.length===1){
+      await _connectYahooLeague(leagues[0].league_key,null,tokens);
+      return;
+    }
+    showYahooLeaguePicker(leagues,tokens);
+
+  }catch(e){
+    ss('conn-status','Error: '+e.message,true);
+    if(btn){btn.disabled=false;btn.textContent='Connect with Yahoo';}
+    if(progEl)progEl.style.display='none';
+  }
+}
+window.connectYahoo = connectYahoo;
+
+// Manual league key entry (fallback)
+async function connectYahooManual(){
+  const keyRaw=($('yahoo-league-key')?.value||'').trim();
+  if(!keyRaw){ss('conn-status','Enter your Yahoo league key (e.g. 423.l.12345)',true);return;}
+  if(!window.Yahoo){ss('conn-status','Yahoo connector not loaded — refresh and try again.',true);return;}
+
+  const tokens=window.Yahoo.getStoredTokens();
+  if(!tokens){ss('conn-status','Authenticate with Yahoo first by clicking "Connect with Yahoo".',true);return;}
+
+  const progEl=$('prog');if(progEl)progEl.style.display='block';
+  prog(20);ss('conn-status','Fetching Yahoo league...');
+
+  try{
+    if(!S.players||Object.keys(S.players).length<100){
+      try{S.players=await window.App.sf('/players/nfl');}catch(e){S.players=S.players||{};}
+    }
+    await _connectYahooLeague(keyRaw,null,tokens);
+  }catch(e){
+    ss('conn-status','Error: '+e.message,true);
+    if(progEl)progEl.style.display='none';
+  }
+}
+window.connectYahooManual = connectYahooManual;
+
+function showYahooLeaguePicker(leagues,tokens){
+  const setupEl=$('setup-block');
+  if(!setupEl)return;
+
+  // Store tokens temporarily for the picker selection
+  try{window._yahooPickerTokens=tokens;}catch(e){}
+
+  const rows=leagues.map(l=>`
+    <div onclick="selectYahooLeague('${escHtml(l.league_key)}')"
+      style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .15s"
+      onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <div style="width:36px;height:36px;border-radius:9px;background:#6001d2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${l.season.slice(-2)||'NFL'}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(l.name)}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.num_teams} teams · ${l.season} · ${escHtml(l.league_key)}</div>
+      </div>
+    </div>`).join('');
+
+  setupEl.innerHTML=`
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:#6001d2;color:#fff;border-radius:6px;padding:3px 10px;margin-bottom:10px;letter-spacing:.06em">YAHOO</div>
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:6px">Your Yahoo Leagues</h3>
+      <p style="font-size:13px;color:var(--text3)">Select the league you want to manage</p>
+    </div>
+    <div style="max-width:440px;margin:0 auto">${rows}</div>`;
+}
+window.showYahooLeaguePicker = showYahooLeaguePicker;
+
+async function selectYahooLeague(leagueKey){
+  const tokens=window._yahooPickerTokens||window.Yahoo.getStoredTokens();
+  if(!tokens){ss('conn-status','Session expired — reconnect with Yahoo.',true);return;}
+  const setupEl=$('setup-block');
+  if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
+    <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#6001d2;border-radius:50%;animation:spin .7s linear infinite"></span>
+    <div style="font-size:16px;font-weight:700;margin:14px 0 6px">Loading league...</div>
+    <div style="font-size:13px;color:var(--text3)">Fetching rosters from Yahoo</div>
+  </div>`;
+  try{
+    prog(40);ss('conn-status','Fetching league rosters...');
+    const result=await window.Yahoo.connectLeague(leagueKey,null,tokens);
+    prog(80);
+    showYahooTeamPicker(result,leagueKey);
+  }catch(e){
+    if(setupEl)setupEl.innerHTML=`<div style="color:var(--red);font-size:14px;text-align:center">Error: ${escHtml(e.message)}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connectYahoo()">Try again</button>`;
+  }
+}
+window.selectYahooLeague = selectYahooLeague;
+
+async function _connectYahooLeague(leagueKey,myTeamId,tokens){
+  prog(50);ss('conn-status','Fetching league rosters...');
+  const result=await window.Yahoo.connectLeague(leagueKey,myTeamId,tokens);
+  prog(80);
+  showYahooTeamPicker(result,leagueKey);
+}
+
+function showYahooTeamPicker(result,leagueKey){
+  const{rosters,league}=result;
+  const setupEl=$('setup-block');
+  if(!setupEl)return;
+
+  const teamRows=rosters.map(r=>`
+    <div onclick="selectYahooTeam('${r.roster_id}','${escHtml(leagueKey)}')"
+      style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .15s"
+      onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <div style="width:36px;height:36px;border-radius:9px;background:#6001d2;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0">${r.roster_id}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r._team_name||'Team '+r.roster_id)}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${escHtml(r._owner_name||'')} · ${r.players.length} players · ${r.settings.wins}-${r.settings.losses}</div>
+      </div>
+    </div>`).join('');
+
+  setupEl.innerHTML=`
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:#6001d2;color:#fff;border-radius:6px;padding:3px 10px;margin-bottom:10px;letter-spacing:.06em">YAHOO</div>
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:6px">${escHtml(league.name)}</h3>
+      <p style="font-size:13px;color:var(--text3)">${league.total_rosters} teams · ${league.season} · Select your team below</p>
+    </div>
+    <div id="yahoo-team-list" style="max-width:440px;margin:0 auto">${teamRows}</div>`;
+}
+window.showYahooTeamPicker = showYahooTeamPicker;
+
+async function selectYahooTeam(teamId,leagueKey){
+  const S_ref=window.S||window.App?.S;
+  if(!S_ref)return;
+  S_ref.myRosterId=String(teamId);
+
+  const setupEl=$('setup-block');
+  if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
+    <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#6001d2;border-radius:50%;animation:spin .7s linear infinite"></span>
+    <div style="font-size:16px;font-weight:700;margin:14px 0 6px">Loading your league...</div>
+    <div style="font-size:13px;color:var(--text3)">Mapping Yahoo data to ReconAI</div>
+  </div>`;
+
+  try{
+    try{
+      localStorage.setItem('yahoo_league_key',leagueKey);
+      localStorage.setItem('yahoo_my_team',String(teamId));
+    }catch(e){}
+
+    _updateLeaguePillYahoo(S_ref.leagues[0]?.name||'Yahoo League');
+
+    const sb=$('setup-block');if(sb)sb.style.display='none';
+    const dc=$('digest-content');if(dc)dc.style.display='block';
+    switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
+    prog(100);
+
+    try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
+    try{if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();}catch(e){}
+    try{if(typeof updateSettingsStatus==='function')updateSettingsStatus();}catch(e){}
+
+    Promise.resolve().then(()=>loadAllData());
+
+  }catch(e){
+    console.error('[Yahoo] selectYahooTeam error:',e);
+    if(setupEl)setupEl.innerHTML=`<div style="color:var(--red);font-size:14px;text-align:center">Error: ${escHtml(e.message)}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connectYahoo()">Try again</button>`;
+  }
+}
+window.selectYahooTeam = selectYahooTeam;
+
+function _updateLeaguePillYahoo(leagueName){
+  const lp=$('league-pill');
+  if(lp)lp.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#6001d2;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">YAHOO</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
 }
 
 // Auto-restore ESPN session on page load
