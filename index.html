@@ -83,6 +83,7 @@
         <div style="max-width:380px;margin:0 auto 12px;display:flex;gap:6px;background:var(--bg3);border-radius:10px;padding:4px">
           <button id="tab-sleeper" onclick="showPlatformTab('sleeper')" style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:var(--bg);color:var(--text);transition:all .15s">Sleeper</button>
           <button id="tab-espn" onclick="showPlatformTab('espn')" style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3);transition:all .15s">ESPN</button>
+          <button id="tab-mfl" onclick="showPlatformTab('mfl')" style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3);transition:all .15s">MFL</button>
         </div>
 
         <!-- Sleeper form -->
@@ -103,6 +104,20 @@
             </div>
           </details>
           <button class="btn" id="espn-conn-btn" onclick="connectESPN()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;box-sizing:border-box;background:linear-gradient(135deg,#e03e2d,#c0392b)">Connect ESPN League</button>
+        </div>
+
+        <!-- MFL form -->
+        <div id="form-mfl" style="display:none;max-width:380px;margin:0 auto 14px">
+          <input type="text" id="mfl-league-id" placeholder="MFL League ID" style="width:100%;font-size:16px;padding:14px 16px;border-radius:12px;margin-bottom:8px;box-sizing:border-box" onkeydown="if(event.key==='Enter')connectMFL()"/>
+          <input type="text" id="mfl-year" placeholder="Season year (e.g. 2024)" style="width:100%;font-size:16px;padding:14px 16px;border-radius:12px;margin-bottom:8px;box-sizing:border-box" onkeydown="if(event.key==='Enter')connectMFL()"/>
+          <details style="margin-bottom:8px">
+            <summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:6px 0;list-style:none;display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--text3)">&#9654;</span> Private league? Add API key</summary>
+            <div style="padding:10px 0 4px">
+              <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:8px">Find your API key in MFL: Account → API Access. Required for private leagues.</div>
+              <input type="password" id="mfl-api-key" placeholder="MFL API key" style="width:100%;font-size:13px;padding:10px 12px;border-radius:8px;box-sizing:border-box;font-family:monospace"/>
+            </div>
+          </details>
+          <button class="btn" id="mfl-conn-btn" onclick="connectMFL()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;box-sizing:border-box;background:linear-gradient(135deg,#0057b8,#003d8a)">Connect MFL League</button>
         </div>
 
         <div id="conn-status" class="status-txt" style="text-align:center;margin-bottom:4px"></div>
@@ -755,11 +770,11 @@
 <script src="shared/ai-dispatch.js"></script>
 <script src="shared/sleeper-api.js"></script>
 <script src="shared/espn-api.js"></script>
+<script src="shared/mfl-api.js"></script>
 
 <!-- War Room Scout modules -->
 <script src="js/app.js"></script>
 <script src="js/sleeper-api.js"></script>
-<script src="js/espn-api.js"></script>
 <script src="js/ai-chat.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/player-modal.js"></script>
