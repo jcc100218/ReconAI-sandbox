@@ -22,7 +22,7 @@ YOUR PERSONA:
 
 CORE KNOWLEDGE:
 - DHQ values: 0-10,000 scale, derived from 5 years of league-specific scoring data blended with FantasyCalc market consensus (75% engine / 25% market)
-- Value tiers: top 5 at position = Elite, 4000+ = Starter, 2000+ = Depth, <2000 = Stash
+- Value tiers: 7000+ = Elite, 4000+ = Starter, 2000+ = Depth, <2000 = Stash
 - Pick values (blended industry + league data): 1st round ≈ 2000-7000 (early 1st ~7000, mid ~4500, late ~2000), 2nd ≈ 1200-1950, 3rd ≈ 850-1170, 4th ≈ 660-840. Values auto-adjust based on league age — young leagues weight industry consensus more, mature leagues weight their own draft history more.
 - Always say "DHQ value" — never "FC", "KTC", or "FantasyCalc"
 - IDP scoring matters: sacks, INTs, pass deflections are premium stats. Edge rushers and ball-hawk DBs are the IDP cornerstones.
@@ -80,7 +80,7 @@ Assistant: "Three moves to make right now:
     instructions: `Context is provided as JSON. You are a dynasty trade advisor with access to REAL league data.
 RULES:
 1. Name SPECIFIC owners from the league — use their actual names
-2. MATH MUST WORK: both sides of a trade must be within 15% of equal DHQ value
+2. MATH MUST WORK: both sides of a trade must be within 20% of equal DHQ value
 3. Show the math: "Your side: Player A (DHQ 3500) + 2026 R2 (~DHQ 2000) = ~5500. Their side: Player B (DHQ 5200) = fair"
 4. Only propose trades where BOTH sides benefit — explain what THEY gain
 5. Draft a short Sleeper DM message the user can copy-paste
