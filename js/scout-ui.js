@@ -628,7 +628,11 @@ function renderLeaguePanel() {
     (b.settings?.fpts || 0) - (a.settings?.fpts || 0)
   );
 
+  const isLargeLeague = sorted.length > 24;
   let html = '';
+  if (isLargeLeague) {
+    html += `<div style="margin-bottom:10px"><input type="text" id="league-search" placeholder="Search ${sorted.length} teams..." oninput="filterLeagueCards(this.value)" style="width:100%;padding:10px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;outline:none"></div>`;
+  }
   sorted.forEach((roster, idx) => {
     const owner = (S.leagueUsers || []).find(u => u.user_id === roster.owner_id);
     const teamName = owner?.metadata?.team_name || owner?.display_name || `Team ${idx + 1}`;
@@ -654,6 +658,16 @@ function renderLeaguePanel() {
   container.innerHTML = html;
 }
 window.renderLeaguePanel = renderLeaguePanel;
+
+function filterLeagueCards(query) {
+  const cards = document.querySelectorAll('.league-card');
+  const q = (query || '').toLowerCase();
+  cards.forEach(card => {
+    const name = (card.querySelector('.league-card-name')?.textContent || '').toLowerCase();
+    card.style.display = !q || name.includes(q) ? '' : 'none';
+  });
+}
+window.filterLeagueCards = filterLeagueCards;
 
 // ════════════════════════════════════════════════════════════════
 // MOBILELAB OVERRIDE — handle new tabs

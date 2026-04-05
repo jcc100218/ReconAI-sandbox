@@ -333,6 +333,102 @@ function lookupSleeperPlayerId(mflId) {
   return 'mfl_' + mflId;
 }
 
+// ── Transactions ─────────────────────────────────────────────────
+
+/**
+ * Fetch MFL transactions and map to Sleeper-compatible format.
+ * MFL TYPE=transactions returns trades, adds, drops, IR moves.
+ */
+async function fetchTransactions(leagueId, year, apiKey) {
+  try {
+    const data = await _mflGet(_mflUrl(year, 'transactions', leagueId, apiKey));
+    const txnArr = data?.transactions?.transaction || [];
+    const txns = Array.isArray(txnArr) ? txnArr : [txnArr];
+    const cw = _crosswalk || {};
+
+    return txns.filter(t => t && t.type).map(t => {
+      const type = (t.type || '').toUpperCase();
+      const ts = parseInt(t.timestamp || 0) * 1000; // MFL uses seconds, convert to ms
+
+      if (type === 'TRADE') {
+        // Parse traded players: "franchise1_adds|franchise1_drops,franchise2_adds|franchise2_drops"
+        const rids = [t.franchise, t.franchise2].filter(Boolean);
+        const adds = {};
+        const drops = {};
+        // MFL trade format varies — parse player lists
+        (t.franchise1_gave_up || '').split(',').filter(Boolean).forEach(pid => {
+          const sid = cw[pid] || ('mfl_' + pid);
+          adds[sid] = t.franchise2;
+          drops[sid] = t.franchise;
+        });
+        (t.franchise2_gave_up || '').split(',').filter(Boolean).forEach(pid => {
+          const sid = cw[pid] || ('mfl_' + pid);
+          adds[sid] = t.franchise;
+          drops[sid] = t.franchise2;
+        });
+        return { type: 'trade', status: 'complete', created: ts, roster_ids: rids, adds, drops, _source: 'mfl' };
+      }
+
+      if (type === 'FREE_AGENT' || type === 'BBID_WAIVER' || type === 'WAIVER') {
+        const adds = {};
+        const drops = {};
+        (t.transaction || '').split('|').forEach(part => {
+          const [pid, action] = (part || '').split(',');
+          if (!pid) return;
+          const sid = cw[pid] || ('mfl_' + pid);
+          if (action === 'added' || !action) adds[sid] = t.franchise;
+          else if (action === 'dropped') drops[sid] = t.franchise;
+        });
+        return { type: type === 'BBID_WAIVER' ? 'waiver' : 'free_agent', status: 'complete', created: ts, adds, drops, _source: 'mfl' };
+      }
+
+      return { type: type.toLowerCase(), status: 'complete', created: ts, _source: 'mfl' };
+    }).filter(t => t.type === 'trade' || t.type === 'free_agent' || t.type === 'waiver');
+  } catch (e) {
+    console.warn('[MFL] Transaction fetch error:', e);
+    return [];
+  }
+}
+
+/**
+ * Fetch MFL draft results and map to Sleeper-compatible format.
+ * Handles large drafts (100+ picks for mega-leagues).
+ */
+async function fetchDraftResults(leagueId, year, apiKey) {
+  try {
+    const data = await _mflGet(_mflUrl(year, 'draftResults', leagueId, apiKey));
+    const units = data?.draftResults?.draftUnit;
+    if (!units) return [];
+    const unitArr = Array.isArray(units) ? units : [units];
+    const cw = _crosswalk || {};
+    const allPicks = [];
+
+    unitArr.forEach(unit => {
+      const picks = unit?.draftPick || [];
+      const pickArr = Array.isArray(picks) ? picks : [picks];
+      pickArr.forEach(pick => {
+        if (!pick || !pick.player) return;
+        const sid = cw[pick.player] || ('mfl_' + pick.player);
+        const [rd, pk] = (pick.pick || '').split('.');
+        allPicks.push({
+          player_id: sid,
+          picked_by: pick.franchise,
+          round: parseInt(rd) || 1,
+          pick_no: parseInt(pk) || 1,
+          overall: allPicks.length + 1,
+          timestamp: parseInt(pick.timestamp || 0) * 1000,
+          _source: 'mfl',
+        });
+      });
+    });
+
+    return allPicks;
+  } catch (e) {
+    console.warn('[MFL] Draft results fetch error:', e);
+    return [];
+  }
+}
+
 // ── Full state population ─────────────────────────────────────────
 
 /**
@@ -437,12 +533,27 @@ async function connectLeague(leagueId, year, apiKey, myFranchiseId) {
 
   S.rosters = rosters;
   S.leagueUsers = leagueUsers;
-  S.tradedPicks = [];
-  S.drafts = [];
   S.bracket = { w: [], l: [] };
   S.matchups = {};
-  S.transactions = {};
   S.season = String(year);
+
+  // Fetch transactions and draft results (non-blocking — don't fail connect)
+  const [txns, draftPicks] = await Promise.all([
+    fetchTransactions(leagueId, year, apiKey).catch(() => []),
+    fetchDraftResults(leagueId, year, apiKey).catch(() => []),
+  ]);
+
+  // Store transactions keyed by week (consistent with Sleeper format)
+  const txnsByWeek = {};
+  txns.forEach(t => { const key = 'w0'; if (!txnsByWeek[key]) txnsByWeek[key] = []; txnsByWeek[key].push(t); });
+  S.transactions = txnsByWeek;
+
+  // Extract traded picks from trade transactions
+  S.tradedPicks = txns.filter(t => t.type === 'trade').map((t, i) => ({
+    season: year, round: 1, roster_id: t.roster_ids?.[0], owner_id: t.roster_ids?.[1], _idx: i,
+  })).slice(0, 50); // Limit for performance
+
+  S.drafts = draftPicks.length ? [{ draft_id: 'mfl_draft_' + year, picks: draftPicks }] : [];
 
   S.leagues = [league];
   S.currentLeagueId = league.league_id;
@@ -464,6 +575,8 @@ window.MFL = {
 
   // Fetch
   fetchLeague,
+  fetchTransactions,
+  fetchDraftResults,
 
   // Mappers
   mapMFLPlayer,
