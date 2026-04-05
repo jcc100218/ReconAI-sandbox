@@ -662,6 +662,277 @@ function _tryRestoreESPN(){
   }catch(e){return false;}
 }
 
+// ── League Registry & Game-Save Hub ─────────────────────────────
+const REGISTRY_KEY='dhq_league_registry';
+function getLeagueRegistry(){try{return JSON.parse(localStorage.getItem(REGISTRY_KEY)||'[]');}catch(e){return[];}}
+function saveLeagueRegistry(arr){try{localStorage.setItem(REGISTRY_KEY,JSON.stringify(arr));}catch(e){}}
+
+function saveLeagueToRegistry(data){
+  const reg=getLeagueRegistry();
+  const idx=reg.findIndex(e=>e.leagueId===data.leagueId);
+  const entry=Object.assign(idx>=0?reg[idx]:{},data,{lastSync:Date.now()});
+  if(idx>=0)reg[idx]=entry;else reg.unshift(entry);
+  saveLeagueRegistry(reg);
+}
+window.saveLeagueToRegistry=saveLeagueToRegistry;
+window.App.saveLeagueToRegistry=saveLeagueToRegistry;
+
+function updateRegistryKPIs(leagueId){
+  try{
+    const reg=getLeagueRegistry();
+    const idx=reg.findIndex(e=>e.leagueId===leagueId);
+    if(idx<0)return;
+    // Health score from stored timeline
+    const tl=DhqStorage.get(`dhq_health_timeline_${leagueId}`,[]);
+    if(tl.length){const lt=tl[tl.length-1];if(lt?.score!=null)reg[idx].healthScore=lt.score;}
+    // Power rank by DHQ value
+    if(S.rosters?.length&&S.myRosterId&&window.App?.LI?.playerScores){
+      const ps=window.App.LI.playerScores;
+      const ranks=S.rosters.map(r=>({rid:r.roster_id,val:(r.players||[]).reduce((s,p)=>s+(ps[p]||0),0)})).sort((a,b)=>b.val-a.val);
+      const pos=ranks.findIndex(r=>String(r.rid)===String(S.myRosterId));
+      if(pos>=0)reg[idx].powerRank=pos+1;
+    }
+    if(S.rosters?.length)reg[idx].totalRosters=S.rosters.length;
+    saveLeagueRegistry(reg);
+  }catch(e){}
+}
+window.updateRegistryKPIs=updateRegistryKPIs;
+window.App.updateRegistryKPIs=updateRegistryKPIs;
+
+function renderLeagueHub(){
+  const sb=$('setup-block');if(!sb)return;
+  const reg=getLeagueRegistry();
+
+  if(!reg.length){
+    sb.innerHTML=`<div class="lh-empty">
+      <div class="lh-empty-title">Connect your first league</div>
+      <div class="lh-empty-sub">Link a platform to get AI-powered lineup, trade &amp; waiver advice.</div>
+      <div class="lh-platform-btns">
+        <button class="lh-platform-btn" onclick="showAddPlatform('sleeper')">Sleeper</button>
+        <button class="lh-platform-btn" onclick="showAddPlatform('espn')">ESPN</button>
+        <button class="lh-platform-btn" onclick="showAddPlatform('mfl')">MFL</button>
+        <button class="lh-platform-btn" onclick="showAddPlatform('yahoo')">Yahoo</button>
+      </div>
+    </div>
+    <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
+    <div class="prog" id="prog" style="display:none;margin-top:8px"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>`;
+    return;
+  }
+
+  const isFree=typeof getTier==='function'?getTier()==='free':false;
+  const savedId=DhqStorage.getStr(STORAGE_KEYS.LEAGUE)||S.currentLeagueId||'';
+  const unlockedId=isFree?(savedId&&reg.find(e=>e.leagueId===savedId)?savedId:reg[0]?.leagueId):null;
+
+  const PM={
+    sleeper:{bg:'rgba(0,179,136,0.15)',color:'#00b388',label:'SLEEPER'},
+    espn:{bg:'rgba(224,62,45,0.15)',color:'#e03e2d',label:'ESPN'},
+    mfl:{bg:'rgba(0,87,184,0.15)',color:'#0057b8',label:'MFL'},
+    yahoo:{bg:'rgba(96,1,210,0.15)',color:'#7b2ff7',label:'YAHOO'},
+  };
+
+  function hKpi(score){
+    if(score==null)return'<span class="lh-kpi lh-kpi-neutral">Health —</span>';
+    const c=score>=70?'lh-kpi-green':score>=40?'lh-kpi-amber':'lh-kpi-red';
+    return`<span class="lh-kpi ${c}">Health ${score}</span>`;
+  }
+  function rKpi(rank,total){
+    if(rank==null)return'';
+    return`<span class="lh-kpi lh-kpi-neutral">#${rank}${total?' / '+total:''}</span>`;
+  }
+  function sTime(ts){
+    if(!ts)return'<span class="lh-sync-time">Never synced</span>';
+    const m=Math.floor((Date.now()-ts)/60000);
+    const s=m<2?'Just now':m<60?`${m}m ago`:m<1440?`${Math.floor(m/60)}h ago`:`${Math.floor(m/1440)}d ago`;
+    return`<span class="lh-sync-time">${s}</span>`;
+  }
+
+  const cards=reg.map((e,i)=>{
+    const locked=isFree&&e.leagueId!==unlockedId;
+    const pm=PM[e.platform]||{bg:'var(--accentL)',color:'var(--accent)',label:(e.platform||'?').toUpperCase()};
+    const isActive=e.leagueId===savedId;
+    const safeId=e.leagueId.replace(/'/g,"\\'");
+    const safeName=(e.leagueName||'').replace(/'/g,"\\'");
+    const action=locked?`showLeagueUpgradeFromHub('${safeId}','${safeName}')`:`loadLeagueFromRegistry('${safeId}')`;
+    return`<div class="lh-card${locked?' locked':''}" onclick="${action}" style="animation-delay:${i*.06}s${isActive?';border-color:rgba(212,175,55,0.4)':''}">
+      <div class="lh-card-top">
+        <div style="flex:1;min-width:0">
+          <div class="lh-league-name">${escHtml(e.leagueName||'League')}</div>
+          <div class="lh-team-row">
+            <span class="lh-platform-badge" style="background:${pm.bg};color:${pm.color}">${pm.label}</span>
+            ${e.teamName?`<span>${escHtml(e.teamName)}</span>`:''}
+            ${e.season?`<span style="color:var(--text3)">· ${e.season}${e.isDynasty?' · Dynasty':''}</span>`:''}
+          </div>
+        </div>
+        ${locked?'<span style="font-size:16px;flex-shrink:0">🔒</span>':''}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="lh-kpis">${hKpi(e.healthScore)}${rKpi(e.powerRank,e.totalRosters)}</div>
+        ${sTime(e.lastSync)}
+      </div>
+    </div>`;
+  }).join('');
+
+  sb.innerHTML=`<div class="lh-header">
+    <div class="lh-title">Your Leagues</div>
+    <button class="btn btn-ghost" style="font-size:13px;padding:7px 14px" onclick="showAddPlatform()">+ Add Platform</button>
+  </div>
+  <div id="lh-cards">${cards}</div>
+  <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
+  <div class="prog" id="prog" style="display:none;margin-top:8px"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>`;
+}
+window.renderLeagueHub=renderLeagueHub;
+window.App.renderLeagueHub=renderLeagueHub;
+
+function showAddPlatform(platform){
+  platform=platform||'sleeper';
+  const sb=$('setup-block');if(!sb)return;
+  const ts=p=>`background:${p===platform?'var(--bg)':'transparent'};color:${p===platform?'var(--text)':'var(--text3)'}`;
+  const hasReg=getLeagueRegistry().length>0;
+  sb.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      ${hasReg?`<button onclick="renderLeagueHub()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0;display:flex;align-items:center;gap:4px">← Back</button>`:''}
+      <div style="font-size:16px;font-weight:700;letter-spacing:-.02em;flex:1">Add a League</div>
+    </div>
+    <div style="max-width:380px;margin:0 auto 12px;display:flex;gap:6px;background:var(--bg3);border-radius:10px;padding:4px">
+      <button id="tab-sleeper" onclick="showPlatformTab('sleeper')" style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;${ts('sleeper')}">Sleeper</button>
+      <button id="tab-espn"    onclick="showPlatformTab('espn')"    style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;${ts('espn')}">ESPN</button>
+      <button id="tab-mfl"     onclick="showPlatformTab('mfl')"     style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;${ts('mfl')}">MFL</button>
+      <button id="tab-yahoo"   onclick="showPlatformTab('yahoo')"   style="flex:1;padding:8px 12px;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;${ts('yahoo')}">Yahoo</button>
+    </div>
+    <div id="form-sleeper" style="${platform==='sleeper'?'':'display:none;'}max-width:380px;margin:0 auto 14px">
+      <input type="text" id="u-input" placeholder="Sleeper username" style="width:100%;font-size:16px;padding:14px 16px;border-radius:12px;margin-bottom:8px;box-sizing:border-box" onkeydown="if(event.key==='Enter')connect()"/>
+      <button class="btn" id="conn-btn" onclick="connect()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;box-sizing:border-box">Connect Sleeper</button>
+    </div>
+    <div id="form-espn" style="${platform==='espn'?'':'display:none;'}max-width:380px;margin:0 auto 14px">
+      <input type="text" id="espn-league-id" placeholder="ESPN League ID" style="width:100%;font-size:16px;padding:14px 16px;border-radius:12px;margin-bottom:8px;box-sizing:border-box" onkeydown="if(event.key==='Enter')connectESPN()"/>
+      <details style="margin-bottom:8px"><summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:6px 0;list-style:none;display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--text3)">&#9654;</span> Private league? Add cookies</summary>
+        <div style="padding:10px 0 4px">
+          <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:8px">Find these in your browser: open ESPN Fantasy, press F12 → Application → Cookies → fantasy.espn.com</div>
+          <input type="password" id="espn-s2" placeholder="espn_s2 cookie value" style="width:100%;font-size:13px;padding:10px 12px;border-radius:8px;margin-bottom:6px;box-sizing:border-box;font-family:monospace"/>
+          <input type="text" id="espn-swid" placeholder="SWID cookie value  {XXXXXXXX-...}" style="width:100%;font-size:13px;padding:10px 12px;border-radius:8px;box-sizing:border-box;font-family:monospace"/>
+        </div>
+      </details>
+      <button class="btn" id="espn-conn-btn" onclick="connectESPN()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;box-sizing:border-box;background:linear-gradient(135deg,#e03e2d,#c0392b)">Connect ESPN League</button>
+    </div>
+    <div id="form-mfl" style="${platform==='mfl'?'':'display:none;'}max-width:380px;margin:0 auto 14px">
+      <input type="text" id="mfl-league-id" placeholder="MFL League ID" style="width:100%;font-size:16px;padding:14px 16px;border-radius:12px;margin-bottom:8px;box-sizing:border-box" onkeydown="if(event.key==='Enter')connectMFL()"/>
+      <input type="text" id="mfl-year" placeholder="Season year (e.g. 2024)" style="width:100%;font-size:16px;padding:14px 16px;border-radius:12px;margin-bottom:8px;box-sizing:border-box" onkeydown="if(event.key==='Enter')connectMFL()"/>
+      <details style="margin-bottom:8px"><summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:6px 0;list-style:none;display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--text3)">&#9654;</span> Private league? Add API key</summary>
+        <div style="padding:10px 0 4px">
+          <input type="password" id="mfl-api-key" placeholder="MFL API key" style="width:100%;font-size:13px;padding:10px 12px;border-radius:8px;box-sizing:border-box;font-family:monospace"/>
+        </div>
+      </details>
+      <button class="btn" id="mfl-conn-btn" onclick="connectMFL()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;box-sizing:border-box;background:linear-gradient(135deg,#0057b8,#003d8a)">Connect MFL League</button>
+    </div>
+    <div id="form-yahoo" style="${platform==='yahoo'?'':'display:none;'}max-width:380px;margin:0 auto 14px">
+      <div style="text-align:center;padding:10px 0 16px">
+        <div style="display:inline-block;background:linear-gradient(135deg,#6001d2,#430099);border-radius:12px;padding:10px 16px;margin-bottom:12px">
+          <svg viewBox="0 0 60 20" width="60" height="20" fill="white"><text x="0" y="16" font-family="Arial Black,sans-serif" font-weight="900" font-size="18">Yahoo!</text></svg>
+        </div>
+        <p style="font-size:14px;color:var(--text2);line-height:1.6;margin:0">Connect your Yahoo account via OAuth to pull your fantasy leagues.</p>
+      </div>
+      <button class="btn" id="yahoo-conn-btn" onclick="connectYahoo()" style="width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:12px;box-sizing:border-box;background:linear-gradient(135deg,#6001d2,#430099)">Connect with Yahoo</button>
+      <div id="yahoo-league-key-section" style="display:none;margin-top:10px">
+        <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:8px">Or enter your league key directly (e.g. 423.l.12345)</div>
+        <input type="text" id="yahoo-league-key" placeholder="423.l.12345" style="width:100%;font-size:15px;padding:12px 14px;border-radius:10px;margin-bottom:8px;box-sizing:border-box;font-family:monospace" onkeydown="if(event.key==='Enter')connectYahooManual()"/>
+        <button class="btn btn-ghost" onclick="connectYahooManual()" style="width:100%;padding:12px;font-size:14px;font-weight:700;border-radius:10px;box-sizing:border-box">Connect with League Key</button>
+      </div>
+      <button onclick="document.getElementById('yahoo-league-key-section').style.display=document.getElementById('yahoo-league-key-section').style.display==='none'?'block':'none'" style="display:block;width:100%;margin-top:8px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--text3);text-align:center;padding:4px">Have a league key instead?</button>
+    </div>
+    <div id="conn-status" class="status-txt" style="text-align:center;margin-bottom:4px"></div>
+    <div class="prog" id="prog" style="display:none;max-width:380px;margin:0 auto"><div class="prog-bar" id="prog-bar" style="width:0%"></div></div>
+    <div style="text-align:center;font-size:13px;color:var(--text3);margin-top:12px">Read-only access · Nothing posted to your league · No data stored externally</div>`;
+  setTimeout(()=>{
+    if(platform==='sleeper'){const u=$('u-input');if(u)u.focus();}
+    else if(platform==='espn'){const e=$('espn-league-id');if(e)e.focus();}
+  },100);
+}
+window.showAddPlatform=showAddPlatform;
+window.App.showAddPlatform=showAddPlatform;
+
+async function loadLeagueFromRegistry(leagueId){
+  const reg=getLeagueRegistry();
+  const entry=reg.find(e=>e.leagueId===leagueId);
+  if(!entry){renderLeagueHub();return;}
+  const sb=$('setup-block');
+  if(sb)sb.innerHTML=`<div style="text-align:center;padding:20px 0">
+    <div style="margin:0 auto 16px;width:52px;height:52px;background:linear-gradient(135deg,#d4af37,#b8941f);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(212,175,55,0.3)">
+      <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#d4af37;border-radius:50%;animation:spin .7s linear infinite"></span>
+    </div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">${escHtml(entry.leagueName||'Loading...')}</div>
+    <div style="font-size:13px;color:var(--text3)" id="scan-step">Reconnecting...</div>
+    <div class="prog" id="prog" style="margin:12px auto 0;max-width:200px"><div class="prog-bar" id="prog-bar" style="width:10%"></div></div>
+    <div id="conn-status" class="status-txt" style="text-align:center;margin-top:8px"></div>
+  </div>`;
+  // Pre-select this league so showLeaguePicker auto-picks it
+  DhqStorage.setStr(STORAGE_KEYS.LEAGUE,leagueId);
+  try{
+    const plat=entry.platform||'sleeper';
+    if(plat==='sleeper'){
+      if(entry.username){DhqStorage.setStr(STORAGE_KEYS.USERNAME,entry.username);}
+      if(!S.players||Object.keys(S.players).length<100){
+        try{S.players=await window.App.sf('/players/nfl');}catch(e2){S.players=S.players||{};}
+      }
+      const step=$('scan-step');if(step)step.textContent='Loading Sleeper data...';
+      prog(20);
+      await connect();
+    }else if(plat==='espn'){
+      if(entry.espnLeagueId)localStorage.setItem('espn_league_id',entry.espnLeagueId);
+      if(entry.espnYear)localStorage.setItem('espn_year',entry.espnYear);
+      if(entry.espnMyTeam)localStorage.setItem('espn_my_team',entry.espnMyTeam);
+      if(entry.espnS2)localStorage.setItem('espn_s2',entry.espnS2);
+      if(entry.espnSwid)localStorage.setItem('espn_swid',entry.espnSwid);
+      await connectESPN();
+    }else if(plat==='yahoo'){
+      if(entry.yahooLeagueKey)localStorage.setItem('yahoo_league_key',entry.yahooLeagueKey);
+      if(entry.yahooMyTeam)localStorage.setItem('yahoo_my_team',String(entry.yahooMyTeam));
+      if(localStorage.getItem('yahoo_session_id')){
+        const step=$('scan-step');if(step)step.textContent='Reconnecting to Yahoo...';
+        prog(20);
+        const _teamKey=entry.yahooLeagueKey+'.t.'+entry.yahooMyTeam;
+        const _res=await window.Yahoo.connectLeague(entry.yahooLeagueKey,_teamKey);
+        S.myRosterId=String(entry.yahooMyTeam);
+        if(!S.user)S.user={user_id:'yahoo_user',display_name:_res.league.name,username:'yahoo_user'};
+        _updateLeaguePillYahoo(_res.league.name);
+        const sbEl=$('setup-block');if(sbEl)sbEl.style.display='none';
+        const dcEl=$('digest-content');if(dcEl)dcEl.style.display='block';
+        switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
+        prog(100);try{renderHomeSnapshot();}catch(e2){}
+        Promise.resolve().then(()=>loadAllData());
+      }else{
+        showAddPlatform('yahoo');
+        setTimeout(()=>{const st=$('conn-status');if(st){st.textContent='Yahoo session expired — reconnect below';}},100);
+      }
+    }else if(plat==='mfl'){
+      showAddPlatform('mfl');
+      setTimeout(()=>{
+        const mflId=$('mfl-league-id');if(mflId&&entry.mflLeagueId)mflId.value=entry.mflLeagueId;
+        const mflYr=$('mfl-year');if(mflYr&&entry.mflYear)mflYr.value=entry.mflYear;
+        const mflKey=$('mfl-api-key');if(mflKey&&entry.mflApiKey)mflKey.value=entry.mflApiKey;
+        connectMFL();
+      },100);
+    }
+  }catch(e){
+    console.warn('[Hub] loadLeagueFromRegistry failed:',e);
+    renderLeagueHub();
+    setTimeout(()=>{const st=$('conn-status');if(st){st.textContent='Connection failed — try again';st.classList.add('err');}},100);
+  }
+}
+window.loadLeagueFromRegistry=loadLeagueFromRegistry;
+window.App.loadLeagueFromRegistry=loadLeagueFromRegistry;
+
+function showLeagueUpgradeFromHub(leagueId,leagueName){
+  const reg=getLeagueRegistry();
+  const current=reg.find(e=>e.leagueId===(S.currentLeagueId||DhqStorage.getStr(STORAGE_KEYS.LEAGUE)));
+  showLeagueUpgradePrompt(
+    {league_id:leagueId,name:leagueName||leagueId},
+    {league_id:current?.leagueId,name:current?.leagueName||'your league'},
+    leagueId,S.user?.user_id||''
+  );
+}
+window.showLeagueUpgradeFromHub=showLeagueUpgradeFromHub;
+window.App.showLeagueUpgradeFromHub=showLeagueUpgradeFromHub;
+
 function showLeaguePicker(leagues,userId){
   try{
     // URL param from War Room takes priority
@@ -777,7 +1048,7 @@ window.App.showLeagueUpgradePrompt = showLeagueUpgradePrompt;
 function switchLeagueMode(){
   $('setup-block').style.display='block';
   const dc=$('digest-content');if(dc)dc.style.display='none';
-  showLeaguePicker(S.leagues,S.user.user_id);
+  if(getLeagueRegistry().length>0){renderLeagueHub();}else{showLeaguePicker(S.leagues,S.user?.user_id||'');}
   switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
 }
 window.switchLeagueMode = switchLeagueMode;
@@ -823,6 +1094,29 @@ async function loadAllData(){
   const loadBanner=$('dhq-loading-banner');
   if(loadBanner)loadBanner.style.display='none';
   prog(5);
+  // ── Registry upsert with fresh metadata ───────────────────────
+  try{
+    const _plat=S.user?.user_id==='espn_user'?'espn':S.user?.user_id==='yahoo_user'?'yahoo':localStorage.getItem('mfl_league_id')===S.currentLeagueId?'mfl':'sleeper';
+    const _myR=S.rosters?.find(r=>String(r.roster_id)===String(S.myRosterId));
+    const _lObj=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+    if(typeof saveLeagueToRegistry==='function')saveLeagueToRegistry({
+      leagueId:S.currentLeagueId,leagueName:_lObj?.name||'',platform:_plat,
+      teamName:_myR?.owner?.display_name||_myR?.owner?.username||'',
+      season:S.season,myRosterId:S.myRosterId,totalRosters:S.rosters?.length,
+      isDynasty:_lObj?.settings?.type===2,
+      username:_plat==='sleeper'?DhqStorage.getStr(STORAGE_KEYS.USERNAME):null,
+      espnLeagueId:_plat==='espn'?localStorage.getItem('espn_league_id'):null,
+      espnYear:_plat==='espn'?localStorage.getItem('espn_year'):null,
+      espnMyTeam:_plat==='espn'?localStorage.getItem('espn_my_team'):null,
+      espnS2:_plat==='espn'?localStorage.getItem('espn_s2'):null,
+      espnSwid:_plat==='espn'?localStorage.getItem('espn_swid'):null,
+      yahooLeagueKey:_plat==='yahoo'?localStorage.getItem('yahoo_league_key'):null,
+      yahooMyTeam:_plat==='yahoo'?localStorage.getItem('yahoo_my_team'):null,
+      mflLeagueId:_plat==='mfl'?localStorage.getItem('mfl_league_id'):null,
+      mflYear:_plat==='mfl'?localStorage.getItem('mfl_year'):null,
+      mflApiKey:_plat==='mfl'?localStorage.getItem('mfl_api_key'):null,
+    });
+  }catch(e){}
   try{
     if(typeof updateSyncStatus==='function')updateSyncStatus();
     await Promise.all([
@@ -858,6 +1152,7 @@ async function loadAllData(){
       setTimeout(()=>{if(typeof startStrategyWalkthrough==='function')startStrategyWalkthrough();},500);
     }
     try{if(typeof runMemoryCapture==='function')runMemoryCapture(S.currentLeagueId);}catch(e){dhqLog('loadAllData.runMemoryCapture',e);}
+    try{if(typeof updateRegistryKPIs==='function')updateRegistryKPIs(S.currentLeagueId);}catch(e){}
     // Load player tags (syncs with War Room)
     if(window.OD?.loadPlayerTags){
       window.OD.loadPlayerTags(S.currentLeagueId).then(tags=>{
@@ -1098,6 +1393,13 @@ window.checkForAlerts = checkForAlerts;
     // Restore notification button state
     if('Notification' in window&&Notification.permission==='granted'){const nb=$('notif-btn');if(nb)nb.textContent='Enabled \u2713';}
     const savedUser = DhqStorage.getStr(STORAGE_KEYS.USERNAME);
+
+    // ── League Hub: show game-save style picker if registry has leagues ──
+    if(getLeagueRegistry().length>0&&!new URLSearchParams(window.location.search).get('yahoo_session')){
+      renderLeagueHub();
+      if(typeof loadUserTier==='function')loadUserTier().catch(()=>{});
+      return;
+    }
 
     // ── Yahoo OAuth callback detection ────────────────────────────
     // After Yahoo OAuth, the edge function redirects back with ?yahoo_session=UUID.

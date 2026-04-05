@@ -1282,6 +1282,87 @@ h1,h2,h3,
 .tbar-card-stat{background:var(--bg3);border-radius:7px;padding:7px 8px;text-align:center;border:1px solid var(--border)}
 .tbar-card-stat-val{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2;font-family:'Oswald',monospace}
 .tbar-card-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+/* ══════════════════════════════════════════════════════════════
+   LEAGUE HUB — save-slot style league selector
+   ══════════════════════════════════════════════════════════════ */
+@keyframes hubCardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hubSpinAnim{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
+#league-hub{margin-bottom:16px}
+
+.hub-wrap{display:flex;flex-direction:column;gap:16px}
+
+/* Top bar: title + add button */
+.hub-top-bar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:4px}
+.hub-section-title{font-size:18px;font-weight:800;letter-spacing:-.03em;margin-bottom:6px}
+.hub-platforms-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hub-username{font-size:12px;color:var(--text3);font-weight:500;letter-spacing:.01em}
+.hub-add-btn{flex-shrink:0;padding:8px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.hub-add-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accentL)}
+
+/* Platform badges */
+.hub-platform-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;border-radius:5px;padding:2px 7px;letter-spacing:.05em;line-height:1.5}
+.hub-badge-sleeper{background:rgba(46,204,113,.18);color:#2ecc71;border:1px solid rgba(46,204,113,.3)}
+.hub-badge-espn{background:rgba(224,62,45,.18);color:#ff6b5e;border:1px solid rgba(224,62,45,.3)}
+.hub-badge-mfl{background:rgba(96,165,250,.18);color:#60a5fa;border:1px solid rgba(96,165,250,.3)}
+.hub-badge-yahoo{background:rgba(96,1,210,.18);color:#a855f7;border:1px solid rgba(148,51,234,.3)}
+
+/* Cards container */
+.hub-cards{display:flex;flex-direction:column;gap:10px}
+
+/* Individual league card */
+.hub-card{
+  background:var(--bg2);
+  border:1px solid rgba(212,175,55,.18);
+  border-radius:10px;
+  padding:16px;
+  cursor:pointer;
+  transition:border-color .2s,box-shadow .2s,transform .2s;
+  animation:hubCardIn .35s ease both;
+  -webkit-tap-highlight-color:transparent;
+  position:relative;
+  overflow:hidden;
+}
+.hub-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 80% 20%,rgba(212,175,55,.05) 0%,transparent 60%);
+  pointer-events:none;
+}
+.hub-card:active{transform:scale(.98)}
+
+/* Card rows */
+.hub-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}
+.hub-card-name{font-size:16px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.hub-card-mid{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.hub-card-team{font-size:13px;color:var(--text2);font-weight:500}
+.hub-card-season{font-size:12px;color:var(--text3);background:var(--bg3);padding:2px 8px;border-radius:4px;font-weight:600;flex-shrink:0}
+
+/* KPI row */
+.hub-card-bot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hub-kpi-group{display:flex;gap:8px}
+.hub-kpi-badge{display:flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 9px}
+.hub-kpi-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;opacity:.7}
+.hub-kpi-num{font-size:14px;font-weight:800;letter-spacing:-.02em;font-family:'JetBrains Mono',monospace}
+.hub-sync-str{font-size:11px;color:var(--text3);letter-spacing:.01em}
+.hub-sync-never{color:var(--accent);opacity:.6}
+
+/* Empty state */
+.hub-empty{text-align:center;padding:32px 20px;background:var(--bg2);border:1px solid var(--border);border-radius:10px}
+.hub-empty-icon{font-size:40px;margin-bottom:14px;line-height:1}
+.hub-empty-title{font-size:18px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.hub-empty-sub{font-size:14px;color:var(--text3);line-height:1.6;max-width:300px;margin:0 auto 20px}
+.hub-platform-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.hub-platform-btn{padding:9px 18px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:#fff;transition:all .15s;letter-spacing:.02em}
+.hub-platform-btn:hover{transform:translateY(-1px);filter:brightness(1.15)}
+.hub-platform-btn:active{transform:scale(.96)}
+.hub-btn-sleeper{background:linear-gradient(135deg,#2ecc71,#27ae60)}
+.hub-btn-espn{background:linear-gradient(135deg,#e03e2d,#c0392b)}
+.hub-btn-mfl{background:linear-gradient(135deg,#0057b8,#003d8a)}
+.hub-btn-yahoo{background:linear-gradient(135deg,#6001d2,#430099)}
+
+/* Loading spinner used inside hub */
+.hub-spinner{display:inline-block;width:22px;height:22px;border:2.5px solid rgba(255,255,255,.15);border-top-color:var(--accent);border-radius:50%;animation:hubSpinAnim .7s linear infinite}
+
 /* Action buttons row */
 .tbar-card-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
 .tbar-card-btn{font-size:12px;font-weight:600;padding:7px 4px;border-radius:7px;border:1px solid var(--border2);background:none;cursor:pointer;font-family:inherit;color:var(--text2);transition:all .15s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
@@ -1294,3 +1375,29 @@ h1,h2,h3,
 .tbar-card-sell:hover{background:var(--amberL)}
 .tbar-card-replace{color:var(--text2);border-color:var(--border2)}
 .tbar-card-replace:hover{background:var(--bg3);color:var(--text)}
+
+/* ── League Hub ─────────────────────────────────────────────────── */
+.lh-header{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.lh-title{font-size:18px;font-weight:700;letter-spacing:-.02em;flex:1}
+.lh-card{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .15s;position:relative;animation:cardIn .3s ease both}
+.lh-card:hover{border-color:var(--accent);box-shadow:0 4px 16px rgba(212,175,55,.12);transform:translateY(-1px)}
+.lh-card:active{transform:scale(.99)}
+.lh-card.locked{opacity:.55;cursor:default}
+.lh-card.locked:hover{border-color:var(--border2);box-shadow:none;transform:none}
+.lh-card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.lh-league-name{font-size:16px;font-weight:700;letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px}
+.lh-platform-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.06em;flex-shrink:0}
+.lh-team-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);flex-wrap:wrap}
+.lh-kpis{display:flex;gap:5px;flex-wrap:wrap;flex:1}
+.lh-kpi{font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.lh-kpi-green{background:var(--greenL);color:var(--green)}
+.lh-kpi-amber{background:var(--amberL);color:var(--amber)}
+.lh-kpi-red{background:var(--redL);color:var(--red)}
+.lh-kpi-neutral{background:var(--bg4);color:var(--text3)}
+.lh-sync-time{font-size:11px;color:var(--text3);flex-shrink:0;white-space:nowrap}
+.lh-empty{text-align:center;padding:20px 0 12px}
+.lh-empty-title{font-size:20px;font-weight:700;letter-spacing:-.03em;margin-bottom:8px}
+.lh-empty-sub{font-size:14px;color:var(--text3);margin-bottom:20px;line-height:1.5}
+.lh-platform-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:300px;margin:0 auto}
+.lh-platform-btn{padding:12px;border-radius:var(--r);font-size:14px;font-weight:700;border:1px solid var(--border2);background:var(--bg3);color:var(--text);cursor:pointer;transition:all .15s;font-family:inherit}
+.lh-platform-btn:hover{border-color:var(--accent);background:var(--accentL);color:var(--accent)}
