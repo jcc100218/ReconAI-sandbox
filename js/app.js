@@ -218,6 +218,168 @@ async function connect(){
 window.connect = connect;
 window.App.connect = connect;
 
+// ── Platform tab toggle ────────────────────────────────────────
+function showPlatformTab(platform){
+  const sleeper=$('form-sleeper');const espn=$('form-espn');
+  const tabS=$('tab-sleeper');const tabE=$('tab-espn');
+  if(platform==='espn'){
+    if(sleeper)sleeper.style.display='none';
+    if(espn)espn.style.display='block';
+    if(tabS){tabS.style.background='transparent';tabS.style.color='var(--text3)';}
+    if(tabE){tabE.style.background='var(--bg)';tabE.style.color='var(--text)';}
+  }else{
+    if(sleeper)sleeper.style.display='block';
+    if(espn)espn.style.display='none';
+    if(tabS){tabS.style.background='var(--bg)';tabS.style.color='var(--text)';}
+    if(tabE){tabE.style.background='transparent';tabE.style.color='var(--text3)';}
+  }
+}
+window.showPlatformTab = showPlatformTab;
+
+// ── ESPN Connect ───────────────────────────────────────────────
+async function connectESPN(){
+  const leagueIdRaw=($('espn-league-id')?.value||'').trim();
+  if(!leagueIdRaw){ss('conn-status','Enter your ESPN League ID',true);return;}
+  // ESPN league IDs are numeric
+  const leagueId=leagueIdRaw.replace(/\D/g,'');
+  if(!leagueId){ss('conn-status','League ID must be a number (from your ESPN URL)',true);return;}
+
+  const espnS2=($('espn-s2')?.value||'').trim();
+  const swid=($('espn-swid')?.value||'').trim();
+
+  const btn=$('espn-conn-btn');
+  if(btn){btn.disabled=true;btn.textContent='Connecting...';}
+  const progEl=$('prog');if(progEl)progEl.style.display='block';
+  prog(5);ss('conn-status','Connecting to ESPN...');
+
+  try{
+    if(!window.ESPN){throw new Error('ESPN connector not loaded — refresh and try again.');}
+
+    // Use current season from settings or current year
+    const selEl=$('season-sel');
+    const year=parseInt(selEl?.value||String(new Date().getFullYear()));
+
+    // Load Sleeper player DB for crosswalk (if not already loaded)
+    prog(15);ss('conn-status','Loading player database...');
+    if(!S.players||Object.keys(S.players).length<100){
+      try{
+        S.players=await window.App.sf('/players/nfl');
+      }catch(e){
+        console.warn('[ESPN] Could not load Sleeper player DB — crosswalk will be limited:',e);
+        S.players=S.players||{};
+      }
+    }
+
+    prog(35);ss('conn-status','Fetching ESPN league data...');
+    const result=await window.ESPN.connectLeague(leagueId,year,espnS2,swid);
+
+    prog(70);ss('conn-status','Mapping rosters...');
+
+    // Show team picker — user must identify their own team
+    if(btn){btn.disabled=false;btn.textContent='Connect ESPN League';}
+    prog(80);
+    showESPNTeamPicker(result,leagueId,year,espnS2,swid);
+
+  }catch(e){
+    ss('conn-status','Error: '+e.message,true);
+    if(btn){btn.disabled=false;btn.textContent='Connect ESPN League';}
+    if(progEl)progEl.style.display='none';
+  }
+}
+window.connectESPN = connectESPN;
+
+function showESPNTeamPicker(result,leagueId,year,espnS2,swid){
+  const{rosters,league}=result;
+  const setupEl=$('setup-block');
+  if(!setupEl)return;
+
+  const teamRows=rosters.map(r=>`
+    <div onclick="selectESPNTeam('${r.roster_id}','${leagueId}','${year}','${escHtml(espnS2||'')}','${escHtml(swid||'')}')"
+      style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .15s"
+      onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+      <div style="width:36px;height:36px;border-radius:9px;background:#e03e2d;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0">${r.roster_id}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r._team_name||'Team '+r.roster_id)}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${r.players.length} players · ${r.settings.wins}-${r.settings.losses}</div>
+      </div>
+    </div>`).join('');
+
+  setupEl.innerHTML=`
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;background:#e03e2d;color:#fff;border-radius:6px;padding:3px 10px;margin-bottom:10px;letter-spacing:.06em">ESPN</div>
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:6px">${escHtml(league.name)}</h3>
+      <p style="font-size:13px;color:var(--text3)">${league.total_rosters} teams · ${year} · Select your team below</p>
+    </div>
+    <div id="espn-team-list" style="max-width:440px;margin:0 auto">${teamRows}</div>`;
+}
+window.showESPNTeamPicker = showESPNTeamPicker;
+
+async function selectESPNTeam(rosterId,leagueId,year,espnS2,swid){
+  const S_ref=window.S||window.App?.S;
+  if(!S_ref)return;
+
+  // Set my roster
+  S_ref.myRosterId=String(rosterId);
+
+  // Show scanning spinner
+  const setupEl=$('setup-block');
+  if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
+    <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#e03e2d;border-radius:50%;animation:spin .7s linear infinite"></span>
+    <div style="font-size:16px;font-weight:700;margin:14px 0 6px">Loading your league...</div>
+    <div style="font-size:13px;color:var(--text3)">Mapping ESPN data to ReconAI</div>
+  </div>`;
+
+  try{
+    // Persist ESPN credentials
+    try{
+      localStorage.setItem('espn_league_id',leagueId);
+      localStorage.setItem('espn_year',String(year));
+      if(espnS2)localStorage.setItem('espn_s2',espnS2);
+      if(swid)localStorage.setItem('espn_swid',swid);
+      localStorage.setItem('espn_my_team',String(rosterId));
+    }catch(e){}
+
+    // Update league pill with ESPN badge
+    _updateLeaguePillESPN(S_ref.leagues[0]?.name||'ESPN League');
+
+    // Show the main dashboard
+    const sb=$('setup-block');if(sb)sb.style.display='none';
+    const dc=$('digest-content');if(dc)dc.style.display='block';
+    switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
+    prog(100);
+
+    try{if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();}catch(e){}
+    try{if(typeof checkApiKeyCallout==='function')checkApiKeyCallout();}catch(e){}
+    try{if(typeof updateSettingsStatus==='function')updateSettingsStatus();}catch(e){}
+
+    // Load DHQ intel + stats (uses Sleeper IDs from crosswalk, works for matched players)
+    Promise.resolve().then(()=>loadAllData());
+
+  }catch(e){
+    console.error('[ESPN] selectESPNTeam error:',e);
+    if(setupEl)setupEl.innerHTML=`<div style="color:var(--red);font-size:14px;text-align:center">Error: ${escHtml(e.message)}</div><button class="btn btn-ghost btn-sm" style="margin-top:10px" onclick="connectESPN()">Try again</button>`;
+  }
+}
+window.selectESPNTeam = selectESPNTeam;
+
+function _updateLeaguePillESPN(leagueName){
+  const lp=$('league-pill');
+  if(lp)lp.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#e03e2d;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">ESPN</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
+}
+
+// Auto-restore ESPN session on page load
+function _tryRestoreESPN(){
+  try{
+    const leagueId=localStorage.getItem('espn_league_id');
+    const year=localStorage.getItem('espn_year');
+    const myTeam=localStorage.getItem('espn_my_team');
+    if(!leagueId||!year||!myTeam)return false;
+    // Check if we have the data already
+    if(S.platform==='espn'&&S.currentLeagueId)return true;
+    return false; // Needs fresh fetch — caller handles
+  }catch(e){return false;}
+}
+
 function showLeaguePicker(leagues,userId){
   try{
     // URL param from War Room takes priority
