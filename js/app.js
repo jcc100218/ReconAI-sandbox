@@ -97,19 +97,7 @@ function updateLineupTabVisibility() {
   if (lineupNav) lineupNav.style.display = inSeason ? '' : 'none';
 
   const existingPromo = document.getElementById('lineup-promo-card');
-  if (inSeason) {
-    if (existingPromo) existingPromo.remove();
-  } else if (!existingPromo) {
-    const homePanel = document.getElementById('panel-digest');
-    const chatModule = homePanel?.querySelector('.recon-chat-module');
-    if (chatModule) {
-      const promo = document.createElement('div');
-      promo.id = 'lineup-promo-card';
-      promo.style.cssText = 'margin:12px 0;padding:16px 18px;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);text-align:center;background-image:linear-gradient(135deg,rgba(124,107,248,.06),rgba(124,107,248,.02))';
-      promo.innerHTML = '<div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">\u{1F3C8} START/SIT ASSISTANT \u2014 Coming Fall 2026</div><div style="font-size:13px;color:var(--text3);line-height:1.5">Get AI-powered lineup recommendations every week during the NFL season.</div>';
-      chatModule.insertAdjacentElement('afterend', promo);
-    }
-  }
+  if (existingPromo) existingPromo.remove();
 }
 window.isNFLInSeason = isNFLInSeason;
 window.updateLineupTabVisibility = updateLineupTabVisibility;

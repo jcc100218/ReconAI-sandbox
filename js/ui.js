@@ -2277,21 +2277,11 @@ function renderCrownJewels(){
 
 function toggleJewels(){}
 
-// ── Master home render — calls all new mobile components ──────
+// ── Master home render — v4 components only ──────────────────
 function renderMobileHome(){
-  renderHomeSkeletons(); // Show skeletons immediately
-  // Refresh v4 components
   if(typeof renderScoutBriefing==='function')renderScoutBriefing();
   if(typeof renderFieldLogCard==='function')renderFieldLogCard();
   if(typeof renderTeamBar==='function')renderTeamBar();
-  renderTeamSnapshot();
-  // Small spacer between snapshot and hero action
-  const spacer=document.createElement('div');spacer.style.height='8px';
-  const heroEl=$('home-hero-action');if(heroEl&&heroEl.parentNode)heroEl.parentNode.insertBefore(spacer,heroEl);
-  renderHeroAction();
-  renderPrepareCards();
-  renderBiggestNeeds();
-  if(typeof renderLeaguePulse==='function')renderLeaguePulse();
 }
 
 // ── Strategy Walkthrough ───────────────────────────────────────
