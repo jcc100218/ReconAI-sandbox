@@ -632,36 +632,22 @@ function renderLeaguePanel() {
   sorted.forEach((roster, idx) => {
     const owner = (S.leagueUsers || []).find(u => u.user_id === roster.owner_id);
     const teamName = owner?.metadata?.team_name || owner?.display_name || `Team ${idx + 1}`;
-    const displayName = owner?.display_name || owner?.username || '?';
-    const initial = (teamName[0] || '?').toUpperCase();
     const w = roster.settings?.wins || 0;
     const l = roster.settings?.losses || 0;
     const t = roster.settings?.ties || 0;
     const isMe = roster.roster_id === myId;
     const winPct = (w + l) > 0 ? w / (w + l) : 0.5;
-
-    // DNA tags
-    const tags = [];
-    if (winPct > 0.65) tags.push({ label: 'Win-now', cls: 'dna-hold' });
-    else if (winPct < 0.35) tags.push({ label: 'Rebuilding', cls: 'dna-build' });
-    else tags.push({ label: 'Competing', cls: 'dna-buy' });
-
-    if (!isMe && Math.abs(w - myWins) <= 2) tags.push({ label: 'Trade target', cls: 'dna-sell' });
-    if (isMe) tags.push({ label: 'You', cls: 'dna-build' });
+    const barW = Math.round(winPct * 100);
 
     const prompt = `Tell me about ${teamName} and how to exploit their weaknesses`;
-    html += `<div class="league-owner-card${isMe ? ' league-owner-me' : ''}" onclick="fillGlobalChat(${JSON.stringify(prompt)})">
-      <div class="league-owner-header">
-        <div class="league-owner-avatar">${_esc(initial)}</div>
-        <div class="league-owner-info">
-          <div class="league-owner-name">${_esc(teamName)}</div>
-          <div class="league-owner-record">${w}-${l}${t > 0 ? `-${t}` : ''} · @${_esc(displayName)}</div>
-        </div>
-        <div class="league-owner-rank">#${idx + 1}</div>
+    html += `<div class="league-card${isMe ? ' league-card-me' : ''}" onclick="fillGlobalChat(${JSON.stringify(prompt)})">
+      <div class="league-card-rank">#${idx + 1}</div>
+      <div class="league-card-body">
+        <div class="league-card-name">${_esc(teamName)}${isMe ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">YOU</span>' : ''}</div>
+        <div class="league-card-meta">${w}-${l}${t > 0 ? `-${t}` : ''}</div>
+        <div class="league-card-bar"><div class="league-card-bar-fill" style="width:${barW}%"></div></div>
       </div>
-      <div class="league-dna-tags">
-        ${tags.map(tag => `<span class="league-dna-tag ${tag.cls}">${_esc(tag.label)}</span>`).join('')}
-      </div>
+      <div class="league-card-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>`;
   });
 

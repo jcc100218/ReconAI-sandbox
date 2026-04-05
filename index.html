@@ -33,6 +33,7 @@
       </div>
       <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" target="_blank" class="header-hide-sm wr-glow" style="font-size:13px;color:var(--amber);text-decoration:none;font-weight:700;padding:4px 10px;border:1px solid rgba(251,191,36,.2);border-radius:6px;white-space:nowrap" title="War Room">War Room</a>
       <a href="https://github.com/jcc100218/ReconAI/issues" target="_blank" class="header-hide-sm" style="color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.5" title="Send Feedback"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></a>
+      <button id="refresh-btn" onclick="handleRefreshClick()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Refresh data"><svg id="refresh-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:10px;transition:color .15s;flex-shrink:0;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
   </div>
@@ -400,74 +401,54 @@
 
     <!-- PLAYER PROFILE — Mobile bottom sheet -->
     <div id="player-modal" class="pm-overlay" style="display:none">
-      <div class="pm-sheet">
-        <!-- Drag handle -->
-        <div class="pm-handle"><div class="pm-handle-bar"></div></div>
-        <!-- Sticky header -->
-        <div class="pm-header" id="pm-banner">
-          <button onclick="closePlayerModal()" class="pm-close">&times;</button>
-          <div style="display:flex;gap:14px;align-items:center">
-            <div style="position:relative;flex-shrink:0">
-              <img id="pm-photo" src="" class="pm-avatar" onerror="this.style.display='none';document.getElementById('pm-initials').style.display='flex'"/>
-              <div id="pm-initials" class="pm-avatar-fallback"></div>
-              <div id="pm-pos-badge" class="pm-pos-badge"></div>
-            </div>
-            <div style="flex:1;min-width:0">
-              <div id="pm-name" style="font-size:18px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1.15;margin-bottom:2px"></div>
-              <div id="pm-bio" style="font-size:13px;color:var(--text3);margin-bottom:4px"></div>
-              <div style="display:flex;gap:5px;flex-wrap:wrap" id="pm-tags"></div>
-            </div>
+      <div class="pm-card">
+        <button onclick="closePlayerModal()" class="pm-close">&times;</button>
+        <!-- Header -->
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+          <div style="position:relative;flex-shrink:0">
+            <img id="pm-photo" src="" class="pm-avatar" onerror="this.style.display='none';document.getElementById('pm-initials').style.display='flex'"/>
+            <div id="pm-initials" class="pm-avatar-fallback"></div>
+            <div id="pm-pos-badge" class="pm-pos-badge"></div>
           </div>
-          <!-- Recon Verdict banner -->
-          <div id="pm-verdict" style="margin-top:10px"></div>
-          <div id="pm-idp-badge" style="display:none"></div>
+          <div style="flex:1;min-width:0">
+            <div id="pm-name" style="font-size:16px;font-weight:700;letter-spacing:-.02em;color:var(--text);line-height:1.15;margin-bottom:2px"></div>
+            <div id="pm-bio" style="font-size:12px;color:var(--text3);margin-bottom:4px"></div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap" id="pm-tags"></div>
+          </div>
         </div>
-
-        <!-- Scrollable body -->
-        <div class="pm-body">
-          <!-- Dynasty insight -->
-          <div id="pm-insight" style="margin-bottom:12px"></div>
-
-          <!-- Stats bar -->
-          <div id="pm-stats-bar" class="pm-stats-grid"></div>
-
-          <!-- Age curve -->
-          <div style="margin-bottom:14px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Age Curve</div>
-              <div id="pm-peak-tag" style="font-size:13px;color:var(--text2)"></div>
-            </div>
-            <div class="age-curve-bar" id="pm-curve"></div>
-            <div class="acb-label" id="pm-curve-lbl"></div>
+        <!-- Hidden stubs for JS compat -->
+        <div id="pm-verdict" style="display:none"></div>
+        <div id="pm-idp-badge" style="display:none"></div>
+        <div id="pm-insight" style="display:none"></div>
+        <!-- Stats bar -->
+        <div id="pm-stats-bar" class="pm-stats-grid"></div>
+        <!-- NFL Depth label -->
+        <div id="pm-depth-label" style="text-align:center;font-size:11px;color:var(--text3);margin:-8px 0 10px;text-transform:uppercase;letter-spacing:.05em"></div>
+        <!-- Age curve -->
+        <div style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Age Curve</div>
+            <div id="pm-peak-tag" style="font-size:11px;color:var(--text2)"></div>
           </div>
-
-          <!-- Season sparkline -->
-          <div id="pm-spark-wrap" style="margin-bottom:14px;display:none">
-            <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Points this season</div>
-            <div class="pts-sparkline" id="pm-spark"></div>
-            <div id="pm-spark-lbl" style="font-size:13px;color:var(--text3);margin-top:3px;display:flex;gap:0"></div>
-          </div>
-
-          <!-- Trade value + Trade Profile / IDP stats -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-            <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
-              <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Dynasty Value</div>
-              <div id="pm-trade-val" style="font-size:22px;font-weight:700;letter-spacing:-.02em;color:var(--accent)"></div>
-              <div id="pm-trade-tier" style="font-size:13px;color:var(--text2);margin-top:2px"></div>
-            </div>
-            <div id="pm-right-panel" style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"></div>
-          </div>
-
+          <div class="age-curve-bar" id="pm-curve"></div>
+          <div class="acb-label" id="pm-curve-lbl"></div>
         </div>
-
-        <!-- Tag section -->
-        <div id="pm-tag-section" style="margin:0 16px 8px;display:none"></div>
-
-        <!-- Sticky action bar -->
-        <div class="pm-action-bar">
-          <button class="pm-action-btn pm-action-primary" id="pm-ask-btn">Scout Report</button>
-          <button class="pm-action-btn" id="pm-trade-btn">Trade Finder</button>
+        <!-- Hidden sparkline stub -->
+        <div id="pm-spark-wrap" style="display:none"><div id="pm-spark"></div><div id="pm-spark-lbl"></div></div>
+        <!-- Dynasty Value + Trade Profile -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="background:var(--bg3);border-radius:var(--r);padding:10px 12px">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Dynasty Value</div>
+            <div id="pm-trade-val" style="font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--accent)"></div>
+            <div id="pm-trade-tier" style="font-size:12px;color:var(--text2);margin-top:2px"></div>
+          </div>
+          <div id="pm-right-panel" style="background:var(--bg3);border-radius:var(--r);padding:10px 12px"></div>
         </div>
+        <!-- Tags -->
+        <div id="pm-tag-section" style="display:none"></div>
+        <!-- Hidden action button stubs -->
+        <button id="pm-ask-btn" style="display:none"></button>
+        <button id="pm-trade-btn" style="display:none"></button>
       </div>
     </div>
 

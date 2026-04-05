@@ -200,17 +200,18 @@ function openPlayerModal(playerId){
     ];
   }else{
     const _gp=stats.prevGP||stats.gp||'—';
-    const _dcLbl2=getDcLabel(playerId);
     statBoxes=[
       {val:val>0?val.toLocaleString():'—',lbl:'DHQ Value',col:col},
       {val:fcRankData?'#'+fcRankData.pos:'—',lbl:'Pos Rank',col:'var(--accent)'},
       {val:stats.prevAvg?.toFixed(1)||stats.seasonAvg?.toFixed(1)||'—',lbl:`'${prevYr} PPG`,col:stats.prevAvg>15?'var(--green)':stats.prevAvg&&stats.prevAvg<8?'var(--red)':'var(--text)'},
       {val:typeof _gp==='number'?_gp:'—',lbl:'GP',col:_gp>=14?'var(--green)':_gp>=10?'var(--text)':'var(--red)'},
       {val:trendLabel,lbl:'30d Trend',col:trendCol},
-      {val:_dcLbl2||'—',lbl:'NFL Depth',col:_dcLbl2&&/[12]$/.test(_dcLbl2)?'var(--green)':'var(--text3)'},
     ];
   }
   $('pm-stats-bar').innerHTML=statBoxes.map(s=>`<div class="pm-stat-box"><div class="pm-stat-box-val" style="color:${s.col}">${s.val}</div><div class="pm-stat-box-lbl">${s.lbl}</div></div>`).join('');
+  // NFL Depth label below stats bar
+  const depthLbl=$('pm-depth-label');
+  if(depthLbl){const _dc=getDcLabel(playerId);depthLbl.textContent=_dc?_dc+' · NFL Depth':'';}
 
   // Age curve
   const ages=Array.from({length:17},(_,i)=>i+20);
@@ -276,53 +277,35 @@ function openPlayerModal(playerId){
       }).join('')}</div>`;
   }
 
-  // Action buttons
-  $('pm-ask-btn').textContent='Scout Report ↗';
-  $('pm-ask-btn').onclick=()=>goAsk(`SEARCH FOR CURRENT INFO FIRST: Look up ${pName(playerId)} ${pos} ${fullTeam(p.team)} current situation, depth chart, and dynasty outlook for 2026. Then give a dynasty buy/sell/hold recommendation with current team context, role, and trade value. DHQ value: ${dynastyValue(playerId).toLocaleString()}.`);
-  $('pm-trade-btn').textContent=onMyTeam?'Trade Finder ↗':'Trade for ↗';
-  $('pm-trade-btn').onclick=()=>{
-    const ownerCtx=LI_LOADED&&LI.ownerProfiles?Object.entries(LI.ownerProfiles).filter(([rid])=>parseInt(rid)!==S.myRosterId).map(([rid,p2])=>{
-      if(!p2.trades)return null;
-      const name=S.leagueUsers.find(u=>{const r=S.rosters.find(r2=>r2.roster_id===parseInt(rid));return r&&u.user_id===r.owner_id;})?.display_name||'Team';
-      return`${name}(${p2.dna}${p2.targetPos?',wants '+p2.targetPos:''})`;
-    }).filter(Boolean).slice(0,6).join('; '):'';
-    const histCtx=LI.playerTradeHistory?.[playerId]?.length?`This player has been traded ${LI.playerTradeHistory[playerId].length} time(s) in this league.`:'';
-    if(onMyTeam){
-      goAsk(`Find the best trade partner for ${pName(playerId)} (${pos}, DHQ ${dynastyValue(playerId).toLocaleString()}). ${histCtx} Consider which owner needs a ${pos} and what I should ask for in return. Owner profiles: ${ownerCtx}. Draft a Sleeper-ready trade message.`);
-    }else{
-      goAsk(`I want to acquire ${pName(playerId)} (${pos}, DHQ ${dynastyValue(playerId).toLocaleString()}). ${histCtx} Who owns them and what would be a fair offer? Owner profiles: ${ownerCtx}. Draft a Sleeper-ready trade message.`);
-    }
-  };
+  // Action buttons (hidden stubs — still wired for compat)
+  const askBtn=$('pm-ask-btn');
+  if(askBtn){
+    askBtn.onclick=()=>goAsk(`SEARCH FOR CURRENT INFO FIRST: Look up ${pName(playerId)} ${pos} ${fullTeam(p.team)} current situation, depth chart, and dynasty outlook for 2026. Then give a dynasty buy/sell/hold recommendation with current team context, role, and trade value. DHQ value: ${dynastyValue(playerId).toLocaleString()}.`);
+  }
+  const tradeBtn=$('pm-trade-btn');
+  if(tradeBtn){
+    tradeBtn.onclick=()=>{
+      const ownerCtx=LI_LOADED&&LI.ownerProfiles?Object.entries(LI.ownerProfiles).filter(([rid])=>parseInt(rid)!==S.myRosterId).map(([rid,p2])=>{
+        if(!p2.trades)return null;
+        const name=S.leagueUsers.find(u=>{const r=S.rosters.find(r2=>r2.roster_id===parseInt(rid));return r&&u.user_id===r.owner_id;})?.display_name||'Team';
+        return`${name}(${p2.dna}${p2.targetPos?',wants '+p2.targetPos:''})`;
+      }).filter(Boolean).slice(0,6).join('; '):'';
+      const histCtx=LI.playerTradeHistory?.[playerId]?.length?`This player has been traded ${LI.playerTradeHistory[playerId].length} time(s) in this league.`:'';
+      if(onMyTeam){
+        goAsk(`Find the best trade partner for ${pName(playerId)} (${pos}, DHQ ${dynastyValue(playerId).toLocaleString()}). ${histCtx} Consider which owner needs a ${pos} and what I should ask for in return. Owner profiles: ${ownerCtx}. Draft a Sleeper-ready trade message.`);
+      }else{
+        goAsk(`I want to acquire ${pName(playerId)} (${pos}, DHQ ${dynastyValue(playerId).toLocaleString()}). ${histCtx} Who owns them and what would be a fair offer? Owner profiles: ${ownerCtx}. Draft a Sleeper-ready trade message.`);
+      }
+    };
+  }
 
-  // Show modal (bottom sheet)
+  // Show card
   const modal=$('player-modal');
   modal.style.display='flex';
   modal.onclick=e=>{if(e.target===modal)closePlayerModal();};
-  // Scroll body to top
-  const pmBody=modal.querySelector('.pm-body');
-  if(pmBody)pmBody.scrollTop=0;
-
-  // Swipe-to-dismiss gesture on drag handle
-  const pmSheet=modal.querySelector('.pm-sheet');
-  const pmHandle=modal.querySelector('.pm-handle');
-  if(pmSheet&&pmHandle&&!pmSheet._swipeInit){
-    pmSheet._swipeInit=true;
-    let startY=0,dragging=false;
-    pmHandle.addEventListener('touchstart',e=>{startY=e.touches[0].clientY;dragging=true;pmSheet.style.transition='none';},{passive:true});
-    pmSheet.addEventListener('touchmove',e=>{
-      if(!dragging)return;
-      const dy=e.touches[0].clientY-startY;
-      if(dy>0){pmSheet.style.transform=`translateY(${dy}px)`;pmSheet.style.opacity=Math.max(0.4,1-dy/400);}
-    },{passive:true});
-    pmSheet.addEventListener('touchend',e=>{
-      if(!dragging)return;
-      dragging=false;
-      const dy=e.changedTouches[0].clientY-startY;
-      pmSheet.style.transition='transform .2s ease,opacity .2s ease';
-      if(dy>100){pmSheet.style.transform='translateY(100%)';pmSheet.style.opacity='0';setTimeout(()=>{closePlayerModal();pmSheet.style.transform='';pmSheet.style.opacity='';},200);}
-      else{pmSheet.style.transform='';pmSheet.style.opacity='';}
-    });
-  }
+  // Scroll card to top
+  const pmCard=modal.querySelector('.pm-card');
+  if(pmCard)pmCard.scrollTop=0;
 
   // News section removed (xAI disabled)
   const newsEl=$('pm-news');if(newsEl){newsEl.style.display='none';newsEl.innerHTML='';}

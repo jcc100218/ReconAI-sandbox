@@ -1008,6 +1008,21 @@ async function resyncAllData(){
   showToast('Data refreshed ✓');
 }
 
+async function handleRefreshClick(){
+  const btn=document.getElementById('refresh-btn');
+  const icon=document.getElementById('refresh-icon');
+  if(!btn||btn.disabled)return;
+  btn.disabled=true;
+  if(icon)icon.style.animation='spin .7s linear infinite';
+  btn.style.opacity='1';btn.style.color='var(--accent)';
+  try{await resyncAllData();}finally{
+    if(icon)icon.style.animation='';
+    btn.style.opacity='.7';btn.style.color='var(--text3)';
+    btn.disabled=false;
+  }
+}
+window.handleRefreshClick=handleRefreshClick;
+
 // tradeValueTier: defined in shared/constants.js
 // dynastyValue: defined in shared/dhq-engine.js
 // getPlayerRank: defined in shared/dhq-engine.js
