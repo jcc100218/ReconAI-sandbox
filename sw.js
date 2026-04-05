@@ -1,4 +1,4 @@
-const CACHE_NAME = 'warroom-scout-v1';
+const CACHE_NAME = 'warroom-scout-v2';
 const STATIC_ASSETS = ['./index.html', './css/styles.css', './manifest.json'];
 
 self.addEventListener('install', () => self.skipWaiting());
