@@ -482,6 +482,9 @@ function _updateLeaguePillMFL(leagueName){
 }
 
 // ── Yahoo Connect ──────────────────────────────────────────────
+// OAuth flow: "Connect with Yahoo" → redirects to Yahoo → Yahoo redirects to
+// yahoo-proxy Edge Function → Edge Function stores tokens → redirects back to
+// app with ?yahoo_session=UUID → boot section detects param, shows league picker.
 async function connectYahoo(){
   if(!window.Yahoo){ss('conn-status','Yahoo connector not loaded — refresh and try again.',true);return;}
 
@@ -491,33 +494,9 @@ async function connectYahoo(){
   prog(5);ss('conn-status','Opening Yahoo sign-in...');
 
   try{
-    const tokens=await window.Yahoo.startAuth();
-    prog(30);ss('conn-status','Loading your leagues...');
-
-    // Load Sleeper player DB for crosswalk
-    if(!S.players||Object.keys(S.players).length<100){
-      try{S.players=await window.App.sf('/players/nfl');}
-      catch(e){S.players=S.players||{};}
-    }
-
-    prog(50);
-    const leagues=await window.Yahoo.fetchUserLeagues(tokens);
-    if(btn){btn.disabled=false;btn.textContent='Connect with Yahoo';}
-    prog(70);
-
-    if(!leagues.length){
-      ss('conn-status','No NFL leagues found for your Yahoo account.',true);
-      if(progEl)progEl.style.display='none';
-      return;
-    }
-
-    // If only one league, skip picker
-    if(leagues.length===1){
-      await _connectYahooLeague(leagues[0].league_key,null,tokens);
-      return;
-    }
-    showYahooLeaguePicker(leagues,tokens);
-
+    // startAuth() redirects the page — no return value.
+    await window.Yahoo.startAuth();
+    // Execution stops here; Yahoo will redirect back to this page.
   }catch(e){
     ss('conn-status','Error: '+e.message,true);
     if(btn){btn.disabled=false;btn.textContent='Connect with Yahoo';}
@@ -526,14 +505,14 @@ async function connectYahoo(){
 }
 window.connectYahoo = connectYahoo;
 
-// Manual league key entry (fallback)
+// Manual league key entry — requires Yahoo session already established via OAuth.
 async function connectYahooManual(){
   const keyRaw=($('yahoo-league-key')?.value||'').trim();
   if(!keyRaw){ss('conn-status','Enter your Yahoo league key (e.g. 423.l.12345)',true);return;}
   if(!window.Yahoo){ss('conn-status','Yahoo connector not loaded — refresh and try again.',true);return;}
-
-  const tokens=window.Yahoo.getStoredTokens();
-  if(!tokens){ss('conn-status','Authenticate with Yahoo first by clicking "Connect with Yahoo".',true);return;}
+  if(!localStorage.getItem('yahoo_session_id')){
+    ss('conn-status','Authenticate with Yahoo first by clicking "Connect with Yahoo".',true);return;
+  }
 
   const progEl=$('prog');if(progEl)progEl.style.display='block';
   prog(20);ss('conn-status','Fetching Yahoo league...');
@@ -542,7 +521,7 @@ async function connectYahooManual(){
     if(!S.players||Object.keys(S.players).length<100){
       try{S.players=await window.App.sf('/players/nfl');}catch(e){S.players=S.players||{};}
     }
-    await _connectYahooLeague(keyRaw,null,tokens);
+    await _connectYahooLeague(keyRaw,null);
   }catch(e){
     ss('conn-status','Error: '+e.message,true);
     if(progEl)progEl.style.display='none';
@@ -550,21 +529,18 @@ async function connectYahooManual(){
 }
 window.connectYahooManual = connectYahooManual;
 
-function showYahooLeaguePicker(leagues,tokens){
+function showYahooLeaguePicker(leagues){
   const setupEl=$('setup-block');
   if(!setupEl)return;
 
-  // Store tokens temporarily for the picker selection
-  try{window._yahooPickerTokens=tokens;}catch(e){}
-
   const rows=leagues.map(l=>`
-    <div onclick="selectYahooLeague('${escHtml(l.league_key)}')"
+    <div onclick="selectYahooLeague('${escHtml(l.leagueKey)}')"
       style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .15s"
       onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
-      <div style="width:36px;height:36px;border-radius:9px;background:#6001d2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${l.season.slice(-2)||'NFL'}</div>
+      <div style="width:36px;height:36px;border-radius:9px;background:#6001d2;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0">${(l.season||'').slice(-2)||'NFL'}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(l.name)}</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.num_teams} teams · ${l.season} · ${escHtml(l.league_key)}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${l.numTeams} teams · ${l.season} · ${escHtml(l.leagueKey)}</div>
       </div>
     </div>`).join('');
 
@@ -579,8 +555,6 @@ function showYahooLeaguePicker(leagues,tokens){
 window.showYahooLeaguePicker = showYahooLeaguePicker;
 
 async function selectYahooLeague(leagueKey){
-  const tokens=window._yahooPickerTokens||window.Yahoo.getStoredTokens();
-  if(!tokens){ss('conn-status','Session expired — reconnect with Yahoo.',true);return;}
   const setupEl=$('setup-block');
   if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
     <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#6001d2;border-radius:50%;animation:spin .7s linear infinite"></span>
@@ -589,7 +563,7 @@ async function selectYahooLeague(leagueKey){
   </div>`;
   try{
     prog(40);ss('conn-status','Fetching league rosters...');
-    const result=await window.Yahoo.connectLeague(leagueKey,null,tokens);
+    const result=await window.Yahoo.connectLeague(leagueKey,null);
     prog(80);
     showYahooTeamPicker(result,leagueKey);
   }catch(e){
@@ -598,9 +572,10 @@ async function selectYahooLeague(leagueKey){
 }
 window.selectYahooLeague = selectYahooLeague;
 
-async function _connectYahooLeague(leagueKey,myTeamId,tokens){
+async function _connectYahooLeague(leagueKey,myTeamId){
   prog(50);ss('conn-status','Fetching league rosters...');
-  const result=await window.Yahoo.connectLeague(leagueKey,myTeamId,tokens);
+  const teamKey=myTeamId?leagueKey+'.t.'+myTeamId:null;
+  const result=await window.Yahoo.connectLeague(leagueKey,teamKey);
   prog(80);
   showYahooTeamPicker(result,leagueKey);
 }
@@ -1124,9 +1099,86 @@ window.checkForAlerts = checkForAlerts;
     if('Notification' in window&&Notification.permission==='granted'){const nb=$('notif-btn');if(nb)nb.textContent='Enabled \u2713';}
     const savedUser = DhqStorage.getStr(STORAGE_KEYS.USERNAME);
 
+    // ── Yahoo OAuth callback detection ────────────────────────────
+    // After Yahoo OAuth, the edge function redirects back with ?yahoo_session=UUID.
+    const _yahooSessionParam = new URLSearchParams(window.location.search).get('yahoo_session');
+    if (_yahooSessionParam) {
+      // Store session ID and clean URL without reloading
+      try{ if(window.Yahoo) window.Yahoo.handleCallback(_yahooSessionParam); else localStorage.setItem('yahoo_session_id',_yahooSessionParam); }catch(e){}
+      try{ window.history.replaceState({},document.title,window.location.pathname); }catch(e){}
+      // Load player DB and show Yahoo league picker
+      setTimeout(async()=>{
+        if(S.user)return;
+        try{
+          ss('conn-status','Loading your Yahoo leagues...');
+          const _pEl=$('prog');if(_pEl)_pEl.style.display='block'; prog(20);
+          if(!S.players||Object.keys(S.players).length<100){
+            try{S.players=await window.App.sf('/players/nfl');}catch(e){S.players=S.players||{};}
+          }
+          prog(50);
+          const _raw=await window.Yahoo.fetchUserLeagues();
+          const _leagues=window.Yahoo.parseUserLeagues(_raw);
+          prog(75);ss('conn-status','');
+          if(!_leagues.length){ss('conn-status','No Yahoo NFL leagues found. Check your account.',true);return;}
+          const _sb=$('setup-block');if(_sb)_sb.style.display='block';
+          if(_leagues.length===1){
+            await _connectYahooLeague(_leagues[0].leagueKey,null);
+          } else {
+            showYahooLeaguePicker(_leagues);
+          }
+        }catch(e){
+          console.warn('[Yahoo] Post-OAuth flow failed:',e.message);
+          ss('conn-status','Yahoo connect failed: '+e.message,true);
+          const _pF=$('prog');if(_pF)_pF.style.display='none';
+        }
+      },500);
+    // ── Yahoo session auto-restore ────────────────────────────────
+    } else {
+      const _yahooLeagueKey = localStorage.getItem('yahoo_league_key');
+      const _yahooMyTeam    = localStorage.getItem('yahoo_my_team');
+      const _yahooSessionId = localStorage.getItem('yahoo_session_id');
+      if (_yahooLeagueKey && _yahooMyTeam && _yahooSessionId) {
+        setTimeout(async()=>{
+          if(S.user)return;
+          try{
+            if(!window.Yahoo){
+              console.warn('[Yahoo] window.Yahoo not loaded — falling back to Sleeper');
+              if(savedUser){const ui=$('u-input');if(ui)ui.value=savedUser;connect();}
+              return;
+            }
+            ss('conn-status','Reconnecting to Yahoo...');
+            const _pEl=$('prog');if(_pEl)_pEl.style.display='block'; prog(5);
+            if(!S.players||Object.keys(S.players).length<100){
+              try{S.players=await window.App.sf('/players/nfl');}catch(e){S.players=S.players||{};}
+            }
+            prog(30);
+            const _teamKey=_yahooLeagueKey+'.t.'+_yahooMyTeam;
+            const _res=await window.Yahoo.connectLeague(_yahooLeagueKey,_teamKey);
+            S.myRosterId=String(_yahooMyTeam);
+            if(!S.user)S.user={user_id:'yahoo_user',display_name:_res.league.name,username:'yahoo_user'};
+            _updateLeaguePillYahoo(_res.league.name);
+            const _sb=$('setup-block');if(_sb)_sb.style.display='none';
+            const _dc=$('digest-content');if(_dc)_dc.style.display='block';
+            switchTab('digest',document.querySelector('.tab[onclick*="digest"]'));
+            prog(100);ss('conn-status','');
+            try{renderHomeSnapshot();}catch(e){}
+            try{checkApiKeyCallout();}catch(e){}
+            if(typeof updateSettingsStatus==='function')try{updateSettingsStatus();}catch(e){}
+            Promise.resolve().then(()=>loadAllData());
+          }catch(e){
+            console.warn('[Yahoo] Auto-restore failed:',e.message);
+            ss('conn-status',''); prog(0);
+            const _pF=$('prog');if(_pF)_pF.style.display='none';
+            localStorage.removeItem('yahoo_league_key');
+            localStorage.removeItem('yahoo_my_team');
+            localStorage.removeItem('yahoo_session_id');
+            if(savedUser){const ui=$('u-input');if(ui)ui.value=savedUser;connect();}
+          }
+        },500);
     // ── ESPN session restore ───────────────────────────────────────
     // If a previous ESPN session exists, reconnect it instead of Sleeper.
     // Uses a 500ms delay so all modules (including window.ESPN) are loaded.
+      } else {
     const _espnSavedId   = localStorage.getItem('espn_league_id');
     const _espnSavedTeam = localStorage.getItem('espn_my_team');
     if (_espnSavedId && _espnSavedTeam) {
@@ -1179,6 +1231,8 @@ window.checkForAlerts = checkForAlerts;
       // First-time user: focus the username input so they know where to start
       setTimeout(()=>{const inp=$('u-input');if(inp)inp.focus();},600);
     }
+      } // end no-Yahoo else block
+    } // end Yahoo/ESPN/Sleeper dispatch
     // Load user tier for paywall
     if (typeof loadUserTier === 'function') loadUserTier().catch(() => {});
 
