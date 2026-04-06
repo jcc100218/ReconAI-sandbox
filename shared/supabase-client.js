@@ -702,6 +702,102 @@ window.OD.loadFieldLog = async function(leagueId, limit) {
     } catch (e) { console.warn('[FW] field_log load failed:', e); return null; }
 };
 
+// ══════════════════════════════════════════════════════════════════
+// LEAGUE DOCS — Commissioner document upload + AI context
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Upload a text document, chunk it, and store in league_docs table.
+ * @param {string} leagueId
+ * @param {string} docName - filename or title
+ * @param {string} text - full document text
+ * @param {string} category - 'bylaws'|'awards'|'calendar'|'scoring'|'general'
+ */
+window.OD.uploadLeagueDoc = async function(leagueId, docName, text, category) {
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return false;
+    try {
+        await ensureUser(username);
+        // Chunk text into ~500 token (~2000 char) segments
+        const CHUNK_SIZE = 2000;
+        const chunks = [];
+        for (let i = 0; i < text.length; i += CHUNK_SIZE) {
+            chunks.push(text.slice(i, i + CHUNK_SIZE));
+        }
+        // Delete existing chunks for this doc
+        await db.from('league_docs').delete().match({ username, league_id: leagueId, doc_name: docName });
+        // Insert new chunks
+        const rows = chunks.map((chunk, idx) => ({
+            username, league_id: leagueId, doc_name: docName,
+            doc_type: 'text', chunk_idx: idx, chunk_text: chunk,
+            category: category || 'general',
+        }));
+        const { error } = await db.from('league_docs').insert(rows);
+        if (error) { console.warn('[FW] league_docs upload error:', error); return false; }
+        return true;
+    } catch (e) { console.warn('[FW] league_docs upload failed:', e); return false; }
+};
+
+/**
+ * Fetch all doc chunks for a league, optionally filtered by category.
+ * Returns concatenated text suitable for AI context injection.
+ */
+window.OD.getLeagueDocsContext = async function(leagueId, category) {
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return '';
+    try {
+        let query = db.from('league_docs')
+            .select('doc_name, chunk_idx, chunk_text, category')
+            .eq('league_id', leagueId)
+            .order('doc_name').order('chunk_idx');
+        if (category) query = query.eq('category', category);
+        const { data, error } = await query;
+        if (error || !data?.length) return '';
+        // Group by doc and reassemble
+        const docs = {};
+        data.forEach(row => {
+            if (!docs[row.doc_name]) docs[row.doc_name] = { name: row.doc_name, category: row.category, chunks: [] };
+            docs[row.doc_name].chunks.push(row.chunk_text);
+        });
+        return Object.values(docs).map(d =>
+            `[${d.category.toUpperCase()}: ${d.name}]\n${d.chunks.join('')}`
+        ).join('\n\n---\n\n');
+    } catch (e) { console.warn('[FW] league_docs fetch failed:', e); return ''; }
+};
+
+/**
+ * List all uploaded docs for a league (name + category, no content).
+ */
+window.OD.listLeagueDocs = async function(leagueId) {
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return [];
+    try {
+        const { data, error } = await db.from('league_docs')
+            .select('doc_name, category, created_at')
+            .eq('league_id', leagueId)
+            .eq('chunk_idx', 0) // only first chunk per doc
+            .order('created_at', { ascending: false });
+        if (error) return [];
+        return (data || []).map(d => ({ name: d.doc_name, category: d.category, uploadedAt: d.created_at }));
+    } catch { return []; }
+};
+
+/**
+ * Delete all chunks for a specific doc.
+ */
+window.OD.deleteLeagueDoc = async function(leagueId, docName) {
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return false;
+    try {
+        const { error } = await db.from('league_docs').delete().match({ username, league_id: leagueId, doc_name: docName });
+        return !error;
+    } catch { return false; }
+};
+
 // Expose on App namespace too
 window.App.OD = window.OD;
 window.App.SUPABASE_URL = SUPABASE_URL;

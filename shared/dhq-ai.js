@@ -948,6 +948,12 @@ function dhqContext(includeOwners) {
     parts.push('[GM_STRATEGY]\nThe owner has set the following strategic preferences. IMPORTANT: Honor these when making recommendations.\n' + stratParts.join('\n'));
   }
 
+  // ── Commissioner league docs (bylaws, awards, custom rules) ──
+  // Loaded async and cached in window for this session
+  if (window._leagueDocsContext) {
+    parts.push('[LEAGUE_DOCUMENTS]\nThe commissioner has uploaded these league-specific documents. Use them to answer league rule questions, reference awards history, and understand league customs:\n' + window._leagueDocsContext);
+  }
+
   // ── League format detection ──────────────────────────────────
   const _S = window.S || window.App?.S || {};
   const _league = _S.leagues?.find(l => l.league_id === _S.currentLeagueId);

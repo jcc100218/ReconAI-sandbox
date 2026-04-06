@@ -1135,6 +1135,10 @@ async function loadAllData(){
       fetchTrending().catch(e=>{console.warn('Trending error:',e);return null;}),
     ]);
     console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys((window.App.LI||{}).playerScores||{}).length);
+    // Load commissioner league docs for AI context (non-blocking)
+    if(window.OD?.getLeagueDocsContext&&S.currentLeagueId){
+      window.OD.getLeagueDocsContext(S.currentLeagueId).then(ctx=>{if(ctx)window._leagueDocsContext=ctx;}).catch(()=>{});
+    }
     // Validate core functions loaded
     const coreDeps = ['dynastyValue','assessTeamFromGlobal','getPlayerAction','buildRosterTable','renderMobileHome'];
     const missing = coreDeps.filter(fn => typeof window[fn] !== 'function');
