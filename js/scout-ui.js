@@ -664,8 +664,18 @@ function renderLeaguePanel() {
     const dnaLabel = dna?.dna || '';
     const needs = (assess?.needs || []).slice(0, 2).map(n => typeof n === 'string' ? n : n.pos).join(', ');
 
+    // Build top 5 players for this roster
+    const rosterPlayers = (roster.players || [])
+      .map(pid => ({ pid, name: window.pName?.(pid) || pid, val: window.App?.LI?.playerScores?.[pid] || 0, pos: window.pPos?.(pid) || '?' }))
+      .filter(p => p.val > 0)
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 5);
+    const strengthList = (assess?.strengths || []).slice(0, 2).map(s => typeof s === 'string' ? s : s.pos).join(', ');
+
     const prompt = `Give me a full scouting report on ${teamName}. Include their roster strengths, weaknesses, trade tendencies, and how I can exploit them.`;
-    html += `<div class="league-card${isMe ? ' league-card-me' : ''}" onclick="fillGlobalChat(${JSON.stringify(prompt)})">
+    const rid = roster.roster_id;
+    html += `<div class="league-card-wrap" id="lc-${rid}">
+    <div class="league-card${isMe ? ' league-card-me' : ''}" onclick="toggleLeagueDossier('${rid}')">
       <div class="league-card-rank">#${idx + 1}</div>
       <div class="league-card-body">
         <div class="league-card-name">${_esc(teamName)}${isMe ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">YOU</span>' : ''}</div>
@@ -680,6 +690,22 @@ function renderLeaguePanel() {
         </div>` : ''}
       </div>
       <div class="league-card-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="league-dossier" id="dossier-${rid}" style="display:none;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-top:-7px;margin-bottom:6px">
+      <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">SCOUTING REPORT</div>
+      ${rosterPlayers.length ? `<div style="margin-bottom:8px">${rosterPlayers.map(p =>
+        `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">
+          <span style="color:var(--text);font-weight:600;flex:1">${_esc(p.name)}</span>
+          <span style="color:var(--accent);font-size:10px;font-weight:700">${p.pos}</span>
+          <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val.toLocaleString()}</span>
+        </div>`
+      ).join('')}</div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        ${strengthList ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(52,211,153,.1);color:var(--green)">Strong: ${_esc(strengthList)}</span>` : ''}
+        ${needs ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(248,113,113,.1);color:var(--red)">Weak: ${_esc(needs)}</span>` : ''}
+      </div>
+      <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify(prompt).replace(/'/g, "\\'")})" style="width:100%;padding:8px;font-size:12px;font-weight:600;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:8px;cursor:pointer;font-family:inherit">Ask Scout about ${_esc(teamName)}</button>
+    </div>
     </div>`;
   });
 
@@ -687,12 +713,22 @@ function renderLeaguePanel() {
 }
 window.renderLeaguePanel = renderLeaguePanel;
 
+function toggleLeagueDossier(rid) {
+  const el = document.getElementById('dossier-' + rid);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  // Close all others
+  document.querySelectorAll('.league-dossier').forEach(d => d.style.display = 'none');
+  if (!isOpen) el.style.display = '';
+}
+window.toggleLeagueDossier = toggleLeagueDossier;
+
 function filterLeagueCards(query) {
-  const cards = document.querySelectorAll('.league-card');
+  const wraps = document.querySelectorAll('.league-card-wrap');
   const q = (query || '').toLowerCase();
-  cards.forEach(card => {
-    const name = (card.querySelector('.league-card-name')?.textContent || '').toLowerCase();
-    card.style.display = !q || name.includes(q) ? '' : 'none';
+  wraps.forEach(wrap => {
+    const name = (wrap.querySelector('.league-card-name')?.textContent || '').toLowerCase();
+    wrap.style.display = !q || name.includes(q) ? '' : 'none';
   });
 }
 window.filterLeagueCards = filterLeagueCards;
