@@ -647,7 +647,7 @@ window.OD.saveFieldLogEntry = async function(entry) {
             context: entry.context || null,
             icon: entry.icon || '📋',
             text: entry.text,
-            source: 'scout',
+            source: entry.source || 'scout',
         }, { onConflict: 'client_id' });
         if (error) { updateLocalSyncStatus('failed'); console.warn('[FW] field_log save error', error); return false; }
         updateLocalSyncStatus('synced');
