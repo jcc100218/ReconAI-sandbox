@@ -18,19 +18,11 @@ function normPos(pos) {
 }
 
 // ── Position colors ─────────────────────────────────────────────
-// Solid accent color per normalized position (charts, badges, pills).
+// Delegates to App.POS_COLORS (owned by constants.js) so there is
+// a single source of truth for position colors across both apps.
+// constants.js MUST load before utils.js.
 function posColor(pos) {
-    const c = {
-        QB: '#FF6B6B',
-        RB: '#4ECDC4',
-        WR: '#45B7D1',
-        TE: '#F7DC6F',
-        K:  '#BB8FCE',
-        DL: '#E67E22',
-        LB: '#F0A500',
-        DB: '#5DADE2'
-    };
-    return c[pos] || 'var(--silver)';
+    return (window.App?.POS_COLORS?.[pos]) || 'var(--silver)';
 }
 
 // ── Position sort order ─────────────────────────────────────────
