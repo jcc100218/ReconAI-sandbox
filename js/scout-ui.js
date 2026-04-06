@@ -225,6 +225,21 @@ function renderTeamBarRoster() {
       const trendStr  = trend > 5 ? `↑ ${trend}%` : trend < -5 ? `↓ ${Math.abs(trend)}%` : '—';
       const trendCol  = trend > 5 ? 'var(--green)' : trend < -5 ? 'var(--red)' : 'var(--text3)';
 
+      // Age curve bar segments
+      const peakMap = window.App?.peakWindows || {QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+      const rawPos2 = p.position || pos;
+      const mappedPos = ['DE','DT'].includes(rawPos2) ? 'DL' : ['CB','S','SS','FS'].includes(rawPos2) ? 'DB' : rawPos2;
+      const [pLo, pHi] = peakMap[mappedPos] || [24, 29];
+      const ageNum = parseInt(age) || 25;
+      const curveAges = [20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36];
+      const segColor = a => a < pLo - 3 ? 'rgba(96,165,250,.3)' : a < pLo ? 'rgba(52,211,153,.5)' : a >= pLo && a <= pHi ? 'rgba(52,211,153,.8)' : a <= pHi + 2 ? 'rgba(251,191,36,.5)' : 'rgba(248,113,113,.4)';
+      const curveHtml = curveAges.map(a => `<div style="flex:1;height:6px;background:${segColor(a)};opacity:${a===ageNum?1:0.5};border-radius:1px;${a===ageNum?'outline:1.5px solid white;outline-offset:-1px;':''}"></div>`).join('');
+
+      // Trade profile verdict
+      const action = typeof getPlayerAction === 'function' ? getPlayerAction(pid) : null;
+      const actionLabel = action?.label || '';
+      const actionCol = action?.col || 'var(--text3)';
+
       html += `
       <div class="tbar-player-row" id="tbar-row-${pid}">
         <span class="pos p${pos}" style="font-size:11px;padding:1px 5px;flex-shrink:0">${pos}</span>
@@ -236,34 +251,31 @@ function renderTeamBarRoster() {
         </div>
       </div>
       <div class="tbar-expand" id="tbar-expand-${pid}">
-        <div class="tbar-expand-inner">
-          <div class="tbar-card-stats">
-            <div class="tbar-card-stat">
-              <div class="tbar-card-stat-val" style="color:var(--accent)">${dhqStr}</div>
-              <div class="tbar-card-stat-lbl">DHQ</div>
+        <div class="tbar-expand-inner" style="padding:10px 12px">
+          <!-- Row 1: Photo + name + team + DHQ -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <img src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" style="width:40px;height:40px;border-radius:10px;object-fit:cover;object-position:top;border:1px solid var(--border2);flex-shrink:0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+            <div style="display:none;width:40px;height:40px;border-radius:10px;background:var(--bg4);align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--text3);flex-shrink:0">${(name[0]||'?').toUpperCase()}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="event.stopPropagation();openPlayerModal('${pid}')">${_esc(name)}</div>
+              <div style="font-size:11px;color:var(--text3)">${pos} · Age ${age} · ${ppg} PPG${prevPpg !== '—' ? ' · Prev ' + prevPpg : ''} · <span style="color:${trendCol}">${trendStr}</span></div>
             </div>
-            <div class="tbar-card-stat">
-              <div class="tbar-card-stat-val">${ppg}</div>
-              <div class="tbar-card-stat-lbl">PPG</div>
-            </div>
-            <div class="tbar-card-stat">
-              <div class="tbar-card-stat-val">${prevPpg}</div>
-              <div class="tbar-card-stat-lbl">Prev PPG</div>
-            </div>
-            <div class="tbar-card-stat">
-              <div class="tbar-card-stat-val">${age}</div>
-              <div class="tbar-card-stat-lbl">Age</div>
-            </div>
-            <div class="tbar-card-stat">
-              <div class="tbar-card-stat-val" style="color:${trendCol}">${trendStr}</div>
-              <div class="tbar-card-stat-lbl">30d</div>
-            </div>
-            <div class="tbar-card-stat">
-              <div class="tbar-card-stat-val" style="color:${pkColor};font-size:11px;line-height:1.2">${pkLabel}</div>
-              <div class="tbar-card-stat-lbl">${pkDesc || 'Peak'}</div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:14px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${dhqStr}</div>
+              ${actionLabel ? `<div style="font-size:10px;font-weight:700;color:${actionCol}">${actionLabel}</div>` : ''}
             </div>
           </div>
-          <div class="tbar-card-actions">
+          <!-- Row 2: Age curve bar -->
+          <div style="margin-bottom:8px">
+            <div style="display:flex;gap:1px;border-radius:3px;overflow:hidden">${curveHtml}</div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-size:9px;color:var(--text3)">20</span>
+              <span style="font-size:10px;color:${pkColor};font-weight:600">${pkLabel} · ${pkDesc}</span>
+              <span style="font-size:9px;color:var(--text3)">36</span>
+            </div>
+          </div>
+          <!-- Row 3: Action buttons -->
+          <div class="tbar-card-actions" style="display:flex;gap:4px">
             <button class="tbar-card-btn tbar-card-hold" onclick="event.stopPropagation();fillGlobalChat('Should I hold ${safeName}?')">Hold</button>
             <button class="tbar-card-btn tbar-card-trade" onclick="event.stopPropagation();fillGlobalChat('What can I get for ${safeName} in a trade?')">Trade</button>
             <button class="tbar-card-btn tbar-card-sell" onclick="event.stopPropagation();fillGlobalChat('Is now a good time to sell ${safeName}?')">Sell High</button>
