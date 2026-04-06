@@ -150,7 +150,7 @@ function mapMFLPlayer(p) {
     position: (p.position || '').toUpperCase(),
     team,
     age: parseInt(p.age) || 0,
-    years_exp: p.draft_year ? (parseInt(year || new Date().getFullYear()) - parseInt(p.draft_year)) : 0,
+    years_exp: p.draft_year ? (new Date().getFullYear() - parseInt(p.draft_year)) : 0,
     injury_status: p.injury_status || '',
   };
 }

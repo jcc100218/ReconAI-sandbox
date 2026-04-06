@@ -33,7 +33,7 @@ const PRO_TEAM_MAP = {
 // ESPN default position ID → Sleeper position string
 const POSITION_MAP = {
   1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'DEF',
-  14: 'DB', 15: 'LB', 16: 'DL',
+  14: 'DB', 15: 'LB',
 };
 
 // ESPN lineup slot ID → position label (null = bench/IR, not starter)

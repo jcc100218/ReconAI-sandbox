@@ -496,6 +496,12 @@ window.OD.checkUsersAccess = async function(usernames) {
     return new Set((data || []).map(u => u.sleeper_username));
 };
 
+async function hashPassword(password) {
+    const enc = new TextEncoder();
+    const buf = await crypto.subtle.digest('SHA-256', enc.encode(password));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 window.OD.verifySupabasePassword = async function(username, password) {
     const db = getClient();
     if (!db || !isConfigured()) return false;

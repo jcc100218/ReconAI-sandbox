@@ -118,6 +118,7 @@ function openPlayerModal(playerId){
       const trend=meta.trend||0;
       const gp=meta.recentGP||17;
       const yrsExp=p.years_exp||0;
+      const team=p.team||'';
 
       let blurb='',blurbColor='var(--amber)';
 
