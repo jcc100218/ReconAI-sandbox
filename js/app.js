@@ -134,7 +134,7 @@ function switchTab(tab,btn){
   const panel=$('panel-'+tab);
   if(panel)panel.classList.add('active');
   if(tab==='waivers'&&typeof loadMentality==='function')loadMentality();
-  if(tab==='draftroom'&&typeof renderDraftNeeds==='function')renderDraftNeeds();
+  if(tab==='draftroom'){if(typeof renderDraftNeeds==='function')renderDraftNeeds();if(typeof onDraftTabOpen==='function')onDraftTabOpen();}
   if(tab==='digest'){
     if(typeof renderMobileHome==='function')renderMobileHome();
     else if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();

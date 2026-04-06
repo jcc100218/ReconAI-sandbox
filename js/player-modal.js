@@ -50,7 +50,8 @@ async function loadPlayerNewsNow(playerId){
 }
 
 function openPlayerModal(playerId){
-  const p=S.players[playerId];if(!p)return;
+  const p=S.players[playerId]||S.players[String(playerId)];
+  if(!p){console.warn('[PM] Player not found:',playerId,'| DB size:',Object.keys(S.players||{}).length);return;}
   window._pmPid=playerId;
   const pos=p.position||'?';const age=p.age||26;const val=dynastyValue(playerId);
   const exp=p.years_exp??0;
@@ -298,6 +299,9 @@ function openPlayerModal(playerId){
       }
     };
   }
+
+  // Log to field log
+  if(window.addFieldLogEntry)window.addFieldLogEntry('👤',`Scouted ${pName(playerId)} (${pos}, ${fullTeam(p.team)})${val>0?' — DHQ '+val.toLocaleString():''}`, 'scout', {players:[playerId]});
 
   // Show card
   const modal=$('player-modal');

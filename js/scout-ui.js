@@ -54,13 +54,13 @@ function renderCtxChips(tab) {
 }
 window.renderCtxChips = renderCtxChips;
 
-// Pre-fill the global chat input with chip text (don't send yet)
+// Fill global chat and auto-send
 function fillGlobalChat(text) {
   const inp = document.getElementById('global-chat-in');
   if (!inp) return;
   inp.value = text;
   inp.focus();
-  inp.select();
+  setTimeout(() => { if (typeof sendGlobalChat === 'function') sendGlobalChat(); }, 150);
 }
 window.fillGlobalChat = fillGlobalChat;
 
@@ -73,6 +73,8 @@ function sendGlobalChat() {
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
   if (inp) inp.value = '';
+  // Log to field log
+  if(window.addFieldLogEntry)window.addFieldLogEntry('💬',`Asked Scout: "${text.slice(0,60)}${text.length>60?'...':''}"`, 'chat', {});
 
   // Switch to home tab so user sees the response
   const activeTab = window._activeTab;
@@ -623,33 +625,59 @@ function renderLeaguePanel() {
   const myR_ = (S.rosters || []).find(r => r.roster_id === myId);
   const myWins = myR_?.settings?.wins || 0;
 
-  const sorted = [...S.rosters].sort((a, b) =>
-    (b.settings?.wins || 0) - (a.settings?.wins || 0) ||
-    (b.settings?.fpts || 0) - (a.settings?.fpts || 0)
-  );
+  // Sort by health score if available, otherwise by wins
+  const assessFn = typeof window.assessTeamFromGlobal === 'function' ? window.assessTeamFromGlobal : null;
+  const ownerProfiles = window.App?.LI?.ownerProfiles || {};
 
-  const isLargeLeague = sorted.length > 24;
+  const enriched = S.rosters.map(roster => {
+    const owner = (S.leagueUsers || []).find(u => u.user_id === roster.owner_id);
+    const assess = assessFn ? assessFn(roster.roster_id) : null;
+    const dna = ownerProfiles[roster.roster_id];
+    return { roster, owner, assess, dna };
+  });
+
+  enriched.sort((a, b) => {
+    const ha = a.assess?.healthScore || 0;
+    const hb = b.assess?.healthScore || 0;
+    if (hb !== ha) return hb - ha;
+    return (b.roster.settings?.wins || 0) - (a.roster.settings?.wins || 0);
+  });
+
+  const isLargeLeague = enriched.length > 24;
   let html = '';
   if (isLargeLeague) {
-    html += `<div style="margin-bottom:10px"><input type="text" id="league-search" placeholder="Search ${sorted.length} teams..." oninput="filterLeagueCards(this.value)" style="width:100%;padding:10px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;outline:none"></div>`;
+    html += `<div style="margin-bottom:10px"><input type="text" id="league-search" placeholder="Search ${enriched.length} teams..." oninput="filterLeagueCards(this.value)" style="width:100%;padding:10px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;outline:none"></div>`;
   }
-  sorted.forEach((roster, idx) => {
-    const owner = (S.leagueUsers || []).find(u => u.user_id === roster.owner_id);
+  enriched.forEach(({ roster, owner, assess, dna }, idx) => {
     const teamName = owner?.metadata?.team_name || owner?.display_name || `Team ${idx + 1}`;
     const w = roster.settings?.wins || 0;
     const l = roster.settings?.losses || 0;
     const t = roster.settings?.ties || 0;
     const isMe = roster.roster_id === myId;
-    const winPct = (w + l) > 0 ? w / (w + l) : 0.5;
-    const barW = Math.round(winPct * 100);
 
-    const prompt = `Tell me about ${teamName} and how to exploit their weaknesses`;
+    // Tier + health
+    const tier = (assess?.tier || '').toUpperCase();
+    const hs = assess?.healthScore || 0;
+    const tierCol = tier === 'ELITE' ? 'var(--green)' : tier === 'CONTENDER' ? 'var(--accent)' : tier === 'CROSSROADS' ? 'var(--amber)' : tier === 'REBUILDING' ? 'var(--red)' : 'var(--text3)';
+
+    // Owner DNA
+    const dnaLabel = dna?.dna || '';
+    const needs = (assess?.needs || []).slice(0, 2).map(n => typeof n === 'string' ? n : n.pos).join(', ');
+
+    const prompt = `Give me a full scouting report on ${teamName}. Include their roster strengths, weaknesses, trade tendencies, and how I can exploit them.`;
     html += `<div class="league-card${isMe ? ' league-card-me' : ''}" onclick="fillGlobalChat(${JSON.stringify(prompt)})">
       <div class="league-card-rank">#${idx + 1}</div>
       <div class="league-card-body">
         <div class="league-card-name">${_esc(teamName)}${isMe ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">YOU</span>' : ''}</div>
-        <div class="league-card-meta">${w}-${l}${t > 0 ? `-${t}` : ''}</div>
-        <div class="league-card-bar"><div class="league-card-bar-fill" style="width:${barW}%"></div></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
+          <span class="league-card-meta">${w}-${l}${t > 0 ? '-' + t : ''}</span>
+          ${hs ? `<span style="font-size:11px;font-weight:700;color:${tierCol};font-family:'JetBrains Mono',monospace">${hs}</span>` : ''}
+          ${tier ? `<span style="font-size:10px;font-weight:700;color:${tierCol};text-transform:uppercase;letter-spacing:.04em">${tier}</span>` : ''}
+        </div>
+        ${dnaLabel || needs ? `<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
+          ${dnaLabel ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dnaLabel)}</span>` : ''}
+          ${needs ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg4);color:var(--text3)">Needs: ${_esc(needs)}</span>` : ''}
+        </div>` : ''}
       </div>
       <div class="league-card-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>`;

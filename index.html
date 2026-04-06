@@ -484,6 +484,12 @@
       <div id="draft-scout-content" style="display:none"></div>
       <input type="text" id="draft-chat-in" style="display:none" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
 
+      <!-- Top Prospects -->
+      <div id="draft-top-prospects" style="margin-bottom:14px"></div>
+
+      <!-- Mock Draft -->
+      <div id="draft-mock" style="margin-bottom:14px"></div>
+
       <!-- 4. Draft Strategy -->
       <div id="draft-summary" style="display:none;margin-bottom:14px">
         <div id="draft-summary-content"></div>
@@ -868,6 +874,16 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('pwa-install').style.display = 'none';
   _deferredPrompt = null;
 });
+
+// Hide mobile nav when keyboard opens (iOS/Android)
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const nav = document.getElementById('mobile-nav');
+    if (!nav) return;
+    const kbOpen = window.visualViewport.height < window.innerHeight * 0.75;
+    nav.style.display = kbOpen ? 'none' : '';
+  });
+}
 </script>
 
 <!-- Trial Expiration Modal — shown once on next load after 30-day trial ends -->

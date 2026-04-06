@@ -560,11 +560,165 @@ Search the web for current ${year} rookie rankings. Be specific with prospect na
 // addDraftMsg: defined in ai-chat.js
 
 
+// ── Top Prospects ─────────────────────────────────────────────────
+function renderTopProspects(){
+  const el=$('draft-top-prospects');if(!el)return;
+  if(!LI_LOADED||!LI.playerMeta){el.innerHTML='';return;}
+
+  // Find rookies by source=FC_ROOKIE, sorted by DHQ value
+  const rookies=Object.entries(LI.playerMeta)
+    .filter(([pid,m])=>m.source==='FC_ROOKIE'&&(LI.playerScores?.[pid]||0)>0)
+    .map(([pid,m])=>({pid,name:pName(pid),pos:m.pos||pPos(pid),team:S.players?.[pid]?.team||'',val:LI.playerScores[pid]||0}))
+    .sort((a,b)=>b.val-a.val)
+    .slice(0,20);
+
+  if(!rookies.length){el.innerHTML='';return;}
+
+  el.innerHTML=`<div style="font-size:13px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Top Prospects</div>
+    <div style="display:flex;flex-direction:column;gap:4px">${rookies.map((r,i)=>{
+      const posCols={QB:'var(--accent-blue)',RB:'var(--green)',WR:'var(--accent)',TE:'var(--amber)',DL:'var(--amber)',LB:'var(--accent)',DB:'var(--red)'};
+      return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer" onclick="openPlayerModal('${r.pid}')">
+        <span style="font-size:12px;font-weight:700;color:var(--text3);min-width:20px;font-family:'JetBrains Mono',monospace">${i+1}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${escHtml(r.name)}</span>
+        <span style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(212,175,55,.1);color:${posCols[r.pos]||'var(--text3)'}">${r.pos}</span>
+        <span style="font-size:12px;font-weight:600;color:var(--accent);font-family:'JetBrains Mono',monospace">${r.val.toLocaleString()}</span>
+      </div>`;
+    }).join('')}</div>`;
+}
+window.renderTopProspects=renderTopProspects;
+
+// ── Mock Draft ───────────────────────────────────────────────────
+// Interactive: user picks for their team, AI picks for all others
+let _mockState=null;
+
+function startMockDraft(){
+  const el=$('draft-mock');if(!el)return;
+  if(!S.rosters?.length||!LI_LOADED){el.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px">Connect league and wait for data to load.</div>';return;}
+
+  const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
+  const draftRounds=league?.settings?.draft_rounds||4;
+  const teams=S.rosters.length;
+
+  // Build available player pool (rookies)
+  const pool=Object.entries(LI.playerMeta||{})
+    .filter(([pid,m])=>m.source==='FC_ROOKIE'&&(LI.playerScores?.[pid]||0)>0)
+    .map(([pid,m])=>({pid,name:pName(pid),pos:m.pos||pPos(pid),val:LI.playerScores[pid]||0}))
+    .sort((a,b)=>b.val-a.val);
+
+  // Build pick order (snake draft)
+  const pickOrder=[];
+  const rosterOrder=[...S.rosters].sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0)); // worst to first
+  for(let rd=1;rd<=draftRounds;rd++){
+    const order=rd%2===1?[...rosterOrder]:[...rosterOrder].reverse();
+    order.forEach((r,i)=>pickOrder.push({round:rd,pick:i+1,rosterId:r.roster_id,overall:pickOrder.length+1}));
+  }
+
+  _mockState={pool:[...pool],pickOrder,picks:[],currentIdx:0};
+  renderMockDraftUI();
+}
+window.startMockDraft=startMockDraft;
+
+function renderMockDraftUI(){
+  const el=$('draft-mock');if(!el||!_mockState)return;
+  const{pool,pickOrder,picks,currentIdx}=_mockState;
+
+  if(currentIdx>=pickOrder.length){
+    // Draft complete
+    el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl)">
+      <div style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:8px">Mock Draft Complete</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${picks.length} picks made across ${Math.max(...picks.map(p=>p.round))} rounds</div>
+      <div style="display:flex;flex-direction:column;gap:3px">${picks.filter(p=>p.rosterId===S.myRosterId).map(p=>`<div style="font-size:12px;color:var(--text2)">R${p.round}.${p.pick}: <strong style="color:var(--accent)">${escHtml(p.playerName)}</strong> (${p.pos}, DHQ ${p.val.toLocaleString()})</div>`).join('')}</div>
+      <button onclick="startMockDraft()" style="margin-top:8px;padding:6px 14px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text2);cursor:pointer;font-family:inherit">Run Again</button>
+    </div>`;
+    return;
+  }
+
+  const current=pickOrder[currentIdx];
+  const isMyPick=current.rosterId===S.myRosterId;
+  const owner=(S.leagueUsers||[]).find(u=>u.user_id===current.rosterId)||{display_name:'Team '+current.rosterId};
+  const teamName=owner?.metadata?.team_name||owner?.display_name||'Team '+current.pick;
+
+  // Recent picks
+  const recentHtml=picks.slice(-5).map(p=>`<div style="font-size:11px;color:var(--text3)">R${p.round}.${p.pick}: ${escHtml(p.teamName)} → <span style="color:var(--text2)">${escHtml(p.playerName)}</span> (${p.pos})</div>`).join('');
+
+  if(isMyPick){
+    // User picks — show available players
+    const available=pool.slice(0,15);
+    el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl)">
+      <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">ON THE CLOCK — R${current.round}.${current.pick}</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">Your Pick</div>
+      ${recentHtml?'<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+recentHtml+'</div>':''}
+      <div style="display:flex;flex-direction:column;gap:4px">${available.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer" onclick="mockDraftPick('${p.pid}')">
+        <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escHtml(p.name)}</span>
+        <span style="font-size:10px;font-weight:700;color:var(--accent)">${p.pos}</span>
+        <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+      </div>`).join('')}</div>
+    </div>`;
+  }else{
+    // AI picks for other teams
+    const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(current.rosterId):null;
+    const needs=(assess?.needs||[]).slice(0,3).map(n=>typeof n==='string'?n:n.pos);
+    // Pick the best available player at a need position, or BPA
+    let pick=null;
+    for(const pos of needs){if(!pick)pick=pool.find(p=>p.pos===pos);}
+    if(!pick)pick=pool[0]; // BPA fallback
+    if(pick){
+      pool.splice(pool.indexOf(pick),1);
+      picks.push({...current,pid:pick.pid,playerName:pick.name,pos:pick.pos,val:pick.val,teamName});
+      _mockState.currentIdx++;
+      // Auto-advance AI picks with a small delay for feel
+      setTimeout(()=>renderMockDraftUI(),80);
+      el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">R${current.round}.${current.pick}</div>
+        <div style="font-size:13px;color:var(--text2)">${escHtml(teamName)} ${needs.length?'(needs '+needs.join(', ')+')':''} selects <strong style="color:var(--text)">${escHtml(pick.name)}</strong> (${pick.pos})</div>
+      </div>`;
+    }else{
+      _mockState.currentIdx++;
+      renderMockDraftUI();
+    }
+  }
+}
+
+function mockDraftPick(pid){
+  if(!_mockState)return;
+  const{pool,pickOrder,picks,currentIdx}=_mockState;
+  const current=pickOrder[currentIdx];
+  const pIdx=pool.findIndex(p=>p.pid===pid);
+  if(pIdx<0)return;
+  const pick=pool.splice(pIdx,1)[0];
+  const owner=(S.leagueUsers||[]).find(u=>u.user_id===current.rosterId);
+  const teamName=owner?.metadata?.team_name||owner?.display_name||'You';
+  picks.push({...current,pid:pick.pid,playerName:pick.name,pos:pick.pos,val:pick.val,teamName});
+  _mockState.currentIdx++;
+  renderMockDraftUI();
+}
+window.mockDraftPick=mockDraftPick;
+
+// ── Auto-run scouting when draft tab opens ────────────────────────
+let _draftScoutingRun=false;
+function onDraftTabOpen(){
+  renderTopProspects();
+  // Auto-run scouting report if not already done
+  if(!_draftScoutingRun&&LI_LOADED&&hasAnyAI()){
+    _draftScoutingRun=true;
+    const contentEl=$('draft-scout-content');
+    if(contentEl)contentEl.style.display='block';
+    runDraftScouting();
+  }
+  // Show mock draft button
+  const mockEl=$('draft-mock');
+  if(mockEl&&!_mockState){
+    mockEl.innerHTML=`<button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
+  }
+}
+window.onDraftTabOpen=onDraftTabOpen;
+
 // ── Expose on window.App and window ─────────────────────────────
 Object.assign(window.App, {
   idealDepth,
   renderDraftNeeds, runDraftScouting,
   renderRookieBoard, renderRookieProfiles,
+  renderTopProspects, startMockDraft, onDraftTabOpen,
 });
 window.idealDepth          = idealDepth;
 window.renderDraftNeeds    = renderDraftNeeds;
