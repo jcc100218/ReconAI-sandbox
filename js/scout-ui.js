@@ -674,7 +674,7 @@ function renderLeaguePanel() {
     });
     // Sort division keys numerically
     const divKeys = Object.keys(divGroups).sort((a, b) => Number(a) - Number(b));
-    let globalIdx = 0;
+    const leagueMeta = (S.leagues && S.leagues[0]?.metadata) || {};
     divKeys.forEach(divNum => {
       // Sort within division by health score
       divGroups[divNum].sort((a, b) => {
@@ -683,10 +683,10 @@ function renderLeaguePanel() {
         if (hb !== ha) return hb - ha;
         return (b.roster.settings?.wins || 0) - (a.roster.settings?.wins || 0);
       });
-      html += '<div style="font-size:0.72rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:12px 0 6px;border-bottom:1px solid rgba(212,175,55,0.15);margin-top:8px;">Division ' + divNum + '</div>';
-      divGroups[divNum].forEach(item => {
-        html += _buildLeagueCard(item, globalIdx, myId);
-        globalIdx++;
+      const divName = leagueMeta['division_' + divNum] || leagueMeta['division_' + divNum + '_name'] || ('Division ' + divNum);
+      html += '<div style="font-size:0.72rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:12px 0 6px;border-bottom:1px solid rgba(212,175,55,0.15);margin-top:8px;">' + _esc(divName) + '</div>';
+      divGroups[divNum].forEach((item, divIdx) => {
+        html += _buildLeagueCard(item, divIdx, myId);
       });
     });
   } else {
@@ -739,13 +739,38 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
           ${dnaLabel ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dnaLabel)}</span>` : ''}
           ${needs ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg4);color:var(--text3)">Needs: ${_esc(needs)}</span>` : ''}
         </div>` : ''}
+        ${(() => {
+          const badges = [];
+          // Window badge (CONTENDING/REBUILDING/TRANSITIONING)
+          const window_ = (assess?.window || '').toUpperCase();
+          if (window_ && window_ !== tier) {
+            const winCol = window_ === 'CONTENDING' ? 'var(--green)' : window_ === 'REBUILDING' ? 'var(--red)' : 'var(--amber)';
+            badges.push('<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:' + winCol + ';color:#fff;font-weight:700;letter-spacing:.03em;opacity:.85">' + window_ + '</span>');
+          }
+          // Active Trader badge
+          const tradeCount = (window.App?.LI?.tradeHistory || []).filter(t => (t.roster_ids || []).includes(roster.roster_id)).length;
+          if (tradeCount >= 3) {
+            badges.push('<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(52,152,219,.2);color:#3498DB;font-weight:700">Active Trader</span>');
+          }
+          // Panic/Desperate badge
+          if ((assess?.panic || 0) >= 3) {
+            badges.push('<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(231,76,60,.15);color:var(--red);font-weight:700">Selling</span>');
+          }
+          // Top 2 strengths badges
+          const strengths = (assess?.strengths || []).slice(0, 2);
+          strengths.forEach(s => {
+            const posLabel = typeof s === 'string' ? s : s.pos;
+            if (posLabel) badges.push('<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(52,211,153,.15);color:var(--green);font-weight:600">' + _esc(posLabel) + '</span>');
+          });
+          return badges.length ? '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + badges.join('') + '</div>' : '';
+        })()}
       </div>
       <div class="league-card-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
     <div class="league-dossier" id="dossier-${rid}" style="display:none;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-top:-7px;margin-bottom:6px">
       <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">SCOUTING REPORT</div>
       ${rosterPlayers.length ? `<div style="margin-bottom:8px">${rosterPlayers.map(p =>
-        `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">
+        `<div onclick="event.stopPropagation();openPlayerModal('${p.pid}')" style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;border-radius:6px;padding:4px 6px;transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
           <span style="color:var(--text);font-weight:600;flex:1">${_esc(p.name)}</span>
           <span style="color:var(--accent);font-size:10px;font-weight:700">${p.pos}</span>
           <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val.toLocaleString()}</span>

@@ -14,6 +14,27 @@
 
 window.App = window.App || {};
 
+// ── Draft Sub-tabs (Board | Mock Draft) ───────────────────────
+function switchDraftView(view) {
+    const boardEl = document.getElementById('draft-board-view');
+    const mockEl = document.getElementById('draft-mock-view');
+    const boardBtn = document.getElementById('draft-tab-board');
+    const mockBtn = document.getElementById('draft-tab-mock');
+    if (!boardEl || !mockEl) return;
+    boardEl.style.display = view === 'board' ? '' : 'none';
+    mockEl.style.display = view === 'mock' ? '' : 'none';
+    if (boardBtn) { boardBtn.style.background = view === 'board' ? 'var(--accent)' : 'transparent'; boardBtn.style.color = view === 'board' ? 'var(--bg1)' : 'var(--text2)'; boardBtn.style.borderColor = view === 'board' ? 'var(--accent)' : 'var(--border)'; }
+    if (mockBtn) { mockBtn.style.background = view === 'mock' ? 'var(--accent)' : 'transparent'; mockBtn.style.color = view === 'mock' ? 'var(--bg1)' : 'var(--text2)'; mockBtn.style.borderColor = view === 'mock' ? 'var(--accent)' : 'var(--border)'; }
+    if (view === 'mock' && !_mockState) {
+        // Show start button if mock hasn't begun
+        const mockDraftEl = document.getElementById('draft-mock');
+        if (mockDraftEl) {
+            mockDraftEl.innerHTML = `<button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
+        }
+    }
+}
+window.switchDraftView = switchDraftView;
+
 // ── Opponent Scouting ──────────────────────────────────────────
 // idealDepth: default depth targets per position (may be overridden by other modules)
 const idealDepth=window.idealDepth||{QB:3,RB:6,WR:7,TE:3,K:1,DL:5,LB:5,DB:5};
@@ -522,7 +543,7 @@ async function runDraftScouting(){
     }
 
     const prompt=`${year} rookie draft scouting for ${teams}-team dynasty league.
-${dhqContext(false)}
+${typeof dhqContext === 'function' ? dhqContext(false) : ''}
 MY NEEDS: ${needsStr}
 MY PICKS: ${pickStr}
 ${dhqBuildMentalityContext()}
@@ -560,30 +581,164 @@ Search the web for current ${year} rookie rankings. Be specific with prospect na
 // addDraftMsg: defined in ai-chat.js
 
 
-// ── Top Prospects ─────────────────────────────────────────────────
+// ── Top Prospects (card-based layout) ─────────────────────────────
+let _draftPosFilter = '';
+
+function _setDraftPosFilter(pos) {
+  _draftPosFilter = _draftPosFilter === pos ? '' : pos;
+  renderTopProspects();
+}
+window._setDraftPosFilter = _setDraftPosFilter;
+
 function renderTopProspects(){
   const el=$('draft-top-prospects');if(!el)return;
   if(!LI_LOADED||!LI.playerMeta){el.innerHTML='';return;}
 
+  // Get team needs from assessment
+  const assess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
+  const needPositions = (assess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
+
   // Find rookies by source=FC_ROOKIE, sorted by DHQ value
-  const rookies=Object.entries(LI.playerMeta)
-    .filter(([pid,m])=>m.source==='FC_ROOKIE'&&(LI.playerScores?.[pid]||0)>0)
-    .map(([pid,m])=>({pid,name:pName(pid),pos:m.pos||pPos(pid),team:S.players?.[pid]?.team||'',val:LI.playerScores[pid]||0}))
-    .sort((a,b)=>b.val-a.val)
-    .slice(0,20);
+  let allRookies = Object.entries(LI.playerMeta)
+    .filter(([pid,m]) => m.source === 'FC_ROOKIE' && (LI.playerScores?.[pid] || 0) > 0)
+    .map(([pid,m]) => {
+      const p = S.players?.[pid] || {};
+      const pos = m.pos || pPos(pid);
+      return {
+        pid, name: pName(pid), pos, team: p.team || '',
+        college: p.college || '', val: LI.playerScores[pid] || 0,
+        height: p.height, weight: p.weight
+      };
+    })
+    .sort((a,b) => b.val - a.val);
 
-  if(!rookies.length){el.innerHTML='';return;}
+  if(!allRookies.length){el.innerHTML='';return;}
 
-  el.innerHTML=`<div style="font-size:13px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Top Prospects</div>
-    <div style="display:flex;flex-direction:column;gap:4px">${rookies.map((r,i)=>{
-      const posCols={QB:'var(--accent-blue)',RB:'var(--green)',WR:'var(--accent)',TE:'var(--amber)',DL:'var(--amber)',LB:'var(--accent)',DB:'var(--red)'};
-      return`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer" onclick="openPlayerModal('${r.pid}')">
-        <span style="font-size:12px;font-weight:700;color:var(--text3);min-width:20px;font-family:'JetBrains Mono',monospace">${i+1}</span>
-        <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">${escHtml(r.name)}</span>
-        <span style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(212,175,55,.1);color:${posCols[r.pos]||'var(--text3)'}">${r.pos}</span>
-        <span style="font-size:12px;font-weight:600;color:var(--accent);font-family:'JetBrains Mono',monospace">${r.val.toLocaleString()}</span>
-      </div>`;
-    }).join('')}</div>`;
+  // Best Available (overall #1)
+  const bestAvail = allRookies[0];
+
+  // Best Fit (highest DHQ at a need position)
+  const bestFit = needPositions.length
+    ? allRookies.find(r => needPositions.includes(r.pos)) || bestAvail
+    : bestAvail;
+
+  // Get user's next pick info
+  const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+  const draftRounds = league?.settings?.draft_rounds || 4;
+  const teams = S.rosters?.length || 12;
+  const year = $('draft-year-sel')?.value || '2026';
+  const allTP = S.tradedPicks || [];
+  let nextRound = null, nextPick = null;
+  for (let rd = 1; rd <= draftRounds; rd++) {
+    const tradedAway = allTP.find(p => String(p.season) === year && p.round === rd && p.roster_id === S.myRosterId && p.owner_id !== S.myRosterId);
+    if (!tradedAway) { nextRound = rd; break; }
+  }
+  if (nextRound) {
+    const rosterRanks = S.rosters.map(r => ({ rid: r.roster_id, val: (r.players || []).reduce((s, pid) => s + dynastyValue(pid), 0) })).sort((a, b) => a.val - b.val);
+    const estPos = rosterRanks.findIndex(r => r.rid === S.myRosterId) + 1 || Math.ceil(teams / 2);
+    nextPick = estPos;
+  }
+
+  // Position filter for prospect grid
+  const posFilters = ['All', 'QB', 'RB', 'WR', 'TE'];
+  const filteredRookies = _draftPosFilter
+    ? allRookies.filter(r => r.pos === _draftPosFilter)
+    : allRookies;
+  const gridRookies = filteredRookies.slice(0, 8);
+
+  // Helper: format height
+  const fmtHt = (h) => h ? Math.floor(h / 12) + "'" + (h % 12) + '"' : '';
+
+  // Helper: position rank (1-based rank within that position group)
+  const posRank = (pid, pos) => {
+    const samePosAll = allRookies.filter(r => r.pos === pos);
+    const idx = samePosAll.findIndex(r => r.pid === pid);
+    return idx >= 0 ? idx + 1 : '—';
+  };
+
+  // Helper: prospect card for hero section (64px photo)
+  const heroCard = (r, label) => {
+    const ht = fmtHt(r.height);
+    const wt = r.weight ? r.weight + 'lbs' : '';
+    const details = [r.college, [ht, wt].filter(Boolean).join(', ')].filter(Boolean).join(' | ');
+    return `<div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:10px;cursor:pointer" onclick="openPlayerModal('${r.pid}')">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${label}</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <img src="https://sleepercdn.com/content/nfl/players/thumb/${r.pid}.jpg" onerror="this.style.display='none'" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--bg4)" loading="lazy"/>
+        <div style="min-width:0;overflow:hidden">
+          <div style="font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.name)}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(details)}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <span style="font-size:11px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(212,175,55,.1);color:var(--accent)">${r.pos}</span>
+            <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">#${posRank(r.pid, r.pos)} ${r.pos}</span>
+            <span style="font-size:11px;color:var(--text3)">|</span>
+            <span style="font-size:12px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${r.val.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  // Helper: grid card (48px photo)
+  const gridCard = (r) => {
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:8px;cursor:pointer;transition:border-color .15s" onclick="openPlayerModal('${r.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:8px">
+        <img src="https://sleepercdn.com/content/nfl/players/thumb/${r.pid}.jpg" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4)" loading="lazy"/>
+        <div style="min-width:0;overflow:hidden;flex:1">
+          <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.name)}</div>
+          <div style="font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.college || r.team || '')}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+            <span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px;background:rgba(212,175,55,.1);color:var(--accent)">${r.pos}</span>
+            <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${r.val.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  // Build HTML
+  let html = '';
+
+  // ON THE CLOCK hero
+  if (nextRound) {
+    const pickLabel = nextRound + '.' + String(nextPick || '??').toString().padStart(2, '0');
+    const needPills = needPositions.slice(0, 4).map(p =>
+      `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--accentL);color:var(--accent)">${p}</span>`
+    ).join('');
+    html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
+        <span style="font-size:13px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace">Round ${nextRound}, Pick ${nextPick || '??'}</span>
+      </div>
+      ${needPositions.length ? `<div style="display:flex;align-items:center;gap:4px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text3)">Your team needs:</span>${needPills}
+      </div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${heroCard(bestAvail, 'Best Available')}
+        ${bestFit.pid !== bestAvail.pid ? heroCard(bestFit, 'Best Fit') : ''}
+      </div>
+    </div>`;
+  }
+
+  // Position filter buttons
+  html += `<div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
+    ${posFilters.map(pos => {
+      const val = pos === 'All' ? '' : pos;
+      const isActive = _draftPosFilter === val;
+      return `<button onclick="_setDraftPosFilter('${val}')" style="padding:4px 12px;font-size:12px;font-weight:700;border-radius:14px;cursor:pointer;border:1px solid ${isActive ? 'var(--accent)' : 'var(--border2)'};background:${isActive ? 'var(--accentL)' : 'transparent'};color:${isActive ? 'var(--accent)' : 'var(--text3)'};font-family:inherit;text-transform:uppercase;letter-spacing:.04em">${pos}</button>`;
+    }).join('')}
+  </div>`;
+
+  // Prospect grid (2x4)
+  if (gridRookies.length) {
+    html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+      ${gridRookies.map(r => gridCard(r)).join('')}
+    </div>`;
+  } else {
+    html += `<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No prospects match this filter</div>`;
+  }
+
+  el.innerHTML = html;
 }
 window.renderTopProspects=renderTopProspects;
 
@@ -839,7 +994,7 @@ function onDraftTabOpen(){
     if(contentEl)contentEl.style.display='block';
     runDraftScouting();
   }
-  // Show mock draft button
+  // Show mock draft start button (in the mock sub-tab)
   const mockEl=$('draft-mock');
   if(mockEl&&!_mockState){
     mockEl.innerHTML=`<button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
@@ -853,7 +1008,7 @@ Object.assign(window.App, {
   renderDraftNeeds, runDraftScouting,
   renderRookieBoard, renderRookieProfiles,
   renderTopProspects, startMockDraft, onDraftTabOpen,
-  toggleMockDraftPause,
+  toggleMockDraftPause, switchDraftView,
 });
 window.idealDepth          = idealDepth;
 window.renderDraftNeeds    = renderDraftNeeds;

@@ -1,3 +1,4 @@
+/* global renderWaiverTop5 */
 // ══════════════════════════════════════════════════════════════════
 // warroom-scout/js/app.js — State, utilities, connect flow, boot
 // Loaded FIRST — sets up window.App namespace for all modules
@@ -133,7 +134,7 @@ function switchTab(tab,btn){
   else{const homeBtn=document.querySelector('.tab[onclick*="digest"],.mobile-nav-item[onclick*="digest"]');if(homeBtn)homeBtn.classList.add('active');}
   const panel=$('panel-'+tab);
   if(panel)panel.classList.add('active');
-  if(tab==='waivers'&&typeof loadMentality==='function')loadMentality();
+  if(tab==='waivers'){if(typeof loadMentality==='function')loadMentality();if(typeof renderWaiverTop5==='function')renderWaiverTop5();}
   if(tab==='draftroom'){if(typeof renderDraftNeeds==='function')renderDraftNeeds();if(typeof onDraftTabOpen==='function')onDraftTabOpen();}
   if(tab==='digest'){
     if(typeof renderMobileHome==='function')renderMobileHome();

@@ -634,6 +634,137 @@ function renderAvailable(){
   tbody.innerHTML=rows||(filtered.length===0?'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>':'');
 }
 
+// ── Top 5 Available (always-visible waiver section) ───────────
+window._waiverPosFilter = 'All';
+window._waiverSort = 'dhq';
+
+function filterWaiverTop5(pos) {
+  window._waiverPosFilter = pos;
+  renderWaiverTop5();
+}
+window.filterWaiverTop5 = filterWaiverTop5;
+
+function sortWaiverTop5(field) {
+  window._waiverSort = field;
+  renderWaiverTop5();
+}
+window.sortWaiverTop5 = sortWaiverTop5;
+
+function renderWaiverTop5() {
+  const filtersEl = $('waiver-pos-filters');
+  const listEl = $('waiver-top5-list');
+  const sortsEl = $('waiver-top5-sorts');
+  if (!listEl) return;
+
+  // Position filter buttons
+  const positions = ['All','QB','RB','WR','TE','K','DL','LB','DB'];
+  const curPos = window._waiverPosFilter || 'All';
+  if (filtersEl) {
+    filtersEl.innerHTML = positions.map(pos =>
+      `<button onclick="filterWaiverTop5('${pos}')" id="waiver-filter-${pos}" style="padding:4px 10px;font-size:11px;font-weight:700;border-radius:4px;border:1px solid ${pos === curPos ? 'var(--accent)' : 'var(--border)'};background:${pos === curPos ? 'var(--accent)' : 'transparent'};color:${pos === curPos ? 'var(--bg1)' : 'var(--text2)'};cursor:pointer;font-family:inherit;text-transform:uppercase">${pos}</button>`
+    ).join('');
+  }
+
+  // Sort buttons
+  const curSort = window._waiverSort || 'dhq';
+  if (sortsEl) {
+    const sorts = [
+      { key: 'dhq', label: 'DHQ' },
+      { key: 'age', label: 'Age' },
+      { key: 'ppg', label: 'PPG' }
+    ];
+    sortsEl.innerHTML = sorts.map(s =>
+      `<button onclick="sortWaiverTop5('${s.key}')" style="padding:3px 8px;font-size:10px;font-weight:700;border-radius:4px;border:1px solid ${s.key === curSort ? 'var(--accent)' : 'var(--border)'};background:${s.key === curSort ? 'var(--accent)' : 'transparent'};color:${s.key === curSort ? 'var(--bg1)' : 'var(--text3)'};cursor:pointer;font-family:inherit;text-transform:uppercase">${s.label}</button>`
+    ).join('');
+  }
+
+  // Loading state
+  if (!LI_LOADED && Object.keys(S.playerStats || {}).length === 0) {
+    listEl.innerHTML = `<div style="padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="skeleton" style="height:14px;width:70%"></div>
+        <div class="skeleton" style="height:14px;width:55%"></div>
+        <div class="skeleton" style="height:14px;width:65%"></div>
+      </div>
+      <div style="font-size:13px;color:var(--text3);margin-top:8px">Building DHQ values...</div>
+    </div>`;
+    return;
+  }
+
+  // Get available players
+  const avail = getAvailablePlayers();
+  if (!avail.length) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">No available players found.</div>';
+    return;
+  }
+
+  // Position mapping helper
+  const posMapFilter = p => { if (['DE','DT'].includes(p)) return 'DL'; if (['CB','S'].includes(p)) return 'DB'; return p; };
+
+  // Filter by position
+  let filtered = curPos !== 'All' ? avail.filter(a => posMapFilter(a.p.position) === curPos || a.p.position === curPos) : avail;
+
+  // Only show players with meaningful value
+  filtered = filtered.filter(a => a.val > 0);
+
+  // Sort
+  const sc = S.leagues?.find(l => l.league_id === S.currentLeagueId)?.scoring_settings || {};
+  const getPPG = (x) => {
+    const st = S.playerStats?.[x.id] || {};
+    const mP = posMapFilter(x.p.position);
+    const isI = ['DL','LB','DB'].includes(mP);
+    const raw = st?.prevRawStats;
+    return isI && raw ? +(calcIDPScore(raw, sc) / Math.max(1, raw.gp || 17)).toFixed(1) : (st.seasonAvg || st.prevAvg || 0);
+  };
+
+  if (curSort === 'age') {
+    filtered = [...filtered].sort((a, b) => (a.p.age || 99) - (b.p.age || 99));
+  } else if (curSort === 'ppg') {
+    filtered = [...filtered].sort((a, b) => getPPG(b) - getPPG(a));
+  } else {
+    // DHQ (default) — already sorted by val desc from getAvailablePlayers
+    filtered = [...filtered].sort((a, b) => b.val - a.val);
+  }
+
+  // Top 5
+  const top5 = filtered.slice(0, 5);
+
+  if (!top5.length) {
+    listEl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">No players match this filter.</div>';
+    return;
+  }
+
+  // Render cards
+  const rows = top5.map(({ id, p, val }) => {
+    const stats = S.playerStats?.[id] || {};
+    const { col } = tradeValueTier(val);
+    const mPos = posMapFilter(p.position);
+    const isIDP = ['DL','LB','DB'].includes(mPos);
+    const raw = stats?.prevRawStats;
+    const ppg = isIDP && raw ? +(calcIDPScore(raw, sc) / Math.max(1, raw.gp || 17)).toFixed(1) : (stats.seasonAvg || stats.prevAvg || 0);
+    const initials = ((p.first_name || '?')[0] + (p.last_name || '?')[0]).toUpperCase();
+
+    return `<div class="wv-avail-card" onclick="openPlayerModal('${id}')">
+      <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:32px;height:32px;font-size:13px>${initials}</span>')" loading="lazy"/>
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</span>
+          <span class="rr-pos" style="${getPosBadgeStyle(p.position)}">${mPos}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:13px;color:var(--text3)">
+          <span>${p.team || 'FA'} · ${p.age || '?'}</span>
+          <span class="rr-val" style="color:${col}">${val > 0 ? val.toLocaleString() : '—'}</span>
+          ${ppg ? '<span>' + ppg.toFixed(1) + ' PPG</span>' : ''}
+        </div>
+      </div>
+      <div class="rr-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>`;
+  }).join('');
+
+  listEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:4px">${rows}</div>`;
+}
+window.renderWaiverTop5 = renderWaiverTop5;
+
 function renderTopPickupHero(){
   const el=$('wv-top-pickup');if(!el)return;
   if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
@@ -744,6 +875,7 @@ function renderWaivers(){
   // Top pickup hero
   renderTopPickupHero();
   renderAvailable();
+  renderWaiverTop5();
 
 
   // League waiver claims
@@ -2437,6 +2569,7 @@ Object.assign(window.App, {
 
   // Available players
   getAvailablePlayers, availSort, renderAvailable, renderWaivers,
+  renderWaiverTop5, filterWaiverTop5, sortWaiverTop5,
 
   // Trades
   renderTrades, renderTradeIntel,
@@ -2525,5 +2658,7 @@ if(window.DhqEvents){
   DhqEvents.on('li:loaded',()=>{
     try{if(typeof renderAvailable==='function')renderAvailable();}
     catch(e){dhqLog('li:loaded.renderAvailable',e);}
+    try{if(typeof renderWaiverTop5==='function')renderWaiverTop5();}
+    catch(e){dhqLog('li:loaded.renderWaiverTop5',e);}
   });
 }

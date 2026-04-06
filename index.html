@@ -237,8 +237,8 @@
           <input type="text" id="home-chat-in" onkeydown="if(event.key==='Enter')sendHomeChat()"/>
         </div>
         <div id="home-crown-jewels" style="display:none"></div>
-        <div id="player-search-wrap" style="display:none">
-          <input type="text" id="player-search-in" oninput="handlePlayerSearch(this.value)"/>
+        <div id="player-search-wrap" style="margin:8px 0">
+          <input type="text" id="player-search-in" placeholder="Search players..." oninput="handlePlayerSearch(this.value)" style="width:100%;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:14px;font-family:inherit"/>
           <div id="player-search-results"></div>
         </div>
         <div id="sync-status" style="display:none">
@@ -354,21 +354,14 @@
       <div id="wq-chat-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease;margin-bottom:8px"></div>
       <input type="text" id="wq-chat-in" style="display:none" onkeydown="if(event.key==='Enter')sendWaiverChat()"/>
 
-      <!-- Top available — legacy scrollable list, hidden in v4 (surfaced recommendations replace this) -->
-      <div id="top-available-section" style="display:none">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="home-sec-title" style="margin-bottom:0">Top Available</div>
-        <select id="avail-pos-sel" style="font-size:13px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text2)" onchange="renderAvailable()">
-          <option value="">All positions</option>
-          <option value="QB">QB</option><option value="RB">RB</option><option value="WR">WR</option>
-          <option value="TE">TE</option><option value="K">K</option><option value="DL">DL</option><option value="LB">LB</option>
-          <option value="DB">DB</option>
-        </select>
-      </div>
-      <div id="available-count" style="font-size:13px;color:var(--text3);margin-bottom:6px"></div>
-      <div id="avail-tbody" style="display:flex;flex-direction:column;gap:4px">
-        <div class="empty">Connect to see available players.</div>
-      </div>
+      <!-- Top 5 Available -->
+      <div id="waiver-top5-section" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em">Top Available</div>
+          <div id="waiver-top5-sorts" style="display:flex;gap:4px"></div>
+        </div>
+        <div id="waiver-pos-filters" style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap"></div>
+        <div id="waiver-top5-list"></div>
       </div>
     </div>
 
@@ -465,6 +458,12 @@
         <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:13px;padding:4px 10px">Scout ↗</button>
       </div>
 
+      <div id="draft-subtabs" style="display:flex;gap:6px;margin:8px 0 12px">
+        <button onclick="switchDraftView('board')" id="draft-tab-board" class="draft-subtab active" style="padding:6px 16px;font-size:13px;font-weight:700;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--bg1);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em">Board</button>
+        <button onclick="switchDraftView('mock')" id="draft-tab-mock" class="draft-subtab" style="padding:6px 16px;font-size:13px;font-weight:700;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em">Mock Draft</button>
+      </div>
+      <div id="draft-board-view">
+
       <!-- 1. Your picks — timeline first -->
       <div id="draft-my-picks-section" style="margin-bottom:14px">
         <div class="home-sec-title">Your Picks</div>
@@ -487,9 +486,6 @@
       <!-- Top Prospects -->
       <div id="draft-top-prospects" style="margin-bottom:14px"></div>
 
-      <!-- Mock Draft -->
-      <div id="draft-mock" style="margin-bottom:14px"></div>
-
       <!-- 4. Draft Strategy -->
       <div id="draft-summary" style="display:none;margin-bottom:14px">
         <div id="draft-summary-content"></div>
@@ -505,6 +501,11 @@
       <!-- Data quality note (bottom, subtle) -->
       <div style="font-size:13px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-top:14px;line-height:1.5">
         Rookie rankings improve as the NFL draft approaches. Pre-draft data is speculative.
+      </div>
+      </div><!-- end draft-board-view -->
+
+      <div id="draft-mock-view" style="display:none">
+        <div id="draft-mock" style="margin-bottom:14px"></div>
       </div>
     </div>
 
