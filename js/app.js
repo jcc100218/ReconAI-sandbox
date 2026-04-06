@@ -324,7 +324,7 @@ async function selectESPNTeam(rosterId,leagueId,year,espnS2,swid){
   if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
     <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#e03e2d;border-radius:50%;animation:spin .7s linear infinite"></span>
     <div style="font-size:16px;font-weight:700;margin:14px 0 6px">Loading your league...</div>
-    <div style="font-size:13px;color:var(--text3)">Mapping ESPN data to ReconAI</div>
+    <div style="font-size:13px;color:var(--text3)">Mapping ESPN data to War Room Scout</div>
   </div>`;
 
   try{
@@ -447,7 +447,7 @@ async function selectMFLTeam(rosterId,leagueId,year,apiKey){
   if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
     <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#0057b8;border-radius:50%;animation:spin .7s linear infinite"></span>
     <div style="font-size:16px;font-weight:700;margin:14px 0 6px">Loading your league...</div>
-    <div style="font-size:13px;color:var(--text3)">Mapping MFL data to ReconAI</div>
+    <div style="font-size:13px;color:var(--text3)">Mapping MFL data to War Room Scout</div>
   </div>`;
 
   try{
@@ -618,7 +618,7 @@ async function selectYahooTeam(teamId,leagueKey){
   if(setupEl)setupEl.innerHTML=`<div style="text-align:center;padding:30px 0">
     <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#6001d2;border-radius:50%;animation:spin .7s linear infinite"></span>
     <div style="font-size:16px;font-weight:700;margin:14px 0 6px">Loading your league...</div>
-    <div style="font-size:13px;color:var(--text3)">Mapping Yahoo data to ReconAI</div>
+    <div style="font-size:13px;color:var(--text3)">Mapping Yahoo data to War Room Scout</div>
   </div>`;
 
   try{
