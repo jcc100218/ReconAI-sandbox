@@ -1,0 +1,37 @@
+{
+  "name": "reconai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "sw.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcc100218/ReconAI.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/jcc100218/ReconAI/issues"
+  },
+  "homepage": "https://github.com/jcc100218/ReconAI#readme",
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "eslint"
+    ]
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  }
+}
