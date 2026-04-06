@@ -655,12 +655,51 @@ function renderLeaguePanel() {
     return (b.roster.settings?.wins || 0) - (a.roster.settings?.wins || 0);
   });
 
+  // Division grouping — check if this league uses divisions
+  const hasDivisions = enriched.some(t => t.roster?.settings?.division > 0);
+
   const isLargeLeague = enriched.length > 24;
   let html = '';
   if (isLargeLeague) {
     html += `<div style="margin-bottom:10px"><input type="text" id="league-search" placeholder="Search ${enriched.length} teams..." oninput="filterLeagueCards(this.value)" style="width:100%;padding:10px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;outline:none"></div>`;
   }
-  enriched.forEach(({ roster, owner, assess, dna }, idx) => {
+
+  // If divisions exist, group and render by division
+  if (hasDivisions) {
+    const divGroups = {};
+    enriched.forEach(item => {
+      const divNum = item.roster?.settings?.division || 0;
+      if (!divGroups[divNum]) divGroups[divNum] = [];
+      divGroups[divNum].push(item);
+    });
+    // Sort division keys numerically
+    const divKeys = Object.keys(divGroups).sort((a, b) => Number(a) - Number(b));
+    let globalIdx = 0;
+    divKeys.forEach(divNum => {
+      // Sort within division by health score
+      divGroups[divNum].sort((a, b) => {
+        const ha = a.assess?.healthScore || 0;
+        const hb = b.assess?.healthScore || 0;
+        if (hb !== ha) return hb - ha;
+        return (b.roster.settings?.wins || 0) - (a.roster.settings?.wins || 0);
+      });
+      html += '<div style="font-size:0.72rem;color:var(--gold);font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:12px 0 6px;border-bottom:1px solid rgba(212,175,55,0.15);margin-top:8px;">Division ' + divNum + '</div>';
+      divGroups[divNum].forEach(item => {
+        html += _buildLeagueCard(item, globalIdx, myId);
+        globalIdx++;
+      });
+    });
+  } else {
+    // Flat list — no divisions
+    enriched.forEach((item, idx) => {
+      html += _buildLeagueCard(item, idx, myId);
+    });
+  }
+
+  container.innerHTML = html;
+}
+
+function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     const teamName = owner?.metadata?.team_name || owner?.display_name || `Team ${idx + 1}`;
     const w = roster.settings?.wins || 0;
     const l = roster.settings?.losses || 0;
@@ -686,7 +725,7 @@ function renderLeaguePanel() {
 
     const prompt = `Give me a full scouting report on ${teamName}. Include their roster strengths, weaknesses, trade tendencies, and how I can exploit them.`;
     const rid = roster.roster_id;
-    html += `<div class="league-card-wrap" id="lc-${rid}">
+    return `<div class="league-card-wrap" id="lc-${rid}">
     <div class="league-card${isMe ? ' league-card-me' : ''}" onclick="toggleLeagueDossier('${rid}')">
       <div class="league-card-rank">#${idx + 1}</div>
       <div class="league-card-body">
@@ -719,9 +758,6 @@ function renderLeaguePanel() {
       <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify(prompt).replace(/'/g, "\\'")})" style="width:100%;padding:8px;font-size:12px;font-weight:600;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:8px;cursor:pointer;font-family:inherit">Ask Scout about ${_esc(teamName)}</button>
     </div>
     </div>`;
-  });
-
-  container.innerHTML = html;
 }
 window.renderLeaguePanel = renderLeaguePanel;
 

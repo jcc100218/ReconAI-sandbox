@@ -590,6 +590,7 @@ window.renderTopProspects=renderTopProspects;
 // ── Mock Draft ───────────────────────────────────────────────────
 // Interactive: user picks for their team, AI picks for all others
 let _mockState=null;
+let mockDraftPaused=false;
 
 function startMockDraft(){
   const el=$('draft-mock');if(!el)return;
@@ -613,22 +614,122 @@ function startMockDraft(){
     order.forEach((r,i)=>pickOrder.push({round:rd,pick:i+1,rosterId:r.roster_id,overall:pickOrder.length+1}));
   }
 
+  mockDraftPaused=false;
   _mockState={pool:[...pool],pickOrder,picks:[],currentIdx:0};
   renderMockDraftUI();
 }
 window.startMockDraft=startMockDraft;
 
+function _mockPosBadge(pos){
+  const cols={QB:'rgba(96,165,250,.2);color:#60a5fa',RB:'rgba(52,211,153,.2);color:#34d399',WR:'rgba(108,99,245,.2);color:#a78bfa',TE:'rgba(251,191,36,.2);color:#fbbf24',DL:'rgba(251,146,60,.2);color:#fb923c',LB:'rgba(167,139,250,.2);color:#a78bfa',DB:'rgba(244,114,182,.2);color:#f472b6'};
+  const style=cols[pos]||'rgba(74,78,90,.2);color:#8b8f9a';
+  return `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:${style};white-space:nowrap">${pos}</span>`;
+}
+
+function _mockPickCard(p,showTeam){
+  const photoUrl=`https://sleepercdn.com/content/nfl/players/thumb/${p.pid}.jpg`;
+  return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:3px">
+    <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
+    ${showTeam?`<span style="font-size:11px;color:var(--text3);min-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.teamName||'')}</span>`:''}
+    <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.playerName||p.name||'')}</span>
+    ${_mockPosBadge(p.pos)}
+    <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;flex-shrink:0">${(p.val||0).toLocaleString()}</span>
+  </div>`;
+}
+
+function _mockDraftGrid(picks,pickOrder){
+  if(!picks.length)return'';
+  const rounds=Math.max(...picks.map(p=>p.round));
+  const teamIds=[...new Set(pickOrder.map(p=>p.rosterId))];
+  // Build team name lookup
+  const teamNames={};
+  teamIds.forEach(rid=>{
+    const owner=(S.leagueUsers||[]).find(u=>{const r=S.rosters.find(r2=>r2.roster_id===rid);return r&&u.user_id===r.owner_id;});
+    teamNames[rid]=(owner?.metadata?.team_name||owner?.display_name||'T'+rid).substring(0,8);
+  });
+  const cols=teamIds.length;
+  let gridHtml=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Draft Board</div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <table style="width:100%;border-collapse:collapse;font-size:10px;min-width:${cols*70}px">
+    <thead><tr>
+      <th style="padding:3px 4px;color:var(--text3);font-weight:700;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap">Rd</th>
+      ${teamIds.map(rid=>`<th style="padding:3px 4px;color:${rid===S.myRosterId?'var(--accent)':'var(--text3)'};font-weight:600;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap">${escHtml(teamNames[rid])}</th>`).join('')}
+    </tr></thead><tbody>`;
+  for(let rd=1;rd<=rounds;rd++){
+    gridHtml+=`<tr>`;
+    gridHtml+=`<td style="padding:3px 4px;font-weight:700;color:var(--text3);border-bottom:1px solid var(--border)">${rd}</td>`;
+    teamIds.forEach(rid=>{
+      const pick=picks.find(p=>p.round===rd&&p.rosterId===rid);
+      const isMe=rid===S.myRosterId;
+      if(pick){
+        gridHtml+=`<td style="padding:3px 4px;text-align:center;border-bottom:1px solid var(--border);${isMe?'background:rgba(212,175,55,.06)':''}" title="${pick.playerName} (${pick.pos})">
+          <div style="font-weight:600;color:${isMe?'var(--accent)':'var(--text2)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65px">${(pick.playerName||'').split(' ').pop()}</div>
+          <div style="font-size:9px;color:var(--text3)">${pick.pos}</div>
+        </td>`;
+      }else{
+        gridHtml+=`<td style="padding:3px 4px;border-bottom:1px solid var(--border);color:var(--text3);text-align:center">—</td>`;
+      }
+    });
+    gridHtml+=`</tr>`;
+  }
+  gridHtml+=`</tbody></table></div></div>`;
+  return gridHtml;
+}
+
+function _mockPosBreakdown(picks){
+  const myPicks=picks.filter(p=>p.rosterId===S.myRosterId);
+  if(!myPicks.length)return'';
+  const counts={};
+  myPicks.forEach(p=>{counts[p.pos]=(counts[p.pos]||0)+1;});
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+    ${Object.entries(counts).sort((a,b)=>b[1]-a[1]).map(([pos,ct])=>`<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--bg4);color:var(--text2)">${pos} x${ct}</span>`).join('')}
+  </div>`;
+}
+
+function toggleMockDraftPause(){
+  mockDraftPaused=!mockDraftPaused;
+  if(!mockDraftPaused&&_mockState){
+    // Resume — continue AI picks
+    renderMockDraftUI();
+  }
+  // Update pause button label
+  const btn=document.getElementById('mock-pause-btn');
+  if(btn){
+    btn.textContent=mockDraftPaused?'Resume':'Pause';
+    btn.style.borderColor=mockDraftPaused?'var(--green)':'var(--border2)';
+    btn.style.color=mockDraftPaused?'var(--green)':'var(--text3)';
+  }
+}
+window.toggleMockDraftPause=toggleMockDraftPause;
+
 function renderMockDraftUI(){
   const el=$('draft-mock');if(!el||!_mockState)return;
   const{pool,pickOrder,picks,currentIdx}=_mockState;
 
+  // Pause/resume button HTML
+  const pauseBtn=`<button id="mock-pause-btn" onclick="toggleMockDraftPause()" style="padding:5px 12px;font-size:11px;font-weight:600;background:none;border:1px solid ${mockDraftPaused?'var(--green)':'var(--border2)'};border-radius:8px;color:${mockDraftPaused?'var(--green)':'var(--text3)'};cursor:pointer;font-family:inherit;flex-shrink:0">${mockDraftPaused?'Resume':'Pause'}</button>`;
+
   if(currentIdx>=pickOrder.length){
-    // Draft complete
+    // Draft complete — show results with grid and breakdown
+    const myPicks=picks.filter(p=>p.rosterId===S.myRosterId);
     el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl)">
-      <div style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:8px">Mock Draft Complete</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${picks.length} picks made across ${Math.max(...picks.map(p=>p.round))} rounds</div>
-      <div style="display:flex;flex-direction:column;gap:3px">${picks.filter(p=>p.rosterId===S.myRosterId).map(p=>`<div style="font-size:12px;color:var(--text2)">R${p.round}.${p.pick}: <strong style="color:var(--accent)">${escHtml(p.playerName)}</strong> (${p.pos}, DHQ ${p.val.toLocaleString()})</div>`).join('')}</div>
-      <button onclick="startMockDraft()" style="margin-top:8px;padding:6px 14px;font-size:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text2);cursor:pointer;font-family:inherit">Run Again</button>
+      <div style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:4px">Mock Draft Complete</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${picks.length} picks across ${Math.max(...picks.map(p=>p.round))} rounds</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your Picks</div>
+      <div style="display:flex;flex-direction:column;gap:2px">${myPicks.map(p=>{
+        const photoUrl='https://sleepercdn.com/content/nfl/players/thumb/'+p.pid+'.jpg';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+          <span style="font-size:11px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace;min-width:32px">R${p.round}.${p.pick}</span>
+          <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
+          <span style="font-size:14px;font-weight:700;color:var(--accent);flex:1">${escHtml(p.playerName)}</span>
+          ${_mockPosBadge(p.pos)}
+          <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+        </div>`;
+      }).join('')}</div>
+      ${_mockPosBreakdown(picks)}
+      ${_mockDraftGrid(picks,pickOrder)}
+      <button onclick="startMockDraft()" style="margin-top:10px;width:100%;padding:8px;font-size:13px;font-weight:700;background:var(--bg3);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:inherit">Run Again</button>
     </div>`;
     return;
   }
@@ -638,24 +739,48 @@ function renderMockDraftUI(){
   const owner=(S.leagueUsers||[]).find(u=>u.user_id===current.rosterId)||{display_name:'Team '+current.rosterId};
   const teamName=owner?.metadata?.team_name||owner?.display_name||'Team '+current.pick;
 
-  // Recent picks
-  const recentHtml=picks.slice(-5).map(p=>`<div style="font-size:11px;color:var(--text3)">R${p.round}.${p.pick}: ${escHtml(p.teamName)} → <span style="color:var(--text2)">${escHtml(p.playerName)}</span> (${p.pos})</div>`).join('');
+  // Recent picks — enhanced with photos
+  const recentHtml=picks.slice(-5).map(p=>_mockPickCard(p,true)).join('');
 
   if(isMyPick){
-    // User picks — show available players
+    // User picks — show available players with photos and pos badges
     const available=pool.slice(0,15);
     el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl)">
-      <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">ON THE CLOCK — R${current.round}.${current.pick}</div>
-      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px">Your Pick</div>
-      ${recentHtml?'<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+recentHtml+'</div>':''}
-      <div style="display:flex;flex-direction:column;gap:4px">${available.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer" onclick="mockDraftPick('${p.pid}')">
-        <span style="font-size:12px;font-weight:600;color:var(--text);flex:1">${escHtml(p.name)}</span>
-        <span style="font-size:10px;font-weight:700;color:var(--accent)">${p.pos}</span>
-        <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
-      </div>`).join('')}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;font-weight:700">ON THE CLOCK — R${current.round}.${current.pick}</div>
+          <div style="font-size:16px;font-weight:800;color:var(--text);margin-top:2px">Your Pick</div>
+        </div>
+        ${pauseBtn}
+      </div>
+      ${recentHtml?'<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Recent Picks</div>'+recentHtml+'</div>':''}
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Available Players</div>
+      <div style="display:flex;flex-direction:column;gap:3px">${available.map(p=>{
+        const photoUrl='https://sleepercdn.com/content/nfl/players/thumb/'+p.pid+'.jpg';
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='var(--border)'">
+          <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
+          <span style="font-size:14px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
+          ${_mockPosBadge(p.pos)}
+          <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+        </div>`;
+      }).join('')}</div>
     </div>`;
   }else{
     // AI picks for other teams
+    if(mockDraftPaused){
+      // Paused — show current state without advancing
+      el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.06em;font-weight:700">PAUSED — R${current.round}.${current.pick}</div>
+            <div style="font-size:14px;font-weight:700;color:var(--text);margin-top:2px">${escHtml(teamName)} on the clock</div>
+          </div>
+          ${pauseBtn}
+        </div>
+        ${recentHtml?'<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Recent Picks</div>'+recentHtml:''}
+      </div>`;
+      return;
+    }
     const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(current.rosterId):null;
     const needs=(assess?.needs||[]).slice(0,3).map(n=>typeof n==='string'?n:n.pos);
     // Pick the best available player at a need position, or BPA
@@ -668,9 +793,18 @@ function renderMockDraftUI(){
       _mockState.currentIdx++;
       // Auto-advance AI picks with a small delay for feel
       setTimeout(()=>renderMockDraftUI(),80);
+      const photoUrl='https://sleepercdn.com/content/nfl/players/thumb/'+pick.pid+'.jpg';
       el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">R${current.round}.${current.pick}</div>
-        <div style="font-size:13px;color:var(--text2)">${escHtml(teamName)} ${needs.length?'(needs '+needs.join(', ')+')':''} selects <strong style="color:var(--text)">${escHtml(pick.name)}</strong> (${pick.pos})</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <div style="flex:1;font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">R${current.round}.${current.pick}</div>
+          ${pauseBtn}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+          <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
+          ${escHtml(teamName)} ${needs.length?'(needs '+needs.join(', ')+')':''} selects
+          <strong style="color:var(--text)">${escHtml(pick.name)}</strong>
+          ${_mockPosBadge(pick.pos)}
+        </div>
       </div>`;
     }else{
       _mockState.currentIdx++;
@@ -719,6 +853,7 @@ Object.assign(window.App, {
   renderDraftNeeds, runDraftScouting,
   renderRookieBoard, renderRookieProfiles,
   renderTopProspects, startMockDraft, onDraftTabOpen,
+  toggleMockDraftPause,
 });
 window.idealDepth          = idealDepth;
 window.renderDraftNeeds    = renderDraftNeeds;

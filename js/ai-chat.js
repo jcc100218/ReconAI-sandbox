@@ -765,3 +765,14 @@ window.expandChat = expandChat;
 window.collapseDraftChat = collapseDraftChat;
 window.sendDraftChatMsg = sendDraftChatMsg;
 window.addDraftMsg = addDraftMsg;
+
+// ── Mobile keyboard detection ──────────────────────────────────
+// Hides mobile nav and repositions chat overlay when virtual keyboard opens
+if (window.visualViewport) {
+  let lastHeight = window.visualViewport.height;
+  window.visualViewport.addEventListener('resize', () => {
+    const isKeyboard = window.visualViewport.height < lastHeight * 0.75;
+    document.body.classList.toggle('keyboard-open', isKeyboard);
+    if (!isKeyboard) lastHeight = window.visualViewport.height;
+  });
+}

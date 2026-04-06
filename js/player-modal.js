@@ -252,16 +252,50 @@ function openPlayerModal(playerId){
     const trend=tpMeta?.trend||0;
     const peakYrsLeft=tpMeta?.peakYrsLeft||0;
     const pa=typeof getPlayerAction==='function'?getPlayerAction(playerId):{label:'Hold',col:'var(--accent)',reason:''};
-    const trendLabel=trend>=15?'▲ '+trend+'%':trend<=-15?'▼ '+Math.abs(trend)+'%':'→ Stable';
-    const trendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
+
+    // Trade Value Tier based on DHQ score
+    const dhqVal=window.App?.LI?.playerScores?.[playerId]||0;
+    const tvTier=dhqVal>=7000?{label:'Elite Trade Asset',col:'var(--green)',bg:'rgba(52,211,153,.1)'}:dhqVal>=4000?{label:'High Value',col:'var(--accent)',bg:'rgba(212,175,55,.1)'}:dhqVal>=2000?{label:'Mid Tier',col:'var(--amber)',bg:'rgba(251,191,36,.1)'}:{label:'Depth Piece',col:'var(--text3)',bg:'rgba(139,143,154,.08)'};
+
+    // Market Trend — use playerTrends if available, else fall back to meta trend
+    const ptData=window.App?.LI?.playerTrends?.[playerId];
+    let mktTrendLabel,mktTrendCol;
+    if(ptData){
+      const ptVal=typeof ptData==='number'?ptData:(ptData.trend||ptData.delta||0);
+      mktTrendLabel=ptVal>0?'▲ Rising':ptVal<0?'▼ Falling':'→ Stable';
+      mktTrendCol=ptVal>0?'var(--green)':ptVal<0?'var(--red)':'var(--text3)';
+    }else{
+      mktTrendLabel=trend>=15?'▲ Rising':trend<=-15?'▼ Falling':'→ Stable';
+      mktTrendCol=trend>=15?'var(--green)':trend<=-15?'var(--red)':'var(--text3)';
+    }
+
+    // Current Owner DNA — find who rosters this player
+    const ownerProfiles=window.App?.LI?.ownerProfiles||{};
+    let ownerDnaHtml='';
+    if(S.rosters?.length){
+      const ownerRoster=S.rosters.find(r=>(r.players||[]).includes(String(playerId)));
+      if(ownerRoster&&ownerRoster.roster_id!==S.myRosterId){
+        const ownerDna=ownerProfiles[ownerRoster.roster_id];
+        const ownerUser=(S.leagueUsers||[]).find(u=>u.user_id===ownerRoster.owner_id);
+        const ownerName=ownerUser?.metadata?.team_name||ownerUser?.display_name||'Owner';
+        if(ownerDna?.dna){
+          ownerDnaHtml=`<div style="margin-top:8px;padding:6px 8px;background:var(--bg4);border-radius:6px;font-size:12px;color:var(--text2)">
+            <span style="color:var(--text3)">Owner:</span> <span style="font-weight:600">${escHtml(ownerName)}</span>
+            <span style="margin-left:4px;padding:1px 6px;border-radius:8px;background:var(--accentL);color:var(--accent);font-weight:600;font-size:11px">${escHtml(ownerDna.dna)}</span>
+          </div>`;
+        }
+      }
+    }
 
     rightPanel.innerHTML=`
       <div style="font-size:13px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDPModal?' <span style="font-size:13px;color:var(--accent);background:var(--accentL);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>':''}</div>
       <div style="font-size:20px;font-weight:800;color:${pa.col}">${pa.label}</div>
-      <div style="font-size:13px;color:var(--text2);margin-top:4px">
-        <span style="color:${trendCol}">${trendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
+      <div style="display:inline-block;margin-top:6px;padding:2px 8px;border-radius:10px;background:${tvTier.bg};font-size:11px;font-weight:700;color:${tvTier.col}">${tvTier.label}</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:6px">
+        <span style="font-weight:600;color:${mktTrendCol}">${mktTrendLabel}</span> · ${peakYrsLeft>0?peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left':'Past peak'}
       </div>
-      <div style="font-size:13px;color:var(--text3);margin-top:4px">${pa.reason}</div>`;
+      <div style="font-size:13px;color:var(--text3);margin-top:4px">${pa.reason}</div>
+      ${ownerDnaHtml}`;
   }
 
   // Tag section
