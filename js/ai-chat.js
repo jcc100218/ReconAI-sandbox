@@ -759,6 +759,9 @@ window.App.tradeBuilderAssets = tradeBuilderAssets;
 
 // Bare window globals for inline handlers / cross-module access
 window.buildMentalityCtx = buildMentalityCtx;
+// Aliases used by ui.js, draft-ui.js — dhqContext is buildCtx, dhqBuildMentalityContext is buildMentalityCtx
+window.dhqContext = buildCtx;
+window.dhqBuildMentalityContext = buildMentalityCtx;
 window.homeAsk = homeAsk;
 window.goAsk = goAsk;
 window.expandChat = expandChat;

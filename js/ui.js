@@ -1213,7 +1213,62 @@ document.addEventListener('click',e=>{
   if(wrap&&!wrap.contains(e.target)){
     const r=$('player-search-results');if(r)r.style.display='none';
   }
+  // Close global search bar if clicking outside it
+  const gsBar=$('global-search-bar');
+  const gsBtn=$('global-search-btn');
+  if(gsBar&&gsBar.style.display!=='none'&&!gsBar.contains(e.target)&&e.target!==gsBtn&&!gsBtn?.contains(e.target)){
+    gsBar.style.display='none';
+    const gsResults=$('gsearch-results');if(gsResults)gsResults.style.display='none';
+    const gsIn=$('gsearch-in');if(gsIn)gsIn.value='';
+  }
 });
+
+// ── Global Player Search (header search bar) ──────────────────
+function toggleGlobalSearch(){
+  const bar=$('global-search-bar');if(!bar)return;
+  const isOpen=bar.style.display!=='none';
+  if(isOpen){
+    bar.style.display='none';
+    const r=$('gsearch-results');if(r)r.style.display='none';
+    const inp=$('gsearch-in');if(inp)inp.value='';
+  }else{
+    bar.style.display='';
+    setTimeout(()=>{const inp=$('gsearch-in');if(inp)inp.focus();},50);
+  }
+}
+window.toggleGlobalSearch=toggleGlobalSearch;
+
+function handleGlobalPlayerSearch(query){
+  const results=$('gsearch-results');if(!results)return;
+  if(!query||query.length<2){results.innerHTML='';results.style.display='none';return;}
+  results.style.display='block';
+  const q=query.toLowerCase();
+  const posMapS=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
+  const matches=Object.entries(S.players||{})
+    .filter(([id,p])=>{
+      const name=(p.first_name+' '+p.last_name).toLowerCase();
+      return name.includes(q)&&(p.status==='Active'||dynastyValue(id)>0);
+    })
+    .map(([id,p])=>({id,p,name:p.first_name+' '+p.last_name,val:dynastyValue(id)}))
+    .sort((a,b)=>b.val-a.val)
+    .slice(0,10);
+  if(!matches.length){results.innerHTML='<div style="padding:12px;font-size:13px;color:var(--text3)">No players found</div>';return;}
+  results.innerHTML=matches.map(({id,p,name,val})=>{
+    const meta=LI_LOADED?LI.playerMeta?.[id]:null;
+    const isRookie=meta?.source==='FC_ROOKIE';
+    const {col}=tradeValueTier(val);
+    const ini=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
+    return`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s" onclick="openPlayerModal('${id}');toggleGlobalSearch()" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
+      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span style=width:32px;height:32px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3);flex-shrink:0>${ini}</span>')" loading="lazy"/>
+      <div style="flex:1;overflow:hidden;min-width:0">
+        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:12px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
+        <div style="font-size:12px;color:var(--text3)">${posMapS(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
+      </div>
+      <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace;flex-shrink:0">${val>0?val.toLocaleString():'—'}</span>
+    </div>`;
+  }).join('');
+}
+window.handleGlobalPlayerSearch=handleGlobalPlayerSearch;
 
 // ── Home Snapshot ──────────────────────────────────────────────
 function renderHomeSnapshot(){

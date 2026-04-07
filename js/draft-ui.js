@@ -350,6 +350,7 @@ function renderDraftNeeds(){
 let _rookieSort={key:'dhq',dir:-1};
 let _rookiePosFilter='';
 let _rookieExpanded=null;
+let _rookieShowAll=false;
 
 function renderRookieBoard(){
   const el=$('rookie-profiles');if(!el)return;
@@ -396,6 +397,12 @@ function renderRookieBoard(){
 
   rookies=rookies.slice(0,50);
 
+  // Limit to top 25 unless user expanded
+  const ROOKIE_PAGE=25;
+  const totalRookies=rookies.length;
+  const visibleRookies=_rookieShowAll?rookies:rookies.slice(0,ROOKIE_PAGE);
+  const hiddenCount=totalRookies-visibleRookies.length;
+
   const sortInd=k=>_rookieSort.key===k?(_rookieSort.dir===-1?' \u25BC':' \u25B2'):'';
   const posFilters=['','QB','RB','WR','TE'];
 
@@ -421,7 +428,7 @@ function renderRookieBoard(){
       <span style="width:40px;text-align:center;cursor:pointer" onclick="_rookieSortBy('fit')">Fit${sortInd('fit')}</span>
     </div>
     <!-- Rows -->
-    ${rookies.map((r,i)=>{
+    ${visibleRookies.map((r,i)=>{
       const dhqCol=r.dhq>=7000?'var(--green)':r.dhq>=4000?'var(--blue)':r.dhq>=2000?'var(--text2)':'var(--text3)';
       const fitBadge=r.fit==='high'?'<span class="fit-high">FIT</span>':r.fit==='med'?'<span class="fit-med">VAL</span>':'<span class="fit-low">\u2014</span>';
       const isExp=_rookieExpanded===r.pid;
@@ -453,7 +460,8 @@ function renderRookieBoard(){
         </div>`:''}
       </div>`;
     }).join('')}
-    ${rookies.length===0?'<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">No rookies match this filter</div>':''}
+    ${visibleRookies.length===0?'<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">No rookies match this filter</div>':''}
+    ${hiddenCount>0?`<button onclick="_rookieShowMore()" style="width:100%;padding:10px;margin-top:6px;font-size:13px;font-weight:600;color:var(--text3);background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'">Show More (${hiddenCount} remaining)</button>`:''}
   `;
 }
 
@@ -465,10 +473,15 @@ function _rookieSortBy(key){
 }
 function _rookieFilter(pos){
   _rookiePosFilter=pos;
+  _rookieShowAll=false; // reset pagination on filter change
   renderRookieBoard();
 }
 function _rookieToggle(pid){
   _rookieExpanded=_rookieExpanded===pid?null:pid;
+  renderRookieBoard();
+}
+function _rookieShowMore(){
+  _rookieShowAll=true;
   renderRookieBoard();
 }
 
@@ -478,6 +491,7 @@ function renderRookieProfiles(){renderRookieBoard();}
 window._rookieSortBy=_rookieSortBy;
 window._rookieFilter=_rookieFilter;
 window._rookieToggle=_rookieToggle;
+window._rookieShowMore=_rookieShowMore;
 window.renderRookieBoard=renderRookieBoard;
 
 async function runDraftScouting(){

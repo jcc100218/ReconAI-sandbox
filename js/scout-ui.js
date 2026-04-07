@@ -715,12 +715,11 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     const dnaLabel = dna?.dna || '';
     const needs = (assess?.needs || []).slice(0, 2).map(n => typeof n === 'string' ? n : n.pos).join(', ');
 
-    // Build top 5 players for this roster
+    // Build top players for this roster — show up to 8, sorted by DHQ (show all if no DHQ data)
     const rosterPlayers = (roster.players || [])
       .map(pid => ({ pid, name: window.pName?.(pid) || pid, val: window.App?.LI?.playerScores?.[pid] || 0, pos: window.pPos?.(pid) || '?' }))
-      .filter(p => p.val > 0)
       .sort((a, b) => b.val - a.val)
-      .slice(0, 5);
+      .slice(0, 8);
     const strengthList = (assess?.strengths || []).slice(0, 2).map(s => typeof s === 'string' ? s : s.pos).join(', ');
 
     const prompt = `Give me a full scouting report on ${teamName}. Include their roster strengths, weaknesses, trade tendencies, and how I can exploit them.`;
@@ -773,7 +772,7 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
         `<div onclick="event.stopPropagation();openPlayerModal('${p.pid}')" style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;border-radius:6px;padding:4px 6px;transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
           <span style="color:var(--text);font-weight:600;flex:1">${_esc(p.name)}</span>
           <span style="color:var(--accent);font-size:10px;font-weight:700">${p.pos}</span>
-          <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val.toLocaleString()}</span>
+          <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val > 0 ? p.val.toLocaleString() : '—'}</span>
         </div>`
       ).join('')}</div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">

@@ -31,11 +31,21 @@
         <div class="status-dot" id="agent-dot"></div>
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
+      <span id="auth-user-badge" style="display:none;font-size:12px;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:6px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="Signed in"></span>
       <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" onclick="localStorage.setItem('fw_preferred_view','warroom')" class="header-hide-sm wr-glow" style="font-size:13px;color:var(--amber);text-decoration:none;font-weight:700;padding:4px 10px;border:1px solid rgba(251,191,36,.2);border-radius:6px;white-space:nowrap" title="Switch to War Room desktop view">War Room</a>
       <a href="https://github.com/jcc100218/ReconAI/issues" target="_blank" class="header-hide-sm" style="color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.5" title="Send Feedback"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></a>
       <button id="refresh-btn" onclick="handleRefreshClick()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Refresh data"><svg id="refresh-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
+      <button id="global-search-btn" onclick="toggleGlobalSearch()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Search players"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:10px;transition:color .15s;flex-shrink:0;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
+  </div>
+  <!-- Global player search bar — toggled by search icon, works on all tabs -->
+  <div id="global-search-bar" style="display:none;padding:6px 12px 8px;background:var(--bg1);border-bottom:1px solid var(--border);position:relative;z-index:90">
+    <input type="text" id="gsearch-in" placeholder="Search players by name..." autocomplete="off"
+      oninput="handleGlobalPlayerSearch(this.value)"
+      onkeydown="if(event.key==='Escape'){toggleGlobalSearch();}"
+      style="width:100%;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box"/>
+    <div id="gsearch-results" style="display:none;position:absolute;left:12px;right:12px;top:calc(100% - 2px);background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.3);max-height:320px;overflow-y:auto"></div>
   </div>
 
   <!-- Team Bar — slim always-visible roster strip -->
@@ -82,6 +92,28 @@
           </div>
           <h3 style="font-size:22px;font-weight:800;letter-spacing:-.04em;margin-bottom:6px;line-height:1.2">Win your dynasty league<br>with AI decisions</h3>
           <p style="max-width:340px;margin:0 auto;font-size:14px;color:var(--text3);line-height:1.5">Instant lineup, waiver, trade, and draft moves based on your exact team.</p>
+        </div>
+
+        <!-- OAuth sign-in (optional — unlocks AI, Field Log sync, full features) -->
+        <div id="oauth-signin-section" style="max-width:380px;margin:0 auto 16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="flex:1;height:1px;background:var(--border)"></div>
+            <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">Sign in</span>
+            <div style="flex:1;height:1px;background:var(--border)"></div>
+          </div>
+          <button onclick="window.OD.signInWithGoogle()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;border-radius:10px;border:1px solid #dadce0;background:#fff;color:#3c4043;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:8px;box-sizing:border-box;font-family:inherit;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.18)'" onmouseout="this.style.boxShadow='none'">
+            <svg viewBox="0 0 24 24" width="18" height="18" style="flex-shrink:0"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Sign in with Google
+          </button>
+          <button onclick="window.OD.signInWithApple()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;border-radius:10px;border:none;background:#000;color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:10px;box-sizing:border-box;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.82'" onmouseout="this.style.opacity='1'">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff" style="flex-shrink:0"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            Sign in with Apple
+          </button>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="flex:1;height:1px;background:var(--border)"></div>
+            <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap">or connect as guest</span>
+            <div style="flex:1;height:1px;background:var(--border)"></div>
+          </div>
         </div>
 
         <!-- Platform tabs -->
@@ -518,6 +550,15 @@
     <!-- SETTINGS -->
     <div class="panel" id="panel-settings">
 
+      <!-- Account (OAuth) -->
+      <div id="settings-account-section" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Account</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span id="settings-account-email" style="font-size:13px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+          <button onclick="window.OD.signOut()" style="flex-shrink:0;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Sign out</button>
+        </div>
+      </div>
+
       <!-- Trial / Subscription -->
       <details class="settings-section" id="trial-settings-section">
         <summary class="settings-summary">
@@ -929,5 +970,44 @@ if (window.visualViewport) {
     <button class="btn btn-ghost" style="width:100%;padding:11px;font-size:14px;border-radius:12px" onclick="closeTrialExpiredModal()">Continue with free</button>
   </div>
 </div>
+
+<!-- OAuth auth state: check session on load, update header badge + settings, hide sign-in buttons if signed in -->
+<script>
+(function initOAuthState() {
+  async function updateAuthUI(user) {
+    const badge = document.getElementById('auth-user-badge');
+    const oauthSection = document.getElementById('oauth-signin-section');
+    const settingsSection = document.getElementById('settings-account-section');
+    const settingsEmail = document.getElementById('settings-account-email');
+    const label = user?.email || user?.user_metadata?.name || user?.user_metadata?.full_name || '';
+    if (user && label) {
+      if (badge) { badge.textContent = label; badge.style.display = ''; }
+      if (oauthSection) oauthSection.style.display = 'none';
+      if (settingsSection) settingsSection.style.display = '';
+      if (settingsEmail) settingsEmail.textContent = label;
+    } else {
+      if (badge) badge.style.display = 'none';
+      if (oauthSection) oauthSection.style.display = '';
+      if (settingsSection) settingsSection.style.display = 'none';
+    }
+  }
+
+  // Wait for Supabase client to be ready, then check session
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      if (!window.OD?.getOAuthSession) return;
+      const session = await window.OD.getOAuthSession();
+      await updateAuthUI(session?.user || null);
+      // Also listen for auth state changes (handles OAuth redirect callback)
+      const client = window.OD.supabase;
+      if (client?.auth?.onAuthStateChange) {
+        client.auth.onAuthStateChange((_event, session) => {
+          updateAuthUI(session?.user || null);
+        });
+      }
+    } catch (e) { console.warn('[Scout] OAuth state check failed:', e); }
+  });
+})();
+</script>
 
 </body></html>
