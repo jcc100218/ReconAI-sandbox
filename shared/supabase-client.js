@@ -804,6 +804,61 @@ window.OD.deleteLeagueDoc = async function(leagueId, docName) {
     } catch { return false; }
 };
 
+// ══════════════════════════════════════════════════════════════════
+// OAUTH SIGN-IN — Google & Apple
+// Providers must be enabled in Supabase Dashboard:
+//   Settings → Authentication → Providers
+//   Google: requires Client ID + Secret from Google Cloud Console
+//   Apple:  requires Service ID + Secret Key from Apple Developer Portal
+// ══════════════════════════════════════════════════════════════════
+
+// Expose raw Supabase client for OAuth calls (e.g. window.OD.supabase.auth.signInWithOAuth)
+Object.defineProperty(window.OD, 'supabase', {
+    get() { return getClient(); },
+    configurable: true,
+    enumerable: true,
+});
+
+window.OD.signInWithGoogle = function() {
+    const client = getClient();
+    if (!client) return;
+    return client.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin + window.location.pathname },
+    });
+};
+
+window.OD.signInWithApple = function() {
+    const client = getClient();
+    if (!client) return;
+    return client.auth.signInWithOAuth({
+        provider: 'apple',
+        options: { redirectTo: window.location.origin + window.location.pathname },
+    });
+};
+
+window.OD.signOut = async function() {
+    const client = getClient();
+    if (client) await client.auth.signOut().catch(() => {});
+    localStorage.removeItem(SESSION_LS_KEY);
+    localStorage.removeItem(FW_SESSION_KEY);
+    window.location.reload();
+};
+
+window.OD.getOAuthSession = async function() {
+    const client = getClient();
+    if (!client) return null;
+    const { data } = await client.auth.getSession();
+    return data?.session || null;
+};
+
+window.OD.getOAuthUser = async function() {
+    const client = getClient();
+    if (!client) return null;
+    const { data } = await client.auth.getUser();
+    return data?.user || null;
+};
+
 // Expose on App namespace too
 window.App.OD = window.OD;
 window.App.SUPABASE_URL = SUPABASE_URL;
