@@ -455,7 +455,7 @@ function saveMentality(){
 // ── Available players ──────────────────────────────────────────
 function getAvailablePlayers(){
   const rostered=new Set(S.rosters.flatMap(r=>(r.players||[]).concat(r.taxi||[]).concat(r.reserve||[])).map(String));
-  const offPos=['QB','RB','WR','TE'];
+  const offPos=['QB','RB','WR','TE','K'];
   const idpPos=['DL','LB','DB'];
   const sc=S.leagues.find(l=>l.league_id===S.currentLeagueId)?.scoring_settings||{};
   const results=[];

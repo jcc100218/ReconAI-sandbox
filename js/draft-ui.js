@@ -406,10 +406,12 @@ function renderRookieBoard(){
   const sortInd=k=>_rookieSort.key===k?(_rookieSort.dir===-1?' \u25BC':' \u25B2'):'';
   const posFilters=['','QB','RB','WR','TE'];
 
-  // Check if league has IDP
+  // Check if league has K/IDP slots
   const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
   const rp=league?.roster_positions||[];
+  const leagueHasK=rp.some(s=>s==='K');
   const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+  if(leagueHasK)posFilters.push('K');
   if(leagueHasIDP)posFilters.push('DL','LB','DB');
 
   el.innerHTML=`
