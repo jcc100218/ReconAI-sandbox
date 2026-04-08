@@ -86,14 +86,27 @@ let _crosswalkYear = null;
 // ── Fetch helpers ─────────────────────────────────────────────────
 
 function _mflUrl(year, type, leagueId, apiKey, extra) {
-  let url = `${MFL_BASE}/${year}/export?TYPE=${type}&L=${leagueId}&JSON=1`;
+  // Strip URL fragments (#) and whitespace from league ID
+  const cleanId = String(leagueId).replace(/#.*$/, '').trim();
+  let url = `${MFL_BASE}/${year}/export?TYPE=${type}&L=${cleanId}&JSON=1`;
   if (apiKey) url += '&APIKEY=' + encodeURIComponent(apiKey);
   if (extra) url += '&' + extra;
   return url;
 }
 
 async function _mflGet(url) {
-  // Try direct fetch first, fall back to CORS proxy if blocked
+  // MFL API doesn't support CORS from GitHub Pages — always use proxy
+  // Try allorigins /get endpoint (wraps response in JSON with CORS headers)
+  try {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const proxyRes = await fetch(proxyUrl);
+    if (proxyRes.ok) {
+      const wrapper = await proxyRes.json();
+      if (wrapper.contents) return JSON.parse(wrapper.contents);
+    }
+  } catch (_e) { /* fall through to direct attempt */ }
+
+  // Fallback: direct fetch (works when not on GitHub Pages, e.g. localhost)
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -104,26 +117,7 @@ async function _mflGet(url) {
     }
     return res.json();
   } catch (directErr) {
-    // If CORS error, try Supabase proxy then public CORS proxy
-    if (directErr.message?.includes('CORS') || directErr.name === 'TypeError') {
-      // Try Supabase edge function proxy
-      const supabaseUrl = window.SUPABASE_URL || 'https://sxshiqyxhhifvtfqawbq.supabase.co';
-      try {
-        const proxyRes = await fetch(`${supabaseUrl}/functions/v1/cors-proxy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'apikey': window.SUPABASE_ANON || '' },
-          body: JSON.stringify({ url }),
-        });
-        if (proxyRes.ok) return proxyRes.json();
-      } catch (_e) { /* fall through */ }
-      // Fallback: allorigins proxy
-      try {
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-        const fallbackRes = await fetch(proxyUrl);
-        if (fallbackRes.ok) return fallbackRes.json();
-      } catch (_e2) { /* fall through */ }
-    }
-    throw directErr;
+    throw new Error('Could not connect to MFL. The API may be temporarily unavailable. Try again in a moment.');
   }
 }
 
