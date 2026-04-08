@@ -159,6 +159,9 @@ const projectGlobals = {
   runMemoryCapture: "readonly",
   _updateChatPlaceholder: "readonly",
   _tierGatePlaceholder: "readonly",
+  fillGlobalChat: "readonly",
+  tryInjectTradeCard: "readonly",
+  openTradeBuilderForPlayer: "readonly",
 
   // Memory API (shared/league-memory.js or similar)
   getMemory: "readonly",
