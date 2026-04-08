@@ -223,19 +223,19 @@ window.App.connect = connect;
 
 function showAuthStep() {
   const as = $('auth-step');
-  const cs = $('connect-step');
+  const sb = $('setup-block');
   if (as) as.style.display = '';
-  if (cs) cs.style.display = 'none';
-  const sb = $('setup-block'); if (sb) sb.style.display = 'block';
+  if (sb) sb.style.display = 'none';
 }
 window.showAuthStep = showAuthStep;
 
 function showConnectStep() {
   const as = $('auth-step');
   const cs = $('connect-step');
+  const sb = $('setup-block');
   if (as) as.style.display = 'none';
+  if (sb) sb.style.display = 'block';
   if (cs) cs.style.display = '';
-  const sb = $('setup-block'); if (sb) sb.style.display = 'block';
   // Focus first input after a short delay
   setTimeout(() => { const inp = $('u-input'); if (inp) inp.focus(); }, 200);
 }
@@ -252,7 +252,11 @@ async function _checkAuthAndShowStep() {
   try {
     const res = await window.OD?.supabase?.auth?.getSession?.();
     if (res?.data?.session) {
-      showConnectStep();
+      if (getLeagueRegistry().length > 0) {
+        renderLeagueHub();
+      } else {
+        showConnectStep();
+      }
     } else {
       showAuthStep();
     }
@@ -269,8 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
       window.OD?.supabase?.auth?.onAuthStateChange?.((event, session) => {
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
           const as = $('auth-step');
-          // Only act if auth-step is currently visible
-          if (as && as.style.display !== 'none' && $('setup-block')?.style.display !== 'none') {
+          // Only act if auth-step is currently visible (setup-block is hidden when auth-step shows)
+          if (as && as.style.display !== 'none') {
             if (getLeagueRegistry().length > 0) {
               renderLeagueHub();
             } else {
