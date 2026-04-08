@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════════
-// js/pro-launch.js — War Room Scout Pro upgrade page
-// Full-screen premium launch experience shown at every tier gate
+// js/pro-launch.js — War Room upgrade page
+// Full-screen premium launch experience. Tiers: Free → War Room → War Room Pro → Commissioner
 // ══════════════════════════════════════════════════════════════════
 
 (function () {
@@ -14,27 +14,34 @@
     {
       icon: '🧠',
       title: 'Full AI Intelligence',
-      desc: 'Unlimited Scout chats with deep reasoning — trade analysis, waiver recommendations, draft intelligence, and daily briefings. No daily caps, no throttling.',
+      desc: 'Unlimited AI chats with deep reasoning — trade analysis, waiver recommendations, draft intelligence, and daily briefings from Alex Ingram.',
       badge: 'Unlimited',
     },
     {
       icon: '🔗',
       title: 'Unlimited Leagues',
-      desc: 'Connect all your Sleeper, ESPN, MFL, and Yahoo leagues and switch between them in one tap. Every team, every platform, one dashboard.',
+      desc: 'Connect all your Sleeper, ESPN, MFL, and Yahoo leagues. Every team, every platform, one command center.',
       badge: 'Multi-league',
     },
     {
       icon: '🎯',
-      title: 'Owner DNA',
-      desc: 'Behavioral profiling that tells you exactly how each opponent trades — their risk tolerance, panic threshold, and what they\'ll accept before you send the offer.',
+      title: 'Owner DNA & Trade Center',
+      desc: 'Behavioral profiling that tells you exactly how each opponent trades — risk tolerance, panic threshold, and what they\'ll accept before you send the offer.',
       badge: 'Exclusive',
     },
     {
-      icon: '📋',
-      title: 'Field Log Sync',
-      desc: 'Everything you scout flows to War Room Core automatically. One source of truth across the whole dynasty.',
-      badge: 'Cross-platform',
+      icon: '📊',
+      title: 'Dashboard + Draft Command',
+      desc: 'Customizable KPI dashboard, mock draft simulator, prospect scouting with The Beast data, and full draft boards.',
+      badge: 'War Room',
     },
+  ];
+
+  const TIERS = [
+    { name: 'Free', price: '$0', period: '', features: ['1 league', 'Basic roster view', '3 AI messages/day', 'Player cards'], accent: 'rgba(255,255,255,0.3)' },
+    { name: 'War Room', price: '$4.99', period: '/mo', features: ['All leagues', 'Unlimited AI', 'Owner DNA', 'Trade Center', 'Draft Command', 'Waivers Engine'], accent: '#D4AF37', recommended: true },
+    { name: 'War Room Pro', price: '$9.99', period: '/mo', features: ['Everything in War Room', 'Advanced analytics', 'League Map', 'Trophy Room', 'Full draft boards'], accent: '#60A5FA' },
+    { name: 'Commissioner', price: '$14.99', period: '/mo', features: ['Everything in Pro', 'State of League reports', 'Trade fairness auditor', 'Rule change simulator', 'Opus-powered analysis'], accent: '#A78BFA' },
   ];
 
   const FAQ_ITEMS = [
@@ -44,15 +51,15 @@
     },
     {
       q: 'What happens to my data if I downgrade?',
-      a: 'Your data stays — Field Log notes, Owner DNA profiles, and league history are retained. You just lose access to Pro features until you resubscribe.',
+      a: 'Your data stays — Field Log notes, Owner DNA profiles, and league history are retained. You just lose access to premium features until you resubscribe.',
     },
     {
-      q: 'Do I get War Room Core too?',
-      a: 'Scout Pro ($4.99/mo) gives you the full mobile Scout experience. War Room desktop is available separately or as part of the Commissioner Suite.',
+      q: 'Does Scout come with War Room?',
+      a: 'Yes. Scout is the free tier. When you upgrade to War Room, you get everything in Scout plus the full desktop command center, AI analysis, and Owner DNA.',
     },
     {
-      q: 'Is there a free tier?',
-      a: 'Yes. Connect one league and get read-only access at no cost. Pro unlocks AI analysis, multi-league, Owner DNA, and advanced analytics.',
+      q: 'What\'s the difference between War Room and War Room Pro?',
+      a: 'War Room gives you the core dynasty toolkit. Pro adds advanced analytics, full league mapping, trophy room, and deeper draft boards.',
     },
   ];
 
@@ -120,19 +127,17 @@
         </div>
 
         <!-- Hero -->
-        <div style="text-align:center;padding:12px 0 44px">
+        <div style="text-align:center;padding:12px 0 32px">
           <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.28);border-radius:24px;padding:5px 14px;margin-bottom:24px">
-            <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55)">War Room Scout</span>
-            <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:linear-gradient(90deg,#d4af37,#f0d060);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Pro</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 2L3 7v6c0 5.25 3.83 10.18 9 11.38C17.17 23.18 21 18.25 21 13V7L12 2z" fill="url(#proHG)" stroke="#D4AF37" stroke-width="1"/><path d="M12 7l1.545 3.13 3.455.503-2.5 2.437.59 3.43L12 14.885 8.91 16.5l.59-3.43-2.5-2.437 3.455-.503L12 7z" fill="#0A0A0A" stroke="#B8941E" stroke-width="0.5"/><defs><linearGradient id="proHG" x1="3" y1="2" x2="21" y2="24"><stop offset="0%" stop-color="#D4AF37"/><stop offset="100%" stop-color="#8B6914"/></linearGradient></defs></svg>
+            <span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:linear-gradient(90deg,#d4af37,#f0d060);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">War Room</span>
           </div>
           <h1 id="pro-launch-hero-heading" style="font-size:clamp(32px,9vw,48px);font-weight:800;letter-spacing:-.04em;line-height:1.06;margin:0 0 20px;background:linear-gradient(160deg,#ffffff 30%,#d4af37 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Every edge.<br>Every league.<br>No limits.</h1>
-          <div style="font-size:15px;color:rgba(255,255,255,.4);margin-bottom:32px;line-height:1.65;max-width:360px;margin-left:auto;margin-right:auto">The full Scout experience — AI analysis, multi-league, Owner DNA, and Field Log across all your teams.</div>
-          <div style="display:inline-flex;align-items:baseline;gap:5px;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.22);border-radius:18px;padding:14px 28px">
-            <span style="font-size:44px;font-weight:800;letter-spacing:-.04em;color:#d4af37;line-height:1">$4.99</span>
-            <span style="font-size:16px;color:rgba(255,255,255,.3)">/month</span>
-          </div>
-          <div style="font-size:12px;color:rgba(255,255,255,.22);margin-top:8px">Cancel anytime &middot; No commitment</div>
+          <div style="font-size:15px;color:rgba(255,255,255,.4);margin-bottom:28px;line-height:1.65;max-width:360px;margin-left:auto;margin-right:auto">Dynasty intelligence powered by AI. Scout comes free — upgrade to unlock the full command center.</div>
         </div>
+
+        <!-- Tier comparison cards -->
+        <div id="pro-launch-tiers" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:32px"></div>
 
         <!-- Trial recap (shown only if usage data exists) -->
         <div id="pro-launch-recap" style="display:none;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.16);border-radius:14px;padding:16px 20px;margin-bottom:32px">
@@ -151,7 +156,7 @@
           style="width:100%;padding:18px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#1a1000;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;letter-spacing:-.02em;box-shadow:0 8px 32px rgba(212,175,55,.32);margin-bottom:12px;font-family:inherit;transition:transform .15s,box-shadow .15s"
           onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 14px 48px rgba(212,175,55,.45)'"
           onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(212,175,55,.32)'">
-          Start Pro &mdash; $4.99/month
+          Upgrade to War Room &mdash; $4.99/month
         </button>
 
         <!-- Secondary: continue with free -->
@@ -217,6 +222,28 @@
   }
 
   // ── Render helpers ─────────────────────────────────────────────
+  function _renderTiers() {
+    const container = document.getElementById('pro-launch-tiers');
+    if (!container) return;
+    const currentTier = typeof getTier === 'function' ? getTier() : 'free';
+    container.innerHTML = TIERS.map(t => {
+      const isCurrent = (currentTier === 'paid' && t.name === 'War Room') || (currentTier === 'free' && t.name === 'Free');
+      return `
+      <div style="background:${t.recommended ? 'rgba(212,175,55,.06)' : 'rgba(255,255,255,.03)'};border:${t.recommended ? '2px solid rgba(212,175,55,.35)' : '1px solid rgba(255,255,255,.08)'};border-radius:12px;padding:14px;position:relative;${isCurrent ? 'outline:2px solid rgba(46,204,113,.4);outline-offset:2px' : ''}">
+        ${t.recommended ? '<div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#d4af37;background:#090909;padding:0 8px;white-space:nowrap">MOST POPULAR</div>' : ''}
+        <div style="display:flex;align-items:baseline;gap:4px;margin-bottom:8px">
+          <span style="font-size:22px;font-weight:800;color:${t.accent};letter-spacing:-.03em">${t.price}</span>
+          <span style="font-size:12px;color:rgba(255,255,255,.25)">${t.period}</span>
+        </div>
+        <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px">${t.name}</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          ${t.features.map(f => `<div style="font-size:11px;color:rgba(255,255,255,.4);display:flex;align-items:center;gap:5px"><span style="color:${t.accent};font-size:9px;flex-shrink:0">✓</span>${f}</div>`).join('')}
+        </div>
+        ${isCurrent ? '<div style="margin-top:8px;font-size:10px;font-weight:700;color:#2ECC71;text-transform:uppercase;letter-spacing:.06em">CURRENT PLAN</div>' : ''}
+      </div>`;
+    }).join('');
+  }
+
   function _renderFeatures() {
     const container = document.getElementById('pro-launch-features');
     if (!container) return;
@@ -293,6 +320,7 @@
     if (manageEl) manageEl.style.display = tier === 'paid' ? '' : 'none';
 
     // Populate content
+    _renderTiers();
     _renderFeatures();
     _renderFAQ();
     _renderRecap();
