@@ -1527,7 +1527,9 @@ function renderLeagueHub() {
       onmouseover="this.style.borderColor='rgba(212,175,55,.55)';this.style.boxShadow='0 6px 28px rgba(212,175,55,.14)'"
       onmouseout="this.style.borderColor='rgba(212,175,55,.28)';this.style.boxShadow='none'"
       onkeydown="if(event.key==='Enter'||event.key===' ')showProLaunchPage()">
-      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(212,175,55,.25),rgba(212,175,55,.08));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⚡</div>
+      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(212,175,55,.25),rgba(212,175,55,.08));display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M12 2L3 7v6c0 5.25 3.83 10.18 9 11.38C17.17 23.18 21 18.25 21 13V7L12 2z" fill="url(#proG)" stroke="#D4AF37" stroke-width="1"/><path d="M12 7l1.545 3.13 3.455.503-2.5 2.437.59 3.43L12 14.885 8.91 16.5l.59-3.43-2.5-2.437 3.455-.503L12 7z" fill="#0A0A0A" stroke="#B8941E" stroke-width="0.5"/><defs><linearGradient id="proG" x1="3" y1="2" x2="21" y2="24"><stop offset="0%" stop-color="#D4AF37"/><stop offset="100%" stop-color="#8B6914"/></linearGradient></defs></svg>
+      </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap">
           <span style="font-size:14px;font-weight:700;color:#fff;line-height:1.2">Unlock Scout Pro</span>
