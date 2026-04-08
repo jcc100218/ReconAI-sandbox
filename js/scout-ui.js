@@ -869,7 +869,7 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
           // Active Trader badge
           const tradeCount = (window.App?.LI?.tradeHistory || []).filter(t => (t.roster_ids || []).includes(roster.roster_id)).length;
           if (tradeCount >= 3) {
-            badges.push('<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(52,152,219,.2);color:#3498DB;font-weight:700">Active Trader</span>');
+            badges.push('<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(212,175,55,.15);color:#d4af37;font-weight:700">Active Trader</span>');
           }
           // Panic/Desperate badge
           if ((assess?.panic || 0) >= 3) {

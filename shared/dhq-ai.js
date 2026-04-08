@@ -196,7 +196,7 @@ Include:
 4. AVOID — positions or rounds with poor historical returns in this league
 Search the web for current rookie rankings. Be specific with prospect names.`,
     maxTokens: 1200,
-    useWebSearch: true,
+    useWebSearch: (typeof canAccess === 'function' && canAccess('BRIEFING_REASONING')) ? true : false,
   },
 
   // ── TRADE SCOUT (opponent analysis) ────────────────────────────
@@ -257,7 +257,7 @@ Keep it to 4-6 sentences. Be definitive — give a clear recommendation.
 EXAMPLE OF AN IDEAL RESPONSE:
 Assistant: "**Amon-Ra St. Brown (WR, age 25, DHQ 7,400) — HOLD.** Elite WR1 locked in as Detroit's target leader. At 25 he's entering his prime (21-33 for WRs) with 8+ elite years ahead. DHQ 7,400 is fair — you'd need a top-3 pick + a starter to replace this production. Only sell for 8,000+ DHQ in return value."`,
     maxTokens: 500,
-    useWebSearch: true,
+    useWebSearch: (typeof canAccess === 'function' && canAccess('BRIEFING_REASONING')) ? true : false,
   },
 
   // ── ROOKIE SCOUT REPORT ──────────────────────────────────────────
@@ -282,7 +282,7 @@ Rate each 1-10 with a one-line explanation.
 
 **DYNASTY TAKEAWAY:** Clear buy/sell recommendation, ideal rookie draft range (e.g. "1.03-1.06"), ceiling outcome vs floor outcome, and how this player fits the user's roster needs. Be opinionated and specific.`,
     maxTokens: 1500,
-    useWebSearch: true,
+    useWebSearch: (typeof canAccess === 'function' && canAccess('BRIEFING_REASONING')) ? true : false,
   },
 
   // ── POWER RANKINGS X POST (skip few-shot) ──────────────────────
