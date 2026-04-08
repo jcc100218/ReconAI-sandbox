@@ -7,7 +7,7 @@
 
 window.App = window.App || {};
 
-const ROOKIE_DATA_BASE = 'https://raw.githubusercontent.com/jcc100218/warroom/main/draft-war-room';
+const ROOKIE_DATA_BASE = 'https://cdn.jsdelivr.net/gh/jcc100218/warroom@main/draft-war-room';
 const _rookieCache = { loaded: false, prospects: {}, byName: {} };
 
 // Position mapping for IDP

@@ -166,9 +166,24 @@ const MFLProvider = {
   },
 
   async _mflGet(url) {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    return res.json();
+    // MFL API doesn't support CORS for arbitrary origins — use proxy on localhost
+    const needsProxy = typeof window !== 'undefined' && (window.location.protocol === 'http:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const fetchUrl = needsProxy ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+    try {
+      const res = await fetch(fetchUrl);
+      if (!res.ok) return null;
+      return res.json();
+    } catch (e) {
+      // Fallback: try corsproxy.io if allorigins fails
+      if (needsProxy) {
+        try {
+          const res2 = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+          if (!res2.ok) return null;
+          return res2.json();
+        } catch { return null; }
+      }
+      return null;
+    }
   },
 
   async getLeagueChain(leagueId, currentSeason) {
