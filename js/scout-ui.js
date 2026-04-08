@@ -73,8 +73,6 @@ function sendGlobalChat() {
   const text = inp ? inp.value.trim() : '';
   if (!text) return;
   if (inp) inp.value = '';
-  // Log to field log
-  if(window.addFieldLogEntry)window.addFieldLogEntry('💬',`Asked Scout: "${text.slice(0,60)}${text.length>60?'...':''}"`, 'chat', {});
 
   // Switch to home tab so user sees the response
   const activeTab = window._activeTab;
@@ -92,6 +90,11 @@ function _routeToHomeChat(text) {
   const homeIn = document.getElementById('home-chat-in');
   if (homeIn) homeIn.value = text;
   if (typeof sendHomeChat === 'function') sendHomeChat();
+  // Scroll to chat area so user can see the response
+  setTimeout(() => {
+    const msgs = document.getElementById('home-chat-msgs');
+    if (msgs) msgs.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 200);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -136,17 +139,19 @@ function renderTeamBar() {
     recEl.textContent = t > 0 ? `${w}-${l}-${t}` : `${w}-${l}`;
   }
 
-  // Power rank (simple wins-based)
-  if (rankEl && S.rosters?.length) {
-    const sorted = [...S.rosters].sort((a, b) =>
-      (b.settings?.wins || 0) - (a.settings?.wins || 0) ||
-      (b.settings?.fpts || 0) - (a.settings?.fpts || 0)
-    );
-    const rank = sorted.findIndex(r => r.roster_id === myRoster.roster_id) + 1;
-    if (rank > 0) {
-      rankEl.style.display = '';
-      rankEl.textContent = `#${rank}`;
-    }
+  // Health score (replaces power rank in offseason)
+  if (rankEl) {
+    try {
+      const assess = typeof window.assessTeamFromGlobal === 'function'
+        ? window.assessTeamFromGlobal(myRoster.roster_id)
+        : null;
+      const health = assess?.health ?? assess?.overallGrade ?? null;
+      if (health != null) {
+        rankEl.style.display = '';
+        const score = typeof health === 'number' ? Math.round(health) : health;
+        rankEl.textContent = `Health: ${score}`;
+      }
+    } catch (e) {}
   }
 }
 window.renderTeamBar = renderTeamBar;
@@ -726,7 +731,6 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     const rid = roster.roster_id;
     return `<div class="league-card-wrap" id="lc-${rid}">
     <div class="league-card${isMe ? ' league-card-me' : ''}" onclick="toggleLeagueDossier('${rid}')">
-      <div class="league-card-rank">#${idx + 1}</div>
       <div class="league-card-body">
         <div class="league-card-name">${_esc(teamName)}${isMe ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">YOU</span>' : ''}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">

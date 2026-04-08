@@ -578,7 +578,12 @@ Based on the ${year} rookie class and my league's ACTUAL historical draft data:
 
 Search the web for current ${year} rookie rankings. Be specific with prospect names.`;
 
-    const reply=await callClaude([{role:'user',content:prompt}],true,2,1200);
+    const timeoutMs=90000;
+    const reply=await Promise.race([
+      callClaude([{role:'user',content:prompt}],true,2,1200),
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Scouting report timed out — try again')),timeoutMs))
+    ]);
+    if(!reply||!reply.trim()){throw new Error('No response from AI — check your connection and try again');}
     $('draft-scout-content').innerHTML=`
       <div class="card" style="border-color:rgba(212,175,55,.2)">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -589,7 +594,7 @@ Search the web for current ${year} rookie rankings. Be specific with prospect na
       </div>`;
     draftChatHistory=[];
     addDraftMsg(`I've analyzed your ${year} draft position. What would you like to dig into?`,'a');
-  }catch(e){$('draft-scout-content').innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${escHtml(e.message)}</div></div>`;}
+  }catch(e){$('draft-scout-content').innerHTML=`<div class="card"><div class="empty" style="color:var(--red)">Error: ${escHtml(e.message||'Unknown error')}</div><button class="btn btn-ghost btn-sm" onclick="runDraftScouting()" style="margin-top:8px">Try Again</button></div>`;}
   btn.textContent='Scout ↗';btn.disabled=false;
 }
 

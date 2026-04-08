@@ -1083,7 +1083,7 @@ async function loadLeagueIntel(){
             // ── ROOKIE: veteran-anchored DHQ mapping ──
             // Skip IDP rookies if league has no IDP slots
             const isIDPPos=['DL','LB','DB'].includes(mappedPos);
-            const hasIDP=(starterCounts.DL||0)>1||(starterCounts.LB||0)>1||(starterCounts.DB||0)>1;
+            const hasIDP=(starterCounts.DL||0)>0||(starterCounts.LB||0)>0||(starterCounts.DB||0)>0;
             if(isIDPPos&&!hasIDP)return;
 
             // Find nearest veteran by FC value to anchor the DHQ mapping

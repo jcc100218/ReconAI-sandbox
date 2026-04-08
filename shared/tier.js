@@ -243,16 +243,16 @@ function showUpgradePrompt(feature, containerEl) {
       ${contextNote}
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">Scout — $4.99/mo</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">War Room Suite — $9.99/mo</div>
       <div style="font-size:13px;color:var(--text3);line-height:1.7">
-        Owner DNA &middot; Trade Builder &middot; Draft Archetypes<br>
-        Briefing Reasoning &middot; FAAB Intelligence &middot; Unlimited Chat
+        Scout + War Room &middot; Owner DNA &middot; Trade Builder<br>
+        Draft Command Center &middot; Unlimited AI &middot; Full Analytics
       </div>
     </div>
     <button
       onclick="window.open('https://warroom.fantasy-dynasty-hq.com','_blank')"
-      style="width:100%;padding:14px;background:linear-gradient(135deg,#7c6bf8,#9b8afb);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;box-shadow:0 4px 16px rgba(124,107,248,.35)">
-      Upgrade to Scout
+      style="width:100%;padding:14px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;box-shadow:0 4px 16px rgba(212,175,55,.25)">
+      Upgrade — $9.99/mo
     </button>
     <button
       onclick="document.getElementById('dhq-upgrade-modal').style.display='none'"

@@ -32,8 +32,7 @@
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
       <span id="auth-user-badge" style="display:none;font-size:12px;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:6px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="Signed in"></span>
-      <a href="https://skjjcruz.github.io/Owner-Dashboard---V10/index.html" onclick="localStorage.setItem('fw_preferred_view','warroom')" class="header-hide-sm wr-glow" style="font-size:13px;color:var(--amber);text-decoration:none;font-weight:700;padding:4px 10px;border:1px solid rgba(251,191,36,.2);border-radius:6px;white-space:nowrap" title="Switch to War Room desktop view">War Room</a>
-      <a href="https://github.com/jcc100218/ReconAI/issues" target="_blank" class="header-hide-sm" style="color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.5" title="Send Feedback"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></a>
+      <a href="https://warroom.fantasy-dynasty-hq.com" onclick="localStorage.setItem('fw_preferred_view','warroom')" class="header-hide-sm wr-glow" style="font-size:13px;color:var(--amber);text-decoration:none;font-weight:700;padding:4px 10px;border:1px solid rgba(251,191,36,.2);border-radius:6px;white-space:nowrap" title="Switch to War Room desktop view">War Room</a>
       <button id="refresh-btn" onclick="handleRefreshClick()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Refresh data"><svg id="refresh-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
       <button id="global-search-btn" onclick="toggleGlobalSearch()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Search players"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:10px;transition:color .15s;flex-shrink:0;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
@@ -567,22 +566,30 @@
         </summary>
         <div style="padding:12px 0 4px">
           <div id="trial-settings-info"></div>
-          <button class="btn" style="padding:10px 18px;width:100%;font-size:14px;font-weight:700;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="window.open('https://warroom.fantasy-dynasty-hq.com','_blank')">Upgrade — $4.99/mo</button>
+          <button class="btn" style="padding:10px 18px;width:100%;font-size:14px;font-weight:700;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="window.open('https://warroom.fantasy-dynasty-hq.com','_blank')">Upgrade — $9.99/mo</button>
         </div>
       </details>
 
-      <!-- Alex Style Picker -->
-      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Alex's Style</div>
-        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">How Alex communicates across all AI responses.</div>
-        <div id="alex-style-picker" style="display:flex;flex-direction:column;gap:6px"></div>
-      </div>
+      <!-- Alex Style Picker (collapsed by default) -->
+      <details style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:14px">
+        <summary style="padding:14px 16px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;user-select:none">
+          <span style="font-size:14px;font-weight:700;color:var(--text);flex:1">Alex's Style</span>
+          <span id="alex-style-current" style="font-size:12px;color:var(--text3)"></span>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div style="padding:0 16px 14px">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:10px">How Alex communicates across all AI responses.</div>
+          <div id="alex-style-picker" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </details>
       <script>
       (function(){
         const el=document.getElementById('alex-style-picker');if(!el)return;
         function render(){
           const styles=window.ALEX_STYLES||{};const cur=localStorage.getItem('wr_alex_style')||'default';
-          el.innerHTML=Object.entries(styles).map(([k,s])=>`<button onclick="localStorage.setItem('wr_alex_style','${k}');document.querySelectorAll('#alex-style-picker button').forEach(b=>b.style.borderColor='var(--border)');this.style.borderColor='var(--accent)'" style="text-align:left;padding:10px 12px;background:${k===cur?'rgba(212,175,55,.06)':'var(--bg3)'};border:1px solid ${k===cur?'var(--accent)':'var(--border)'};border-radius:8px;cursor:pointer;font-family:inherit"><div style="font-size:13px;font-weight:700;color:${k===cur?'var(--accent)':'var(--text)'}">${s.name}${k===cur?' ✓':''}</div><div style="font-size:11px;color:var(--text3);line-height:1.4;margin-top:2px">${(s.tone||'').substring(0,80)}...</div></button>`).join('');
+          const curLabel=document.getElementById('alex-style-current');
+          if(curLabel&&styles[cur])curLabel.textContent=styles[cur].name||'Default';
+          el.innerHTML=Object.entries(styles).map(([k,s])=>`<button onclick="localStorage.setItem('wr_alex_style','${k}');this.closest('details').querySelector('#alex-style-current').textContent='${(s.name||'').replace(/'/g,"\\'")}';document.querySelectorAll('#alex-style-picker button').forEach(b=>{b.style.borderColor='var(--border)';b.style.background='var(--bg3)';b.querySelector('div').style.color='var(--text)'});this.style.borderColor='var(--accent)';this.style.background='rgba(212,175,55,.06)';this.querySelector('div').style.color='var(--accent)'" style="text-align:left;padding:10px 12px;background:${k===cur?'rgba(212,175,55,.06)':'var(--bg3)'};border:1px solid ${k===cur?'var(--accent)':'var(--border)'};border-radius:8px;cursor:pointer;font-family:inherit"><div style="font-size:13px;font-weight:700;color:${k===cur?'var(--accent)':'var(--text)'}">${s.name}${k===cur?' ✓':''}</div><div style="font-size:11px;color:var(--text3);line-height:1.4;margin-top:2px">${(s.tone||'').substring(0,80)}...</div></button>`).join('');
         }
         if(window.ALEX_STYLES)render();else setTimeout(render,500);
       })();
@@ -966,7 +973,7 @@ if (window.visualViewport) {
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)"><span style="color:var(--red);font-size:11px;font-weight:700">✕</span> Daily briefings</div>
       </div>
     </div>
-    <button class="btn" style="width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;margin-bottom:8px;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="switchTab('settings');closeTrialExpiredModal()">Upgrade now — $4.99/mo</button>
+    <button class="btn" style="width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;margin-bottom:8px;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="switchTab('settings');closeTrialExpiredModal()">Upgrade now — $9.99/mo</button>
     <button class="btn btn-ghost" style="width:100%;padding:11px;font-size:14px;border-radius:12px" onclick="closeTrialExpiredModal()">Continue with free</button>
   </div>
 </div>

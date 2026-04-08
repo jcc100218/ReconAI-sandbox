@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="40" fill="#7c6bf8"/>
-  <circle cx="96" cy="96" r="60" stroke="#c4b5fd" stroke-width="3" fill="none" stroke-dasharray="8 5" opacity="0.6"/>
-  <circle cx="96" cy="96" r="30" stroke="#e0d4ff" stroke-width="3" fill="none"/>
-  <circle cx="96" cy="96" r="8" fill="#e0d4ff"/>
-  <line x1="96" y1="16" x2="96" y2="48" stroke="#c4b5fd" stroke-width="2.5" opacity="0.5"/>
-  <line x1="96" y1="144" x2="96" y2="176" stroke="#c4b5fd" stroke-width="2.5" opacity="0.5"/>
-  <line x1="16" y1="96" x2="48" y2="96" stroke="#c4b5fd" stroke-width="2.5" opacity="0.5"/>
-  <line x1="144" y1="96" x2="176" y2="96" stroke="#c4b5fd" stroke-width="2.5" opacity="0.5"/>
+  <rect width="192" height="192" rx="40" fill="#08090b"/>
+  <circle cx="96" cy="96" r="60" stroke="#D4AF37" stroke-width="3" fill="none" stroke-dasharray="8 5" opacity="0.6"/>
+  <circle cx="96" cy="96" r="30" stroke="#D4AF37" stroke-width="3" fill="none"/>
+  <circle cx="96" cy="96" r="8" fill="#D4AF37"/>
+  <line x1="96" y1="16" x2="96" y2="48" stroke="#D4AF37" stroke-width="2.5" opacity="0.5"/>
+  <line x1="96" y1="144" x2="96" y2="176" stroke="#D4AF37" stroke-width="2.5" opacity="0.5"/>
+  <line x1="16" y1="96" x2="48" y2="96" stroke="#D4AF37" stroke-width="2.5" opacity="0.5"/>
+  <line x1="144" y1="96" x2="176" y2="96" stroke="#D4AF37" stroke-width="2.5" opacity="0.5"/>
 </svg>

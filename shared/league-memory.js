@@ -80,7 +80,7 @@ async function saveMemoryEntry(leagueId, type, content) {
       created_at: new Date().toISOString(),
     };
 
-    // Try Supabase (skip if table not created yet)
+    // Try Supabase (skip if table not created yet or previous attempt failed)
     let saved = false;
     if (!window._leagueMemoryDbDisabled) {
       try {
@@ -88,12 +88,15 @@ async function saveMemoryEntry(leagueId, type, content) {
         if (db) {
           const { error } = await db.from(MEMORY_TABLE).insert([entry]);
           if (!error) saved = true;
-          else if (error.code === '42P01' || error.message?.includes('does not exist')) {
-            console.warn('[LeagueMemory] Table not created yet — using localStorage only. Run the SQL from console to enable.');
+          else {
+            // Disable on any table-missing error (42P01, 404, PGRST204, etc.)
+            console.warn('[LeagueMemory] DB write failed — using localStorage only.');
             window._leagueMemoryDbDisabled = true;
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        window._leagueMemoryDbDisabled = true;
+      }
     }
 
     // Always save to localStorage as backup/fallback
@@ -138,7 +141,8 @@ async function loadLeagueMemory(leagueId, limit = 20) {
           .limit(MAX_MEMORY_ENTRIES);
         if (!error && data?.length) {
           entries = data;
-        } else if (error && (error.code === '42P01' || error.message?.includes('does not exist'))) {
+        } else if (error) {
+          // Disable DB on any error (table missing, auth issue, etc.)
           window._leagueMemoryDbDisabled = true;
         }
       }
@@ -259,6 +263,7 @@ async function captureTradeOutcomes(leagueId) {
     const seenSet = new Set(seen);
     const pName = window.pName || (id => id);
 
+    const newEntries = [];
     for (const t of trades) {
       if (!t.roster_ids?.includes(myRid)) continue;
 
@@ -284,15 +289,16 @@ async function captureTradeOutcomes(leagueId) {
       if (pickGot) summary += ` + ${pickGot} pick(s)`;
       if (t.valueDiff) summary += `. Net value: ${t.valueDiff > 0 ? '+' : ''}${t.valueDiff} DHQ`;
 
-      await saveMemoryEntry(leagueId, 'trade_outcome', {
-        summary,
-        fairness: t.fairness,
-        valueDiff: t.valueDiff,
-        season: t.season,
-        week: t.week,
+      newEntries.push({
+        type: 'trade_outcome',
+        content: { summary, fairness: t.fairness, valueDiff: t.valueDiff, season: t.season, week: t.week }
       });
-
       seenSet.add(tKey);
+    }
+
+    // Batch save all new trade outcomes at once
+    for (const e of newEntries) {
+      await saveMemoryEntry(leagueId, e.type, e.content);
     }
 
     localStorage.setItem(seenKey, JSON.stringify([...seenSet].slice(-100)));
@@ -313,7 +319,7 @@ async function captureOwnerShifts(leagueId) {
     const prev = JSON.parse(localStorage.getItem(snapKey) || '{}');
     const getUser = window.getUser || (id => 'Team ' + id);
 
-    let shifted = false;
+    const shiftEntries = [];
 
     for (const [rid, profile] of Object.entries(profiles)) {
       const prevTrades = prev[rid]?.trades || 0;
@@ -324,15 +330,19 @@ async function captureOwnerShifts(leagueId) {
       if (diff >= 3) {
         const ownerName = getUser(window.S?.rosters?.find(r => r.roster_id == rid)?.owner_id);
         const dna = profile.dna || 'unknown';
-        await saveMemoryEntry(leagueId, 'owner_shift', {
+        shiftEntries.push({
           summary: `${ownerName} made ${diff} new trades (DNA: ${dna}). Was ${prevTrades} trades, now ${currTrades}.`,
           rosterId: rid,
           tradesBefore: prevTrades,
           tradesAfter: currTrades,
           dna,
         });
-        shifted = true;
       }
+    }
+
+    // Batch save all owner shifts
+    for (const content of shiftEntries) {
+      await saveMemoryEntry(leagueId, 'owner_shift', content);
     }
 
     // Update snapshot
@@ -342,7 +352,7 @@ async function captureOwnerShifts(leagueId) {
     }
     localStorage.setItem(snapKey, JSON.stringify(snap));
 
-    if (shifted) console.log('[LeagueMemory] Owner shift(s) detected and saved');
+    if (shiftEntries.length) console.log('[LeagueMemory] Owner shift(s) detected and saved');
   } catch (e) {
     console.warn('[LeagueMemory] captureOwnerShifts error:', e);
   }
