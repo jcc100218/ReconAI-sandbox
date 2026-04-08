@@ -889,10 +889,11 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     <div class="league-dossier" id="dossier-${rid}" style="display:none;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-top:-7px;margin-bottom:6px">
       <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">SCOUTING REPORT</div>
       ${rosterPlayers.length ? `<div style="margin-bottom:8px">${rosterPlayers.map(p =>
-        `<div onclick="event.stopPropagation();openPlayerModal('${p.pid}')" style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;cursor:pointer;border-radius:6px;padding:4px 6px;transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
-          <span style="color:var(--text);font-weight:600;flex:1">${_esc(p.name)}</span>
+        `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
+          <span onclick="event.stopPropagation();openPlayerModal('${p.pid}')" style="color:var(--text);font-weight:600;flex:1;cursor:pointer">${_esc(p.name)}</span>
           <span style="color:var(--accent);font-size:10px;font-weight:700">${p.pos}</span>
           <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val > 0 ? p.val.toLocaleString() : '—'}</span>
+          ${!isMe ? `<button onclick="event.stopPropagation();openTradeBuilderForOpponentPlayer('${p.pid}','${rid}')" style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accentL);border:none;border-radius:5px;padding:2px 6px;cursor:pointer;font-family:inherit;flex-shrink:0">Trade</button>` : ''}
         </div>`
       ).join('')}</div>` : ''}
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">

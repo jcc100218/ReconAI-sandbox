@@ -1449,6 +1449,26 @@ function renderLeagueHub() {
       </div>`;
   }).join('');
 
+  // Pro upgrade banner — shown for free/trial users, above the card grid
+  const tier = typeof getTier === 'function' ? getTier() : 'free';
+  const showProBanner = tier === 'free' || tier === 'trial';
+  const proBanner = showProBanner ? `
+    <div onclick="showProLaunchPage()" role="button" tabindex="0"
+      style="cursor:pointer;margin-bottom:14px;border-radius:14px;padding:15px 18px;background:linear-gradient(135deg,rgba(212,175,55,.1) 0%,rgba(212,175,55,.04) 100%);border:1px solid rgba(212,175,55,.28);display:flex;align-items:center;gap:14px;transition:border-color .18s,box-shadow .18s"
+      onmouseover="this.style.borderColor='rgba(212,175,55,.55)';this.style.boxShadow='0 6px 28px rgba(212,175,55,.14)'"
+      onmouseout="this.style.borderColor='rgba(212,175,55,.28)';this.style.boxShadow='none'"
+      onkeydown="if(event.key==='Enter'||event.key===' ')showProLaunchPage()">
+      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(212,175,55,.25),rgba(212,175,55,.08));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⚡</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:700;color:#fff;line-height:1.2">Unlock Scout Pro</span>
+          <span style="font-size:10px;font-weight:700;color:#d4af37;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.3);border-radius:20px;padding:2px 8px;white-space:nowrap;letter-spacing:.04em">$4.99/mo</span>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.38);line-height:1.4">AI analysis &middot; All leagues &middot; Owner DNA &middot; Field Log</div>
+      </div>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="rgba(212,175,55,.55)" stroke-width="2.5" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>` : '';
+
   hub.innerHTML = `
     <div class="hub-wrap">
       <div class="hub-top-bar">
@@ -1461,15 +1481,8 @@ function renderLeagueHub() {
         </div>
         <button class="hub-add-btn" onclick="showAddPlatformForm()">+ Add Platform</button>
       </div>
-      <div class="hub-cards">${cards}${isFree || getTier() === 'trial' ? `
-        <div onclick="showProLaunchPage()" style="cursor:pointer;background:linear-gradient(135deg,rgba(212,175,55,.12),rgba(184,148,31,.06));border:1px solid rgba(212,175,55,.3);border-radius:var(--rl,12px);padding:16px;display:flex;align-items:center;gap:14px;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='rgba(212,175,55,.6)';this.style.boxShadow='0 4px 20px rgba(212,175,55,.15)'" onmouseout="this.style.borderColor='rgba(212,175,55,.3)';this.style.boxShadow='none'">
-          <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#d4af37,#b8941f);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⚡</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:700;color:#d4af37;margin-bottom:2px">Upgrade to Scout Pro</div>
-            <div style="font-size:12px;color:rgba(255,255,255,.4)">Unlimited leagues &middot; Full AI &middot; Owner DNA</div>
-          </div>
-          <div style="font-size:12px;font-weight:700;color:#d4af37;flex-shrink:0">$4.99/mo →</div>
-        </div>` : ''}</div>
+      ${proBanner}
+      <div class="hub-cards">${cards}</div>
     </div>`;
 
   hub.style.display = 'block';

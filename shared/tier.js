@@ -243,10 +243,10 @@ function showUpgradePrompt(feature, containerEl) {
       ${contextNote}
     </div>
     <div style="background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:16px;margin-bottom:20px">
-      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">War Room Suite — $9.99/mo</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:8px">Scout Pro — $4.99/mo</div>
       <div style="font-size:13px;color:var(--text3);line-height:1.7">
-        Scout + War Room &middot; Owner DNA &middot; Trade Builder<br>
-        Draft Command Center &middot; Unlimited AI &middot; Full Analytics
+        Unlimited AI chat &middot; All leagues &middot; Owner DNA<br>
+        Field Log Sync &middot; Full draft intelligence
       </div>
     </div>
     <button

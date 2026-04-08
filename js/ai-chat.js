@@ -294,6 +294,8 @@ async function sendHomeChat(){
     msgsEl.style.display='flex';
     const um=document.createElement('div');um.className='hc-msg-u';um.textContent=text;
     msgsEl.appendChild(um);
+    // Inject trade card if message looks like a trade request
+    if(typeof window.tryInjectTradeCard==='function')window.tryInjectTradeCard(text,msgsEl);
     const lm=document.createElement('div');lm.className='hc-msg-a';
     lm.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
     msgsEl.appendChild(lm);
