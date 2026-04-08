@@ -67,7 +67,7 @@
     <span id="trial-banner-text" class="trial-banner-text">
       <span id="trial-banner-days">30 days</span> left of full access
     </span>
-    <button onclick="switchTab('settings')" class="trial-banner-upgrade">Upgrade</button>
+    <button onclick="showProLaunchPage()" class="trial-banner-upgrade">Upgrade</button>
     <button onclick="dismissTrialBanner()" class="trial-banner-dismiss" aria-label="Dismiss">&times;</button>
   </div>
 
@@ -554,6 +554,11 @@
         </div>
       </div>
 
+      <!-- Subscription management (Pro users) -->
+      <div id="settings-manage-sub" style="display:none;text-align:center;margin-bottom:14px">
+        <button onclick="showProLaunchPage()" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--accent);text-decoration:underline;font-family:inherit;padding:4px">Manage Subscription</button>
+      </div>
+
       <!-- Trial / Subscription -->
       <details class="settings-section" id="trial-settings-section">
         <summary class="settings-summary">
@@ -562,7 +567,7 @@
         </summary>
         <div style="padding:12px 0 4px">
           <div id="trial-settings-info"></div>
-          <button class="btn" style="padding:10px 18px;width:100%;font-size:14px;font-weight:700;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="window.open('https://warroom.fantasy-dynasty-hq.com','_blank')">Upgrade — $9.99/mo</button>
+          <button class="btn" style="padding:10px 18px;width:100%;font-size:14px;font-weight:700;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="showProLaunchPage()">Upgrade to Pro — $4.99/mo</button>
         </div>
       </details>
 
@@ -859,6 +864,7 @@
 <script src="js/draft-ui.js"></script>
 <script src="js/trade-calc.js"></script>
 <script src="js/scout-ui.js"></script>
+<script src="js/pro-launch.js"></script>
 <script src="js/tutorial.js"></script>
 
 <!-- Service Worker registration -->
@@ -975,7 +981,7 @@ if (window.visualViewport) {
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)"><span style="color:var(--red);font-size:11px;font-weight:700">✕</span> Daily briefings</div>
       </div>
     </div>
-    <button class="btn" style="width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;margin-bottom:8px;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="switchTab('settings');closeTrialExpiredModal()">Upgrade now — $9.99/mo</button>
+    <button class="btn" style="width:100%;padding:13px;font-size:15px;font-weight:700;border-radius:12px;margin-bottom:8px;background:linear-gradient(135deg,#d4af37,#b8941f);box-shadow:0 4px 16px rgba(212,175,55,.25)" onclick="closeTrialExpiredModal();showProLaunchPage()">Upgrade to Pro — $4.99/mo</button>
     <button class="btn btn-ghost" style="width:100%;padding:11px;font-size:14px;border-radius:12px" onclick="closeTrialExpiredModal()">Continue with free</button>
   </div>
 </div>

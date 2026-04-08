@@ -250,9 +250,9 @@ function showUpgradePrompt(feature, containerEl) {
       </div>
     </div>
     <button
-      onclick="window.open('https://warroom.fantasy-dynasty-hq.com','_blank')"
-      style="width:100%;padding:14px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;box-shadow:0 4px 16px rgba(212,175,55,.25)">
-      Upgrade — $9.99/mo
+      onclick="document.getElementById('dhq-upgrade-modal').style.display='none';if(window.showProLaunchPage)showProLaunchPage();"
+      style="width:100%;padding:14px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#1a1000;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;box-shadow:0 4px 16px rgba(212,175,55,.25)">
+      Upgrade to Pro — $4.99/mo
     </button>
     <button
       onclick="document.getElementById('dhq-upgrade-modal').style.display='none'"
@@ -484,9 +484,9 @@ function _tierGatePlaceholder(featureLabel, feature) {
         <div style="font-size:22px">🔒</div>
         <div style="font-size:14px;font-weight:700;color:var(--text)">${featureLabel}</div>
         <button
-          onclick="showUpgradePrompt('${feature}')"
-          style="padding:8px 20px;background:linear-gradient(135deg,#7c6bf8,#9b8afb);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(124,107,248,.3)">
-          Unlock
+          onclick="if(window.showProLaunchPage)showProLaunchPage();else showUpgradePrompt('${feature}')"
+          style="padding:8px 20px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#1a1000;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(212,175,55,.3)">
+          Unlock with Pro
         </button>
       </div>
     </div>

@@ -918,7 +918,7 @@ function showLeagueUpgradePrompt(targetLeague,currentLeague,leagueId,userId){
         <div style="display:flex;flex-direction:column;gap:6px">${teaserHtml}</div>
       </div>`:''}
       <div style="display:flex;flex-direction:column;gap:10px">
-        <button onclick="document.getElementById('league-limit-modal').remove();if(window.App?.openUpgradeModal)window.App.openUpgradeModal('leagues-multi');else showToast('Upgrade at warroom.fantasy');" style="padding:13px 20px;background:var(--accent);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:-.01em">Upgrade to unlock all leagues →</button>
+        <button onclick="document.getElementById('league-limit-modal').remove();if(window.showProLaunchPage)showProLaunchPage();" style="padding:13px 20px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#1a1000;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:-.01em">Upgrade to Pro — unlock all leagues →</button>
         <button onclick="document.getElementById('league-limit-modal').remove();selectLeague('${leagueId}','${userId}')" style="padding:10px 20px;background:transparent;color:var(--text2);border:1px solid var(--border2);border-radius:12px;font-size:13px;font-weight:500;cursor:pointer">Switch to this league instead</button>
         <button onclick="document.getElementById('league-limit-modal').remove()" style="padding:8px;background:transparent;color:var(--text3);border:none;font-size:13px;cursor:pointer">Cancel</button>
       </div>
@@ -1461,7 +1461,15 @@ function renderLeagueHub() {
         </div>
         <button class="hub-add-btn" onclick="showAddPlatformForm()">+ Add Platform</button>
       </div>
-      <div class="hub-cards">${cards}</div>
+      <div class="hub-cards">${cards}${isFree || getTier() === 'trial' ? `
+        <div onclick="showProLaunchPage()" style="cursor:pointer;background:linear-gradient(135deg,rgba(212,175,55,.12),rgba(184,148,31,.06));border:1px solid rgba(212,175,55,.3);border-radius:var(--rl,12px);padding:16px;display:flex;align-items:center;gap:14px;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='rgba(212,175,55,.6)';this.style.boxShadow='0 4px 20px rgba(212,175,55,.15)'" onmouseout="this.style.borderColor='rgba(212,175,55,.3)';this.style.boxShadow='none'">
+          <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#d4af37,#b8941f);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⚡</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:#d4af37;margin-bottom:2px">Upgrade to Scout Pro</div>
+            <div style="font-size:12px;color:rgba(255,255,255,.4)">Unlimited leagues &middot; Full AI &middot; Owner DNA</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#d4af37;flex-shrink:0">$4.99/mo →</div>
+        </div>` : ''}</div>
     </div>`;
 
   hub.style.display = 'block';
