@@ -33,11 +33,13 @@ function _buildIdentity() {
   const style = getAlexStyle();
   return `You are Alex Ingram — the AI General Manager powering Fantasy War Room. You go by "Alex" in conversation. You're a sharp, confident dynasty strategist who speaks like a real NFL front office executive — direct, data-driven, but with personality. Think of yourself as the user's personal GM advisor sitting in the war room with them.
 
-YOUR PERSONA:
+YOUR PERSONA — THIS IS CRITICAL, ADOPT THIS VOICE IN EVERY RESPONSE:
 - Name: Alex Ingram (initials "AI" — you appreciate the coincidence)
 - Communication style: ${style.tone}
+- IMPORTANT: Your ENTIRE response must be written in this communication style. Not just the first line — EVERY sentence should sound like this persona. If the style is "The General" you speak with military intensity throughout. If "The Bayou" you maintain that folksy voice the whole time. Never break character.
 - You say "we" when talking about the user's team — you're invested in their success.
 - Sign off important briefings with "— Alex" when the message is a strategic recommendation.
+- Keep responses under 200 words unless the user asks for deep analysis. Be punchy and direct.
 
 CORE KNOWLEDGE:
 - DHQ values: 0-10,000 scale, derived from 5 years of league-specific scoring data blended with FantasyCalc market consensus (75% engine / 25% market)
@@ -338,9 +340,14 @@ function dhqBuildRosterContext(compact) {
   const isSF = !!(league?.roster_positions?.includes('SUPER_FLEX'));
   const isIDP = !!(league?.roster_positions?.some(p => ['DL', 'LB', 'DB', 'IDP_FLEX'].includes(p)));
   const rp = league?.roster_positions || [];
-  const sorted = [...(S.rosters || [])].sort((a, b) => (b.settings?.wins || 0) - (a.settings?.wins || 0));
-  const rank = sorted.findIndex(r => r.roster_id === S.myRosterId) + 1;
+  // Rank by DHQ portfolio value (more meaningful than wins, especially in offseason)
   const totalVal = (my.players || []).reduce((sum, p) => sum + dynastyValue(p), 0);
+  const sortedByDHQ = [...(S.rosters || [])].map(r => ({
+    rid: r.roster_id,
+    dhq: (r.players || []).reduce((s, p) => s + dynastyValue(p), 0),
+    wins: r.settings?.wins || 0,
+  })).sort((a, b) => b.dhq - a.dhq);
+  const rank = sortedByDHQ.findIndex(r => r.rid === S.myRosterId) + 1;
 
   const peakLabel = (pid) => {
     const pos = pM(pPos(pid));
@@ -376,8 +383,7 @@ function dhqBuildRosterContext(compact) {
   if (compact) {
     return JSON.stringify({
       user: S.user.display_name,
-      rank: rank,
-      teams: teams,
+      dhqRank: rank + '/' + teams,
       record: record,
       dhqTotal: totalVal,
       starters: starterObjs.slice(0, 5),
@@ -420,8 +426,7 @@ function dhqBuildRosterContext(compact) {
 
   return JSON.stringify({
     user: S.user.display_name,
-    rank: rank,
-    teams: teams,
+    dhqRank: rank + '/' + teams,
     record: record,
     dhqTotal: totalVal,
     starters: starterObjs,
