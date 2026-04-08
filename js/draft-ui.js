@@ -796,17 +796,47 @@ function startMockDraft(mode){
   // Build available player pool
   let pool;
   if(_mockMode==='rookie'){
-    // Rookies only — from FC_ROOKIE source + CSV prospect data
-    pool=Object.entries(LI.playerMeta||{})
-      .filter(([pid,m])=>m.source==='FC_ROOKIE'&&(LI.playerScores?.[pid]||0)>0)
-      .map(([pid,m])=>{
-        const pos=m.pos||pPos(pid);
-        // Skip IDP if league doesn't have IDP slots
-        if(!leagueHasIDP&&['DL','LB','DB'].includes(pos))return null;
-        if(!leagueHasK&&pos==='K')return null;
-        return{pid,name:pName(pid),pos,val:LI.playerScores[pid]||0};
-      }).filter(Boolean)
-      .sort((a,b)=>b.val-a.val);
+    // Rookies only — unified pool from CSV enrichment data (The Beast)
+    // Primary: CSV prospects from getProspects() (shared across War Room + Scout)
+    // Supplement: Sleeper rookies with DHQ values not in CSV
+    const csvProspects = typeof window.getProspects === 'function' ? window.getProspects() : [];
+    const csvNames = new Set(csvProspects.map(p => (p.name || '').toLowerCase().trim()));
+
+    // CSV prospects as the base pool
+    pool = csvProspects
+      .filter(csv => {
+        const pos = pM(csv.mappedPos || csv.pos) || csv.pos;
+        if (!leagueHasIDP && ['DL','LB','DB'].includes(pos)) return false;
+        if (!leagueHasK && pos === 'K') return false;
+        return true;
+      })
+      .map(csv => {
+        const pos = pM(csv.mappedPos || csv.pos) || csv.pos;
+        // Try to find matching Sleeper PID for photo/linking
+        const sleeperMatch = Object.entries(S.players || {}).find(([, p]) =>
+          (p.full_name || '').toLowerCase().trim() === (csv.name || '').toLowerCase().trim() && p.years_exp === 0
+        );
+        const pid = sleeperMatch ? sleeperMatch[0] : 'csv_' + (csv.name || '').toLowerCase().replace(/[^a-z]/g, '_');
+        const dhq = sleeperMatch ? (LI.playerScores?.[sleeperMatch[0]] || 0) : 0;
+        const val = dhq > 0 ? dhq : (csv.draftScore || 0);
+        return { pid, name: csv.name, pos, val };
+      })
+      .filter(p => p.val > 0)
+      .sort((a, b) => b.val - a.val);
+
+    // Supplement with Sleeper rookies not in CSV
+    Object.entries(LI.playerScores || {}).forEach(([pid, val]) => {
+      if (val <= 0) return;
+      const p = S.players?.[pid];
+      if (!p || p.years_exp !== 0) return;
+      const name = (p.full_name || '').toLowerCase().trim();
+      if (csvNames.has(name)) return; // already in pool
+      const pos = pM(pPos(pid)) || pPos(pid);
+      if (!leagueHasIDP && ['DL','LB','DB'].includes(pos)) return;
+      if (!leagueHasK && pos === 'K') return;
+      pool.push({ pid, name: p.full_name || pName(pid), pos, val });
+    });
+    pool.sort((a, b) => b.val - a.val);
   }else{
     // Startup: all players with DHQ value
     pool=Object.entries(LI.playerScores||{})
