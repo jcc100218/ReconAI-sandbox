@@ -219,6 +219,70 @@ async function connect(){
 window.connect = connect;
 window.App.connect = connect;
 
+// ── Two-step connect flow ──────────────────────────────────────
+
+function showAuthStep() {
+  const as = $('auth-step');
+  const cs = $('connect-step');
+  if (as) as.style.display = '';
+  if (cs) cs.style.display = 'none';
+  const sb = $('setup-block'); if (sb) sb.style.display = 'block';
+}
+window.showAuthStep = showAuthStep;
+
+function showConnectStep() {
+  const as = $('auth-step');
+  const cs = $('connect-step');
+  if (as) as.style.display = 'none';
+  if (cs) cs.style.display = '';
+  const sb = $('setup-block'); if (sb) sb.style.display = 'block';
+  // Focus first input after a short delay
+  setTimeout(() => { const inp = $('u-input'); if (inp) inp.focus(); }, 200);
+}
+window.showConnectStep = showConnectStep;
+
+function continueAsGuest() {
+  showConnectStep();
+}
+window.continueAsGuest = continueAsGuest;
+
+// Check Supabase session; show auth-step or connect-step accordingly
+async function _checkAuthAndShowStep() {
+  if (DEV_MODE) { showConnectStep(); return; }
+  try {
+    const res = await window.OD?.supabase?.auth?.getSession?.();
+    if (res?.data?.session) {
+      showConnectStep();
+    } else {
+      showAuthStep();
+    }
+  } catch(e) {
+    showAuthStep();
+  }
+}
+
+// After Google/Apple OAuth completes, Supabase fires onAuthStateChange.
+// Transition from auth-step → connect-step (or league hub if leagues exist).
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    try {
+      window.OD?.supabase?.auth?.onAuthStateChange?.((event, session) => {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+          const as = $('auth-step');
+          // Only act if auth-step is currently visible
+          if (as && as.style.display !== 'none' && $('setup-block')?.style.display !== 'none') {
+            if (getLeagueRegistry().length > 0) {
+              renderLeagueHub();
+            } else {
+              showConnectStep();
+            }
+          }
+        }
+      });
+    } catch(e) {}
+  }, 600);
+});
+
 // ── Platform tab toggle ────────────────────────────────────────
 function showPlatformTab(platform){
   const forms={sleeper:'form-sleeper',espn:'form-espn',mfl:'form-mfl',yahoo:'form-yahoo'};
@@ -1496,10 +1560,10 @@ function showAddPlatformForm(platform) {
   const hub = $('league-hub'); if (hub) hub.style.display = 'none';
   const sb = $('setup-block');
   if (sb) {
-    // Restore original form HTML if it was replaced by a spinner/picker
-    if (!sb.querySelector('#form-sleeper') && _originalSetupHTML) sb.innerHTML = _originalSetupHTML;
-    sb.style.display = 'block';
+    // Restore original form HTML if setup-block was replaced by a spinner/picker
+    if (!sb.querySelector('#connect-step') && _originalSetupHTML) sb.innerHTML = _originalSetupHTML;
   }
+  showConnectStep(); // always skip auth-step when adding a platform
   if (platform) showPlatformTab(platform);
 }
 window.showAddPlatformForm = showAddPlatformForm;
@@ -1721,6 +1785,7 @@ window.loadRegistryLeague = loadRegistryLeague;
       if (_yahooLeagueKey && _yahooMyTeam && _yahooSessionId) {
         setTimeout(async()=>{
           if(S.user)return;
+          showConnectStep();
           try{
             if(!window.Yahoo){
               console.warn('[Yahoo] window.Yahoo not loaded — falling back to Sleeper');
@@ -1765,6 +1830,7 @@ window.loadRegistryLeague = loadRegistryLeague;
     if (_espnSavedId && _espnSavedTeam) {
       setTimeout(async () => {
         if (S.user) return; // Already connected via another path
+        showConnectStep();
         try {
           const _yr   = parseInt(localStorage.getItem('espn_year') || String(new Date().getFullYear()));
           const _s2   = localStorage.getItem('espn_s2')   || '';
@@ -1805,12 +1871,13 @@ window.loadRegistryLeague = loadRegistryLeague;
         }
       }, 500);
     } else if(savedUser){
+      showConnectStep(); // returning user — skip auth step
       const uInput = $('u-input');
       if(uInput) uInput.value = savedUser;
       setTimeout(()=>{if(!S.user)connect();},500);
     } else {
-      // First-time user: focus the username input so they know where to start
-      setTimeout(()=>{const inp=$('u-input');if(inp)inp.focus();},600);
+      // Fresh first-time user — check Supabase session to decide which step
+      _checkAuthAndShowStep();
     }
       } // end no-Yahoo else block
     } // end Yahoo/ESPN/Sleeper dispatch
