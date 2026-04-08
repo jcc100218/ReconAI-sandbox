@@ -319,33 +319,26 @@ function buildRosterTable(){
     const phaseCol=pk.cls==='peak'?'var(--green)':pk.cls==='rising'?'var(--green)':pk.cls==='seedling'?'var(--blue)':pk.cls==='veteran'?'var(--amber)':'var(--red)';
     const cardCls='rr-card'+(isStarter?' rr-starter':'')+(isReserve||isTaxi?' rr-reserve':'');
 
+    const playerTag=window._playerTags?.[pid];
+    const tagHtml=playerTag?'<span style="font-size:10px;padding:1px 5px;border-radius:4px;font-weight:700;background:'+(playerTag==='trade'?'var(--amberL)':playerTag==='cut'?'var(--redL)':playerTag==='untouchable'?'var(--greenL)':'var(--blueL)')+';color:'+(playerTag==='trade'?'var(--amber)':playerTag==='cut'?'var(--red)':playerTag==='untouchable'?'var(--green)':'var(--blue)')+'">'+( playerTag==='trade'?'TB':playerTag==='cut'?'CUT':playerTag==='untouchable'?'UT':'W')+'</span>':'';
+
     html+=`<div class="${cardCls}" onclick="openPlayerModal('${pid}')">
       <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${pid}.jpg" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials>${initials}</span>')" loading="lazy"/>
-      <div class="rr-info">
-        <div class="rr-top">
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:6px">
           <span class="rr-name">${pName(pid)}</span>
           <span class="rr-pos" style="${getPosBadgeStyle(pos)}">${pos}</span>
           ${inj?'<span class="rr-inj">'+inj+'</span>':''}
-          ${isRookie?'<span style="font-size:13px;color:var(--blue);font-weight:700">R</span>':''}
-          ${(()=>{const playerTag=window._playerTags?.[pid];return playerTag?'<span style="font-size:13px;padding:1px 5px;border-radius:4px;font-weight:700;background:'+(playerTag==='trade'?'var(--amberL)':playerTag==='cut'?'var(--redL)':playerTag==='untouchable'?'var(--greenL)':'var(--blueL)')+';color:'+(playerTag==='trade'?'var(--amber)':playerTag==='cut'?'var(--red)':playerTag==='untouchable'?'var(--green)':'var(--blue)')+'">'+( playerTag==='trade'?'TB':playerTag==='cut'?'CUT':playerTag==='untouchable'?'UT':'W')+'</span>':'';})()}
+          ${isRookie?'<span style="font-size:10px;color:var(--blue);font-weight:700">R</span>':''}
+          ${tagHtml}
+          ${verdict?`<span class="rr-verdict-chip" style="color:${verdict.col};background:${verdict.bg};font-size:10px;padding:1px 5px"${verdict.label==='Sell'||verdict.label==='Sell High'?' onclick="event.stopPropagation();mobileTab(\'trades\')"':''}>${verdict.label}</span>`:''}
         </div>
-        <div class="rr-bottom">
-          <span>Age ${age||'?'}</span>
-          <span class="rr-val" style="color:${col};font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}${trendHtml}</span>
-          ${ppg?'<span>'+ppg.toFixed(1)+' PPG</span>':''}
-          ${verdict?`<span class="rr-verdict-chip" style="color:${verdict.col};background:${verdict.bg}"${verdict.label==='Sell'||verdict.label==='Sell High'?' onclick="event.stopPropagation();mobileTab(\'trades\')"':''}">${verdict.label}</span>`:''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:13px;color:var(--text3)">
+          <span>${p.team||'FA'} · ${age||'?'}</span>
+          <span class="rr-val" style="color:${col};font-weight:700;font-family:'JetBrains Mono',monospace">${val>0?val.toLocaleString():'—'}${trendHtml}</span>
+          ${ppg?'<span>'+ppg.toFixed(1)+'</span>':''}
+          <span style="color:${phaseCol};font-size:11px;font-weight:600">${pk.label}</span>
         </div>
-      </div>
-      <div class="rr-right">
-        <div class="rr-phase" style="color:${phaseCol}">${pk.label}</div>
-        <div style="display:flex;gap:1px;margin-top:2px">
-          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='seedling'?'var(--blue)':'var(--bg4)'}"></div>
-          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='rising'?'var(--green)':'var(--bg4)'}"></div>
-          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='peak'?'var(--green)':'var(--bg4)'}"></div>
-          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='veteran'?'var(--amber)':'var(--bg4)'}"></div>
-          <div style="width:8px;height:3px;border-radius:1px;background:${pk.cls==='declining'?'var(--red)':'var(--bg4)'}"></div>
-        </div>
-        <div class="rr-phase-desc">${pk.desc}</div>
       </div>
       <div class="rr-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>`;

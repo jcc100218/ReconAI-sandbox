@@ -495,39 +495,36 @@
       </div>
       <div id="draft-board-view">
 
-      <!-- 1. Your picks — timeline first -->
+      <!-- 1. ON THE CLOCK — hero card + all picks in one section -->
+      <div id="draft-best-bet"></div>
       <div id="draft-my-picks-section" style="margin-bottom:14px">
-        <div class="home-sec-title">Your Picks</div>
         <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px">
           <span style="color:var(--text3);font-size:13px">Connect to see picks</span>
         </div>
       </div>
 
-      <!-- 2. ON THE CLOCK — hero card -->
-      <div id="draft-best-bet"></div>
+      <!-- 2. Scouting Report (AI-generated) -->
+      <div id="draft-scout-content" style="display:none"></div>
 
-      <!-- 3. Draft Advisor chat history (input handled by global chat bar) -->
+      <!-- 3. Draft Advisor chat -->
       <div style="position:relative;margin-bottom:8px">
         <div id="draft-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
         <button id="draft-chat-collapse" onclick="collapseDraftChat()" style="display:none;position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer;z-index:1" title="Collapse chat">&#9650; Collapse</button>
       </div>
-      <div id="draft-scout-content" style="display:none"></div>
       <input type="text" id="draft-chat-in" style="display:none" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
 
       <!-- Top Prospects -->
       <div id="draft-top-prospects" style="margin-bottom:14px"></div>
 
-      <!-- 4. Draft Strategy -->
+      <!-- 4. Draft Intel (Strategy + History combined) -->
       <div id="draft-summary" style="display:none;margin-bottom:14px">
         <div id="draft-summary-content"></div>
       </div>
+      <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
 
       <!-- 5. Scouting Board -->
       <div id="draft-needs" style="display:none"></div>
       <div id="rookie-profiles" style="margin-top:0;display:none"></div>
-
-      <!-- 6. Historical (bottom) -->
-      <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
 
       <!-- Data quality note (bottom, subtle) -->
       <div style="font-size:13px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-top:14px;line-height:1.5">
@@ -788,13 +785,17 @@
   </div>
 </div>
 
-<!-- Global Chat Overlay (persistent chat bar + context chips) -->
+<!-- Global Chat Overlay (unified search + chat bar + context chips) -->
 <div class="global-chat-overlay" id="global-chat-overlay">
   <div class="ctx-chips-row" id="ctx-chips-row">
     <!-- populated by scout-ui.js -->
   </div>
+  <!-- Unified search results dropdown (appears above chat bar) -->
+  <div id="unified-search-results" style="display:none;max-height:240px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:12px 12px 0 0;margin-bottom:-1px;box-shadow:0 -4px 20px rgba(0,0,0,.25)"></div>
   <div class="global-chat-row">
-    <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Ask Scout anything..." autocomplete="off" onkeydown="if(event.key==='Enter')sendGlobalChat()"/>
+    <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Search players or ask Scout..." autocomplete="off"
+      oninput="handleUnifiedInput(this.value)"
+      onkeydown="if(event.key==='Enter')handleUnifiedEnter(event);if(event.key==='Escape'){this.value='';document.getElementById('unified-search-results').style.display='none';}"/>
     <button class="global-chat-send" onclick="sendGlobalChat()" aria-label="Send">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>

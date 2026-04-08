@@ -190,12 +190,6 @@ function renderDraftNeeds(){
             <button class="pm-action-btn" style="flex:0 0 auto;padding:12px 14px" onclick="sendDraftChatMsg('Should I trade pick ${pickLabel2}? What could I get for it?')">Trade Pick</button>
           </div>
         </div>`;
-    } else if(ownPickRounds.length) {
-      // Fallback: no strong need — show BPA guidance
-      bestBetEl.innerHTML=`<div style="padding:12px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:14px">
-        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">Draft BPA with your R${ownPickRounds[0]} pick</div>
-        <div style="font-size:13px;color:var(--text3);line-height:1.5">No critical positional needs — take the best player available and build long-term value.</div>
-      </div>`;
     } else {
       bestBetEl.innerHTML='';
     }
@@ -253,7 +247,7 @@ function renderDraftNeeds(){
   const sortedPos=posAnalysis.filter(p=>p.pos!=='K');
 
   let dhtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-    <div class="home-sec-title" style="margin-bottom:8px">Draft Strategy</div>`;
+    <div class="home-sec-title" style="margin-bottom:8px">Draft Intel</div>`;
 
   if(sortedPos.length){
     dhtml+=`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${sortedPos.map(p=>{
@@ -278,15 +272,8 @@ function renderDraftNeeds(){
     dhtml+=`<div style="font-size:13px;color:var(--green);padding:6px 0">No critical needs — draft best player available.</div>`;
   }
 
-  dhtml+=`</div>`;
-  summaryContent.innerHTML=dhtml;
-  needsEl.style.display='none';
-
-  // === RENDER: Historical success ===
-  const histEl=$('draft-history-section');
-  if(histEl&&LI_LOADED&&LI.hitRateByRound){
-    histEl.style.display='block';
-    // Compressed historical insights
+  // Append history INTO the strategy card (merged "Draft Intel")
+  if(LI_LOADED&&LI.hitRateByRound){
     const myPickRoundsSet=new Set(ownPickRounds);
     const keyInsights=[];
     for(let rd=1;rd<=Math.min(draftRounds,7);rd++){
@@ -298,13 +285,11 @@ function renderDraftNeeds(){
       if(isMine)keyInsights.push({rd,rate,bestPos:bestPos2,mine:true});
     }
 
-    let hHtml=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
-      <div class="home-sec-title" style="margin-bottom:8px">Draft History · ${LI.draftMeta?.length||0} drafts</div>`;
-
-    // Show key insights with radial progress
     if(keyInsights.length){
-      hHtml+=`<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:4px">`;
-      hHtml+=keyInsights.map(k=>{
+      dhtml+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your Pick Hit Rates · ${LI.draftMeta?.length||0} drafts</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:4px">`;
+      dhtml+=keyInsights.map(k=>{
         const hitCol=k.rate>=50?'var(--green)':k.rate>=25?'var(--amber)':'var(--red)';
         return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">
           <span style="font-weight:700;color:var(--accent);min-width:24px">R${k.rd}</span>
@@ -312,11 +297,11 @@ function renderDraftNeeds(){
           ${k.bestPos?`<span style="color:var(--text3);font-size:13px">best at ${k.bestPos}</span>`:''}
         </div>`;
       }).join('');
-      hHtml+=`</div>`;
+      dhtml+=`</div>`;
     }
 
-    // Full grid below (collapsed by default)
-    hHtml+=`<details style="margin-top:8px"><summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0">View all rounds</summary>
+    // Full grid (collapsed by default)
+    dhtml+=`<details style="margin-top:8px"><summary style="font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0">View all rounds</summary>
     <div style="display:grid;grid-template-columns:40px 1fr 50px 1fr;gap:4px 8px;align-items:center;font-size:13px;margin-top:8px">
       <span style="font-weight:700;color:var(--text3)">Rd</span><span style="font-weight:700;color:var(--text3)">Rate</span><span></span><span style="font-weight:700;color:var(--text3)">Best</span>`;
 
@@ -332,16 +317,18 @@ function renderDraftNeeds(){
         return`<span style="color:${bp.rate>=40?'var(--green)':bp.rate>=20?'var(--text2)':'var(--text3)'}">${bp.pos} ${bp.rate}%${needDot}</span>`;
       }).join(' · ');
 
-      hHtml+=`
+      dhtml+=`
         <span style="font-weight:700;color:${isMine?'var(--accent)':'var(--text)'}">${isMine?'► ':''}R${rd}</span>
         <div style="background:var(--bg4);border-radius:2px;height:5px;overflow:hidden"><div style="width:${Math.max(3,rate)}%;height:100%;background:${hitColor};border-radius:2px"></div></div>
         <span style="color:${hitColor};font-weight:600">${rate}%</span>
         <span style="color:var(--text3)">${posRecs||'—'}</span>`;
     }
-
-    hHtml+=`</div></details></div>`;
-    histEl.innerHTML=hHtml;
+    dhtml+=`</div></details></div>`;
   }
+
+  dhtml+=`</div>`;
+  summaryContent.innerHTML=dhtml;
+  needsEl.style.display='none';
 
   renderRookieBoard();
 }
@@ -558,25 +545,46 @@ async function runDraftScouting(){
       }
     }
 
+    // Build positional scarcity context from starterSlots
+    const scarcityCtx=Object.keys(starterSlots).filter(pos=>starterSlots[pos]>0).map(pos=>{
+      const posPlayers=allPlayers.filter(pid=>pPos(pid)===pos);
+      const peaksD={QB:33,RB:27,WR:30,TE:30,DL:29,LB:28,DB:29};
+      const aging=posPlayers.filter(pid=>{const a=pAge(pid);return a>(peaksD[pos]||29);}).length;
+      const young=posPlayers.filter(pid=>pAge(pid)<25).length;
+      const elite=posPlayers.filter(pid=>dynastyValue(pid)>=5000).length;
+      const startable=posPlayers.filter(pid=>dynastyValue(pid)>=2000).length;
+      const slotsNeeded=starterSlots[pos];
+      const status=startable>=slotsNeeded?'FILLED':'GAP';
+      return`${pos}: ${startable}/${slotsNeeded} starters (${status}), ${aging} aging, ${young} young, ${elite} elite`;
+    }).join('\n');
+
     const prompt=`${year} rookie draft scouting for ${teams}-team dynasty league.
 ${typeof dhqContext === 'function' ? dhqContext(false) : ''}
-MY NEEDS: ${needsStr}
+MY ROSTER NEEDS (starters/slots):
+${scarcityCtx}
 MY PICKS: ${pickStr}
 ${dhqBuildMentalityContext()}
 ${historyCtx}
-IDP:sack=${sc7.idp_sack||4},INT=${sc7.idp_int||5},PD=${sc7.idp_pass_def||3}
+SCORING: IDP sack=${sc7.idp_sack||4}, INT=${sc7.idp_int||5}, PD=${sc7.idp_pass_def||3}, PPR=${sc7.rec||1}
+
+CRITICAL RULES:
+- Consider POSITIONAL SCARCITY in the rookie class — how many startable rookies exist at each position
+- Factor in STARTER THRESHOLDS — if I need 4 DL starters and only have 2, that's more urgent than needing 6 WR and having 5
+- Use HIT PROBABILITY BY ROUND AND POSITION — don't recommend a position in a round where hit rates are historically terrible
+- Ensure all recommendations are INTERNALLY CONSISTENT — do not recommend targeting a position in one section and avoiding it in another
+- Be SPECIFIC about which rounds to target which positions based on value intersection
 
 Based on the ${year} rookie class and my league's ACTUAL historical draft data:
 
-1. TOP 3 POSITIONS TO TARGET — ranked by my roster need + what historically hits at my pick slots. Don't recommend positions where I'm already stacked or where hit rates are terrible at my slots.
+1. TOP 3 POSITIONS TO TARGET — ranked by starter gap + positional scarcity in this class + historical hit rate at my pick slots. Explain WHY each position, citing specific roster gaps and class depth.
 
-2. DRAFT BOARD — 6 specific rookies to target. For each: name, pos, NFL team, which of my rounds to target them, and why they fit MY roster (1 sentence).
+2. DRAFT BOARD — 6 specific rookies to target. For each: name, position, projected NFL draft round, which of MY picks to target them with, and why they fit MY roster (1 sentence). Order by priority.
 
-3. PICK STRATEGY — should I trade up/down given my pick slots? What's the value play based on hit rates?
+3. PICK STRATEGY — should I trade up/down given my pick slots? What's the value play based on hit rates? Be specific about which picks to move and what to target.
 
-4. AVOID — positions or rounds where my league's history shows poor returns.
+4. AVOID — positions or rounds where my league's history shows poor returns. Only list genuine traps, not just lower-priority positions.
 
-Search the web for current ${year} rookie rankings. Be specific with prospect names.`;
+Search the web for current ${year} rookie rankings and NFL draft projections. Use real prospect names and accurate draft positions.`;
 
     const timeoutMs=90000;
     const reply=await Promise.race([

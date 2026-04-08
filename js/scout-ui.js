@@ -65,6 +65,68 @@ function fillGlobalChat(text) {
 window.fillGlobalChat = fillGlobalChat;
 
 // ════════════════════════════════════════════════════════════════
+// UNIFIED SEARCH + CHAT INPUT
+// ════════════════════════════════════════════════════════════════
+
+let _unifiedDebounce = null;
+
+function handleUnifiedInput(val) {
+  clearTimeout(_unifiedDebounce);
+  const results = document.getElementById('unified-search-results');
+  if (!results) return;
+  if (!val || val.length < 2) { results.style.display = 'none'; return; }
+
+  _unifiedDebounce = setTimeout(() => {
+    const q = val.toLowerCase();
+    const players = window.S?.players || {};
+    const matches = Object.entries(players)
+      .filter(([, p]) => {
+        const full = ((p.first_name || '') + ' ' + (p.last_name || '')).toLowerCase();
+        return full.includes(q) && p.position && !['HC','OC','DC','GM'].includes(p.position);
+      })
+      .map(([pid, p]) => {
+        const dhq = typeof dynastyValue === 'function' ? dynastyValue(pid) : 0;
+        return { pid, name: (p.first_name || '') + ' ' + (p.last_name || ''), pos: p.position, team: p.team || 'FA', dhq };
+      })
+      .sort((a, b) => b.dhq - a.dhq)
+      .slice(0, 5);
+
+    let html = '';
+    if (matches.length) {
+      html += matches.map(m =>
+        `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s" onclick="document.getElementById('unified-search-results').style.display='none';document.getElementById('global-chat-in').value='';openPlayerModal('${m.pid}')">
+          <img src="https://sleepercdn.com/content/nfl/players/${m.pid}.jpg" style="width:28px;height:28px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'"/>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:600;color:var(--text)">${_esc(m.name)}</div>
+            <div style="font-size:12px;color:var(--text3)">${m.pos} · ${m.team}${m.dhq > 0 ? ' · ' + m.dhq.toLocaleString() + ' DHQ' : ''}</div>
+          </div>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>`
+      ).join('');
+    }
+    // Always show "Ask Scout" option at bottom
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--accentL);transition:background .1s" onclick="document.getElementById('unified-search-results').style.display='none';sendGlobalChat()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--accent)">Ask Scout</div>
+        <div style="font-size:12px;color:var(--text3)">"${_esc(val.slice(0, 50))}"</div>
+      </div>
+    </div>`;
+
+    results.innerHTML = html;
+    results.style.display = '';
+  }, 200);
+}
+window.handleUnifiedInput = handleUnifiedInput;
+
+function handleUnifiedEnter(event) {
+  const results = document.getElementById('unified-search-results');
+  if (results) results.style.display = 'none';
+  sendGlobalChat();
+}
+window.handleUnifiedEnter = handleUnifiedEnter;
+
+// ════════════════════════════════════════════════════════════════
 // GLOBAL CHAT SEND
 // ════════════════════════════════════════════════════════════════
 
@@ -384,50 +446,72 @@ function _generateBriefingItems() {
   const myRoster = typeof myR === 'function' ? myR() : null;
   if (!myRoster) return [];
 
+  // Get team assessment (same engine as War Room)
+  const assess = typeof window.assessTeamFromGlobal === 'function'
+    ? window.assessTeamFromGlobal(myRoster.roster_id) : null;
+  const tier = assess?.tier || '';
+  const hs = assess?.healthScore || 0;
+  const needs = (assess?.needs || []).slice(0, 3);
+  const elites = assess?.elites || 0;
+  const needPos = needs.map(n => typeof n === 'string' ? n : n.pos).filter(Boolean).join(', ');
+
   const w = myRoster.settings?.wins || 0;
   const l = myRoster.settings?.losses || 0;
   const total = w + l;
   const winPct = total > 0 ? w / total : 0.5;
 
-  // Item 1: Record-driven narrative
-  if (total > 0) {
-    if (winPct < 0.40) {
-      items.push({
-        priority: 'urgent',
-        title: `Rebuild window — ${w}-${l} record`,
-        desc: 'Your record is below .400. Consider trading veterans for draft capital to accelerate your rebuild.',
-        action: 'Build trade →',
-        actionFn: "mobileTab('trades')",
-      });
-    } else if (winPct >= 0.65) {
-      items.push({
-        priority: 'opportunity',
-        title: `Win-now mode — ${w}-${l} record`,
-        desc: 'Strong record. Explore trading future picks for elite contributors before the deadline.',
-        action: 'Find upgrades →',
-        actionFn: "fillGlobalChat('What win-now trades should I make this week?')",
-      });
-    } else {
-      items.push({
-        priority: 'watch',
-        title: `Middling record — ${w}-${l}`,
-        desc: 'Right in the middle of the pack. A well-timed move or two could push you into playoff position.',
-        action: 'Identify targets →',
-        actionFn: "fillGlobalChat('What one trade move would most improve my playoff odds?')",
-      });
-    }
+  // Item 1: Team health diagnosis (assessment-driven, not just record)
+  if (assess) {
+    const healthDesc = hs >= 85
+      ? `Elite roster (${hs} health). ${elites} franchise player${elites !== 1 ? 's' : ''} anchoring your team.`
+      : hs >= 70
+      ? `Contender-class roster (${hs} health).${needPos ? ' Biggest gap: ' + needPos + '.' : ''}`
+      : hs >= 55
+      ? `Roster at a crossroads (${hs} health).${needPos ? ' Priority needs: ' + needPos + '.' : ''} A smart trade could shift momentum.`
+      : `Rebuild mode (${hs} health).${needPos ? ' Critical gaps at ' + needPos + '.' : ''} Focus on acquiring young talent and draft capital.`;
+
+    items.push({
+      priority: hs >= 70 ? 'opportunity' : hs >= 55 ? 'watch' : 'urgent',
+      title: `${tier || 'Team'} · Health ${hs}${total > 0 ? ' · ' + w + '-' + l : ''}`,
+      desc: healthDesc,
+      action: hs >= 70 ? 'Find upgrades →' : 'Build trade →',
+      actionFn: hs >= 70
+        ? "fillGlobalChat('What upgrades should I target to push for a championship?')"
+        : "fillGlobalChat('What trades should I make to improve my roster health?')",
+    });
+  } else if (total > 0) {
+    // Fallback: record-based if assessment unavailable
+    const title = winPct < 0.40 ? `Rebuild window — ${w}-${l}` : winPct >= 0.65 ? `Win-now — ${w}-${l}` : `${w}-${l} record`;
+    items.push({
+      priority: winPct < 0.40 ? 'urgent' : 'opportunity',
+      title,
+      desc: winPct < 0.40 ? 'Consider trading vets for draft capital.' : 'Explore upgrades before the deadline.',
+      action: 'Find moves →',
+      actionFn: "mobileTab('trades')",
+    });
   }
 
-  // Item 2: Waiver opportunity
-  items.push({
-    priority: 'opportunity',
-    title: 'Waiver wire has upside',
-    desc: 'Low-ownership players with breakout potential are available right now.',
-    action: 'View waivers →',
-    actionFn: "mobileTab('waivers')",
-  });
+  // Item 2: Positional need action (if assessment found needs)
+  if (needs.length > 0) {
+    const topNeed = typeof needs[0] === 'string' ? needs[0] : needs[0].pos;
+    items.push({
+      priority: 'watch',
+      title: `${topNeed} is your biggest gap`,
+      desc: `Your roster is thinnest at ${topNeed}. Check waivers and trade targets to address this before it costs you.`,
+      action: 'Find ' + topNeed + ' →',
+      actionFn: `fillGlobalChat('Who are the best ${topNeed} targets I can acquire via trade or waivers?')`,
+    });
+  } else {
+    items.push({
+      priority: 'opportunity',
+      title: 'Waiver wire has upside',
+      desc: 'Low-ownership players with breakout potential are available.',
+      action: 'View waivers →',
+      actionFn: "mobileTab('waivers')",
+    });
+  }
 
-  // Item 3: Draft capital check
+  // Item 3: Draft capital
   if (items.length < 3) {
     const picks = myRoster.draft_picks || [];
     const futureCapital = picks.length;
@@ -435,7 +519,7 @@ function _generateBriefingItems() {
       items.push({
         priority: 'watch',
         title: 'Low draft capital',
-        desc: "You have no future picks on hand. Consider acquiring picks before the rookie draft.",
+        desc: "No future picks in hand. Acquire picks before the rookie draft.",
         action: 'Acquire picks →',
         actionFn: "fillGlobalChat('How can I acquire more draft picks this offseason?')",
       });
@@ -443,7 +527,7 @@ function _generateBriefingItems() {
       items.push({
         priority: 'opportunity',
         title: `${futureCapital} pick${futureCapital !== 1 ? 's' : ''} in hand`,
-        desc: 'Use the draft room to map your targets. Good capital = leverage in trades.',
+        desc: 'Use the draft room to map your targets. Good capital = leverage.',
         action: 'Open draft room →',
         actionFn: "mobileTab('draftroom')",
       });
