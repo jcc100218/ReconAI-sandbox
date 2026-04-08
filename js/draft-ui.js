@@ -1003,6 +1003,7 @@ function renderMockDraftUI(){
         <button onclick="startMockDraft()" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:var(--bg3);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:inherit">Run Again</button>
         <button onclick="sendDraftChatMsg('Grade my mock draft: ${myPicks.map(p=>p.playerName+' ('+p.pos+', R'+p.round+')').join(', ')}. How did I do? What would you change?')" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:linear-gradient(135deg,var(--accent),#b8941f);border:none;border-radius:8px;color:var(--bg1);cursor:pointer;font-family:inherit">Ask Alex</button>
       </div>
+      <button onclick="_saveMockTemplate()" style="width:100%;margin-top:6px;padding:6px;font-size:12px;font-weight:600;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text3);cursor:pointer;font-family:inherit" id="save-mock-btn">Save Draft Template</button>
     </div>`;
     return;
   }
@@ -1059,12 +1060,15 @@ function renderMockDraftUI(){
       <div style="display:flex;flex-direction:column;gap:3px">${enriched.map(p=>{
         const photoUrl='https://sleepercdn.com/content/nfl/players/thumb/'+p.pid+'.jpg';
         const isNeed=myNeeds.includes(p.pos);
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${isNeed?'rgba(212,175,55,.04)':'var(--bg3)'};border:1px solid ${isNeed?'rgba(212,175,55,.2)':'var(--border)'};border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='${isNeed?'rgba(212,175,55,.2)':'var(--border)'}'" >
+        const pTag=window._playerTags?.[p.pid]||'';
+        const tagBorder=pTag==='trade'?'rgba(251,191,36,.4)':pTag==='untouchable'?'rgba(52,211,153,.4)':pTag==='cut'?'rgba(248,113,113,.4)':'';
+        return `<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:${isNeed?'rgba(212,175,55,.04)':'var(--bg3)'};border:1px solid ${tagBorder||isNeed?'rgba(212,175,55,.2)':'var(--border)'};border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='${tagBorder||isNeed?'rgba(212,175,55,.2)':'var(--border)'}'" >
           <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
           <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
           ${_mockPosBadge(p.pos)}
           ${p.consensusRank?`<span style="font-size:10px;color:var(--text3)">C#${p.consensusRank}</span>`:''}
           <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
+          <span onclick="event.stopPropagation();_mockTag('${p.pid}','trade')" style="font-size:9px;cursor:pointer;padding:1px 4px;border-radius:3px;background:${pTag==='trade'?'var(--amberL)':'transparent'};color:${pTag==='trade'?'var(--amber)':'var(--text3)'}" title="Target">\u2605</span>
         </div>`;
       }).join('')}</div>
     </div>`;
@@ -1170,6 +1174,49 @@ function onDraftTabOpen(){
   }
 }
 window.onDraftTabOpen=onDraftTabOpen;
+
+// ── Mock Draft Save/Load Templates ──────────────────────────────
+const MOCK_TEMPLATES_KEY = () => 'wr_mock_templates_' + (S?.currentLeagueId || '');
+
+function _saveMockTemplate() {
+  if (!_mockState) return;
+  const myPicks = _mockState.picks.filter(p => p.rosterId === S.myRosterId);
+  if (!myPicks.length) return;
+  try {
+    const templates = JSON.parse(localStorage.getItem(MOCK_TEMPLATES_KEY()) || '[]');
+    templates.unshift({
+      id: Date.now(),
+      date: new Date().toLocaleDateString(),
+      mode: _mockState.mode || 'rookie',
+      picks: myPicks.map(p => ({ name: p.playerName, pos: p.pos, round: p.round, pick: p.pick, val: p.val })),
+    });
+    localStorage.setItem(MOCK_TEMPLATES_KEY(), JSON.stringify(templates.slice(0, 10)));
+    const btn = document.getElementById('save-mock-btn');
+    if (btn) { btn.textContent = 'Saved!'; setTimeout(() => btn.textContent = 'Save Draft Template', 1500); }
+  } catch (e) { console.warn('[MockDraft] Save error:', e); }
+}
+window._saveMockTemplate = _saveMockTemplate;
+
+function _loadMockTemplates() {
+  try { return JSON.parse(localStorage.getItem(MOCK_TEMPLATES_KEY()) || '[]'); } catch { return []; }
+}
+window._loadMockTemplates = _loadMockTemplates;
+
+// ── Mock Draft Tagging ──────────────────────────────────────────
+function _mockTag(pid, tag) {
+  if (!window._playerTags) window._playerTags = {};
+  if (window._playerTags[pid] === tag) {
+    delete window._playerTags[pid];
+  } else {
+    window._playerTags[pid] = tag;
+  }
+  // Persist tags to localStorage
+  try {
+    localStorage.setItem('wr_player_tags_' + (S?.currentLeagueId || ''), JSON.stringify(window._playerTags));
+  } catch {}
+  renderMockDraftUI();
+}
+window._mockTag = _mockTag;
 
 // ── Expose on window.App and window ─────────────────────────────
 Object.assign(window.App, {
