@@ -38,10 +38,10 @@
   ];
 
   const TIERS = [
-    { name: 'Free', price: '$0', period: '', features: ['1 league', 'Basic roster view', '3 AI messages/day', 'Player cards'], accent: 'rgba(255,255,255,0.3)' },
-    { name: 'War Room', price: '$4.99', period: '/mo', features: ['All leagues', 'Unlimited AI', 'Owner DNA', 'Trade Center', 'Draft Command', 'Waivers Engine'], accent: '#D4AF37', recommended: true },
-    { name: 'War Room Pro', price: '$9.99', period: '/mo', features: ['Everything in War Room', 'Advanced analytics', 'League Map', 'Trophy Room', 'Full draft boards'], accent: '#60A5FA' },
-    { name: 'Commissioner', price: '$14.99', period: '/mo', features: ['Everything in Pro', 'State of League reports', 'Trade fairness auditor', 'Rule change simulator', 'Opus-powered analysis'], accent: '#A78BFA' },
+    { name: 'Free', price: '$0', period: '', features: ['1 league', 'DHQ dynasty values', 'Player cards + age curves', 'Team diagnosis', '1 AI query/day'], accent: 'rgba(255,255,255,0.3)' },
+    { name: 'War Room', price: '$9.99', period: '/mo', features: ['Everything in Free', 'Unlimited AI analysis', 'Owner DNA profiles', 'Behavioral trade model', 'Draft command center', 'Scout + War Room access'], accent: '#D4AF37', recommended: true },
+    { name: 'Pro', price: '$12.99', period: '/mo', features: ['Everything in War Room', 'Global dashboard (all leagues)', 'Cross-league AI advice', 'Player exposure tracking', 'Unified Trophy Room', 'Season recap generator'], accent: '#60A5FA' },
+    { name: 'Annual', price: '$79.99', period: '/yr', features: ['Everything in War Room', 'Locked-in annual rate', 'Save 33% — $6.67/mo', 'Priority feature access'], accent: '#2ECC71' },
   ];
 
   const FAQ_ITEMS = [
@@ -156,7 +156,7 @@
           style="width:100%;padding:18px;background:linear-gradient(135deg,#d4af37,#b8941f);color:#1a1000;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;letter-spacing:-.02em;box-shadow:0 8px 32px rgba(212,175,55,.32);margin-bottom:12px;font-family:inherit;transition:transform .15s,box-shadow .15s"
           onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 14px 48px rgba(212,175,55,.45)'"
           onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(212,175,55,.32)'">
-          Upgrade to War Room &mdash; $4.99/month
+          Upgrade to War Room &mdash; $9.99/month
         </button>
 
         <!-- Secondary: continue with free -->
