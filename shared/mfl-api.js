@@ -93,14 +93,38 @@ function _mflUrl(year, type, leagueId, apiKey, extra) {
 }
 
 async function _mflGet(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('This MFL league is private. Provide your API key to connect.');
+  // Try direct fetch first, fall back to CORS proxy if blocked
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('This MFL league is private. Provide your API key to connect.');
+      }
+      throw new Error('MFL API error ' + res.status + '. Check your League ID and year.');
     }
-    throw new Error('MFL API error ' + res.status + '. Check your League ID and year.');
+    return res.json();
+  } catch (directErr) {
+    // If CORS error, try Supabase proxy then public CORS proxy
+    if (directErr.message?.includes('CORS') || directErr.name === 'TypeError') {
+      // Try Supabase edge function proxy
+      const supabaseUrl = window.SUPABASE_URL || 'https://sxshiqyxhhifvtfqawbq.supabase.co';
+      try {
+        const proxyRes = await fetch(`${supabaseUrl}/functions/v1/cors-proxy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': window.SUPABASE_ANON || '' },
+          body: JSON.stringify({ url }),
+        });
+        if (proxyRes.ok) return proxyRes.json();
+      } catch (_e) { /* fall through */ }
+      // Fallback: allorigins proxy
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+        const fallbackRes = await fetch(proxyUrl);
+        if (fallbackRes.ok) return fallbackRes.json();
+      } catch (_e2) { /* fall through */ }
+    }
+    throw directErr;
   }
-  return res.json();
 }
 
 /**

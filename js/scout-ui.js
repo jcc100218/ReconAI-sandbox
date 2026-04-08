@@ -186,9 +186,17 @@ function renderTeamBar() {
   const recEl   = document.getElementById('tbar-record');
   const rankEl  = document.getElementById('tbar-rank');
 
-  // Team name
+  // Team avatar + name
+  const owner = (S.leagueUsers || []).find(u => u.user_id === myRoster.owner_id);
+  const avatarEl = document.getElementById('tbar-avatar');
+  if (avatarEl) {
+    const avatarId = owner?.avatar || S.user?.avatar;
+    if (avatarId) {
+      avatarEl.src = `https://sleepercdn.com/avatars/thumbs/${avatarId}`;
+      avatarEl.style.display = '';
+    }
+  }
   if (nameEl) {
-    const owner = (S.leagueUsers || []).find(u => u.user_id === myRoster.owner_id);
     const tname = owner?.metadata?.team_name || owner?.display_name || 'My Team';
     nameEl.textContent = tname;
   }
@@ -207,11 +215,12 @@ function renderTeamBar() {
       const assess = typeof window.assessTeamFromGlobal === 'function'
         ? window.assessTeamFromGlobal(myRoster.roster_id)
         : null;
-      const health = assess?.health ?? assess?.overallGrade ?? null;
+      const health = assess?.healthScore ?? assess?.health ?? assess?.overallGrade ?? null;
       if (health != null) {
         rankEl.style.display = '';
         const score = typeof health === 'number' ? Math.round(health) : health;
-        rankEl.textContent = `Health: ${score}`;
+        const tierLabel = assess?.tier ? assess.tier.charAt(0) + assess.tier.slice(1).toLowerCase() : '';
+        rankEl.textContent = tierLabel ? `${tierLabel} · ${score}` : `Health: ${score}`;
       }
     } catch (e) {}
   }
@@ -811,16 +820,39 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
       .slice(0, 8);
     const strengthList = (assess?.strengths || []).slice(0, 2).map(s => typeof s === 'string' ? s : s.pos).join(', ');
 
+    // Portfolio value (total DHQ)
+    const portfolioVal = (roster.players || []).reduce((s, pid) => s + (window.App?.LI?.playerScores?.[pid] || 0), 0);
+
+    // Trade compatibility — does this team need what I have / have what I need?
+    const _assessFn = typeof window.assessTeamFromGlobal === 'function' ? window.assessTeamFromGlobal : null;
+    const myAssess = myId ? (_assessFn ? _assessFn(myId) : null) : null;
+    const myNeeds = (myAssess?.needs || []).slice(0, 3).map(n => typeof n === 'string' ? n : n.pos);
+    const myStrengths = (myAssess?.strengths || []).slice(0, 3).map(s => typeof s === 'string' ? s : s.pos);
+    const theirStrengths = (assess?.strengths || []).slice(0, 3).map(s => typeof s === 'string' ? s : s.pos);
+    const theirNeeds = (assess?.needs || []).slice(0, 3).map(n => typeof n === 'string' ? n : n.pos);
+    const iCanGet = myNeeds.filter(pos => theirStrengths.includes(pos));
+    const theyWant = theirNeeds.filter(pos => myStrengths.includes(pos));
+    const tradeMatch = !isMe && (iCanGet.length > 0 || theyWant.length > 0);
+
+    // Owner avatar
+    const avatarId = owner?.avatar;
+    const avatarHtml = avatarId
+      ? `<img src="https://sleepercdn.com/avatars/thumbs/${avatarId}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
+      : `<div style="width:28px;height:28px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${_esc((teamName[0] || '?').toUpperCase())}</div>`;
+
     const prompt = `Give me a full scouting report on ${teamName}. Include their roster strengths, weaknesses, trade tendencies, and how I can exploit them.`;
     const rid = roster.roster_id;
     return `<div class="league-card-wrap" id="lc-${rid}">
     <div class="league-card${isMe ? ' league-card-me' : ''}" onclick="toggleLeagueDossier('${rid}')">
+      ${avatarHtml}
       <div class="league-card-body">
         <div class="league-card-name">${_esc(teamName)}${isMe ? ' <span style="color:var(--accent);font-size:11px;font-weight:700">YOU</span>' : ''}</div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
           <span class="league-card-meta">${w}-${l}${t > 0 ? '-' + t : ''}</span>
           ${hs ? `<span style="font-size:11px;font-weight:700;color:${tierCol};font-family:'JetBrains Mono',monospace">${hs}</span>` : ''}
           ${tier ? `<span style="font-size:10px;font-weight:700;color:${tierCol};text-transform:uppercase;letter-spacing:.04em">${tier}</span>` : ''}
+          ${portfolioVal > 0 ? `<span style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${Math.round(portfolioVal/1000)}k</span>` : ''}
+          ${tradeMatch ? `<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(212,175,55,.15);color:var(--accent);font-weight:700">Trade Match</span>` : ''}
         </div>
         ${dnaLabel || needs ? `<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
           ${dnaLabel ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dnaLabel)}</span>` : ''}
@@ -863,10 +895,15 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
           <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val > 0 ? p.val.toLocaleString() : '—'}</span>
         </div>`
       ).join('')}</div>` : ''}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
         ${strengthList ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(52,211,153,.1);color:var(--green)">Strong: ${_esc(strengthList)}</span>` : ''}
         ${needs ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(248,113,113,.1);color:var(--red)">Weak: ${_esc(needs)}</span>` : ''}
+        ${portfolioVal > 0 ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:var(--bg4);color:var(--text3)">Portfolio: ${portfolioVal.toLocaleString()} DHQ</span>` : ''}
       </div>
+      ${tradeMatch ? `<div style="padding:6px 8px;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.15);border-radius:8px;margin-bottom:8px;font-size:12px;line-height:1.5">
+        ${iCanGet.length ? `<div style="color:var(--green)">They have <strong>${iCanGet.join(', ')}</strong> you need</div>` : ''}
+        ${theyWant.length ? `<div style="color:var(--accent)">They need <strong>${theyWant.join(', ')}</strong> you can trade</div>` : ''}
+      </div>` : ''}
       <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify(prompt).replace(/'/g, "\\'")})" style="width:100%;padding:8px;font-size:12px;font-weight:600;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:8px;cursor:pointer;font-family:inherit">Ask Scout about ${_esc(teamName)}</button>
     </div>
     </div>`;
