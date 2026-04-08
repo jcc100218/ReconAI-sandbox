@@ -206,6 +206,8 @@ function renderTradeCard(myPlayers, theirPlayers, myPicks, theirPicks, targetDna
   const diff    = theirTotal - myTotal;
   const diffStr = diff > 0 ? `+${diff.toLocaleString()}` : diff < 0 ? diff.toLocaleString() : 'Even';
   const diffCol = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--accent)';
+  const probCol = prob >= 60 ? 'var(--green)' : prob >= 35 ? 'var(--amber)' : 'var(--red)';
+  const dnaLabel = targetDna && targetDna !== 'NONE' ? ` vs ${targetDna}` : '';
 
   const renderRow = (pid) => {
     const val = getVal(pid); const pos = getPos_(pid);
@@ -230,12 +232,12 @@ function renderTradeCard(myPlayers, theirPlayers, myPicks, theirPicks, targetDna
     </div>`;
   };
 
-  // Store for "Open Trade Builder" button
-  window._tbLastCard = { myPlayers: [...myPlayers], theirPlayers: [...theirPlayers] };
+  // Store for builder/field-log buttons
+  window._tbLastCard = { myPlayers: [...myPlayers], theirPlayers: [...theirPlayers], myPicks: [...(myPicks||[])], theirPicks: [...(theirPicks||[])], targetDna };
 
   const counterHtml = counter ? `
     <div style="margin-top:8px;padding:7px 9px;background:rgba(251,191,36,.06);border:1px solid rgba(251,191,36,.15);border-radius:8px">
-      <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Counter Suggestion</div>
+      <div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">💡 Counter Suggestion</div>
       ${counter.map(s => `<div style="font-size:12px;color:var(--text2)">${_tbEsc(s)}</div>`).join('')}
     </div>` : '';
 
@@ -259,12 +261,15 @@ function renderTradeCard(myPlayers, theirPlayers, myPicks, theirPicks, targetDna
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
       <div style="flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${prob}%;background:${prob >= 60 ? 'var(--green)' : prob >= 35 ? 'var(--amber)' : 'var(--red)'};border-radius:3px"></div>
+        <div style="height:100%;width:${prob}%;background:${probCol};border-radius:3px"></div>
       </div>
-      <span style="font-size:11px;font-weight:700;color:var(--text2);white-space:nowrap">${prob}% accept</span>
+      <span style="font-size:11px;font-weight:700;color:${probCol};white-space:nowrap">🎯 ${prob}%${dnaLabel}</span>
     </div>
     ${counterHtml}
-    <button onclick="openTradeBuilder(null,window._tbLastCard.myPlayers,window._tbLastCard.theirPlayers)" style="margin-top:8px;width:100%;padding:7px;font-size:12px;font-weight:700;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:8px;cursor:pointer;font-family:inherit">Open Trade Builder →</button>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button onclick="openTradeBuilder(null,window._tbLastCard.myPlayers,window._tbLastCard.theirPlayers)" style="flex:1;padding:7px;font-size:12px;font-weight:700;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:8px;cursor:pointer;font-family:inherit">Edit Trade</button>
+      <button onclick="logTradeFromLastCard()" style="padding:7px 10px;font-size:12px;font-weight:600;background:var(--bg4);color:var(--text2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-family:inherit">→ Field Log</button>
+    </div>
   </div>`;
 }
 window.renderTradeCard = renderTradeCard;
@@ -545,7 +550,57 @@ function _tbRenderPanel() {
       ${counter.map(s => `<div style="font-size:13px;color:var(--text2)">${_tbEsc(s)}</div>`).join('')}
     </div>` : ''}
 
-    <button onclick="tbAnalyze()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:var(--accent);color:#08090b;border:none;border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:-.01em">
-      Ask Scout to Analyze →
-    </button>`;
+    <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:0">
+      <button onclick="tbAnalyze()" style="width:100%;padding:13px;font-size:14px;font-weight:700;background:var(--accent);color:#08090b;border:none;border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:-.01em">
+        Ask Scout to Analyze →
+      </button>
+      <button onclick="tbLogToFieldLog()" style="padding:13px 12px;font-size:12px;font-weight:600;background:var(--bg3);color:var(--text2);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap">→ Log</button>
+    </div>`;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// SECTION 5: Field Log integration
+// ═══════════════════════════════════════════════════════════════
+
+function _logTradeScenario(myPids, theirPids, myPicks, theirPicks, grade) {
+  const getName = pid => typeof pName === 'function' ? pName(pid) : String(pid);
+  const myNames = [
+    ...(myPids || []).map(getName),
+    ...(myPicks || []).map(r => `Rd ${r} pick`),
+  ].join(' + ') || '—';
+  const theirNames = [
+    ...(theirPids || []).map(getName),
+    ...(theirPicks || []).map(r => `Rd ${r} pick`),
+  ].join(' + ') || 'TBD';
+  const gradeStr = grade?.grade || '?';
+  const text = `Trade scenario: ${myNames} for ${theirNames} — Grade: ${gradeStr}`;
+  const allPlayers = [
+    ...(myPids || []).map(pid => ({ id: pid, name: getName(pid) })),
+    ...(theirPids || []).map(pid => ({ id: pid, name: getName(pid) })),
+  ];
+  if (typeof window.addFieldLogEntry === 'function') {
+    window.addFieldLogEntry('🔄', text, 'trade', { actionType: 'trade_scenario', players: allPlayers });
+    if (typeof window.showToast === 'function') window.showToast('Trade scenario saved to Field Log');
+  }
+}
+
+// Called from inline trade card "→ Field Log" button
+function logTradeFromLastCard() {
+  const c = window._tbLastCard;
+  if (!c) return;
+  const getVal = pid => typeof dynastyValue === 'function' ? dynastyValue(pid) : 0;
+  const myTotal    = (c.myPlayers || []).reduce((s, p) => s + getVal(p), 0) + (c.myPicks || []).reduce((s, r) => s + _tbPickDHQ(r), 0);
+  const theirTotal = (c.theirPlayers || []).reduce((s, p) => s + getVal(p), 0) + (c.theirPicks || []).reduce((s, r) => s + _tbPickDHQ(r), 0);
+  _logTradeScenario(c.myPlayers, c.theirPlayers, c.myPicks, c.theirPicks, getTradeGrade(myTotal, theirTotal));
+}
+window.logTradeFromLastCard = logTradeFromLastCard;
+
+// Called from Trade Builder panel "→ Log" button
+function tbLogToFieldLog() {
+  const { myPlayers, theirPlayers, myPicks, theirPicks } = _tbState;
+  const getVal = pid => typeof dynastyValue === 'function' ? dynastyValue(pid) : 0;
+  const myTotal    = myPlayers.reduce((s, p) => s + getVal(p), 0) + myPicks.reduce((s, r) => s + _tbPickDHQ(r), 0);
+  const theirTotal = theirPlayers.reduce((s, p) => s + getVal(p), 0) + theirPicks.reduce((s, r) => s + _tbPickDHQ(r), 0);
+  _logTradeScenario(myPlayers, theirPlayers, myPicks, theirPicks, getTradeGrade(myTotal, theirTotal));
+}
+window.tbLogToFieldLog = tbLogToFieldLog;

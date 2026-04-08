@@ -353,7 +353,7 @@ function renderTeamBarRoster() {
           <!-- Row 3: Action buttons -->
           <div class="tbar-card-actions" style="display:flex;gap:4px">
             <button class="tbar-card-btn tbar-card-hold" onclick="event.stopPropagation();fillGlobalChat('Should I hold ${safeName}?')">Hold</button>
-            <button class="tbar-card-btn tbar-card-trade" onclick="event.stopPropagation();fillGlobalChat('What can I get for ${safeName} in a trade?')">Trade</button>
+            <button class="tbar-card-btn tbar-card-trade" onclick="event.stopPropagation();if(typeof openTradeBuilderForPlayer==='function'){openTradeBuilderForPlayer('${pid}')}else{fillGlobalChat('What can I get for ${safeName} in a trade?')}">Trade</button>
             <button class="tbar-card-btn tbar-card-sell" onclick="event.stopPropagation();fillGlobalChat('Is now a good time to sell ${safeName}?')">Sell High</button>
             <button class="tbar-card-btn tbar-card-replace" onclick="event.stopPropagation();fillGlobalChat('Who can replace ${safeName} on waivers?')">Replace</button>
           </div>
