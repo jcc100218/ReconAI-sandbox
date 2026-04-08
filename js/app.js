@@ -1518,10 +1518,27 @@ function renderLeagueHub() {
       </div>`;
   }).join('');
 
-  // Pro upgrade banner — shown for free/trial users, above the card grid
+  // Pro banner — upgrade for free/trial, launcher for paid
   const tier = typeof getTier === 'function' ? getTier() : 'free';
-  const showProBanner = tier === 'free' || tier === 'trial';
-  const proBanner = showProBanner ? `
+  const isPaidTier = tier === 'paid';
+  const wrUrl = 'https://warroom.fantasy-dynasty-hq.com';
+  const proBanner = isPaidTier ? `
+    <a href="${wrUrl}" role="button" tabindex="0"
+      style="cursor:pointer;margin-bottom:14px;border-radius:14px;padding:15px 18px;background:linear-gradient(135deg,rgba(212,175,55,.12) 0%,rgba(0,0,0,.3) 100%);border:1.5px solid rgba(212,175,55,.4);display:flex;align-items:center;gap:14px;transition:all .18s;text-decoration:none"
+      onmouseover="this.style.borderColor='rgba(212,175,55,.7)';this.style.boxShadow='0 6px 28px rgba(212,175,55,.2)';this.style.transform='translateY(-1px)'"
+      onmouseout="this.style.borderColor='rgba(212,175,55,.4)';this.style.boxShadow='none';this.style.transform='none'">
+      <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,rgba(212,175,55,.25),rgba(212,175,55,.08));display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M12 2L3 7v6c0 5.25 3.83 10.18 9 11.38C17.17 23.18 21 18.25 21 13V7L12 2z" fill="url(#proG)" stroke="#D4AF37" stroke-width="1"/><path d="M12 7l1.545 3.13 3.455.503-2.5 2.437.59 3.43L12 14.885 8.91 16.5l.59-3.43-2.5-2.437 3.455-.503L12 7z" fill="#0A0A0A" stroke="#B8941E" stroke-width="0.5"/><defs><linearGradient id="proG" x1="3" y1="2" x2="21" y2="24"><stop offset="0%" stop-color="#D4AF37"/><stop offset="100%" stop-color="#8B6914"/></linearGradient></defs></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap">
+          <span style="font-size:14px;font-weight:700;color:#d4af37;line-height:1.2">Launch War Room</span>
+          <span style="font-size:10px;font-weight:700;color:#2ECC71;background:rgba(46,204,113,.14);border:1px solid rgba(46,204,113,.3);border-radius:20px;padding:2px 8px;white-space:nowrap;letter-spacing:.04em">PRO</span>
+        </div>
+        <div style="font-size:12px;color:rgba(255,255,255,.38);line-height:1.4">Open desktop command center &middot; Dashboard &middot; Trade Center &middot; Draft</div>
+      </div>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#d4af37" stroke-width="2" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+    </a>` : `
     <div onclick="showProLaunchPage()" role="button" tabindex="0"
       style="cursor:pointer;margin-bottom:14px;border-radius:14px;padding:15px 18px;background:linear-gradient(135deg,rgba(212,175,55,.1) 0%,rgba(212,175,55,.04) 100%);border:1px solid rgba(212,175,55,.28);display:flex;align-items:center;gap:14px;transition:border-color .18s,box-shadow .18s"
       onmouseover="this.style.borderColor='rgba(212,175,55,.55)';this.style.boxShadow='0 6px 28px rgba(212,175,55,.14)'"
@@ -1532,13 +1549,13 @@ function renderLeagueHub() {
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px;flex-wrap:wrap">
-          <span style="font-size:14px;font-weight:700;color:#fff;line-height:1.2">Unlock Scout Pro</span>
+          <span style="font-size:14px;font-weight:700;color:#fff;line-height:1.2">Upgrade to War Room</span>
           <span style="font-size:10px;font-weight:700;color:#d4af37;background:rgba(212,175,55,.14);border:1px solid rgba(212,175,55,.3);border-radius:20px;padding:2px 8px;white-space:nowrap;letter-spacing:.04em">$4.99/mo</span>
         </div>
-        <div style="font-size:12px;color:rgba(255,255,255,.38);line-height:1.4">AI analysis &middot; All leagues &middot; Owner DNA &middot; Field Log</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.38);line-height:1.4">AI analysis &middot; All leagues &middot; Owner DNA &middot; Draft Intel</div>
       </div>
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="rgba(212,175,55,.55)" stroke-width="2.5" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-    </div>` : '';
+    </div>`;
 
   hub.innerHTML = `
     <div class="hub-wrap">
