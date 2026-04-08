@@ -37,6 +37,24 @@ const TUTORIAL_STEPS = [
     desc: 'Your draft war room — scouting reports, rookie rankings, mock drafts, and AI-powered pick advice based on your league\'s history.',
     position: 'top',
   },
+  {
+    target: '#mnav-waivers',
+    title: 'Waiver Intelligence',
+    desc: 'AI-powered waiver recommendations with FAAB bid ranges and confidence levels. Scout finds hidden gems and tells you exactly what to bid.',
+    position: 'top',
+  },
+  {
+    target: '#mnav-fieldlog',
+    title: 'Field Notes',
+    desc: 'Every meaningful action you take — trades proposed, players scouted, waivers claimed — gets logged here. Your personal decision journal.',
+    position: 'top',
+  },
+  {
+    target: 'button[title="Settings"]',
+    title: 'Settings & Alex',
+    desc: 'Customize your experience — choose Alex\'s personality style, connect additional leagues, manage your subscription, and configure AI providers.',
+    position: 'bottom',
+  },
 ];
 
 let _tutStep = 0;

@@ -617,7 +617,11 @@ window.OD.loadPlayerTags = async function(leagueId) {
 const FL_LS_KEY = 'scout_field_log_v1';
 
 // Save a single entry to Supabase, updating sync status in localStorage
+let _fieldLogDbDisabled = false;
+
 window.OD.saveFieldLogEntry = async function(entry) {
+    if (_fieldLogDbDisabled) return false;
+
     const username = getCurrentUsername();
     const db = getClient();
 
@@ -649,18 +653,26 @@ window.OD.saveFieldLogEntry = async function(entry) {
             text: entry.text,
             source: entry.source || 'scout',
         }, { onConflict: 'client_id' });
-        if (error) { updateLocalSyncStatus('failed'); console.warn('[FW] field_log save error', error); return false; }
+        if (error) {
+            // Disable DB writes on auth/RLS errors to stop spamming
+            if (error.code === '42501' || error.message?.includes('row-level security') || error.code === '401') {
+                _fieldLogDbDisabled = true;
+            }
+            updateLocalSyncStatus('failed');
+            return false;
+        }
         updateLocalSyncStatus('synced');
         return true;
     } catch (e) {
+        _fieldLogDbDisabled = true;
         updateLocalSyncStatus('failed');
-        console.warn('[FW] field_log save failed:', e);
         return false;
     }
 };
 
 // Bulk sync any pending/failed entries from localStorage
 window.OD.syncPendingFieldLog = async function() {
+    if (_fieldLogDbDisabled) return 0;
     try {
         const raw = localStorage.getItem(FL_LS_KEY);
         if (!raw) return 0;
