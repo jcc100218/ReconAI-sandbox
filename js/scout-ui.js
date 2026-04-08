@@ -520,10 +520,21 @@ function _generateBriefingItems() {
     });
   }
 
-  // Item 3: Draft capital
+  // Item 3: Draft capital (use tradedPicks API, not roster.draft_picks)
   if (items.length < 3) {
-    const picks = myRoster.draft_picks || [];
-    const futureCapital = picks.length;
+    const curYear = parseInt(S.season) || new Date().getFullYear();
+    const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+    const draftRounds = league?.settings?.draft_rounds || 4;
+    const allTP = S.tradedPicks || [];
+    let futureCapital = 0;
+    for (let yr = curYear; yr <= curYear + 2; yr++) {
+      for (let rd = 1; rd <= draftRounds; rd++) {
+        const tradedAway = allTP.find(p => parseInt(p.season) === yr && p.round === rd && p.roster_id === myRoster.roster_id && p.owner_id !== myRoster.roster_id);
+        if (!tradedAway) futureCapital++;
+        const acquired = allTP.filter(p => parseInt(p.season) === yr && p.round === rd && p.owner_id === myRoster.roster_id && p.roster_id !== myRoster.roster_id);
+        futureCapital += acquired.length;
+      }
+    }
     if (futureCapital === 0) {
       items.push({
         priority: 'watch',
