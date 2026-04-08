@@ -27,6 +27,12 @@ function _rdNormPos(pos) {
   return _RD_POS_MAP[pos] || pos;
 }
 
+// ── Veteran offsets: how many established vets go before #1 rookie in startups ──
+const VET_OFFSETS = {
+  QB: 10, RB: 6, WR: 10, TE: 5, K: 3,
+  DL: 12, LB: 10, DB: 12, OL: 20,
+};
+
 // ── Fantasy value multipliers (dynasty PPR) ───────────────────
 const FANTASY_MULT = {
   QB: 2.0, RB: 1.9, WR: 1.75, TE: 1.5, K: 0.5,
@@ -194,6 +200,18 @@ async function loadRookieProspects() {
       };
     });
 
+    // Compute rookiePosRank (position rank among all rookies, by consensus rank)
+    const byMappedPos = {};
+    Object.values(prospects).forEach(p => {
+      const mp = p.mappedPos || p.pos;
+      if (!byMappedPos[mp]) byMappedPos[mp] = [];
+      byMappedPos[mp].push(p);
+    });
+    Object.values(byMappedPos).forEach(arr => {
+      arr.sort((a, b) => a.rank - b.rank);
+      arr.forEach((p, i) => { p.rookiePosRank = i + 1; });
+    });
+
     _rookieCache.prospects = prospects;
     _rookieCache.byName = prospects;
     _rookieCache.loaded = true;
@@ -208,25 +226,67 @@ async function loadRookieProspects() {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════
+// DYNASTY VALUE — slot rookies into the DHQ position ladder
+// Computed lazily (only when DHQ engine has loaded)
+// ══════════════════════════════════════════════════════════════════
+
+// Build sorted DHQ ladder for a position from the engine's playerScores
+function _getPositionLadder(pos) {
+  const scores = window.App?.LI?.playerScores;
+  const meta = window.App?.LI?.playerMeta;
+  if (!scores || !meta) return [];
+  return Object.entries(scores)
+    .filter(([pid]) => meta[pid]?.pos === pos && scores[pid] > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([, val]) => val);
+}
+
+// Compute startup dynasty value for a prospect
+function _computeStartupValue(prospect) {
+  const pos = prospect.mappedPos || prospect.pos;
+  const posRank = prospect.rookiePosRank || 999;
+  const vetOffset = VET_OFFSETS[pos] || 10;
+  const startupPosRank = posRank + vetOffset;
+
+  const ladder = _getPositionLadder(pos);
+  if (!ladder.length) return prospect.draftScore || 0; // No DHQ data yet
+
+  // Clamp to ladder length
+  const idx = Math.min(startupPosRank - 1, ladder.length - 1);
+  return ladder[idx] || ladder[ladder.length - 1] || prospect.draftScore || 0;
+}
+
+// Enrich a prospect with dynasty value if DHQ engine is loaded
+function _enrichWithDynastyValue(p) {
+  if (!p || p._dynastyComputed) return p;
+  if (!window.App?.LI?.playerScores) return p; // Engine not loaded yet
+  p.dynastyValue = _computeStartupValue(p);
+  p._dynastyComputed = true;
+  return p;
+}
+
 // ── Lookup functions ──────────────────────────────────────────
 function findProspect(name) {
   if (!name || !_rookieCache.loaded) return null;
   const key = name.toLowerCase().trim();
-  if (_rookieCache.byName[key]) return _rookieCache.byName[key];
+  let match = _rookieCache.byName[key] || null;
   // Partial match (last name + first initial)
-  const parts = key.split(' ');
-  if (parts.length >= 2) {
-    const lastName = parts[parts.length - 1];
-    for (const [k, v] of Object.entries(_rookieCache.byName)) {
-      if (k.endsWith(lastName) && k.includes(parts[0])) return v;
+  if (!match) {
+    const parts = key.split(' ');
+    if (parts.length >= 2) {
+      const lastName = parts[parts.length - 1];
+      for (const [k, v] of Object.entries(_rookieCache.byName)) {
+        if (k.endsWith(lastName) && k.includes(parts[0])) { match = v; break; }
+      }
     }
   }
-  return null;
+  return match ? _enrichWithDynastyValue(match) : null;
 }
 
 function getProspects(pos) {
   if (!_rookieCache.loaded) return [];
-  const all = Object.values(_rookieCache.prospects);
+  const all = Object.values(_rookieCache.prospects).map(_enrichWithDynastyValue);
   if (!pos) return all.sort((a, b) => a.rank - b.rank);
   const mapped = _rdNormPos(pos);
   return all.filter(p => p.mappedPos === mapped || p.pos === pos).sort((a, b) => a.rank - b.rank);
