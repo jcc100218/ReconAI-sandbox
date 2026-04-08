@@ -580,17 +580,15 @@ CRITICAL RULES:
 - Ensure all recommendations are INTERNALLY CONSISTENT — do not recommend targeting a position in one section and avoiding it in another
 - Be SPECIFIC about which rounds to target which positions based on value intersection
 
-Based on the ${year} rookie class and my league's ACTUAL historical draft data:
+Based on the ${year} rookie class and my league's ACTUAL historical draft data, give me a CONCISE scout briefing (this is mobile — keep it tight):
 
-1. TOP 3 POSITIONS TO TARGET — ranked by starter gap + positional scarcity in this class + historical hit rate at my pick slots. Explain WHY each position, citing specific roster gaps and class depth.
+1. TOP 3 TARGETS — specific rookie names, position, and which of MY picks to use. One sentence each on why they fit my roster.
 
-2. DRAFT BOARD — 6 specific rookies to target. For each: name, position, projected NFL draft round, which of MY picks to target them with, and why they fit MY roster (1 sentence). Order by priority.
+2. QUICK STRATEGY — one paragraph: should I trade up/down? What positions to hammer vs avoid? What's the key value play?
 
-3. PICK STRATEGY — should I trade up/down given my pick slots? What's the value play based on hit rates? Be specific about which picks to move and what to target.
+3. ONE THING TO WATCH — the single most important insight for my draft (a position run risk, a sleeper, a trap to avoid).
 
-4. AVOID — positions or rounds where my league's history shows poor returns. Only list genuine traps, not just lower-priority positions.
-
-Search the web for current ${year} rookie rankings and NFL draft projections. Use real prospect names and accurate draft positions.`;
+Keep the total response under 300 words. Be specific with prospect names. Search the web for current ${year} rookie rankings.`;
 
     const timeoutMs=90000;
     const reply=await Promise.race([
@@ -945,25 +943,66 @@ function renderMockDraftUI(){
   const pauseBtn=`<button id="mock-pause-btn" onclick="toggleMockDraftPause()" style="padding:5px 12px;font-size:11px;font-weight:600;background:none;border:1px solid ${mockDraftPaused?'var(--green)':'var(--border2)'};border-radius:8px;color:${mockDraftPaused?'var(--green)':'var(--text3)'};cursor:pointer;font-family:inherit;flex-shrink:0">${mockDraftPaused?'Resume':'Pause'}</button>`;
 
   if(currentIdx>=pickOrder.length){
-    // Draft complete — show results with grid and breakdown
+    // Draft complete — show results with grade and consensus comparison
     const myPicks=picks.filter(p=>p.rosterId===S.myRosterId);
+
+    // Calculate post-mock draft grade
+    const totalVal=myPicks.reduce((s,p)=>s+p.val,0);
+    const avgVal=myPicks.length?Math.round(totalVal/myPicks.length):0;
+    const leagueAvgByTeam={};
+    picks.forEach(p=>{leagueAvgByTeam[p.rosterId]=(leagueAvgByTeam[p.rosterId]||0)+p.val;});
+    const leagueAvgs=Object.values(leagueAvgByTeam);
+    const leagueAvg=leagueAvgs.length?Math.round(leagueAvgs.reduce((s,v)=>s+v,0)/leagueAvgs.length):0;
+    const myRank=leagueAvgs.sort((a,b)=>b-a).indexOf(totalVal)+1||leagueAvgs.length;
+    const gradePct=leagueAvgs.length?Math.round((1-((myRank-1)/leagueAvgs.length))*100):50;
+    const gradeLabel=gradePct>=85?'A+':gradePct>=75?'A':gradePct>=65?'B+':gradePct>=55?'B':gradePct>=45?'C+':gradePct>=35?'C':'D';
+    const gradeCol=gradePct>=65?'var(--green)':gradePct>=45?'var(--amber)':'var(--red)';
+
+    // Consensus comparison — check if each pick was a reach or steal
+    const pickAnalysis=myPicks.map(p=>{
+      const csvP=typeof window.findProspect==='function'?window.findProspect(p.playerName):null;
+      const consensusRank=csvP?.rank||null;
+      const pickOverall=p.overall||0;
+      let verdict='';
+      if(consensusRank&&pickOverall){
+        const diff=consensusRank-pickOverall;
+        if(diff>=10)verdict='STEAL';
+        else if(diff>=3)verdict='Value';
+        else if(diff<=-10)verdict='REACH';
+        else if(diff<=-3)verdict='Early';
+      }
+      return{...p,consensusRank,verdict};
+    });
+
     el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl)">
-      <div style="font-size:14px;font-weight:700;color:var(--accent);margin-bottom:4px">Mock Draft Complete</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${picks.length} picks across ${Math.max(...picks.map(p=>p.round))} rounds</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:48px;height:48px;border-radius:12px;background:${gradeCol};display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:var(--bg1);font-family:'JetBrains Mono',monospace">${gradeLabel}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:700;color:var(--accent)">Mock Draft Complete</div>
+          <div style="font-size:13px;color:var(--text3)">${picks.length} picks · Ranked #${myRank} of ${Object.keys(leagueAvgByTeam).length} teams · ${totalVal.toLocaleString()} total DHQ</div>
+        </div>
+      </div>
       <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Your Picks</div>
-      <div style="display:flex;flex-direction:column;gap:2px">${myPicks.map(p=>{
+      <div style="display:flex;flex-direction:column;gap:2px">${pickAnalysis.map(p=>{
         const photoUrl='https://sleepercdn.com/content/nfl/players/thumb/'+p.pid+'.jpg';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+        const verdictHtml=p.verdict?`<span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:${p.verdict==='STEAL'||p.verdict==='Value'?'var(--greenL)':'var(--redL)'};color:${p.verdict==='STEAL'||p.verdict==='Value'?'var(--green)':'var(--red)'}">${p.verdict}</span>`:'';
+        const consensusHtml=p.consensusRank?`<span style="font-size:10px;color:var(--text3)">C#${p.consensusRank}</span>`:'';
+        return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px" onclick="openPlayerModal('${p.pid}')">
           <span style="font-size:11px;font-weight:700;color:var(--text3);font-family:'JetBrains Mono',monospace;min-width:32px">R${p.round}.${p.pick}</span>
           <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
-          <span style="font-size:14px;font-weight:700;color:var(--accent);flex:1">${escHtml(p.playerName)}</span>
+          <span style="font-size:13px;font-weight:700;color:var(--accent);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.playerName)}</span>
           ${_mockPosBadge(p.pos)}
+          ${verdictHtml}
+          ${consensusHtml}
           <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
         </div>`;
       }).join('')}</div>
       ${_mockPosBreakdown(picks)}
       ${_mockDraftGrid(picks,pickOrder)}
-      <button onclick="startMockDraft()" style="margin-top:10px;width:100%;padding:8px;font-size:13px;font-weight:700;background:var(--bg3);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:inherit">Run Again</button>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button onclick="startMockDraft()" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:var(--bg3);border:1px solid var(--accent);border-radius:8px;color:var(--accent);cursor:pointer;font-family:inherit">Run Again</button>
+        <button onclick="sendDraftChatMsg('Grade my mock draft: ${myPicks.map(p=>p.playerName+' ('+p.pos+', R'+p.round+')').join(', ')}. How did I do? What would you change?')" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:linear-gradient(135deg,var(--accent),#b8941f);border:none;border-radius:8px;color:var(--bg1);cursor:pointer;font-family:inherit">Ask Alex</button>
+      </div>
     </div>`;
     return;
   }
@@ -977,8 +1016,25 @@ function renderMockDraftUI(){
   const recentHtml=picks.slice(-5).map(p=>_mockPickCard(p,true)).join('');
 
   if(isMyPick){
-    // User picks — show available players with photos and pos badges
-    const available=pool.slice(0,15);
+    // User picks — show available players with Alex recommendation
+    const available=pool.slice(0,12);
+    const myProfile=_mockState.teamProfiles?.[S.myRosterId]||{};
+    const myNeeds=myProfile.needs||[];
+
+    // Alex recommendation: top pick at need position or BPA
+    let alexPick=null,alexReason='';
+    for(const pos of myNeeds){
+      const candidate=available.find(p=>p.pos===pos);
+      if(candidate){alexPick=candidate;alexReason=`fills your ${pos} gap`;break;}
+    }
+    if(!alexPick&&available.length){alexPick=available[0];alexReason='best player available';}
+
+    // Consensus rank for top picks
+    const enriched=available.map(p=>{
+      const csv=typeof window.findProspect==='function'?window.findProspect(p.name):null;
+      return{...p,consensusRank:csv?.rank||null};
+    });
+
     el.innerHTML=`<div style="padding:14px;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl)">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <div style="flex:1">
@@ -987,14 +1043,27 @@ function renderMockDraftUI(){
         </div>
         ${pauseBtn}
       </div>
+      ${alexPick?`<div style="padding:8px 10px;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.15);border-radius:8px;margin-bottom:8px;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="mockDraftPick('${alexPick.pid}')">
+        <div style="font-size:13px">💡</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:700;color:var(--accent)">Alex says: take ${escHtml(alexPick.name)}</div>
+          <div style="font-size:11px;color:var(--text3)">${escHtml(alexPick.pos)} · ${alexPick.val.toLocaleString()} DHQ · ${alexReason}</div>
+        </div>
+        ${_mockPosBadge(alexPick.pos)}
+      </div>`:''}
       ${recentHtml?'<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Recent Picks</div>'+recentHtml+'</div>':''}
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Available Players</div>
-      <div style="display:flex;flex-direction:column;gap:3px">${available.map(p=>{
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Available Players</span>
+        ${myNeeds.length?`<span style="font-size:10px;color:var(--accent)">Need: ${myNeeds.slice(0,3).join(', ')}</span>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">${enriched.map(p=>{
         const photoUrl='https://sleepercdn.com/content/nfl/players/thumb/'+p.pid+'.jpg';
-        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='var(--border)'">
+        const isNeed=myNeeds.includes(p.pos);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${isNeed?'rgba(212,175,55,.04)':'var(--bg3)'};border:1px solid ${isNeed?'rgba(212,175,55,.2)':'var(--border)'};border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='${isNeed?'rgba(212,175,55,.2)':'var(--border)'}'" >
           <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
-          <span style="font-size:14px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
+          <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
           ${_mockPosBadge(p.pos)}
+          ${p.consensusRank?`<span style="font-size:10px;color:var(--text3)">C#${p.consensusRank}</span>`:''}
           <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
         </div>`;
       }).join('')}</div>
