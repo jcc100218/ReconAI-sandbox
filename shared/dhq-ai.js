@@ -839,9 +839,11 @@ async function dhqAI(type, message, context, options) {
   });
 
   // Auto-enable web search for real-time intent (injuries, news, rumors)
+  // Tier-gated: only trial or paid users get web search (via canAccess)
+  const canUseWebSearch = typeof canAccess === 'function' && canAccess('BRIEFING_REASONING');
   const lastUserContent = (options?.messages || []).filter(m => m.role === 'user').slice(-1)[0]?.content || message || '';
   const realTimeIntent = /\b(injur|news|update|latest|rumor|contract|sign(ed|ing)|cut|release|suspend|arrest|trade rumor|depth chart|status|headline|report)\b/i.test(lastUserContent);
-  const finalWebSearch = useWebSearch || realTimeIntent;
+  const finalWebSearch = canUseWebSearch && (useWebSearch || realTimeIntent);
 
   const reply = await callClaude(systemPrefixed, finalWebSearch, 2, maxTokens, type);
 
