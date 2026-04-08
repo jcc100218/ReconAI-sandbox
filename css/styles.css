@@ -1212,17 +1212,17 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 .fieldlog-empty-icon{font-size:36px;margin-bottom:12px}
 .fieldlog-empty-text{font-size:14px;line-height:1.6;color:var(--text3)}
 
-/* ── War Room Gold Typography ───────────────────────────────────── */
-/* Bebas Neue for display headings */
+/* ── Scout Gold Typography ───────────────────────────────────────── */
+/* DM Sans for display headings */
 .logo,.sec,.home-sec-title,
 h1,h2,h3,
 .feed-headline,
 .dr-pick-name,
-.hero-action-card .hero-title{font-family:'Bebas Neue',sans-serif;letter-spacing:.04em}
-/* Oswald for data/numbers */
+.hero-action-card .hero-title{font-family:'DM Sans',sans-serif;font-weight:800;letter-spacing:.01em}
+/* JetBrains Mono for data/numbers */
 .metric-val,.tv-total,.pr-score-big,
 .snapshot-card .snap-value,
-.lu-score,.lineup-total-proj{font-family:'Oswald','JetBrains Mono',monospace;font-weight:600}
+.lu-score,.lineup-total-proj{font-family:'JetBrains Mono',monospace;font-weight:600}
 
 /* ── Team Bar v2: DHQ + Expandable Player Cards ─────────────────── */
 /* Tappable name button */
@@ -1237,7 +1237,7 @@ h1,h2,h3,
 /* Stats grid: 3 cols on narrow, up to 6 inline */
 .tbar-card-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
 .tbar-card-stat{background:var(--bg3);border-radius:7px;padding:7px 8px;text-align:center;border:1px solid var(--border)}
-.tbar-card-stat-val{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2;font-family:'Oswald',monospace}
+.tbar-card-stat-val{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.2;font-family:'JetBrains Mono',monospace}
 .tbar-card-stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
 /* ══════════════════════════════════════════════════════════════
    LEAGUE HUB — save-slot style league selector

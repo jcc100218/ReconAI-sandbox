@@ -78,12 +78,12 @@ function _ensureModalDOM() {
         #fw-player-modal *{box-sizing:border-box}
         .fwpm-stat-box{padding:10px 6px;text-align:center;border-right:1px solid ${_wr.borderDim}}
         .fwpm-stat-box:last-child{border-right:none}
-        .fwpm-stat-val{font-size:17px;font-weight:800;letter-spacing:-.03em;line-height:1;font-family:'Bebas Neue',Oswald,monospace}
+        .fwpm-stat-val{font-size:17px;font-weight:800;letter-spacing:-.03em;line-height:1;font-family:'JetBrains Mono',monospace}
         .fwpm-stat-lbl{font-size:13px;color:${_wr.text2};text-transform:uppercase;letter-spacing:.06em;margin-top:5px;font-weight:600}
         .fwpm-section{margin-bottom:14px}
-        .fwpm-section-title{font-family:'Bebas Neue',Oswald,sans-serif;font-size:13px;font-weight:600;color:${_wr.text2};text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+        .fwpm-section-title{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;color:${_wr.text2};text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
         .fwpm-card-box{background:${_wr.panel};border:1px solid ${_wr.border};border-radius:10px;padding:12px}
-        .fwpm-btn{font-size:13px;padding:7px 16px;background:${_wr.panel};border:1px solid ${_wr.border};border-radius:8px;color:${_wr.text2};text-decoration:none;cursor:pointer;font-family:Oswald,sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:.04em;transition:all .15s;display:inline-block}
+        .fwpm-btn{font-size:13px;padding:7px 16px;background:${_wr.panel};border:1px solid ${_wr.border};border-radius:8px;color:${_wr.text2};text-decoration:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.04em;transition:all .15s;display:inline-block}
         .fwpm-btn:hover{background:${_wr.goldBg};color:${_wr.gold};border-color:${_wr.gold}}
         .fwpm-btn-gold{background:${_wr.gold};color:${_wr.black};border-color:${_wr.gold}}
         .fwpm-btn-gold:hover{background:#c9a42e}
@@ -106,7 +106,7 @@ function _ensureModalDOM() {
             <div id="fwpm-pos" style="position:absolute;bottom:-6px;left:50%;transform:translateX(-50%);font-size:13px;font-weight:700;padding:2px 8px;border-radius:10px;white-space:nowrap"></div>
           </div>
           <div style="flex:1;min-width:0;padding-top:2px">
-            <div id="fwpm-name" style="font-family:'Bebas Neue',Oswald,sans-serif;font-size:22px;font-weight:700;letter-spacing:.02em;color:${_wr.text};line-height:1.1;margin-bottom:4px"></div>
+            <div id="fwpm-name" style="font-family:'DM Sans',sans-serif;font-size:22px;font-weight:800;letter-spacing:-.01em;color:${_wr.text};line-height:1.1;margin-bottom:4px"></div>
             <!-- Insight blurb -->
             <div id="fwpm-insight" style="margin-bottom:6px"></div>
             <div id="fwpm-bio" style="font-size:13px;color:${_wr.text2};margin-bottom:6px"></div>
@@ -131,7 +131,7 @@ function _ensureModalDOM() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
           <div class="fwpm-card-box">
             <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Dynasty Trade Value</div>
-            <div id="fwpm-val" style="font-size:24px;font-weight:800;letter-spacing:-.02em;color:${_wr.gold};font-family:'Bebas Neue',Oswald,monospace"></div>
+            <div id="fwpm-val" style="font-size:24px;font-weight:800;letter-spacing:-.02em;color:${_wr.gold};font-family:'JetBrains Mono',monospace"></div>
             <div id="fwpm-tier" style="font-size:13px;color:${_wr.text2};margin-top:2px"></div>
           </div>
           <div id="fwpm-right" class="fwpm-card-box"></div>
@@ -522,7 +522,7 @@ function openFWPlayerModal(playerIdOrObj, playersData, statsData, scoringSetting
 
     rightPanel.innerHTML = `
       <div style="font-size:13px;color:${_wr.text3};text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Trade Profile${isIDP ? ' <span style="font-size:13px;color:'+_wr.gold+';background:rgba(212,175,55,.1);padding:1px 5px;border-radius:4px;font-weight:700;vertical-align:middle;margin-left:4px">IDP</span>' : ''}</div>
-      <div style="font-size:22px;font-weight:800;color:${recCol};font-family:'Bebas Neue',Oswald,monospace;letter-spacing:.02em">${pa.label}</div>
+      <div style="font-size:22px;font-weight:800;color:${recCol};font-family:'JetBrains Mono',monospace;letter-spacing:.02em">${pa.label}</div>
       <div style="font-size:13px;color:${_wr.text2};margin-top:4px;line-height:1.4">
         <span style="color:${tpTrendCol}">${tpTrend}</span> \u00B7 ${peakYrsLeft > 0 ? peakYrsLeft+' peak yr'+(peakYrsLeft>1?'s':'')+' left' : 'Past peak'}
       </div>
