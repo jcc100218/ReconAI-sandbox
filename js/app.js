@@ -1014,6 +1014,7 @@ async function loadAllData(){
       loadRosterStats().catch(e=>{console.warn('Stats error:',e);return null;}),
       loadLeagueIntel().catch(e=>{console.warn('DHQ error:',e);return null;}),
       fetchTrending().catch(e=>{console.warn('Trending error:',e);return null;}),
+      typeof window.loadRookieProspects==='function'?window.loadRookieProspects().catch(()=>null):null,
     ]);
     console.log('loadAllData: complete in '+((Date.now()-t0)/1000).toFixed(1)+'s | stats:'+Object.keys(S.playerStats||{}).length+' | DHQ:'+Object.keys((window.App.LI||{}).playerScores||{}).length);
     // Load commissioner league docs for AI context (non-blocking)
@@ -1047,6 +1048,8 @@ async function loadAllData(){
       setTimeout(()=>{if(typeof startStrategyWalkthrough==='function')startStrategyWalkthrough();},500);
     }
     try{if(typeof runMemoryCapture==='function')runMemoryCapture(S.currentLeagueId);}catch(e){dhqLog('loadAllData.runMemoryCapture',e);}
+    // Show tutorial for first-time users (after all data is rendered)
+    try{if(typeof window.startTutorial==='function')setTimeout(window.startTutorial,800);}catch(_e){}
     try{if(typeof updateRegistryKPIs==='function')updateRegistryKPIs(S.currentLeagueId);}catch(e){}
     // Load player tags (syncs with War Room)
     if(window.OD?.loadPlayerTags){

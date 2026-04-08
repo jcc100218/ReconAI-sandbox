@@ -26,11 +26,8 @@ function switchDraftView(view) {
     if (boardBtn) { boardBtn.style.background = view === 'board' ? 'var(--accent)' : 'transparent'; boardBtn.style.color = view === 'board' ? 'var(--bg1)' : 'var(--text2)'; boardBtn.style.borderColor = view === 'board' ? 'var(--accent)' : 'var(--border)'; }
     if (mockBtn) { mockBtn.style.background = view === 'mock' ? 'var(--accent)' : 'transparent'; mockBtn.style.color = view === 'mock' ? 'var(--bg1)' : 'var(--text2)'; mockBtn.style.borderColor = view === 'mock' ? 'var(--accent)' : 'var(--border)'; }
     if (view === 'mock' && !_mockState) {
-        // Show start button if mock hasn't begun
-        const mockDraftEl = document.getElementById('draft-mock');
-        if (mockDraftEl) {
-            mockDraftEl.innerHTML = `<button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
-        }
+        // Show start button with mode toggle if mock hasn't begun
+        onDraftTabOpen();
     }
 }
 window.switchDraftView = switchDraftView;
@@ -360,11 +357,17 @@ function renderRookieBoard(){
       const meta=LI?.playerMeta?.[pid]||{};
       const college=p.college||'';
       const age=p.age||'';
+      // Enrich with CSV rookie data if available
+      const csvProspect=typeof window.findProspect==='function'?window.findProspect((p.first_name||'')+' '+(p.last_name||'')):null;
+      const csvRank=csvProspect?.rank||null;
+      const csvSummary=csvProspect?.summary||'';
+      const csvSize=csvProspect?[csvProspect.size,csvProspect.weight?csvProspect.weight+'lbs':'',csvProspect.speed||''].filter(Boolean).join(' · '):'';
+      const csvTier=csvProspect?.tier||'';
       // Fit score based on team needs
       const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
       const needPos=assess?.needs?.map(n=>n.pos)||[];
       const fit=needPos.includes(pos)?'high':needPos.length&&!assess?.strengths?.includes(pos)?'med':'low';
-      return{pid,p,dhq,pos,college,age,meta,fit};
+      return{pid,p,dhq,pos,college:csvProspect?.college||college,age,meta,fit,csvRank,csvSummary,csvSize,csvTier};
     })
     .filter(Boolean);
 
@@ -438,9 +441,12 @@ function renderRookieBoard(){
           <span style="width:40px;text-align:center">${fitBadge}</span>
         </div>
         ${isExp?`<div style="padding:10px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-bottom:4px;animation:panelIn .2s ease">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <span style="font-size:13px;color:var(--text2)">${r.pos} \u00B7 ${r.p.team||'TBD'} \u00B7 Age ${r.age||'?'}${r.p.height?' \u00B7 '+Math.floor(r.p.height/12)+"'"+r.p.height%12+'"':''}${r.p.weight?' \u00B7 '+r.p.weight+'lbs':''}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+            <span style="font-size:13px;color:var(--text2)">${r.pos} \u00B7 ${r.p.team||'TBD'} \u00B7 Age ${r.age||'?'}${r.csvSize?' \u00B7 '+r.csvSize:r.p.height?' \u00B7 '+Math.floor(r.p.height/12)+"'"+r.p.height%12+'"':''}${!r.csvSize&&r.p.weight?' \u00B7 '+r.p.weight+'lbs':''}</span>
+            ${r.csvRank?'<span style="font-size:11px;padding:1px 6px;border-radius:4px;font-weight:700;background:var(--accentL);color:var(--accent)">Consensus #'+r.csvRank+'</span>':''}
+            ${r.csvTier?'<span style="font-size:11px;padding:1px 6px;border-radius:4px;font-weight:600;background:var(--bg4);color:var(--text3)">'+r.csvTier+'</span>':''}
           </div>
+          ${r.csvSummary?'<div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:8px;padding:8px;background:var(--bg3);border-radius:6px">'+r.csvSummary+(r.csvSummary.length>=300?'...':'')+'</div>':''}
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm" onclick="sendDraftChatMsg('Full scouting report on ${(r.p.full_name||'').replace(/'/g,"\\'")} (${r.pos}, ${r.college||'Unknown'}). Include strengths, weaknesses, NFL comparison, and where I should draft them.')">Scout Report</button>
             <button class="btn btn-sm btn-ghost" onclick="openPlayerModal('${r.pid}')">Player Card</button>
@@ -775,31 +781,75 @@ window.renderTopProspects=renderTopProspects;
 // Interactive: user picks for their team, AI picks for all others
 let _mockState=null;
 let mockDraftPaused=false;
+let _mockMode='rookie'; // 'rookie' or 'startup'
 
-function startMockDraft(){
+function startMockDraft(mode){
   const el=$('draft-mock');if(!el)return;
   if(!S.rosters?.length||!LI_LOADED){el.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px">Connect league and wait for data to load.</div>';return;}
+  if(mode)_mockMode=mode;
 
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
-  const draftRounds=league?.settings?.draft_rounds||4;
+  const draftRounds=_mockMode==='rookie'?(league?.settings?.draft_rounds||4):Math.min(league?.settings?.draft_rounds||4,30);
   const teams=S.rosters.length;
+  const rp=league?.roster_positions||[];
+  const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+  const leagueHasK=rp.some(s=>s==='K');
 
-  // Build available player pool (rookies)
-  const pool=Object.entries(LI.playerMeta||{})
-    .filter(([pid,m])=>m.source==='FC_ROOKIE'&&(LI.playerScores?.[pid]||0)>0)
-    .map(([pid,m])=>({pid,name:pName(pid),pos:m.pos||pPos(pid),val:LI.playerScores[pid]||0}))
-    .sort((a,b)=>b.val-a.val);
-
-  // Build pick order (snake draft)
-  const pickOrder=[];
-  const rosterOrder=[...S.rosters].sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0)); // worst to first
-  for(let rd=1;rd<=draftRounds;rd++){
-    const order=rd%2===1?[...rosterOrder]:[...rosterOrder].reverse();
-    order.forEach((r,i)=>pickOrder.push({round:rd,pick:i+1,rosterId:r.roster_id,overall:pickOrder.length+1}));
+  // Build available player pool
+  let pool;
+  if(_mockMode==='rookie'){
+    // Rookies only — from FC_ROOKIE source + CSV prospect data
+    pool=Object.entries(LI.playerMeta||{})
+      .filter(([pid,m])=>m.source==='FC_ROOKIE'&&(LI.playerScores?.[pid]||0)>0)
+      .map(([pid,m])=>{
+        const pos=m.pos||pPos(pid);
+        // Skip IDP if league doesn't have IDP slots
+        if(!leagueHasIDP&&['DL','LB','DB'].includes(pos))return null;
+        if(!leagueHasK&&pos==='K')return null;
+        return{pid,name:pName(pid),pos,val:LI.playerScores[pid]||0};
+      }).filter(Boolean)
+      .sort((a,b)=>b.val-a.val);
+  }else{
+    // Startup: all players with DHQ value
+    pool=Object.entries(LI.playerScores||{})
+      .filter(([pid,val])=>val>500&&S.players[pid])
+      .map(([pid,val])=>({pid,name:pName(pid),pos:pPos(pid)||'?',val}))
+      .sort((a,b)=>b.val-a.val);
   }
 
+  // Build pick order with traded pick awareness (snake draft)
+  const pickOrder=[];
+  const rosterOrder=[...S.rosters].sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0));
+  const year=$('draft-year-sel')?.value||'2026';
+  const tradedPicks=S.tradedPicks||[];
+
+  for(let rd=1;rd<=draftRounds;rd++){
+    const order=rd%2===1?[...rosterOrder]:[...rosterOrder].reverse();
+    order.forEach((r,i)=>{
+      // Check if this pick was traded
+      const traded=tradedPicks.find(tp=>tp.round===rd&&tp.previous_owner_id===r.roster_id&&String(tp.season)===year);
+      const actualOwner=traded?traded.owner_id:r.roster_id;
+      pickOrder.push({round:rd,pick:i+1,rosterId:actualOwner,originalRosterId:r.roster_id,overall:pickOrder.length+1});
+    });
+  }
+
+  // Pre-compute team assessments + owner DNA for AI picks
+  const teamProfiles={};
+  S.rosters.forEach(r=>{
+    const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(r.roster_id):null;
+    const ownerProfile=LI.ownerProfiles?.[r.roster_id]||{};
+    const owner=(S.leagueUsers||[]).find(u=>u.user_id===r.owner_id);
+    teamProfiles[r.roster_id]={
+      assess,
+      dna:ownerProfile.dna||'balanced',
+      tier:assess?.tier||'CROSSROADS',
+      needs:(assess?.needs||[]).slice(0,4).map(n=>typeof n==='string'?n:n.pos),
+      teamName:(owner?.metadata?.team_name||owner?.display_name||'Team').substring(0,12),
+    };
+  });
+
   mockDraftPaused=false;
-  _mockState={pool:[...pool],pickOrder,picks:[],currentIdx:0};
+  _mockState={pool:[...pool],pickOrder,picks:[],currentIdx:0,teamProfiles,mode:_mockMode};
   renderMockDraftUI();
 }
 window.startMockDraft=startMockDraft;
@@ -920,8 +970,8 @@ function renderMockDraftUI(){
 
   const current=pickOrder[currentIdx];
   const isMyPick=current.rosterId===S.myRosterId;
-  const owner=(S.leagueUsers||[]).find(u=>u.user_id===current.rosterId)||{display_name:'Team '+current.rosterId};
-  const teamName=owner?.metadata?.team_name||owner?.display_name||'Team '+current.pick;
+  const profile=_mockState.teamProfiles?.[current.rosterId]||{};
+  const teamName=profile.teamName||'Team '+current.pick;
 
   // Recent picks — enhanced with photos
   const recentHtml=picks.slice(-5).map(p=>_mockPickCard(p,true)).join('');
@@ -965,12 +1015,28 @@ function renderMockDraftUI(){
       </div>`;
       return;
     }
-    const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(current.rosterId):null;
-    const needs=(assess?.needs||[]).slice(0,3).map(n=>typeof n==='string'?n:n.pos);
-    // Pick the best available player at a need position, or BPA
+    const profile=_mockState.teamProfiles?.[current.rosterId]||{};
+    const needs=profile.needs||[];
+    const dna=profile.dna||'balanced';
+    const tier=profile.tier||'CROSSROADS';
+
+    // AI pick logic: considers team needs, DNA style, and competitive tier
     let pick=null;
-    for(const pos of needs){if(!pick)pick=pool.find(p=>p.pos===pos);}
-    if(!pick)pick=pool[0]; // BPA fallback
+    if(dna==='hoarder'||tier==='REBUILDING'){
+      // Rebuilders and hoarders prioritize BPA for upside
+      pick=pool[0];
+    }else if(dna==='aggressive'||tier==='ELITE'){
+      // Aggressive owners and contenders target immediate starters at need positions
+      for(const pos of needs){if(!pick)pick=pool.find(p=>p.pos===pos);}
+      if(!pick)pick=pool[0];
+    }else{
+      // Balanced: fill top need if available in top 5 BPA, otherwise take BPA
+      for(const pos of needs){
+        const candidate=pool.findIndex(p=>p.pos===pos);
+        if(candidate>=0&&candidate<5){pick=pool[candidate];break;}
+      }
+      if(!pick)pick=pool[0];
+    }
     if(pick){
       pool.splice(pool.indexOf(pick),1);
       picks.push({...current,pid:pick.pid,playerName:pick.name,pos:pick.pos,val:pick.val,teamName});
@@ -1023,10 +1089,15 @@ function onDraftTabOpen(){
     if(contentEl)contentEl.style.display='block';
     runDraftScouting();
   }
-  // Show mock draft start button (in the mock sub-tab)
+  // Show mock draft start button with mode toggle (in the mock sub-tab)
   const mockEl=$('draft-mock');
   if(mockEl&&!_mockState){
-    mockEl.innerHTML=`<button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
+    mockEl.innerHTML=`
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button onclick="_mockMode='rookie';document.querySelectorAll('.mock-mode-btn').forEach(b=>{b.style.background='transparent';b.style.color='var(--text3)';b.style.borderColor='var(--border)'});this.style.background='var(--accent)';this.style.color='var(--bg1)';this.style.borderColor='var(--accent)'" class="mock-mode-btn" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:${_mockMode==='rookie'?'var(--accent)':'transparent'};color:${_mockMode==='rookie'?'var(--bg1)':'var(--text3)'};border:1px solid ${_mockMode==='rookie'?'var(--accent)':'var(--border)'};border-radius:8px;cursor:pointer;font-family:inherit">Rookie Draft</button>
+        <button onclick="_mockMode='startup';document.querySelectorAll('.mock-mode-btn').forEach(b=>{b.style.background='transparent';b.style.color='var(--text3)';b.style.borderColor='var(--border)'});this.style.background='var(--accent)';this.style.color='var(--bg1)';this.style.borderColor='var(--accent)'" class="mock-mode-btn" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:${_mockMode==='startup'?'var(--accent)':'transparent'};color:${_mockMode==='startup'?'var(--bg1)':'var(--text3)'};border:1px solid ${_mockMode==='startup'?'var(--accent)':'var(--border)'};border-radius:8px;cursor:pointer;font-family:inherit">Startup Draft</button>
+      </div>
+      <button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
   }
 }
 window.onDraftTabOpen=onDraftTabOpen;
