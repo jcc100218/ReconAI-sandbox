@@ -94,19 +94,26 @@ function _mflUrl(year, type, leagueId, apiKey, extra) {
   return url;
 }
 
-async function _mflGet(url) {
-  // MFL API doesn't support CORS from GitHub Pages — always use proxy
-  // Try allorigins /get endpoint (wraps response in JSON with CORS headers)
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const proxyRes = await fetch(proxyUrl);
-    if (proxyRes.ok) {
-      const wrapper = await proxyRes.json();
-      if (wrapper.contents) return JSON.parse(wrapper.contents);
-    }
-  } catch (_e) { /* fall through to direct attempt */ }
+// CORS proxy chain — MFL API only allows its own origin
+const _CORS_PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+];
 
-  // Fallback: direct fetch (works when not on GitHub Pages, e.g. localhost)
+async function _mflGet(url) {
+  // Try each CORS proxy in order
+  for (const makeProxy of _CORS_PROXIES) {
+    try {
+      const proxyUrl = makeProxy(url);
+      const res = await fetch(proxyUrl);
+      if (res.ok) {
+        const text = await res.text();
+        try { return JSON.parse(text); } catch (_e) { continue; }
+      }
+    } catch (_e) { /* try next proxy */ }
+  }
+
+  // Fallback: direct fetch (works on localhost or if MFL fixes CORS)
   try {
     const res = await fetch(url);
     if (!res.ok) {
@@ -116,8 +123,8 @@ async function _mflGet(url) {
       throw new Error('MFL API error ' + res.status + '. Check your League ID and year.');
     }
     return res.json();
-  } catch (directErr) {
-    throw new Error('Could not connect to MFL. The API may be temporarily unavailable. Try again in a moment.');
+  } catch (_directErr) {
+    throw new Error('Could not connect to MFL. Try refreshing the page or check your League ID.');
   }
 }
 
