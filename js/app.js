@@ -7,7 +7,8 @@
 window.App = window.App || {};
 
 // ── Dev Mode ────────────────────────────────────────────────────
-const DEV_MODE = new URLSearchParams(window.location.search).has('dev') || window.location.hostname.includes('sandbox');
+const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const DEV_MODE = new URLSearchParams(window.location.search).has('dev') || window.location.hostname.includes('sandbox') || IS_LOCAL;
 window.App.DEV_MODE = DEV_MODE;
 window.DEV_MODE = DEV_MODE;
 if(DEV_MODE){
@@ -16,7 +17,7 @@ if(DEV_MODE){
   document.addEventListener('DOMContentLoaded',()=>{
     const b=document.createElement('div');
     b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#f59e0b;color:#000;font-size:13px;font-weight:700;text-align:center;padding:3px;letter-spacing:.05em;font-family:monospace';
-    b.textContent='⚡ SANDBOX — changes here do not affect production';
+    b.textContent = IS_LOCAL ? '⚡ LOCAL DEV — bigloco auto-logged in, all features unlocked' : '⚡ SANDBOX — changes here do not affect production';
     document.body.prepend(b);
   });
 }
@@ -1696,6 +1697,10 @@ window.loadRegistryLeague = loadRegistryLeague;
 // ── Boot: Restore API key + auto-connect ───────────────────────
 (function restoreApiKey(){
   try{
+    // ── Localhost auto-login: always seed 'bigloco' so auto-connect fires ──
+    if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+      localStorage.setItem('dynastyhq_username', 'bigloco');
+    }
     // Check for Fantasy Wars email session or profile for Sleeper username
     try {
       if (!DhqStorage.getStr(STORAGE_KEYS.USERNAME)) {
