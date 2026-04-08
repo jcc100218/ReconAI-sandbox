@@ -46,6 +46,8 @@ async function loadLeague(leagueId,userId){
     sf(`/league/${leagueId}/matchups/${week}`).catch(()=>[]),
     sf(`/league/${leagueId}/transactions/${week}`).catch(()=>[]),
   ]);
+  // Clear league-scoped data from previous league (prevents stale stats bleeding)
+  S.playerStats={};S.posRanks={};S.matchups={};S.transactions={};
   S.rosters=rosters||[];S.leagueUsers=users||[];S.tradedPicks=tradedPicks||[];
   S.drafts=drafts||[];S.bracket={w:bracketW||[],l:bracketL||[]};
   S.matchups['w'+week]=matchups||[];
