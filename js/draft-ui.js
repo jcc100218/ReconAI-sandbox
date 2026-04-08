@@ -845,14 +845,35 @@ function startMockDraft(mode){
       .sort((a,b)=>b.val-a.val);
   }
 
-  // Build pick order with traded pick awareness (snake draft)
+  // Build pick order using real Sleeper draft_order when available
   const pickOrder=[];
-  const rosterOrder=[...S.rosters].sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0));
   const year=$('draft-year-sel')?.value||'2026';
   const tradedPicks=S.tradedPicks||[];
 
+  // Get real draft order from Sleeper drafts API
+  const drafts=S.drafts||[];
+  const upcomingDraft=drafts.find(d=>d.status==='pre_draft')||drafts[0];
+  const sleeperDraftOrder=upcomingDraft?.draft_order||{};
+  const draftType=upcomingDraft?.type||'snake';
+
+  let rosterOrder;
+  if(Object.keys(sleeperDraftOrder).length>0){
+    // Use actual Sleeper draft order (user_id → slot)
+    const slotMap=[];
+    Object.entries(sleeperDraftOrder).forEach(([uid,slot])=>{
+      const roster=S.rosters.find(r=>r.owner_id===uid);
+      if(roster)slotMap.push({slot,roster});
+    });
+    slotMap.sort((a,b)=>a.slot-b.slot);
+    rosterOrder=slotMap.map(s=>s.roster);
+  }else{
+    // Fallback: reverse standings (worst record picks first)
+    rosterOrder=[...S.rosters].sort((a,b)=>(a.settings?.wins||0)-(b.settings?.wins||0));
+  }
+
   for(let rd=1;rd<=draftRounds;rd++){
-    const order=rd%2===1?[...rosterOrder]:[...rosterOrder].reverse();
+    const isReversed=draftType==='snake'&&rd%2===0;
+    const order=isReversed?[...rosterOrder].reverse():[...rosterOrder];
     order.forEach((r,i)=>{
       // Check if this pick was traded
       const traded=tradedPicks.find(tp=>tp.round===rd&&tp.previous_owner_id===r.roster_id&&String(tp.season)===year);
