@@ -631,6 +631,11 @@ function renderTopProspects(){
   const assess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
   const needPositions = (assess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
 
+  // Strategy context
+  const strat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+  const draftStyle = strat.draftStyle || 'bpa';
+  const targetPos = strat.targetPositions || [];
+
   // Find rookies by source=FC_ROOKIE, sorted by DHQ value
   let allRookies = Object.entries(LI.playerMeta)
     .filter(([pid,m]) => m.source === 'FC_ROOKIE' && (LI.playerScores?.[pid] || 0) > 0)
@@ -712,25 +717,72 @@ function renderTopProspects(){
     </div>`;
   };
 
-  // Helper: grid card (48px photo)
+  // Helper: grid card (48px photo) with strategy alignment
   const gridCard = (r) => {
-    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:8px;cursor:pointer;transition:border-color .15s" onclick="openPlayerModal('${r.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='var(--border)'">
+    const isStratTarget = targetPos.includes(r.pos);
+    const isNeedFit = needPositions.includes(r.pos);
+    const badgeHtml = isStratTarget
+      ? '<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:5px;background:rgba(212,175,55,.18);color:var(--accent);letter-spacing:.03em">TARGET</span>'
+      : isNeedFit
+      ? '<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:5px;background:rgba(52,211,153,.12);color:var(--green);letter-spacing:.03em">NEED</span>'
+      : '';
+    const borderColor = isStratTarget ? 'rgba(212,175,55,.4)' : isNeedFit ? 'rgba(52,211,153,.3)' : 'var(--border)';
+    return `<div style="background:var(--bg2);border:1px solid ${borderColor};border-radius:var(--r);padding:8px;cursor:pointer;transition:border-color .15s" onclick="openPlayerModal('${r.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.55)'" onmouseout="this.style.borderColor='${borderColor}'">
       <div style="display:flex;align-items:center;gap:8px">
         <img src="https://sleepercdn.com/content/nfl/players/thumb/${r.pid}.jpg" onerror="this.style.display='none'" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg4)" loading="lazy"/>
         <div style="min-width:0;overflow:hidden;flex:1">
           <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.name)}</div>
           <div style="font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(r.college || r.team || '')}</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+          <div style="display:flex;align-items:center;gap:5px;margin-top:3px;flex-wrap:wrap">
             <span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px;background:rgba(212,175,55,.1);color:var(--accent)">${r.pos}</span>
             <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${r.val.toLocaleString()}</span>
+            ${badgeHtml}
           </div>
         </div>
       </div>
     </div>`;
   };
 
-  // Build HTML
+  // Build HTML — Alex Pick card first
   let html = '';
+
+  // ALEX'S PICK — decisive recommendation
+  const alexPick = draftStyle === 'need'
+    ? (allRookies.find(r => needPositions.includes(r.pos)) || bestFit)
+    : draftStyle === 'mix'
+    ? (allRookies.find(r => needPositions.includes(r.pos) || targetPos.includes(r.pos)) || bestAvail)
+    : bestAvail;
+
+  const alexPickNeedFit = needPositions.includes(alexPick.pos);
+  const alexPickTargetFit = targetPos.includes(alexPick.pos);
+  const alexWhyParts = [];
+  if(alexPickNeedFit) alexWhyParts.push('Fills your biggest '+alexPick.pos+' gap');
+  else if(alexPickTargetFit) alexWhyParts.push('Hits your target position');
+  else alexWhyParts.push('#1 overall value at '+alexPick.val.toLocaleString()+' DHQ');
+  if(alexPick.val>=5000) alexWhyParts.push('Elite dynasty upside');
+  else if(alexPick.val>=3000) alexWhyParts.push('Strong dynasty value');
+  const alexWhy = alexWhyParts.slice(0,2).join('. ');
+  const alexPickLabel = draftStyle==='bpa'?'Best Player Available':draftStyle==='need'?'Best Fit for Your Needs':'Alex\'s Pick';
+
+  html += `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:14px;margin-bottom:14px;cursor:pointer" onclick="openPlayerModal('${alexPick.pid}')">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Alex says</span>
+      <span style="font-size:10px;color:var(--text3)">·</span>
+      <span style="font-size:10px;color:var(--text3);font-weight:600">${escHtml(alexPickLabel)}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="https://sleepercdn.com/content/nfl/players/thumb/${alexPick.pid}.jpg" onerror="this.style.display='none'" style="width:56px;height:56px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--bg4)" loading="lazy"/>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1.1">Take ${escHtml(alexPick.name)}.</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.4">${escHtml(alexWhy)}. Don't overthink it.</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(212,175,55,.15);color:var(--accent)">${alexPick.pos}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${alexPick.val.toLocaleString()}</span>
+          ${alexPickNeedFit||alexPickTargetFit?'<span style="font-size:9px;font-weight:700;color:var(--green);padding:1px 5px;border:1px solid rgba(52,211,153,.3);border-radius:6px">ALIGNED</span>':''}
+        </div>
+      </div>
+    </div>
+  </div>`;
 
   // ON THE CLOCK hero
   if (nextRound) {

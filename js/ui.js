@@ -727,6 +727,12 @@ function renderWaiverTop5() {
     return;
   }
 
+  // Strategy context for alignment badges
+  const _wStrat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+  const _wTargetPos = _wStrat.targetPositions || [];
+  const _wMyAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
+  const _wNeedPos = (_wMyAssess?.needs || []).map(n => typeof n === 'string' ? n : n.pos).filter(Boolean);
+
   // Render cards
   const rows = top5.map(({ id, p, val }) => {
     const stats = S.playerStats?.[id] || {};
@@ -736,6 +742,13 @@ function renderWaiverTop5() {
     const raw = stats?.prevRawStats;
     const ppg = isIDP && raw ? +(calcIDPScore(raw, sc) / Math.max(1, raw.gp || 17)).toFixed(1) : (stats.seasonAvg || stats.prevAvg || 0);
     const initials = ((p.first_name || '?')[0] + (p.last_name || '?')[0]).toUpperCase();
+    const isNeed = _wNeedPos[0] === mPos;
+    const isTarget = _wTargetPos.includes(mPos);
+    const alignBadge = isTarget
+      ? '<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:5px;background:rgba(212,175,55,.15);color:var(--accent)">TARGET</span>'
+      : isNeed
+      ? '<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:5px;background:rgba(52,211,153,.12);color:var(--green)">NEED</span>'
+      : '';
 
     return `<div class="wv-avail-card" onclick="openPlayerModal('${id}')">
       <img class="rr-photo" src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span class=rr-initials style=width:32px;height:32px;font-size:13px>${initials}</span>')" loading="lazy"/>
@@ -743,6 +756,7 @@ function renderWaiverTop5() {
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${pName(id)}</span>
           <span class="rr-pos" style="${getPosBadgeStyle(p.position)}">${mPos}</span>
+          ${alignBadge}
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:2px;font-size:13px;color:var(--text3)">
           <span>${p.team || 'FA'} · ${p.age || '?'}</span>
@@ -762,14 +776,19 @@ function renderTopPickupHero(){
   const el=$('wv-top-pickup');if(!el)return;
   if(!LI_LOADED||!S.rosters?.length){el.innerHTML='';return;}
   const avail=getAvailablePlayers();
-  if(!avail.length){el.innerHTML='';return;}
+
+  // Strategy context for FAAB scaling
+  const strat=window.GMStrategy?.getStrategy?window.GMStrategy.getStrategy():{};
+  const aggression=strat.aggression||'medium';
+  const aggrMult=aggression==='high'?1.4:aggression==='low'?0.7:1.0;
+  const targetPositions=strat.targetPositions||[];
 
   const assess=typeof assessTeamFromGlobal==='function'?assessTeamFromGlobal(S.myRosterId):null;
   const faab=getFAAB();
   const faabMarket=LI_LOADED&&LI.faabByPos?LI.faabByPos:{};
   const posMapF=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 
-  // Find best pickup — prefer needs, then highest value (floor scales with league size)
+  // Find best pickup — prefer needs then target positions, then highest value (floor scales with league size)
   const _heroFloorTeams=S.rosters?.length||12;
   const _heroFloor=_heroFloorTeams>=14?1800:_heroFloorTeams>=12?1500:_heroFloorTeams>=10?1200:800;
   const qualAvail=avail.filter(a=>a.val>=_heroFloor);
@@ -778,8 +797,13 @@ function renderTopPickupHero(){
     const need=assess.needs[0];
     best=qualAvail.find(a=>posMapF(a.p.position)===need.pos);
   }
-  if(!best)best=qualAvail[0];
-  if(!best){el.innerHTML='';return;}
+  // Also try target positions if no need match
+  if(!best&&targetPositions.length){
+    best=qualAvail.find(a=>targetPositions.includes(posMapF(a.p.position)));
+  }
+  // Final fallback: highest value or first available regardless of floor
+  if(!best)best=qualAvail[0]||avail[0];
+  if(!best){el.innerHTML='<div style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);font-size:13px;color:var(--text3);text-align:center">No waiver recommendations yet — connect your league to see options.</div>';return;}
 
   const p=best.p;const pid=best.id;const pos=posMapF(p.position);
   const val=best.val;
@@ -788,41 +812,49 @@ function renderTopPickupHero(){
   const pk=peakYears(pid);
   const meta=LI.playerMeta?.[pid];
   const peakYrs=meta?.peakYrsLeft||0;
+  const isNeedFit=assess?.needs?.length&&posMapF(p.position)===assess.needs[0].pos;
+  const isTargetFit=targetPositions.includes(pos);
 
-  // FAAB calc
+  // FAAB calc (scaled by aggression setting)
   const market=faabMarket[pos];
-  let faabStr='';let bidAmt=0;
+  let bidAmt=0;
   if(market&&market.count>=3&&faab.budget>0&&faab.isFAAB){
     const floor=faab.minBid||1;
-    bidAmt=Math.max(floor,Math.min(Math.round(faab.remaining*0.12),Math.round(market.avg*(val/4000))));
-    const lo=Math.max(floor,Math.round(bidAmt*0.7));
-    const hi=Math.min(faab.remaining,Math.round(bidAmt*1.3));
-    faabStr=`$${lo}–$${hi}`;
+    const raw=Math.round(faab.remaining*0.12)*aggrMult;
+    bidAmt=Math.max(floor,Math.min(Math.round(raw),Math.round(market.avg*(val/4000)*aggrMult),faab.remaining));
+  }else if(faab.budget>0&&faab.isFAAB&&val>0){
+    const floor=faab.minBid||1;
+    bidAmt=Math.max(floor,Math.min(Math.round(faab.remaining*0.10*aggrMult),Math.round(val/200*aggrMult),faab.remaining));
   }
 
-  // Reasons
-  const reasons=[];
-  if(assess?.needs?.length&&posMapF(p.position)===assess.needs[0].pos){
-    reasons.push('Fills your biggest '+pos+' gap');
-  }
-  if(ppg)reasons.push(ppg.toFixed(1)+' PPG last season');
-  if(peakYrs>=3)reasons.push(peakYrs+'-year peak window');
-  if(val>=4000)reasons.push('Strong dynasty value ('+val.toLocaleString()+' DHQ)');
-  else if(val>=2000)reasons.push(val.toLocaleString()+' DHQ');
+  // Alex Says headline
+  const alexHeadline=bidAmt
+    ?`Bid $${bidAmt} on ${pName(pid)}.`
+    :`Add ${pName(pid)}.`;
+  const alexWhy=isNeedFit
+    ?`Fills your ${pos} gap.`
+    :isTargetFit
+    ?`Hits your ${pos} target.`
+    :ppg
+    ?`${ppg.toFixed(1)} PPG last season.`
+    :`${val.toLocaleString()} DHQ value available.`;
 
-  const ctaLabel=bidAmt?'View in Waivers · ~$'+bidAmt:'View in Waivers →';
+  const urgencyColor=aggression==='high'?'var(--red)':aggression==='low'?'var(--text3)':'var(--amber)';
+  const urgencyLabel=aggression==='high'?'Act now':aggression==='low'?'Worth a look':'This week';
 
   el.innerHTML=`
     <div class="wv-hero" onclick="openPlayerModal('${pid}')">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em">Top Pickup</span>
-        ${_strategyContextLine()||''}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Alex says</span>
+        <span style="font-size:10px;color:var(--text3)">·</span>
+        <span style="font-size:10px;font-weight:700;color:${urgencyColor}">${urgencyLabel}</span>
+        ${isNeedFit||isTargetFit?'<span style="font-size:9px;font-weight:700;color:var(--green);padding:1px 5px;border:1px solid rgba(52,211,153,.3);border-radius:6px;margin-left:auto">ALIGNED</span>':''}
       </div>
-      <div class="wv-hero-title">${pName(pid)}</div>
+      <div class="wv-hero-title" style="font-size:20px;font-weight:800;letter-spacing:-.02em;line-height:1.2">${alexHeadline} <span style="color:var(--text3);font-weight:500;font-size:16px">${alexWhy}</span></div>
       <div class="wv-hero-sub">${pos} · ${fullTeam(p.team)||p.team||'FA'} · Age ${p.age||'?'} · ${pk.label}</div>
-      <ul class="wv-hero-reasons">${reasons.map(r=>'<li>'+r+'</li>').join('')}</ul>
+      ${bidAmt?`<div style="margin:8px 0;font-size:13px;color:var(--text2)"><strong style="color:var(--accent)">Suggested bid: $${bidAmt}</strong>${aggression==='high'?' — aggressive budget':''}${aggression==='low'?' — conservative':''}. ${faab.remaining?'You have $'+faab.remaining+' remaining.':''}</div>`:''}
       <div class="wv-hero-actions">
-        <button class="wv-hero-cta" onclick="event.stopPropagation();mobileTab('waivers')">${ctaLabel}</button>
+        <button class="wv-hero-cta" onclick="event.stopPropagation();mobileTab('waivers')">${bidAmt?'View · ~$'+bidAmt:'View in Waivers →'}</button>
         <button class="pm-action-btn" onclick="event.stopPropagation();openPlayerModal('${pid}')" style="flex:0 0 auto;padding:12px 16px">Details</button>
       </div>
     </div>`;

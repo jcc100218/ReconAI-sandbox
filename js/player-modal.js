@@ -77,27 +77,64 @@ function openPlayerModal(playerId){
   $('pm-name').innerHTML=`${pName(playerId)} ${onMyTeam?'<span style="font-size:13px;color:var(--green);font-weight:600">✓ roster</span>':''}`;
   $('pm-bio').innerHTML=`${pos} · ${fullTeam(p.team)} · Age ${age} · ${exp}yr exp${p.college?' · '+p.college:''}`;
 
-  // Recon Verdict
+  // Alex Says — strategy-aware verdict at top of every player card
   const verdictEl=$('pm-verdict');
   if(verdictEl){
     const meta2=LI_LOADED?LI.playerMeta?.[playerId]:null;
-    const vd=_reconVerdict(playerId,val,pos,age,meta2);
-    if(vd){
-      // Generate explanation
-      const peakYrsLeft2=meta2?.peakYrsLeft||0;
-      const trend2=meta2?.trend||0;
-      let vdText='';
-      if(vd.label==='Build Around')vdText='Core dynasty asset. Long runway, elite production.';
-      else if(vd.label==='Buy')vdText='Ascending value with peak years ahead. Acquire now.';
-      else if(vd.label==='Hold')vdText=peakYrsLeft2>=3?'In prime with '+peakYrsLeft2+' peak years left. Reliable starter.':'Producing well. Hold unless you get an overpay.';
-      else if(vd.label==='Sell High')vdText='Still productive but window closing. Maximize return now.';
-      else if(vd.label==='Sell')vdText='Past peak with declining trajectory. Move while value remains.';
-      else if(vd.label==='Stash')vdText=meta2?.source==='FC_ROOKIE'?'Incoming rookie. Monitor landing spot and opportunity.':'Low cost with upside. Worth a roster spot to develop.';
-      verdictEl.innerHTML=`<div class="pm-verdict-banner" style="background:${vd.bg}">
-        <span class="pm-verdict-label" style="color:${vd.col};background:${vd.bg};border:1px solid ${vd.col}">${vd.label}</span>
-        <span style="color:${vd.col};font-weight:500">${vdText}</span>
-      </div>`;
-    } else verdictEl.innerHTML='';
+    const pa2=typeof getPlayerAction==='function'?getPlayerAction(playerId):{label:'Hold',col:'var(--accent)',reason:''};
+
+    // Strategy context: check untouchables, target positions, sell positions
+    const strat=window.GMStrategy?.getStrategy?window.GMStrategy.getStrategy():{};
+    let stratLabel=pa2.label;
+    let stratReason=pa2.reason||'';
+    let stratCol=pa2.col||'var(--accent)';
+
+    if((strat.untouchables||[]).includes(String(playerId))){
+      stratLabel='HOLD';stratReason='Marked as untouchable in your strategy.';stratCol='var(--green)';
+    } else if((strat.blockList||[]).includes(String(playerId))){
+      stratLabel='SKIP';stratReason='On your block list. Pass on this player.';stratCol='var(--text3)';
+    } else if((strat.targetList||[]).includes(String(playerId))){
+      stratLabel='BUY';stratReason='On your personal target list. Prioritize acquisition.';stratCol='var(--accent)';
+    } else if((strat.targetPositions||[]).includes(pos)){
+      stratLabel=pa2.label==='Sell'||pa2.label==='Sell High'?pa2.label:'BUY';
+      stratReason=pa2.label==='Sell'||pa2.label==='Sell High'?stratReason:'This '+pos+' fits your strategy. '+(pa2.reason||'');
+    } else if((strat.sellPositions||[]).includes(pos)){
+      stratLabel=pa2.label==='Buy'||pa2.label==='Build Around'?pa2.label:'SELL';
+      stratReason=pa2.label==='Buy'||pa2.label==='Build Around'?stratReason:'Your strategy flags '+pos+' as a sell position. '+(pa2.reason||'');
+      if(stratLabel==='SELL')stratCol='var(--red)';
+    }
+
+    // Check sell rules (sell above age threshold)
+    const sellRule=(strat.sellRules||[]).find(r=>r.pos===pos&&(age||0)>=r.ageAbove);
+    if(sellRule&&stratLabel!=='SKIP'){
+      stratLabel='SELL HIGH';stratReason='Age '+age+' triggers your sell rule for '+pos+'. Trade while value holds.';stratCol='var(--amber)';
+    }
+
+    // Alignment badge
+    const alignResult=window.GMStrategy?.checkAlignment?window.GMStrategy.checkAlignment({type:'trade',direction:onMyTeam?'sell':'acquire',position:pos,playerId:String(playerId),playerAge:age}):{alignment:'partial'};
+    const alignColor=alignResult.alignment==='aligned'?'var(--green)':alignResult.alignment==='conflicts'?'var(--red)':'var(--text3)';
+    const alignLabel=alignResult.alignment==='aligned'?'Strategy Aligned':alignResult.alignment==='conflicts'?'Conflicts Strategy':'Neutral';
+
+    // Rationale line (one sharp sentence)
+    const peakYrsLeft2=meta2?.peakYrsLeft||0;
+    if(!stratReason){
+      if(stratLabel==='Build Around')stratReason='Core dynasty asset. Long runway, elite production.';
+      else if(stratLabel==='BUY'||stratLabel==='Buy')stratReason=peakYrsLeft2>=3?peakYrsLeft2+' peak years ahead. Acquire now.':'Ascending value. Acquire before price rises.';
+      else if(stratLabel==='HOLD'||stratLabel==='Hold')stratReason=peakYrsLeft2>=3?'In prime with '+peakYrsLeft2+' peak years left. Reliable.':'Producing well. Hold unless you get an overpay.';
+      else if(stratLabel==='SELL HIGH'||stratLabel==='Sell High')stratReason='Window closing. Maximize return now.';
+      else if(stratLabel==='SELL'||stratLabel==='Sell')stratReason='Past peak. Move while value remains.';
+      else if(stratLabel==='Stash')stratReason=meta2?.source==='FC_ROOKIE'?'Incoming rookie. Monitor landing spot.':'Low cost upside. Worth a roster spot.';
+    }
+
+    verdictEl.style.display='block';
+    verdictEl.innerHTML=`<div style="background:rgba(212,175,55,.07);border:1px solid rgba(212,175,55,.2);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+        <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Alex says</span>
+        <span style="font-size:16px;font-weight:800;color:${stratCol};letter-spacing:-.01em">${escHtml(stratLabel)}</span>
+        <span style="margin-left:auto;font-size:9px;font-weight:700;color:${alignColor};padding:1px 6px;border:1px solid ${alignColor};border-radius:8px;opacity:.85">${alignLabel}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.45">${escHtml(stratReason)}</div>
+    </div>`;
   }
   // IDP data
   const isIDPModal=['DL','LB','DB'].includes(pos);

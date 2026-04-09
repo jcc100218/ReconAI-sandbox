@@ -729,6 +729,38 @@ window.renderFieldLogPanel = renderFieldLogPanel;
 // LEAGUE PANEL
 // ════════════════════════════════════════════════════════════════
 
+// ── Exploit Targets section (GMEngine-powered) ────────────────
+function _renderExploitTargets() {
+  const eng = window.GMEngine;
+  if (!eng) return '';
+  const opps = eng.generateOpportunities();
+  if (!opps.length || !opps[0].rosterId) return '';
+  const ownerProfiles = window.App?.LI?.ownerProfiles || {};
+  return `<div style="margin-bottom:16px">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      EXPLOIT TARGETS <span style="height:1px;flex:1;background:rgba(212,175,55,.2);display:inline-block;margin-left:4px"></span>
+    </div>
+    ${opps.slice(0, 3).map((o, i) => {
+      const isTop = i === 0;
+      const dna = ownerProfiles[o.rosterId]?.dna || '';
+      const border = isTop ? 'rgba(212,175,55,.6)' : 'var(--border)';
+      const glow = isTop ? ';box-shadow:0 0 12px rgba(212,175,55,.10)' : '';
+      return `<div style="padding:11px 14px;background:var(--bg2);border:1px solid ${border};border-radius:var(--r);margin-bottom:6px;display:flex;align-items:center;gap:10px${glow}">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+            ${isTop ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 5px;border:1px solid rgba(212,175,55,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">#1 TARGET</span>' : ''}
+            <span style="font-size:14px;font-weight:700;color:var(--text)">${_esc(o.ownerName)}</span>
+            ${dna ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dna)}</span>` : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.4">${_esc(o.insight)}</div>
+          ${o.exploitScore >= 75 ? '<div style="font-size:11px;color:var(--green);margin-top:3px;font-weight:600">High priority</div>' : ''}
+        </div>
+        <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify('What trades can I build with ' + o.ownerName + '?')})" style="flex-shrink:0;padding:7px 12px;font-size:12px;font-weight:700;background:${isTop ? 'var(--accent)' : 'var(--accentL)'};color:${isTop ? 'var(--bg1)' : 'var(--accent)'};border:none;border-radius:8px;cursor:pointer;font-family:inherit">Attack</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
 function renderLeaguePanel() {
   const container = document.getElementById('panel-league-content');
   if (!container) return;
@@ -746,7 +778,31 @@ function renderLeaguePanel() {
   const myR_ = (S.rosters || []).find(r => r.roster_id === myId);
   const myWins = myR_?.settings?.wins || 0;
 
-  // Sort by health score if available, otherwise by wins
+  // Build exploitability score map from GMEngine (if available)
+  const eng = window.GMEngine;
+  const exploitMap = {};
+  if (eng) {
+    const myAssess = typeof window.assessTeamFromGlobal === 'function' ? window.assessTeamFromGlobal(myId) : null;
+    const myStrengths = (myAssess?.strengths || []).map(s => typeof s === 'string' ? s : s?.pos).filter(Boolean);
+    const myNeeds = (myAssess?.needs || []).map(n => typeof n === 'string' ? n : n.pos).filter(Boolean);
+    const ownerProfilesMap = window.App?.LI?.ownerProfiles || {};
+    const assessFn2 = typeof window.assessTeamFromGlobal === 'function' ? window.assessTeamFromGlobal : null;
+    (S.rosters || []).forEach(r => {
+      if (r.roster_id === myId) { exploitMap[r.roster_id] = -1; return; }
+      const profile = ownerProfilesMap[r.roster_id] || {};
+      const theirAssess = assessFn2 ? assessFn2(r.roster_id) : null;
+      const theirNeeds = theirAssess ? (theirAssess.needs || []).map(n => typeof n === 'string' ? n : n.pos).filter(Boolean) : [];
+      const theirStrengths = theirAssess ? (theirAssess.strengths || []).map(s => typeof s === 'string' ? s : s?.pos).filter(Boolean) : [];
+      const willingness = profile.dna?.includes('Active') ? 1.0 : profile.dna?.includes('Win-now') ? 0.85 : profile.dna?.includes('Rebuilder') ? 0.75 : profile.dna?.includes('Holds firm') ? 0.2 : 0.5;
+      let score = willingness * 50;
+      if (theirNeeds.some(p => myStrengths.includes(p))) score += 25;
+      if (myNeeds.some(p => theirStrengths.includes(p))) score += 25;
+      if ((theirAssess?.healthScore || 50) < 60) score += 10;
+      exploitMap[r.roster_id] = score;
+    });
+  }
+
+  // Sort by exploitability (opponents first by score, own team last)
   const assessFn = typeof window.assessTeamFromGlobal === 'function' ? window.assessTeamFromGlobal : null;
   const ownerProfiles = window.App?.LI?.ownerProfiles || {};
 
@@ -758,6 +814,16 @@ function renderLeaguePanel() {
   });
 
   enriched.sort((a, b) => {
+    const isMe_a = a.roster.roster_id === myId;
+    const isMe_b = b.roster.roster_id === myId;
+    if (isMe_a) return 1;
+    if (isMe_b) return -1;
+    // Sort opponents by exploitability if available
+    if (Object.keys(exploitMap).length) {
+      const ea = exploitMap[a.roster.roster_id] || 0;
+      const eb = exploitMap[b.roster.roster_id] || 0;
+      if (eb !== ea) return eb - ea;
+    }
     const ha = a.assess?.healthScore || 0;
     const hb = b.assess?.healthScore || 0;
     if (hb !== ha) return hb - ha;
@@ -768,7 +834,8 @@ function renderLeaguePanel() {
   const hasDivisions = enriched.some(t => t.roster?.settings?.division > 0);
 
   const isLargeLeague = enriched.length > 24;
-  let html = '';
+  let html = _renderExploitTargets();
+  html += `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">ALL TEAMS <span style="height:1px;flex:1;background:var(--border);display:inline-block;margin-left:4px"></span></div>`;
   if (isLargeLeague) {
     html += `<div style="margin-bottom:10px"><input type="text" id="league-search" placeholder="Search ${enriched.length} teams..." oninput="filterLeagueCards(this.value)" style="width:100%;padding:10px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;outline:none"></div>`;
   }
@@ -825,6 +892,10 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     const needs = (assess?.needs || []).slice(0, 2).map(n => typeof n === 'string' ? n : n.pos).join(', ');
 
     // Build top players for this roster — show up to 8, sorted by DHQ (show all if no DHQ data)
+    // Strategy target positions for alignment highlights
+    const _strat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+    const _stratTargetPos = _strat.targetPositions || [];
+
     const rosterPlayers = (roster.players || [])
       .map(pid => ({ pid, name: window.pName?.(pid) || pid, val: window.App?.LI?.playerScores?.[pid] || 0, pos: window.pPos?.(pid) || '?' }))
       .sort((a, b) => b.val - a.val)
@@ -899,14 +970,16 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     </div>
     <div class="league-dossier" id="dossier-${rid}" style="display:none;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-top:-7px;margin-bottom:6px">
       <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">SCOUTING REPORT</div>
-      ${rosterPlayers.length ? `<div style="margin-bottom:8px">${rosterPlayers.map(p =>
-        `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;border-radius:6px;transition:background .15s" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='transparent'">
+      ${rosterPlayers.length ? `<div style="margin-bottom:8px">${rosterPlayers.map(p => {
+        const isTarget = !isMe && _stratTargetPos.includes(p.pos);
+        return `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:12px;border-radius:6px;transition:background .15s${isTarget ? ';background:rgba(212,175,55,.06)' : ''}" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='${isTarget ? 'rgba(212,175,55,.06)' : 'transparent'}'">
           <span onclick="event.stopPropagation();openPlayerModal('${p.pid}')" style="color:var(--text);font-weight:600;flex:1;cursor:pointer">${_esc(p.name)}</span>
           <span style="color:var(--accent);font-size:10px;font-weight:700">${p.pos}</span>
+          ${isTarget ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 4px;border:1px solid rgba(212,175,55,.4);border-radius:6px;letter-spacing:.03em">TARGET</span>' : ''}
           <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">${p.val > 0 ? p.val.toLocaleString() : '—'}</span>
           ${!isMe ? `<button onclick="event.stopPropagation();openTradeBuilderForOpponentPlayer('${p.pid}','${rid}')" style="font-size:10px;font-weight:700;color:var(--accent);background:var(--accentL);border:none;border-radius:5px;padding:2px 6px;cursor:pointer;font-family:inherit;flex-shrink:0">Trade</button>` : ''}
-        </div>`
-      ).join('')}</div>` : ''}
+        </div>`;
+      }).join('')}</div>` : ''}
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
         ${strengthList ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(52,211,153,.1);color:var(--green)">Strong: ${_esc(strengthList)}</span>` : ''}
         ${needs ? `<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:rgba(248,113,113,.1);color:var(--red)">Weak: ${_esc(needs)}</span>` : ''}
