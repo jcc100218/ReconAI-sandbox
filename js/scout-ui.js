@@ -263,20 +263,28 @@ function renderTeamBarRoster() {
     return;
   }
 
-  // Group by normalized position
-  const groups = { QB: [], RB: [], WR: [], TE: [], IDP: [] };
+  // Group by normalized position in display order
+  const POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
+  const groups = { QB: [], RB: [], WR: [], TE: [], K: [], DL: [], LB: [], DB: [] };
   myRoster.players.forEach(pid => {
     const rawPos = typeof pPos === 'function' ? pPos(pid) : '';
-    const norm = ['QB','RB','WR','TE'].includes(rawPos) ? rawPos
-      : ['DL','LB','DB','DE','DT','CB','S','SS','FS','EDGE','IDL'].includes(rawPos) ? 'IDP'
-      : null;
+    let norm;
+    if (['QB','RB','WR','TE','K'].includes(rawPos)) norm = rawPos;
+    else if (['DE','DT','EDGE','IDL'].includes(rawPos)) norm = 'DL';
+    else if (['CB','S','SS','FS'].includes(rawPos)) norm = 'DB';
+    else if (['DL','LB','DB'].includes(rawPos)) norm = rawPos;
     if (norm) groups[norm].push(pid);
   });
+
+  // Sort each position group by DHQ descending
+  const _dhqVal = pid => typeof dynastyValue === 'function' ? dynastyValue(pid) : 0;
+  POS_ORDER.forEach(pos => groups[pos].sort((a, b) => _dhqVal(b) - _dhqVal(a)));
 
   const weeksDone = Math.max(1, (S.currentWeek || 1) - 1);
 
   let html = '';
-  Object.entries(groups).forEach(([pos, players]) => {
+  POS_ORDER.forEach(pos => {
+    const players = groups[pos];
     if (!players.length) return;
     html += `<div class="tbar-pos-group"><div class="tbar-pos-label">${pos}</div>`;
     players.forEach(pid => {
@@ -1193,6 +1201,7 @@ function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
           return badges.length ? '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + badges.join('') + '</div>' : '';
         })()}
       </div>
+      ${!isMe ? `<button onclick="event.stopPropagation();openTradeBuilder(${rid})" style="font-size:11px;font-weight:700;color:var(--accent);background:var(--accentL);border:1px solid rgba(212,175,55,.25);border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit;flex-shrink:0;white-space:nowrap">Build Trade</button>` : ''}
       <div class="league-card-chevron"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
     <div class="league-dossier" id="dossier-${rid}" style="display:none;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:0 0 var(--r) var(--r);margin-top:-7px;margin-bottom:6px">

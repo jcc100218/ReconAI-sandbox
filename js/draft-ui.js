@@ -1202,9 +1202,12 @@ function renderMockDraftUI(){
         const isNeed=myNeeds.includes(p.pos);
         const pTag=window._playerTags?.[p.pid]||'';
         const tagBorder=pTag==='trade'?'rgba(251,191,36,.4)':pTag==='untouchable'?'rgba(52,211,153,.4)':pTag==='cut'?'rgba(248,113,113,.4)':'';
-        return `<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:${isNeed?'rgba(212,175,55,.04)':'var(--bg3)'};border:1px solid ${tagBorder||isNeed?'rgba(212,175,55,.2)':'var(--border)'};border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='${tagBorder||isNeed?'rgba(212,175,55,.2)':'var(--border)'}'" >
+        const borderColor=tagBorder||(isNeed?'rgba(212,175,55,.2)':'var(--border)');
+        // Skip csv_ PIDs for player modal (no Sleeper data)
+        const canModal=!p.pid.startsWith('csv_');
+        return `<div style="display:flex;align-items:center;gap:6px;padding:7px 10px;background:${isNeed?'rgba(212,175,55,.04)':'var(--bg3)'};border:1px solid ${borderColor};border-radius:8px;cursor:pointer;transition:border-color .15s" onclick="mockDraftPick('${p.pid}')" onmouseover="this.style.borderColor='rgba(212,175,55,.4)'" onmouseout="this.style.borderColor='${borderColor}'" >
           <img src="${photoUrl}" onerror="this.style.display='none'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;flex-shrink:0;background:var(--bg4)">
-          <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
+          <span onclick="event.stopPropagation();${canModal?`openPlayerModal('${p.pid}')`:`_mockShowInfo(${JSON.stringify(p)})`}" style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline;text-decoration-color:rgba(255,255,255,.15)">${escHtml(p.name)}</span>
           ${_mockPosBadge(p.pos)}
           ${p.consensusRank?`<span style="font-size:10px;color:var(--text3)">C#${p.consensusRank}</span>`:''}
           <span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</span>
@@ -1357,6 +1360,32 @@ function _mockTag(pid, tag) {
   renderMockDraftUI();
 }
 window._mockTag = _mockTag;
+
+// ── Compact info popup for CSV-only prospects (no Sleeper PID) ───
+function _mockShowInfo(p) {
+  const existing = document.getElementById('mock-info-popup');
+  if (existing) existing.remove();
+  const div = document.createElement('div');
+  div.id = 'mock-info-popup';
+  div.style.cssText = 'position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;font-family:"DM Sans",sans-serif';
+  div.onclick = () => div.remove();
+  div.innerHTML = `<div style="background:var(--bg2);border:1px solid var(--accent);border-radius:16px;padding:20px;max-width:320px;width:90%;margin:0 16px" onclick="event.stopPropagation()">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:800;color:var(--text)">${escHtml(p.name||'')}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">${escHtml(p.pos||'')} · Rookie Prospect</div>
+      </div>
+      ${p.val>0?`<div style="font-size:14px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${p.val.toLocaleString()}</div>`:''}
+    </div>
+    ${p.consensusRank?`<div style="font-size:12px;color:var(--text3);margin-bottom:8px">Consensus Rank: #${p.consensusRank}</div>`:''}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button onclick="document.getElementById('mock-info-popup').remove()" style="flex:1;padding:8px;font-size:13px;font-weight:600;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;font-family:inherit">Close</button>
+      <button onclick="document.getElementById('mock-info-popup').remove();mockDraftPick('${escHtml(p.pid||'')}')" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:linear-gradient(135deg,var(--accent),#b8941f);border:none;border-radius:8px;color:var(--bg1);cursor:pointer;font-family:inherit">Draft</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+}
+window._mockShowInfo = _mockShowInfo;
 
 // ── Expose on window.App and window ─────────────────────────────
 Object.assign(window.App, {
