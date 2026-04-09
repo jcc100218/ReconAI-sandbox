@@ -2530,10 +2530,109 @@ function renderCrownJewels(){
 function toggleJewels(){}
 
 // ── Master home render — v4 components only ──────────────────
-function renderMobileHome(){
-  if(typeof renderScoutBriefing==='function')renderScoutBriefing();
-  if(typeof renderFieldLogCard==='function')renderFieldLogCard();
-  if(typeof renderTeamBar==='function')renderTeamBar();
+function renderMobileHome() {
+  const el = document.getElementById('digest-content');
+  if (!el) return;
+
+  // Use GMEngine if available
+  const engine = window.GMEngine;
+  const strategy = window.GMStrategy?.getStrategy?.() || {};
+
+  if (!engine) {
+    // Fallback to old rendering if engine not loaded
+    if (typeof renderScoutBriefing === 'function') renderScoutBriefing();
+    if (typeof renderFieldLogCard === 'function') renderFieldLogCard();
+    return;
+  }
+
+  const nextMove = engine.generateNextMove();
+  const priorities = engine.generatePriorities();
+  const opportunities = engine.generateOpportunities();
+  const diagnosis = engine.generateDiagnosis();
+  const fieldIntel = engine.generateFieldIntel();
+  const hasDrift = window.GMStrategy?.hasDrift?.();
+
+  // Build the War Room Brief HTML
+  let html = '';
+
+  // Alex Identity Row
+  const personality = strategy.alexPersonality || 'balanced';
+  const persColor = personality === 'aggressive' ? '#E74C3C' : personality === 'value_hunter' ? '#2ECC71' : '#D4AF37';
+  html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(212,175,55,0.15);">
+    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#D4AF37,#B8941F);display:flex;align-items:center;justify-content:center;font-size:18px;">★</div>
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:700;color:#E8E8F0;">Alex Ingram <span style="color:${persColor};font-size:12px;font-weight:600;margin-left:4px;">${personality.charAt(0).toUpperCase()+personality.slice(1)} ➤</span></div>
+      <div style="font-size:12px;color:#9090A8;">${(strategy.mode||'balanced').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} · Health ${window.LI?.teamHealth || '--'}</div>
+    </div>
+  </div>`;
+
+  // Strategy Sync Strip
+  html += `<div style="margin:12px 0;padding:10px 14px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:10px;cursor:pointer;" onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Show me my current strategy settings')">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:12px;font-weight:700;color:#D4AF37;letter-spacing:0.5px;">AI GM STRATEGY</span>
+      <span style="font-size:11px;color:#2ECC71;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#2ECC71;display:inline-block;"></span> Synced</span>
+    </div>
+    <div style="font-size:13px;color:#E8E8F0;margin-top:4px;">Strategy: ${(strategy.mode||'balanced').replace(/_/g,' ')} · Target ${(strategy.targetPositions||[]).join(', ')||'—'} · ${strategy.aggression||'medium'} aggression</div>
+  </div>`;
+
+  // Team Diagnosis
+  if (diagnosis && diagnosis.length) {
+    html += `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);">`;
+    diagnosis.forEach(d => { html += `<div style="font-size:13px;color:#CCCCCC;line-height:1.5;">${d}</div>`; });
+    html += `</div>`;
+  }
+
+  // NEXT MOVE card
+  if (nextMove && nextMove.type !== 'hold') {
+    const confColor = nextMove.confidence === 'high' ? '#2ECC71' : nextMove.confidence === 'medium' ? '#F0A500' : '#9090A8';
+    html += `<div style="margin:14px 0;padding:16px;background:#1A1A1A;border:1px solid rgba(212,175,55,0.4);border-radius:10px;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#D4AF37,#B8941F);"></div>
+      <div style="font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:1px;margin-bottom:8px;">⚡ NEXT MOVE</div>
+      <div style="font-size:15px;font-weight:600;color:#E8E8F0;line-height:1.4;">${nextMove.action}</div>
+      <div style="font-size:12px;color:#9090A8;margin-top:6px;">Confidence: <span style="color:${confColor};font-weight:600;">${nextMove.confidence}</span> · Window: ${nextMove.urgency?.replace(/_/g,' ')||'—'}</div>
+      ${nextMove.reasoning ? `<div style="font-size:12px;color:#606078;margin-top:4px;">${nextMove.reasoning}</div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Build a trade for ${(nextMove.action||'').replace(/'/g,'')}')" style="padding:8px 16px;border-radius:6px;background:#D4AF37;border:none;color:#000;font-size:12px;font-weight:700;cursor:pointer;">Build Trade</button>
+        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Why should I ${(nextMove.action||'').replace(/'/g,'')}')" style="padding:8px 16px;border-radius:6px;background:transparent;border:1px solid rgba(212,175,55,0.3);color:#D4AF37;font-size:12px;font-weight:600;cursor:pointer;">See Why</button>
+      </div>
+    </div>`;
+  }
+
+  // PRIORITIES
+  if (priorities && priorities.length) {
+    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#E74C3C;letter-spacing:1px;margin-bottom:8px;">🎯 PRIORITIES</div>`;
+    priorities.forEach((p,i) => {
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="flex:1;"><div style="font-size:13px;color:#E8E8F0;">${i+1}. ${p.problem}</div><div style="font-size:11px;color:#9090A8;">${p.consequence||''}</div></div>
+        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Help me ${p.actionLabel||'fix this'}')" style="padding:6px 14px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">${p.actionLabel||'Fix'}</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // OPPORTUNITIES
+  if (opportunities && opportunities.length) {
+    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#F0A500;letter-spacing:1px;margin-bottom:8px;">🔥 OPPORTUNITIES</div>`;
+    opportunities.forEach(o => {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="width:32px;height:32px;border-radius:50%;background:#242424;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9090A8;">${(o.ownerName||'?').slice(0,2).toUpperCase()}</div>
+        <div style="flex:1;"><div style="font-size:13px;color:#E8E8F0;font-weight:600;">${o.ownerName||'Unknown'}</div><div style="font-size:11px;color:#9090A8;">${o.insight||''}</div></div>
+        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Build a trade with ${o.ownerName||''}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;">${o.suggestedAction||'Attack'}</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // FIELD INTEL
+  if (fieldIntel && fieldIntel.length) {
+    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:1px;margin-bottom:8px;">🧠 FIELD INTEL</div>`;
+    fieldIntel.forEach(fi => {
+      html += `<div style="font-size:12px;color:#9090A8;padding:4px 0;">· ${fi}</div>`;
+    });
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 // ── Strategy Walkthrough ───────────────────────────────────────
