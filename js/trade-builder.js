@@ -582,6 +582,21 @@ function _logTradeScenario(myPids, theirPids, myPicks, theirPicks, grade) {
     window.addFieldLogEntry('🔄', text, 'trade', { actionType: 'trade_scenario', players: allPlayers });
     if (typeof window.showToast === 'function') window.showToast('Trade scenario saved to Field Log');
   }
+
+  // Check strategy alignment — show override modal if conflict detected
+  if (window.GMStrategy?.recordAction && (myPids || []).length > 0) {
+    const action = { type: 'trade', direction: 'sell', playerId: myPids[0] };
+    const result = window.GMStrategy.recordAction(action);
+    if (result.alignment === 'conflicts' && typeof window.showOverrideReasonModal === 'function') {
+      try {
+        const log = JSON.parse(localStorage.getItem('scout_field_log_v1') || '[]');
+        const lastEntry = log[0];
+        if (lastEntry) {
+          setTimeout(() => window.showOverrideReasonModal(lastEntry.id, lastEntry.text), 350);
+        }
+      } catch (e) { /* ignore */ }
+    }
+  }
 }
 
 // Called from inline trade card "→ Field Log" button

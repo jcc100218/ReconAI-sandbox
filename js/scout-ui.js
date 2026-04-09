@@ -650,78 +650,293 @@ const FL_CATEGORY_LABELS = {
   waivers: '📡 Waivers', research: '🔍 Research', note: '📝 Note',
 };
 
-// Full panel
+// ── Activity panel helpers ────────────────────────────────────
+
+function _modeLabel(mode) {
+  const labels = { rebuild: 'Rebuild', balanced_rebuild: 'Balanced Rebuild', contend: 'Contend', win_now: 'Win Now' };
+  return labels[mode] || mode || 'current';
+}
+
+function _describeConflict(c) {
+  if (c.reasons?.length) return c.reasons[0];
+  if (c.type) return `${c.type}${c.position ? ' ' + c.position : ''} move conflicts with plan`;
+  return 'Action conflicts with strategy';
+}
+
+function _getDayKey(ts) {
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const t = todayStart.getTime();
+  if (ts >= t) return 'Today';
+  if (ts >= t - 86400000) return 'Yesterday';
+  if (ts >= t - 6 * 86400000) return 'This Week';
+  return new Date(ts).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+}
+
+function _getEntryAlignment(entry) {
+  if (!window.GMStrategy?.checkAlignment) return null;
+  if (!entry.actionType || entry.actionType === 'note' || entry.actionType === 'scout') return null;
+  const player = entry.players?.[0];
+  if (!player) return null;
+  const isAcquire = /waiver|acquire/.test(entry.actionType || '');
+  const action = {
+    type: entry.category || entry.actionType,
+    playerId: player.id,
+    position: player.pos || null,
+    direction: isAcquire ? 'acquire' : 'sell',
+  };
+  const result = window.GMStrategy.checkAlignment(action);
+  if (result.alignment === 'aligned')   return { type: 'aligned',   label: '✓ Aligned' };
+  if (result.alignment === 'partial')   return { type: 'partial',   label: '~ Partial' };
+  if (result.alignment === 'conflicts') return { type: 'conflicts', label: '✗ Conflicts' };
+  return null;
+}
+
+function _getTradeFrequency(log) {
+  const cutoff = Date.now() - 14 * 86400000;
+  const n = log.filter(e => (e.actionType === 'trade' || e.category === 'trade') && e.ts >= cutoff).length;
+  if (n >= 4) return 'Active';
+  if (n >= 2) return 'Moderate';
+  return 'Conservative';
+}
+
+function _getFaabStyle(log) {
+  const cutoff = Date.now() - 14 * 86400000;
+  const n = log.filter(e => (e.actionType === 'waiver' || e.category === 'waivers') && e.ts >= cutoff).length;
+  if (n >= 4) return 'Aggressive';
+  if (n >= 2) return 'Moderate';
+  return 'Conservative';
+}
+
+function _getPositionBias(log) {
+  const cutoff = Date.now() - 14 * 86400000;
+  const posCounts = {};
+  log.filter(e => e.ts >= cutoff).forEach(e => {
+    (e.players || []).forEach(p => { if (p.pos) posCounts[p.pos] = (posCounts[p.pos] || 0) + 1; });
+  });
+  const top = Object.entries(posCounts).sort((a, b) => b[1] - a[1])[0];
+  return top ? top[0] : 'Balanced';
+}
+
+function _getLastSyncTime(log) {
+  const s = log.filter(e => e.syncStatus === 'synced').sort((a, b) => b.ts - a.ts)[0];
+  return s ? _relativeTime(s.ts) : 'Never';
+}
+
+function _clearDriftWithNote() {
+  if (window.GMStrategy?.clearDrift) window.GMStrategy.clearDrift();
+  addFieldLogEntry('🎯', 'Staying the course — acknowledged drift, chose to continue.', 'note', {});
+  renderFieldLogPanel();
+}
+window._clearDriftWithNote = _clearDriftWithNote;
+
+// ── Override reason modal ────────────────────────────────────
+
+function showOverrideReasonModal(entryId, actionDesc) {
+  const existing = document.getElementById('override-reason-modal');
+  if (existing) existing.remove();
+
+  const options = [
+    'Short-term win',
+    'Injury reaction',
+    'Changed my mind',
+    'Testing the market',
+    'Just a gut feel',
+  ];
+
+  const el = document.createElement('div');
+  el.id = 'override-reason-modal';
+  el.className = 'override-modal-overlay';
+  el.innerHTML = `<div class="override-modal-card">
+    <div class="override-modal-header">
+      <div class="override-modal-title">⚠️ This move conflicts with your strategy.</div>
+      <div class="override-modal-sub">Quick note — why this move?</div>
+    </div>
+    <div class="override-modal-options">
+      ${options.map(o => `<button class="override-modal-option" onclick="_selectOverrideReason('${entryId}',${JSON.stringify(o)})">${_esc(o)}</button>`).join('')}
+    </div>
+    <button class="override-modal-skip" onclick="_closeOverrideModal()">Skip</button>
+  </div>`;
+
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('override-modal-visible'));
+}
+window.showOverrideReasonModal = showOverrideReasonModal;
+
+function _selectOverrideReason(entryId, label) {
+  const log = getFieldLog();
+  const entry = log.find(e => e.id === entryId);
+  if (entry) {
+    entry.overrideReason = label;
+    localStorage.setItem(FL_KEY, JSON.stringify(log));
+  }
+  _closeOverrideModal();
+  renderFieldLogPanel();
+  if (typeof window.showToast === 'function') window.showToast('Reason noted — Alex will learn from this.');
+}
+window._selectOverrideReason = _selectOverrideReason;
+
+function _closeOverrideModal() {
+  const el = document.getElementById('override-reason-modal');
+  if (!el) return;
+  el.classList.remove('override-modal-visible');
+  setTimeout(() => el.remove(), 220);
+}
+window._closeOverrideModal = _closeOverrideModal;
+
+// Full Activity panel
 function renderFieldLogPanel() {
   const container = document.getElementById('panel-fieldlog-content');
   if (!container) return;
   const log = getFieldLog();
+  const strategy = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+  const drift = window.GMStrategy?.getDrift ? window.GMStrategy.getDrift() : { conflicts: [] };
+  const hasDrift = window.GMStrategy?.hasDrift ? window.GMStrategy.hasDrift() : false;
 
+  let html = '';
+
+  // ── SECTION 1: STRATEGY DRIFT ──────────────────────────────
+  if (hasDrift) {
+    const recentConflicts = (drift.conflicts || [])
+      .filter(c => Date.now() - c.timestamp < 7 * 86400000);
+    const modeLabel = _modeLabel(strategy.mode);
+    html += `<div class="activity-drift-card">
+      <div class="activity-drift-header">
+        <span class="activity-drift-icon">⚠️</span>
+        <div>
+          <div class="activity-drift-title">STRATEGY DRIFT DETECTED</div>
+          <div class="activity-drift-sub">You've made ${recentConflicts.length} move${recentConflicts.length !== 1 ? 's' : ''} that conflict with your ${_esc(modeLabel)} plan.</div>
+        </div>
+      </div>
+      <div class="activity-drift-conflicts">
+        ${recentConflicts.map(c => `<div class="activity-drift-item">• ${_esc(_describeConflict(c))}</div>`).join('')}
+      </div>
+      <div class="activity-drift-actions">
+        <button class="activity-drift-btn-primary" onclick="typeof openStrategyEditor==='function'&&openStrategyEditor()">Adjust Strategy</button>
+        <button class="activity-drift-btn-secondary" onclick="_clearDriftWithNote()">Stay Course</button>
+      </div>
+    </div>`;
+  }
+
+  // ── SECTION 2: ALEX LEARNING ──────────────────────────────
+  const intel = window.GMEngine?.generateFieldIntel ? window.GMEngine.generateFieldIntel() : [];
+  const tradeFreq = _getTradeFrequency(log);
+  const faabStyle = _getFaabStyle(log);
+  const posBias   = _getPositionBias(log);
+
+  html += `<div class="activity-learning-section">
+    <div class="activity-section-header">
+      <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">🧠 Alex Learning</span>
+      <span style="height:1px;flex:1;background:rgba(212,175,55,.15);display:inline-block"></span>
+    </div>
+    <div class="activity-intel-list">
+      ${intel.length
+        ? intel.map(obs => `<div class="activity-intel-item">
+            <span class="activity-intel-icon">🧠</span>
+            <span class="activity-intel-text">${_esc(obs)}</span>
+          </div>`).join('')
+        : `<div style="font-size:13px;color:var(--text3);padding:8px 0">Make some moves and Alex will start learning your patterns.</div>`
+      }
+    </div>
+    <div class="activity-behavior-profile">
+      <div class="activity-profile-title">Behavior Profile</div>
+      <div class="activity-profile-grid">
+        <div class="activity-profile-stat">
+          <div class="activity-profile-label">Trading</div>
+          <div class="activity-profile-value">${_esc(tradeFreq)}</div>
+        </div>
+        <div class="activity-profile-stat">
+          <div class="activity-profile-label">FAAB</div>
+          <div class="activity-profile-value">${_esc(faabStyle)}</div>
+        </div>
+        <div class="activity-profile-stat">
+          <div class="activity-profile-label">Pos Bias</div>
+          <div class="activity-profile-value">${_esc(posBias)}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── SECTION 3: ACTIVITY LOG ───────────────────────────────
   const pendingCount = log.filter(e => e.syncStatus === 'pending' || e.syncStatus === 'failed').length;
   const _syncGated = typeof canAccess === 'function'
     && !canAccess(window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync');
-  const _syncFeat  = window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync';
-  const syncBtn = _syncGated
-    ? `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--text3)">Local only — sync requires War Room Scout</div>
-        <button onclick="showUpgradePrompt('${_syncFeat}')" style="padding:6px 14px;background:linear-gradient(135deg,#D4AF37,#e8cc6c);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Unlock Sync</button>
-      </div>`
-    : `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--text3)">${pendingCount > 0 ? `${pendingCount} entries pending sync` : 'All entries synced to War Room'}</div>
-        <button id="fieldlog-sync-btn" onclick="syncFieldLog()" style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;opacity:${pendingCount > 0 ? '1' : '0.5'}">↑ Sync to War Room</button>
-      </div>`;
+  const _syncFeat = window.FEATURES?.FIELD_LOG_SYNC || 'field_log_sync';
+
+  html += `<div class="activity-log-section">
+    <div class="activity-section-header">
+      <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Activity Log</span>
+      <span style="height:1px;flex:1;background:var(--border);display:inline-block"></span>
+    </div>`;
 
   if (!log.length) {
-    container.innerHTML = syncBtn + `<div class="fieldlog-empty">
+    html += `<div class="fieldlog-empty">
       <div class="fieldlog-empty-icon">📋</div>
-      <div class="fieldlog-empty-text">Your field log is empty.<br>Moves you make — trade scenarios, waiver bids, draft targets — appear here automatically.</div>
+      <div class="fieldlog-empty-text">No activity yet.<br>Trade scenarios, waiver bids, and draft targets appear here automatically.</div>
     </div>`;
-    return;
+  } else {
+    // Group by smart day label
+    const groupOrder = [];
+    const groupMap = {};
+    log.forEach(e => {
+      const key = _getDayKey(e.ts);
+      if (!groupMap[key]) { groupMap[key] = []; groupOrder.push(key); }
+      groupMap[key].push(e);
+    });
+
+    html += groupOrder.map(dayKey => {
+      const entries = groupMap[dayKey];
+      return `<div style="margin-bottom:16px">
+        <div class="activity-date-header">${_esc(dayKey)}</div>
+        ${entries.map(e => {
+          const timeStr = new Date(e.ts).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+          const syncDot = e.syncStatus === 'synced'
+            ? `<span title="Synced" style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span>`
+            : e.syncStatus === 'failed'
+            ? `<span title="Sync failed" style="width:6px;height:6px;border-radius:50%;background:#E74C3C;display:inline-block;flex-shrink:0"></span>`
+            : `<span title="Pending sync" style="width:6px;height:6px;border-radius:50%;background:var(--text3);display:inline-block;flex-shrink:0"></span>`;
+          const catLabel = FL_CATEGORY_LABELS[e.category] || e.category;
+          const alignment = _getEntryAlignment(e);
+          const alignBadge = alignment
+            ? `<span class="activity-align-badge activity-align-${alignment.type}">${alignment.label}</span>`
+            : '';
+          const playersHtml = e.players?.length
+            ? `<div style="font-size:11px;color:var(--accent);margin-top:2px">${e.players.map(p => _esc(p.name || p)).join(', ')}</div>`
+            : '';
+          const overrideHtml = e.overrideReason
+            ? `<div class="activity-override-reason">"${_esc(e.overrideReason)}"</div>`
+            : '';
+          return `<div class="fieldlog-entry">
+            <div class="fieldlog-entry-icon">${e.icon}</div>
+            <div class="fieldlog-entry-body">
+              <div class="fieldlog-entry-title">${_esc(e.text)}</div>
+              ${playersHtml}${overrideHtml}
+              <div class="fieldlog-entry-meta" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                <span>${catLabel}</span>
+                <span>·</span>
+                <span>${timeStr}</span>
+                ${alignBadge}
+                ${syncDot}
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
   }
 
-  // Group by date
-  const groups = {};
-  log.forEach(e => {
-    const d = new Date(e.ts);
-    const key = d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(e);
-  });
+  // Sync footer
+  const lastSyncTime = _getLastSyncTime(log);
+  html += `<div class="activity-sync-footer">
+    ${_syncGated
+      ? `<span style="font-size:12px;color:var(--text3)">Local only — sync requires War Room Scout</span>
+         <button onclick="showUpgradePrompt('${_syncFeat}')" style="padding:5px 12px;background:linear-gradient(135deg,#D4AF37,#e8cc6c);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🔒 Unlock</button>`
+      : `<span style="font-size:12px;color:var(--text3)">${pendingCount > 0 ? `${pendingCount} pending` : `Synced to War Room · ${lastSyncTime}`}</span>
+         <button id="fieldlog-sync-btn" onclick="syncFieldLog()" style="padding:5px 12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;opacity:${pendingCount > 0 ? '1' : '0.5'}">↑ Sync</button>`
+    }
+  </div>
+  </div>`; // close activity-log-section
 
-  const entriesHtml = Object.entries(groups).map(([date, entries]) =>
-    `<div style="margin-bottom:16px">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:8px">${date}</div>
-      ${entries.map(e => {
-        const timeStr = new Date(e.ts).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-        const syncDot = e.syncStatus === 'synced'
-          ? `<span title="Synced to War Room" style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span>`
-          : e.syncStatus === 'failed'
-          ? `<span title="Sync failed" style="width:6px;height:6px;border-radius:50%;background:#E74C3C;display:inline-block;flex-shrink:0"></span>`
-          : `<span title="Pending sync" style="width:6px;height:6px;border-radius:50%;background:var(--text3);display:inline-block;flex-shrink:0"></span>`;
-        const catLabel = FL_CATEGORY_LABELS[e.category] || e.category;
-        const playersHtml = e.players?.length
-          ? `<div style="font-size:11px;color:var(--accent);margin-top:3px">${e.players.map(p => _esc(p.name || p)).join(', ')}</div>`
-          : '';
-        const contextHtml = e.context
-          ? `<div style="font-size:12px;color:var(--text2);margin-top:3px;font-style:italic;line-height:1.4">${_esc(e.context)}</div>`
-          : '';
-        return `<div class="fieldlog-entry">
-          <div class="fieldlog-entry-icon">${e.icon}</div>
-          <div class="fieldlog-entry-body">
-            <div class="fieldlog-entry-title">${_esc(e.text)}</div>
-            ${playersHtml}${contextHtml}
-            <div class="fieldlog-entry-meta" style="display:flex;align-items:center;gap:6px">
-              <span>${catLabel}</span>
-              <span>·</span>
-              <span>${timeStr}</span>
-              ${syncDot}
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`
-  ).join('');
-
-  container.innerHTML = syncBtn + entriesHtml;
+  container.innerHTML = html;
 }
 window.renderFieldLogPanel = renderFieldLogPanel;
 
