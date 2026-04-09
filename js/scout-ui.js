@@ -951,26 +951,38 @@ function _renderExploitTargets() {
   const opps = eng.generateOpportunities();
   if (!opps.length || !opps[0].rosterId) return '';
   const ownerProfiles = window.App?.LI?.ownerProfiles || {};
+  const S = window.S;
   return `<div style="margin-bottom:16px">
-    <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-      TOP TARGETS <span style="height:1px;flex:1;background:rgba(212,175,55,.2);display:inline-block;margin-left:4px"></span>
+    <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      WHO TO EXPLOIT <span style="height:1px;flex:1;background:rgba(231,76,60,.2);display:inline-block;margin-left:4px"></span>
     </div>
     ${opps.slice(0, 3).map((o, i) => {
       const isTop = i === 0;
       const dna = ownerProfiles[o.rosterId]?.dna || '';
-      const border = isTop ? 'rgba(212,175,55,.6)' : 'var(--border)';
-      const glow = isTop ? ';box-shadow:0 0 12px rgba(212,175,55,.10)' : '';
+      const border = isTop ? 'rgba(231,76,60,.5)' : 'var(--border)';
+      const glow = isTop ? ';box-shadow:0 0 14px rgba(231,76,60,.08)' : '';
+      const roster = (S?.rosters || []).find(r => r.roster_id === o.rosterId);
+      const owner = (S?.leagueUsers || []).find(u => u.user_id === roster?.owner_id);
+      const avatarId = owner?.avatar;
+      const initials = (o.ownerName || '?').slice(0, 2).toUpperCase();
+      const avatarHtml = avatarId
+        ? `<img src="https://sleepercdn.com/avatars/thumbs/${avatarId}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
+        : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text3);flex-shrink:0">${initials}</div>`;
       return `<div style="padding:11px 14px;background:var(--bg2);border:1px solid ${border};border-radius:var(--r);margin-bottom:6px;display:flex;align-items:center;gap:10px${glow}">
+        ${avatarHtml}
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
-            ${isTop ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 5px;border:1px solid rgba(212,175,55,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">#1 TARGET</span>' : ''}
+            ${isTop ? '<span style="font-size:9px;font-weight:700;color:var(--red);padding:1px 5px;border:1px solid rgba(231,76,60,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">BEST TARGET</span>' : ''}
             <span style="font-size:14px;font-weight:700;color:var(--text)">${_esc(o.ownerName)}</span>
             ${dna ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dna)}</span>` : ''}
           </div>
-          <div style="font-size:12px;color:var(--text2);line-height:1.4">${_esc(o.insight)}</div>
-          ${o.exploitScore >= 75 ? '<div style="font-size:11px;color:var(--green);margin-top:3px;font-weight:600">High priority</div>' : ''}
+          <div style="font-size:13px;color:var(--text2);line-height:1.4;font-weight:500">${_esc(o.insight)}</div>
+          ${o.exploitScore >= 75 ? '<div style="font-size:11px;color:var(--red);margin-top:3px;font-weight:700">Move now</div>' : o.exploitScore >= 50 ? '<div style="font-size:11px;color:var(--amber);margin-top:3px;font-weight:600">Good window</div>' : ''}
         </div>
-        <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify('What trades can I build with ' + o.ownerName + '?')})" style="flex-shrink:0;padding:7px 12px;font-size:12px;font-weight:700;background:${isTop ? 'var(--accent)' : 'var(--accentL)'};color:${isTop ? 'var(--bg1)' : 'var(--accent)'};border:none;border-radius:8px;cursor:pointer;font-family:inherit">Attack</button>
+        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+          <button onclick="event.stopPropagation();typeof openTradeBuilder==='function'?openTradeBuilder(${o.rosterId},[],[]):fillGlobalChat(${JSON.stringify('Build me the best trade I can make with ' + o.ownerName)})" style="padding:6px 11px;font-size:12px;font-weight:700;background:${isTop ? 'var(--red)' : 'var(--redL)'};color:${isTop ? '#fff' : 'var(--red)'};border:1px solid rgba(231,76,60,.3);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap">Attack</button>
+          <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify('Build me the best trade I can make with ' + o.ownerName)})" style="padding:6px 11px;font-size:12px;font-weight:600;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap">Build Trade</button>
+        </div>
       </div>`;
     }).join('')}
   </div>`;

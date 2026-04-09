@@ -404,7 +404,7 @@ function renderRookieBoard(){
   if(leagueHasK)posFilters.push('K');
   if(leagueHasIDP)posFilters.push('DL','LB','DB');
 
-  // Hero card — Alex's top board pick based on draftStyle
+  // Hero card — Alex's decisive pick, big and bold
   const _rbStrat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
   const _rbDs = _rbStrat.draftStyle || 'bpa';
   const _rbAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
@@ -414,11 +414,30 @@ function renderRookieBoard(){
     let _rbPick = rookies[0];
     if (_rbDs === 'need' && _rbNeeds.length) _rbPick = rookies.find(r => _rbNeeds.includes(r.pos)) || _rbPick;
     else if (_rbDs === 'mix' && _rbNeeds.length) _rbPick = rookies.find(r => _rbNeeds.includes(r.pos) || (_rbStrat.targetPositions||[]).includes(r.pos)) || _rbPick;
-    const _rbPhrase = _rbDs === 'need' ? 'Fills your ' + _rbPick.pos + ' gap' : _rbDs === 'mix' ? 'Best value + fit' : '#1 overall value at ' + _rbPick.dhq.toLocaleString() + ' DHQ';
-    _rbHero = `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px;cursor:pointer" onclick="openPlayerModal('${_rbPick.pid}')">
-      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Alex says</div>
-      <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2">Take ${escHtml(pName(_rbPick.pid))}.</div>
-      <div style="font-size:13px;color:var(--text2);margin-top:3px">${escHtml(_rbPhrase)}.</div>
+    const _rbIsTop = _rbPick === rookies[0];
+    const _rbNext = rookies[1];
+    const _rbTierBreak = _rbIsTop && _rbNext && (_rbPick.dhq - _rbNext.dhq) > 1000;
+    const _rbSubtitle = _rbTierBreak
+      ? 'Clear tier break. Don\'t overthink it.'
+      : _rbDs === 'need'
+      ? 'Fills your ' + _rbPick.pos + ' gap. Best value at your position of need.'
+      : _rbDs === 'mix'
+      ? 'Best value + roster fit. Take him.'
+      : '#1 overall value. BPA, no question.';
+    // Strategy alignment
+    const _rbAlignCheck = window.GMStrategy?.checkAlignment ? window.GMStrategy.checkAlignment({type:'draft',pos:_rbPick.pos}) : null;
+    const _rbAlignLabel = _rbAlignCheck?.status === 'aligned' ? 'Strategy aligned' : _rbAlignCheck?.status === 'partial' ? 'Partial fit' : _rbPick.fit === 'high' ? 'Roster fit' : '';
+    const _rbAlignCol = _rbAlignCheck?.status === 'aligned' ? 'var(--green)' : _rbPick.fit === 'high' ? 'var(--green)' : 'var(--amber)';
+    _rbHero = `<div style="background:rgba(212,175,55,.08);border:2px solid rgba(212,175,55,.4);border-radius:var(--rl);padding:16px 18px;margin-bottom:14px;cursor:pointer;position:relative;overflow:hidden" onclick="openPlayerModal('${_rbPick.pid}')">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent)"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Alex says</div>
+        ${_rbAlignLabel ? `<span style="font-size:9px;font-weight:700;color:${_rbAlignCol};padding:1px 6px;border:1px solid ${_rbAlignCol};border-radius:8px;opacity:.9">${escHtml(_rbAlignLabel)}</span>` : ''}
+        ${_rbTierBreak ? '<span style="font-size:9px;font-weight:700;color:var(--red);padding:1px 6px;border:1px solid rgba(231,76,60,.4);border-radius:8px">Tier break</span>' : ''}
+      </div>
+      <div style="font-size:22px;font-weight:900;color:var(--text);line-height:1.1;letter-spacing:-.02em">Take ${escHtml(pName(_rbPick.pid))}.</div>
+      <div style="font-size:14px;color:var(--text2);margin-top:6px;font-weight:500">${escHtml(_rbSubtitle)}</div>
+      ${_rbPick.dhq > 0 ? `<div style="font-size:12px;color:var(--text3);margin-top:6px;font-family:'JetBrains Mono',monospace">${_rbPick.pos} · ${_rbPick.dhq.toLocaleString()} DHQ${_rbPick.csvRank ? ' · Consensus #' + _rbPick.csvRank : ''}</div>` : ''}
     </div>`;
   }
 

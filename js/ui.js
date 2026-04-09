@@ -523,7 +523,7 @@ function renderAvailable(){
   if(_availCache&&_availCacheKey===cacheKey){avail=_availCache;}
   else{avail=getAvailablePlayers();_availCache=avail;_availCacheKey=cacheKey;}
 
-  if(!avail.length){tbody.innerHTML='<div style="padding:16px;text-align:center;color:var(--text3)">No available players found.</div>';return;}
+  if(!avail.length){tbody.innerHTML='<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No urgent targets — check back after waivers process.</div>';return;}
   const posFilter=$('avail-pos-sel')?.value||'';
   const posMapFilter=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
   let filtered=posFilter?avail.filter(a=>posMapFilter(a.p.position)===posFilter||a.p.position===posFilter):avail;
@@ -624,32 +624,52 @@ function renderAvailable(){
     </div>`;
   }).join('');
 
-  // Hero card — top bid recommendation, never empty
+  // Hero card — top bid recommendation, always first, never empty
+  const _avStrat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+  const _avAggression = _avStrat.aggression || 'medium';
   let _avHero = '';
   if (filtered.length > 0) {
     const _avTop = filtered[0];
     const _avPos = posMapFilter(_avTop.p.position);
     const _avMkt = faabMarket[_avPos];
     let _avBidStr = '';
+    let _avBidPct = '';
     if (_avMkt && _avMkt.count >= 3 && faab.budget > 0) {
       const _avBase = Math.round(_avMkt.avg * (_avTop.val / 4000));
       const _avFl = faab.minBid || 1;
       const _avSug = Math.max(_avFl, Math.min(Math.round(faab.remaining * 0.25), _avBase));
       _avBidStr = `$${_avSug}`;
+      if (faab.budget > 0) _avBidPct = Math.round((_avSug / faab.budget) * 100) + '%';
     } else if (faab.budget > 0 && _avTop.val > 0) {
-      _avBidStr = `~$${Math.max(faab.minBid || 1, Math.round(_avTop.val / 500))}`;
+      const _avEst = Math.max(faab.minBid || 1, Math.round(_avTop.val / 500));
+      _avBidStr = `~$${_avEst}`;
+      if (faab.budget > 0) _avBidPct = Math.round((_avEst / faab.budget) * 100) + '%';
     }
     const _avNeedPos = (_avMyAssess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
     const _avIsNeed = _avNeedPos.includes(_avPos);
     const _avReason = _avIsNeed ? `Fills your ${_avPos} gap` : `Best available at ${_avTop.val.toLocaleString()} DHQ`;
-    const _avLabel = _avBidStr ? `Bid ${_avBidStr} on` : 'Add';
-    _avHero = `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="openPlayerModal('${_avTop.id}')">
-      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Alex says</div>
-      <div style="font-size:16px;font-weight:800;color:var(--text);line-height:1.2">${escHtml(_avLabel)} ${escHtml(pName(_avTop.id))}.</div>
-      <div style="font-size:13px;color:var(--text2);margin-top:3px">${escHtml(_avReason)}.</div>
+    const _avBidDisplay = _avBidPct ? `Bid ${_avBidPct} on` : _avBidStr ? `Bid ${_avBidStr} on` : 'Add';
+    const _avUrgency = _avAggression === 'aggressive'
+      ? 'Move now or lose him.'
+      : _avAggression === 'conservative'
+      ? `Worth monitoring at ${_avBidStr || 'low value'}.`
+      : 'Don\'t sleep on this one.';
+    // Strategy alignment badge
+    const _avAlignCheck = window.GMStrategy?.checkAlignment ? window.GMStrategy.checkAlignment({type:'waiver',pos:_avPos}) : null;
+    const _avAlignLabel = _avAlignCheck?.status === 'aligned' ? 'Strategy aligned' : _avAlignCheck?.status === 'partial' ? 'Partial fit' : '';
+    const _avAlignCol = _avAlignCheck?.status === 'aligned' ? 'var(--green)' : 'var(--amber)';
+    _avHero = `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:14px 16px;margin-bottom:10px;cursor:pointer" onclick="openPlayerModal('${_avTop.id}')">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Alex says</div>
+        ${_avAlignLabel ? `<span style="font-size:9px;font-weight:700;color:${_avAlignCol};padding:1px 6px;border:1px solid ${_avAlignCol};border-radius:8px;opacity:.85">${escHtml(_avAlignLabel)}</span>` : ''}
+      </div>
+      <div style="font-size:18px;font-weight:800;color:var(--text);line-height:1.2">${escHtml(_avBidDisplay)} ${escHtml(pName(_avTop.id))}.</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px">${escHtml(_avReason)}. ${escHtml(_avUrgency)}</div>
     </div>`;
+  } else {
+    _avHero = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No urgent targets — check back after waivers process.</div>';
   }
-  tbody.innerHTML=_avHero+(rows||(filtered.length===0?'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>':''));
+  tbody.innerHTML=_avHero+(rows||'');
 }
 
 // ── Top 5 Available (always-visible waiver section) ───────────
@@ -947,6 +967,38 @@ function renderWaivers(){
 
 // ── Trades ─────────────────────────────────────────────────────
 function renderTrades(){
+  // Best trade available hero
+  const _trHeroEl=$('trades-hero');
+  if(_trHeroEl){
+    const _trEng=window.GMEngine;
+    const _trStrat=window.GMStrategy?.getStrategy?window.GMStrategy.getStrategy():{};
+    let _trHeroHtml='';
+    if(_trEng){
+      const _trOpps=_trEng.generateOpportunities();
+      const _trMove=_trEng.generateNextMove();
+      const _trTop=_trOpps&&_trOpps[0]&&_trOpps[0].rosterId?_trOpps[0]:null;
+      if(_trTop){
+        const _trAlignCheck=window.GMStrategy?.checkAlignment?window.GMStrategy.checkAlignment({type:'trade',pos:(_trStrat.targetPositions||[])[0]||''}):null;
+        const _trAlignLabel=_trAlignCheck?.status==='aligned'?'Strategy aligned':_trAlignCheck?.status==='partial'?'Partial fit':'';
+        const _trAlignCol=_trAlignCheck?.status==='aligned'?'var(--green)':'var(--amber)';
+        const _trAction=_trMove&&_trMove.type==='trade'?_trMove.action:`Target ${_trTop.ownerName}`;
+        _trHeroHtml=`<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.4);border-radius:var(--rl);padding:14px 16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Best trade right now</div>
+            ${_trAlignLabel?`<span style="font-size:9px;font-weight:700;color:${_trAlignCol};padding:1px 6px;border:1px solid ${_trAlignCol};border-radius:8px;opacity:.85">${_trAlignLabel}</span>`:''}
+          </div>
+          <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.3">${escHtml(_trAction)}.</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:4px">${escHtml(_trTop.insight)}${_trTop.exploitScore>=75?' — move now':_trTop.exploitScore>=50?' — good window':''}.</div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button onclick="typeof openTradeBuilder==='function'?openTradeBuilder(${_trTop.rosterId},[],[]):fillGlobalChat(${JSON.stringify('Build the best trade I can make with '+_trTop.ownerName)})" style="padding:8px 16px;font-size:13px;font-weight:700;background:var(--accent);color:var(--bg1);border:none;border-radius:8px;cursor:pointer;font-family:inherit">Build Trade</button>
+            <button onclick="fillGlobalChat(${JSON.stringify('What is the acceptance likelihood if I trade with '+_trTop.ownerName+'?')})" style="padding:8px 14px;font-size:13px;font-weight:600;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:8px;cursor:pointer;font-family:inherit">Acceptance %</button>
+          </div>
+        </div>`;
+      }
+    }
+    _trHeroEl.innerHTML=_trHeroHtml;
+  }
+
   const week=S.currentWeek;
   const trades=(S.transactions['w'+week]||[]).filter(t=>t.type==='trade');
   const el=$('trades-recent');if(!el)return;
