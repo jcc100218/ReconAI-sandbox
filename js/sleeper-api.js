@@ -164,9 +164,11 @@ async function loadRosterStats(){
 // Calls in loadRosterStats and ui.js resolve via the window global set there.
 
 // ── Expose on window.App ────────────────────────────────────────
+// NOTE: sf and SLEEPER are intentionally NOT re-exported here.
+// shared/sleeper-api.js owns window.App.sf (cached sleeperFetch) and
+// window.App.SLEEPER. Re-exporting them here would silently overwrite
+// the shared cached version with the local bare fetch wrapper.
 Object.assign(window.App, {
-  SLEEPER,
-  sf,
   fetchTrending,
   loadLeague,
   loadOwnership,
