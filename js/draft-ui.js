@@ -404,7 +404,25 @@ function renderRookieBoard(){
   if(leagueHasK)posFilters.push('K');
   if(leagueHasIDP)posFilters.push('DL','LB','DB');
 
-  el.innerHTML=`
+  // Hero card — Alex's top board pick based on draftStyle
+  const _rbStrat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+  const _rbDs = _rbStrat.draftStyle || 'bpa';
+  const _rbAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
+  const _rbNeeds = (_rbAssess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
+  let _rbHero = '';
+  if (rookies.length > 0) {
+    let _rbPick = rookies[0];
+    if (_rbDs === 'need' && _rbNeeds.length) _rbPick = rookies.find(r => _rbNeeds.includes(r.pos)) || _rbPick;
+    else if (_rbDs === 'mix' && _rbNeeds.length) _rbPick = rookies.find(r => _rbNeeds.includes(r.pos) || (_rbStrat.targetPositions||[]).includes(r.pos)) || _rbPick;
+    const _rbPhrase = _rbDs === 'need' ? 'Fills your ' + _rbPick.pos + ' gap' : _rbDs === 'mix' ? 'Best value + fit' : '#1 overall value at ' + _rbPick.dhq.toLocaleString() + ' DHQ';
+    _rbHero = `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px;cursor:pointer" onclick="openPlayerModal('${_rbPick.pid}')">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Alex says</div>
+      <div style="font-size:17px;font-weight:800;color:var(--text);line-height:1.2">Take ${escHtml(pName(_rbPick.pid))}.</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:3px">${escHtml(_rbPhrase)}.</div>
+    </div>`;
+  }
+
+  el.innerHTML=_rbHero+`
     <div class="home-sec-title" style="margin-bottom:8px">Rookie Board</div>
     <!-- Position filters -->
     <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">

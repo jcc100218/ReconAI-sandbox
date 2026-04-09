@@ -738,7 +738,7 @@ function _renderExploitTargets() {
   const ownerProfiles = window.App?.LI?.ownerProfiles || {};
   return `<div style="margin-bottom:16px">
     <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-      EXPLOIT TARGETS <span style="height:1px;flex:1;background:rgba(212,175,55,.2);display:inline-block;margin-left:4px"></span>
+      TOP TARGETS <span style="height:1px;flex:1;background:rgba(212,175,55,.2);display:inline-block;margin-left:4px"></span>
     </div>
     ${opps.slice(0, 3).map((o, i) => {
       const isTop = i === 0;

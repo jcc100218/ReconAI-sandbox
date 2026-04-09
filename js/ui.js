@@ -624,7 +624,32 @@ function renderAvailable(){
     </div>`;
   }).join('');
 
-  tbody.innerHTML=rows||(filtered.length===0?'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>':'');
+  // Hero card — top bid recommendation, never empty
+  let _avHero = '';
+  if (filtered.length > 0) {
+    const _avTop = filtered[0];
+    const _avPos = posMapFilter(_avTop.p.position);
+    const _avMkt = faabMarket[_avPos];
+    let _avBidStr = '';
+    if (_avMkt && _avMkt.count >= 3 && faab.budget > 0) {
+      const _avBase = Math.round(_avMkt.avg * (_avTop.val / 4000));
+      const _avFl = faab.minBid || 1;
+      const _avSug = Math.max(_avFl, Math.min(Math.round(faab.remaining * 0.25), _avBase));
+      _avBidStr = `$${_avSug}`;
+    } else if (faab.budget > 0 && _avTop.val > 0) {
+      _avBidStr = `~$${Math.max(faab.minBid || 1, Math.round(_avTop.val / 500))}`;
+    }
+    const _avNeedPos = (_avMyAssess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
+    const _avIsNeed = _avNeedPos.includes(_avPos);
+    const _avReason = _avIsNeed ? `Fills your ${_avPos} gap` : `Best available at ${_avTop.val.toLocaleString()} DHQ`;
+    const _avLabel = _avBidStr ? `Bid ${_avBidStr} on` : 'Add';
+    _avHero = `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="openPlayerModal('${_avTop.id}')">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px">Alex says</div>
+      <div style="font-size:16px;font-weight:800;color:var(--text);line-height:1.2">${escHtml(_avLabel)} ${escHtml(pName(_avTop.id))}.</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:3px">${escHtml(_avReason)}.</div>
+    </div>`;
+  }
+  tbody.innerHTML=_avHero+(rows||(filtered.length===0?'<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No strong waiver adds this week.</div>':''));
 }
 
 // ── Top 5 Available (always-visible waiver section) ───────────
