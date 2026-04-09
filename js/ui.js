@@ -629,8 +629,30 @@ function renderAvailable(){
   const _avAggression = _avStrat.aggression || 'medium';
   let _avHero = '';
   if (filtered.length > 0) {
-    const _avTop = filtered[0];
+    // Smart pick: prefer players at positions where user has 0-1 rostered (real gaps)
+    const _myRosterPids = (typeof myR === 'function' ? myR()?.players : null) || [];
+    const _avPosMapFn = p => (['DE','DT'].includes(p)?'DL':['CB','S'].includes(p)?'DB':p);
+    const _myPosCounts = {};
+    _myRosterPids.forEach(pid => {
+      const pos = _avPosMapFn(S.players?.[pid]?.position || '');
+      if (pos) _myPosCounts[pos] = (_myPosCounts[pos] || 0) + 1;
+    });
+    // Find best player at a real gap (0-1 at that pos), then depth (2), then 3+
+    let _avTop = filtered.find(c => (_myPosCounts[posMapFilter(c.p.position)] || 0) <= 1)
+      || filtered.find(c => {
+        const cnt = _myPosCounts[posMapFilter(c.p.position)] || 0;
+        if (cnt < 3) return true;
+        // 3+ at position: only recommend if clear upgrade over worst starter
+        const pos = posMapFilter(c.p.position);
+        const myAtPos = _myRosterPids
+          .filter(pid => _avPosMapFn(S.players?.[pid]?.position||'') === pos)
+          .map(pid => typeof dynastyValue === 'function' ? dynastyValue(pid) : 0)
+          .sort((a,b) => a - b);
+        return myAtPos.length > 0 && c.val > myAtPos[0] * 1.25;
+      })
+      || filtered[0];
     const _avPos = posMapFilter(_avTop.p.position);
+    const _avMyCount = _myPosCounts[_avPos] || 0;
     const _avMkt = faabMarket[_avPos];
     let _avBidStr = '';
     let _avBidPct = '';
@@ -647,7 +669,11 @@ function renderAvailable(){
     }
     const _avNeedPos = (_avMyAssess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
     const _avIsNeed = _avNeedPos.includes(_avPos);
-    const _avReason = _avIsNeed ? `Fills your ${_avPos} gap` : `Best available at ${_avTop.val.toLocaleString()} DHQ`;
+    const _avReason = _avMyCount === 0 ? `You have no ${_avPos} on your roster`
+      : _avMyCount <= 1 ? `Fills your ${_avPos} gap`
+      : _avMyCount >= 3 && !_avIsNeed ? `Depth add at ${_avPos} — upgrade over your weakest ${_avPos}`
+      : _avIsNeed ? `Fills your ${_avPos} gap`
+      : `Best available at ${_avTop.val.toLocaleString()} DHQ`;
     const _avBidDisplay = _avBidPct ? `Bid ${_avBidPct} on` : _avBidStr ? `Bid ${_avBidStr} on` : 'Add';
     const _avUrgency = _avAggression === 'aggressive'
       ? 'Move now or lose him.'

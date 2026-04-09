@@ -235,96 +235,182 @@
     const S = _S();
     const curYear = parseInt(S.season) || new Date().getFullYear();
 
+    // Offseason detection: roughly Feb (month 1) through Aug (month 7)
+    const _nowMonth = new Date().getMonth(); // 0-indexed: 0=Jan, 1=Feb, ..., 7=Aug
+    const isOffseason = _nowMonth >= 1 && _nowMonth <= 7;
+
+    // Premium positions by dynasty value (DHQ-weighted)
+    const _PREMIUM_POS = ['QB', 'RB', 'WR', 'TE'];
+    const _scoringSettings = S.leagues?.find?.(l => l.league_id === S.currentLeagueId)?.scoring_settings || {};
+    const _isPPR = (_scoringSettings.rec || 0) >= 0.5;
+    // In PPR, WR/pass-catching RBs are elevated; otherwise RB premium is higher
+    const _topPremium = _PREMIUM_POS.filter(p => needs.includes(p));
+
     const priorities = [];
 
-    // Priority 1: Top positional deficit
-    if (needs.length > 0) {
-      const pos = needs[0];
-      const isDeficit = (assess.needs || []).find(n => (typeof n === 'string' ? n : n.pos) === pos)?.urgency === 'deficit';
-      const consequence = isDeficit
-        ? `Fix within 2 weeks or you're leaving wins on the table.`
-        : `Address before your next tough matchup.`;
-      priorities.push({
-        problem: `${pos} is your weakest position group`,
-        consequence,
-        actionLabel: `Fix ${pos}`,
-        actionType: 'trade',
-      });
-    }
+    if (isOffseason) {
+      // ── OFFSEASON priorities: dynasty asset accumulation, not weekly output ──
 
-    // Priority 2: Mode-specific structural priority
-    if (mode === 'rebuild' || mode === 'balanced_rebuild') {
-      // Check draft capital
-      const allTP = S.tradedPicks || [];
-      let futurePicks = 0;
-      for (let yr = curYear; yr <= curYear + 2; yr++) {
-        const league = (S.leagues || []).find(l => l.league_id === S.currentLeagueId);
-        const draftRounds = league?.settings?.draft_rounds || 4;
-        for (let rd = 1; rd <= draftRounds; rd++) {
-          const tradedAway = allTP.find(p => parseInt(p.season) === yr && p.round === rd && p.roster_id === myRoster.roster_id && p.owner_id !== myRoster.roster_id);
-          if (!tradedAway) futurePicks++;
-          futurePicks += allTP.filter(p => parseInt(p.season) === yr && p.round === rd && p.owner_id === myRoster.roster_id && p.roster_id !== myRoster.roster_id).length;
-        }
-      }
-      if (futurePicks < 6) {
+      // Priority 1: Biggest positional gap at a premium position
+      if (_topPremium.length > 0) {
+        const pos = _topPremium[0];
         priorities.push({
-          problem: 'Draft capital is below rebuild minimum',
-          consequence: 'Rebuilds stall without enough future picks. Every week costs you.',
-          actionLabel: 'Acquire Picks',
+          problem: `${pos} room needs a foundational piece before the season`,
+          consequence: _isPPR && pos === 'WR'
+            ? 'PPR leagues reward deep WR rooms. Build now while prices are lower.'
+            : `${pos} is the engine of dynasty rosters. Lock in your piece now.`,
+          actionLabel: `Target ${pos}`,
           actionType: 'trade',
         });
-      } else {
+      } else if (needs.length > 0) {
+        const pos = needs[0];
         priorities.push({
-          problem: 'Deploy your pick capital — don\'t let it sit idle',
-          consequence: `You have ${futurePicks} picks. Map a target list now or trade up.`,
-          actionLabel: 'Plan Draft',
-          actionType: 'draft',
+          problem: `${pos} is your thinnest position heading into the season`,
+          consequence: 'Offseason is when roster construction shapes your year. Address now.',
+          actionLabel: `Find ${pos}`,
+          actionType: 'trade',
         });
       }
-    } else {
-      // Win-now: depth at second-weakest position
-      const pos2 = needs[1];
-      if (pos2) {
-        priorities.push({
-          problem: `${pos2} depth is thin for a deep playoff run`,
-          consequence: 'One injury ends your season. Depth is championship insurance.',
-          actionLabel: `Find ${pos2}`,
-          actionType: needs.length > 1 ? 'trade' : 'waiver',
-        });
+
+      // Priority 2: Offseason trade window
+      if (mode === 'rebuild' || mode === 'balanced_rebuild') {
+        // Check draft capital
+        const allTP = S.tradedPicks || [];
+        let futurePicks = 0;
+        for (let yr = curYear; yr <= curYear + 2; yr++) {
+          const league = (S.leagues || []).find(l => l.league_id === S.currentLeagueId);
+          const draftRounds = league?.settings?.draft_rounds || 4;
+          for (let rd = 1; rd <= draftRounds; rd++) {
+            const tradedAway = allTP.find(p => parseInt(p.season) === yr && p.round === rd && p.roster_id === myRoster.roster_id && p.owner_id !== myRoster.roster_id);
+            if (!tradedAway) futurePicks++;
+            futurePicks += allTP.filter(p => parseInt(p.season) === yr && p.round === rd && p.owner_id === myRoster.roster_id && p.roster_id !== myRoster.roster_id).length;
+          }
+        }
+        if (futurePicks < 6) {
+          priorities.push({
+            problem: 'Draft capital is below rebuild minimum',
+            consequence: 'Rookie drafts are the core of a rebuild. Stack picks before the window closes.',
+            actionLabel: 'Acquire Picks',
+            actionType: 'trade',
+          });
+        } else {
+          priorities.push({
+            problem: 'Trade window is open — move aging assets now',
+            consequence: `Win-now teams are buying. Convert veterans into youth or picks before values drop.`,
+            actionLabel: 'Shop Veterans',
+            actionType: 'trade',
+          });
+        }
       } else {
+        // Win-now: offseason is for shoring up weaknesses
         priorities.push({
-          problem: 'Sell your surplus into the market now',
-          consequence: 'Peak window means buyers are aggressive. Convert excess into wins.',
+          problem: 'Trade window is open — upgrade before rosters lock in',
+          consequence: 'Offseason is prime trading time. Contenders who wait pay a premium in-season.',
           actionLabel: 'Build Trade',
           actionType: 'trade',
         });
       }
-    }
 
-    // Priority 3: Health-based or urgency catch-all
-    if (priorities.length < 3) {
-      if (hs < 65 && hs > 0) {
+      // Priority 3: Draft prep
+      if (priorities.length < 3) {
         priorities.push({
-          problem: 'Overall roster health is below contender threshold',
-          consequence: 'Competing teams are pulling ahead every week you wait.',
-          actionLabel: 'Full Rebuild',
+          problem: 'Map your rookie draft targets before ADP firms up',
+          consequence: 'Early prep lets you identify steals and avoid reaches. Start your board now.',
+          actionLabel: 'Mock Draft',
+          actionType: 'draft',
+        });
+      }
+
+    } else {
+      // ── IN-SEASON priorities: weekly output and matchup-based ──
+
+      // Priority 1: Top positional deficit
+      if (needs.length > 0) {
+        const pos = needs[0];
+        const isDeficit = (assess.needs || []).find(n => (typeof n === 'string' ? n : n.pos) === pos)?.urgency === 'deficit';
+        const consequence = isDeficit
+          ? `Fix within 2 weeks or you're leaving wins on the table.`
+          : `Address before your next tough matchup.`;
+        priorities.push({
+          problem: `${pos} is your weakest position group`,
+          consequence,
+          actionLabel: `Fix ${pos}`,
           actionType: 'trade',
         });
-      } else if (hs >= 80) {
-        priorities.push({
-          problem: 'Protect your franchise players from trade pressure',
-          consequence: 'Elite rosters get picked apart if you\'re not careful about what you trade.',
-          actionLabel: 'Set Untouchables',
-          actionType: 'hold',
-        });
-      } else if (needs.length > 2) {
-        const pos3 = needs[2];
-        priorities.push({
-          problem: `${pos3} is a secondary gap worth monitoring`,
-          consequence: 'Secondary gaps compound. Fix when the right deal appears.',
-          actionLabel: `Monitor ${pos3}`,
-          actionType: 'waiver',
-        });
+      }
+
+      // Priority 2: Mode-specific structural priority
+      if (mode === 'rebuild' || mode === 'balanced_rebuild') {
+        const allTP = S.tradedPicks || [];
+        let futurePicks = 0;
+        for (let yr = curYear; yr <= curYear + 2; yr++) {
+          const league = (S.leagues || []).find(l => l.league_id === S.currentLeagueId);
+          const draftRounds = league?.settings?.draft_rounds || 4;
+          for (let rd = 1; rd <= draftRounds; rd++) {
+            const tradedAway = allTP.find(p => parseInt(p.season) === yr && p.round === rd && p.roster_id === myRoster.roster_id && p.owner_id !== myRoster.roster_id);
+            if (!tradedAway) futurePicks++;
+            futurePicks += allTP.filter(p => parseInt(p.season) === yr && p.round === rd && p.owner_id === myRoster.roster_id && p.roster_id !== myRoster.roster_id).length;
+          }
+        }
+        if (futurePicks < 6) {
+          priorities.push({
+            problem: 'Draft capital is below rebuild minimum',
+            consequence: 'Rebuilds stall without enough future picks. Every week costs you.',
+            actionLabel: 'Acquire Picks',
+            actionType: 'trade',
+          });
+        } else {
+          priorities.push({
+            problem: 'Deploy your pick capital — don\'t let it sit idle',
+            consequence: `You have ${futurePicks} picks. Map a target list now or trade up.`,
+            actionLabel: 'Plan Draft',
+            actionType: 'draft',
+          });
+        }
+      } else {
+        const pos2 = needs[1];
+        if (pos2) {
+          priorities.push({
+            problem: `${pos2} depth is thin for a deep playoff run`,
+            consequence: 'One injury ends your season. Depth is championship insurance.',
+            actionLabel: `Find ${pos2}`,
+            actionType: needs.length > 1 ? 'trade' : 'waiver',
+          });
+        } else {
+          priorities.push({
+            problem: 'Sell your surplus into the market now',
+            consequence: 'Peak window means buyers are aggressive. Convert excess into wins.',
+            actionLabel: 'Build Trade',
+            actionType: 'trade',
+          });
+        }
+      }
+
+      // Priority 3: Health-based or urgency catch-all
+      if (priorities.length < 3) {
+        if (hs < 65 && hs > 0) {
+          priorities.push({
+            problem: 'Overall roster health is below contender threshold',
+            consequence: 'Competing teams are pulling ahead every week you wait.',
+            actionLabel: 'Full Rebuild',
+            actionType: 'trade',
+          });
+        } else if (hs >= 80) {
+          priorities.push({
+            problem: 'Protect your franchise players from trade pressure',
+            consequence: 'Elite rosters get picked apart if you\'re not careful about what you trade.',
+            actionLabel: 'Set Untouchables',
+            actionType: 'hold',
+          });
+        } else if (needs.length > 2) {
+          const pos3 = needs[2];
+          priorities.push({
+            problem: `${pos3} is a secondary gap worth monitoring`,
+            consequence: 'Secondary gaps compound. Fix when the right deal appears.',
+            actionLabel: `Monitor ${pos3}`,
+            actionType: 'waiver',
+          });
+        }
       }
     }
 
