@@ -14,6 +14,29 @@
 
 window.App = window.App || {};
 
+// ── Phase 8 v2: centralized IDP position helpers ─────────────
+// Scout's old lists were narrower than War Room's, so Psycho league (and
+// any league with NT/IDL/EDGE/MLB/SS/FS positions) lost IDP prospects.
+// Align with War Room's js/draft-room.js:58-70 so both apps agree.
+const IDP_RAW_POSITIONS = ['DL','DE','DT','NT','IDL','EDGE','LB','OLB','ILB','MLB','DB','CB','S','SS','FS'];
+const IDP_SLOT_TYPES    = ['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'];
+const IDP_MAPPED = ['DL','LB','DB'];
+
+function isIDPPosition(pos) { return IDP_RAW_POSITIONS.includes(pos); }
+function leagueHasIDPSlots(league) {
+  const rp = league?.roster_positions;
+  // If roster_positions data is missing (Sleeper occasionally delays this
+  // field on cold load), default to TRUE — better to over-include IDP and
+  // let users filter visually than to hide prospects they can draft.
+  if (!rp || !rp.length) {
+    console.warn('[draft] league.roster_positions unavailable — defaulting to IDP-on');
+    return true;
+  }
+  return rp.some(s => IDP_SLOT_TYPES.includes(s));
+}
+window.isIDPPosition = isIDPPosition;
+window.leagueHasIDPSlots = leagueHasIDPSlots;
+
 // ── Draft Sub-tabs (Board | Mock Draft) ───────────────────────
 function switchDraftView(view) {
     const boardEl = document.getElementById('draft-board-view');
@@ -376,19 +399,29 @@ function renderRookieBoard(){
   const el=$('rookie-profiles');if(!el)return;
   // Don't block on LI_LOADED — show what we have from Sleeper data
 
+  // Phase 8 v2: position mapper aligned with shared/utils.js normPos —
+  // collapses raw NFL positions (NT/IDL/EDGE/MLB/SS/FS etc.) into the
+  // fantasy display groups (DL/LB/DB). This must be wider than the old
+  // narrow posMapD so IDP prospects match the DL/LB/DB filter chips.
+  const posMapRookie = p => {
+    if (['DE','DT','NT','IDL','EDGE'].includes(p)) return 'DL';
+    if (['OLB','ILB','MLB'].includes(p)) return 'LB';
+    if (['CB','S','SS','FS'].includes(p)) return 'DB';
+    return p;
+  };
+
   // Get rookies from player database
   let rookies=Object.entries(S.players||{})
     .filter(([pid,p])=>p.years_exp===0&&p.status!=='Inactive'&&p.position&&!['HC','OC','DC','GM'].includes(p.position))
     .map(([pid,p])=>{
       const dhq=dynastyValue(pid)||0;
-      const pos=pPos(pid)||p.position;
+      const pos=posMapRookie(pPos(pid)||p.position);
       const rookieMeta=LI?.playerMeta?.[pid];
       if(dhq<=0&&!p.team&&rookieMeta?.source!=='FC_ROOKIE')return null;
-      // Check IDP filtering
+      // Check IDP filtering via shared helpers (Phase 8 v2)
       const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
-      const rp=league?.roster_positions||[];
-      const isIDP=['DL','DE','DT','LB','OLB','ILB','DB','CB','S'].includes(p.position);
-      const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+      const isIDP=isIDPPosition(p.position);
+      const leagueHasIDP=leagueHasIDPSlots(league);
       if(isIDP&&!leagueHasIDP)return null;
       const meta=LI?.playerMeta?.[pid]||{};
       const college=p.college||'';
@@ -432,11 +465,11 @@ function renderRookieBoard(){
   const sortInd=k=>_rookieSort.key===k?(_rookieSort.dir===-1?' \u25BC':' \u25B2'):'';
   const posFilters=['','QB','RB','WR','TE'];
 
-  // Check if league has K/IDP slots
+  // Check if league has K/IDP slots (Phase 8 v2 — via shared helpers)
   const league=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
   const rp=league?.roster_positions||[];
   const leagueHasK=rp.some(s=>s==='K');
-  const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+  const leagueHasIDP=leagueHasIDPSlots(league);
   if(leagueHasK)posFilters.push('K');
   if(leagueHasIDP)posFilters.push('DL','LB','DB');
 
@@ -965,14 +998,19 @@ let _mockMode='rookie'; // 'rookie' or 'startup'
 
 function startMockDraft(mode){
   const el=$('draft-mock');if(!el)return;
+  // Phase 9 v2: startup mock draft is disabled for now. Always run rookie mock.
+  if(mode==='startup'||_mockMode==='startup'){
+    if(typeof showToast==='function')showToast('Startup mock draft is coming soon — running rookie draft instead.');
+    _mockMode='rookie';
+  }
   if(!S.rosters?.length||!LI_LOADED){el.innerHTML='<div style="padding:16px;color:var(--text3);font-size:13px">Connect league and wait for data to load.</div>';return;}
-  if(mode)_mockMode=mode;
+  if(mode&&mode!=='startup')_mockMode=mode;
 
   const league=S.leagues.find(l=>l.league_id===S.currentLeagueId);
   const draftRounds=_mockMode==='rookie'?(league?.settings?.draft_rounds||4):Math.min(league?.settings?.draft_rounds||4,30);
   const teams=S.rosters.length;
   const rp=league?.roster_positions||[];
-  const leagueHasIDP=rp.some(s=>['DL','DE','DT','LB','DB','CB','S','IDP_FLEX'].includes(s));
+  const leagueHasIDP=leagueHasIDPSlots(league);
   const leagueHasK=rp.some(s=>s==='K');
 
   // Build available player pool
@@ -1400,15 +1438,18 @@ function onDraftTabOpen(){
     if(contentEl)contentEl.style.display='block';
     runDraftScouting();
   }
-  // Show mock draft start button with mode toggle (in the mock sub-tab)
+  // Phase 9 v2: mode toggle removed — only rookie mock draft is available.
+  // Startup is a future feature; the button is hidden and the force-rookie
+  // gate in startMockDraft handles any leftover deep links.
   const mockEl=$('draft-mock');
   if(mockEl&&!_mockState){
+    _mockMode='rookie';
     mockEl.innerHTML=`
-      <div style="display:flex;gap:6px;margin-bottom:10px">
-        <button onclick="_mockMode='rookie';document.querySelectorAll('.mock-mode-btn').forEach(b=>{b.style.background='transparent';b.style.color='var(--text3)';b.style.borderColor='var(--border)'});this.style.background='var(--accent)';this.style.color='var(--bg1)';this.style.borderColor='var(--accent)'" class="mock-mode-btn" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:${_mockMode==='rookie'?'var(--accent)':'transparent'};color:${_mockMode==='rookie'?'var(--bg1)':'var(--text3)'};border:1px solid ${_mockMode==='rookie'?'var(--accent)':'var(--border)'};border-radius:8px;cursor:pointer;font-family:inherit">Rookie Draft</button>
-        <button onclick="_mockMode='startup';document.querySelectorAll('.mock-mode-btn').forEach(b=>{b.style.background='transparent';b.style.color='var(--text3)';b.style.borderColor='var(--border)'});this.style.background='var(--accent)';this.style.color='var(--bg1)';this.style.borderColor='var(--accent)'" class="mock-mode-btn" style="flex:1;padding:8px;font-size:13px;font-weight:700;background:${_mockMode==='startup'?'var(--accent)':'transparent'};color:${_mockMode==='startup'?'var(--bg1)':'var(--text3)'};border:1px solid ${_mockMode==='startup'?'var(--accent)':'var(--border)'};border-radius:8px;cursor:pointer;font-family:inherit">Startup Draft</button>
+      <div style="padding:14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:10px;text-align:center">
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">Rookie Mock Draft</div>
+        <div style="font-size:12px;color:var(--text3);line-height:1.5">Simulate your upcoming rookie draft with real pool data, league draft order, and Alex's live picks.</div>
       </div>
-      <button onclick="startMockDraft()" style="width:100%;padding:12px;font-size:14px;font-weight:700;background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rl);color:var(--accent);cursor:pointer;font-family:inherit;transition:all .15s">Start Mock Draft</button>`;
+      <button onclick="startMockDraft('rookie')" style="width:100%;padding:14px;font-size:15px;font-weight:800;background:linear-gradient(135deg,var(--accent),#e8cc6c);border:none;border-radius:var(--rl);color:var(--bg1);cursor:pointer;font-family:inherit;transition:all .15s">Start Rookie Mock Draft</button>`;
   }
 }
 window.onDraftTabOpen=onDraftTabOpen;
