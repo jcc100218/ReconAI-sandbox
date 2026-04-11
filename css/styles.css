@@ -1125,14 +1125,45 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 .tbar-action-btn.hold{color:var(--green);border-color:rgba(46,204,113,.3)}
 .tbar-action-btn.trade{color:var(--accent);border-color:rgba(212,175,55,.3)}
 
-/* ── Global Chat Overlay / GM Bar (fixed, above mobile nav) ─── */
-.global-chat-overlay{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:680px;z-index:190;padding:0 12px;padding-bottom:env(safe-area-inset-bottom,0px);background:linear-gradient(to top,var(--bg) 55%,transparent);pointer-events:none}
+/* ── GM Bar — Claude-style launcher (Phase 7 v2) ────────────── */
+/* Scrim: semi-transparent backdrop, only visible + tappable when expanded */
+.gm-bar-scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .22s ease;z-index:189}
+body.gm-bar-active .gm-bar-scrim{opacity:1;pointer-events:auto}
+
+/* Outer overlay — fixed at bottom, grows upward on expand */
+.global-chat-overlay{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:680px;z-index:190;padding:0 12px;padding-bottom:env(safe-area-inset-bottom,0px);pointer-events:none}
 .global-chat-overlay>*{pointer-events:all}
-/* GM bar expansion: chips + Alex Learning are hidden by default, revealed on .expanded */
-.gm-bar-header{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.4,0,.2,1),opacity .2s;opacity:0;pointer-events:none}
-.global-chat-overlay.expanded .gm-bar-header{max-height:260px;opacity:1;pointer-events:all}
-.ctx-chips-row{display:flex;gap:7px;overflow-x:auto;padding:0 0 7px;scrollbar-width:none;-webkit-overflow-scrolling:touch;max-height:0;opacity:0;transition:max-height .28s cubic-bezier(.4,0,.2,1),opacity .2s,padding .28s}
-.global-chat-overlay.expanded .ctx-chips-row{max-height:80px;opacity:1;padding:8px 0 7px}
+
+/* Panel — collapsed is input only; expanded takes over most of the viewport */
+.gm-bar-panel{display:flex;flex-direction:column;background:linear-gradient(to top,var(--bg) 60%,var(--bg) 100%);border-radius:20px 20px 0 0;max-height:calc(100vh - 128px);transition:box-shadow .22s ease}
+.global-chat-overlay.expanded .gm-bar-panel{background:var(--bg);border:1px solid var(--border2);border-bottom:none;box-shadow:0 -12px 40px rgba(0,0,0,.45),0 -2px 12px rgba(212,175,55,.08);padding:0 14px 10px}
+
+/* Expanded body — the Claude-launcher-style content.
+   Use display:none/block rather than max-height so nothing in the cascade
+   can leave the body collapsed while still visible. */
+.gm-bar-body{display:none;opacity:0;pointer-events:none;transition:opacity .22s ease}
+.global-chat-overlay.expanded .gm-bar-body{display:block;opacity:1;pointer-events:auto;padding-top:4px;max-height:70vh;overflow-y:auto}
+
+/* Grab handle at top of expanded panel (mobile convention) */
+.gm-bar-grab{display:flex;align-items:center;justify-content:center;padding:10px 0 6px;position:relative}
+.gm-bar-grab-handle{width:40px;height:4px;border-radius:2px;background:var(--border2)}
+.gm-bar-close{position:absolute;right:0;top:4px;width:32px;height:32px;border-radius:10px;background:var(--bg2);border:1px solid var(--border2);color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.gm-bar-close:hover{background:var(--bg3);color:var(--accent);border-color:var(--accent)}
+
+/* Launcher row — 3 big quick-nav buttons */
+.gm-bar-launcher{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0 14px}
+.gm-launch-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 10px;background:linear-gradient(135deg,rgba(212,175,55,.08),var(--bg2));border:1px solid rgba(212,175,55,.25);border-radius:14px;cursor:pointer;font-family:inherit;color:var(--text);transition:all .18s;-webkit-tap-highlight-color:transparent}
+.gm-launch-btn svg{color:var(--accent);transition:transform .18s}
+.gm-launch-btn span{font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.gm-launch-btn:hover{border-color:rgba(212,175,55,.6);background:linear-gradient(135deg,rgba(212,175,55,.14),rgba(212,175,55,.04));transform:translateY(-2px);box-shadow:0 6px 18px rgba(212,175,55,.15)}
+.gm-launch-btn:hover svg{transform:scale(1.1)}
+.gm-launch-btn:active{transform:scale(.97)}
+
+/* GM strategy + Alex Learning block */
+.gm-bar-alex-block{padding:12px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:12px}
+
+/* Context chips */
+.ctx-chips-row{display:flex;gap:7px;overflow-x:auto;padding:0 0 6px;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-bottom:10px}
 .ctx-chips-row::-webkit-scrollbar{display:none}
 .ctx-chip{flex-shrink:0;background:var(--bg2);border:1px solid var(--border2);border-radius:22px;padding:5px 13px;cursor:pointer;font-family:inherit;transition:all .2s;text-align:left;-webkit-tap-highlight-color:transparent}
 .ctx-chip:hover,.ctx-chip:active{border-color:rgba(212,175,55,.45);background:var(--accentL);transform:translateY(-1px)}
@@ -1179,6 +1210,49 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 .field-log-time{font-size:11px;color:var(--text3);white-space:nowrap;padding-top:1px}
 .field-log-see-all{width:100%;margin-top:10px;padding:8px;background:none;border:1px solid var(--border2);border-radius:8px;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;-webkit-tap-highlight-color:transparent}
 .field-log-see-all:hover{background:var(--accentL)}
+
+/* ── League Command Center (Phase 5 v2) ─────────────────────── */
+/* Hero strip */
+.league-hero{display:flex;align-items:center;gap:12px;padding:10px 0 14px;margin-bottom:14px;border-bottom:1px solid rgba(212,175,55,.15)}
+.league-hero-back{width:36px;height:36px;border-radius:10px;background:var(--bg2);border:1px solid var(--border2);color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;padding:0;-webkit-tap-highlight-color:transparent}
+.league-hero-back:hover{background:var(--bg3);border-color:var(--accent)}
+.league-hero-avatar{width:44px;height:44px;border-radius:12px;object-fit:cover;flex-shrink:0;border:1px solid var(--border2)}
+.league-hero-body{flex:1;min-width:0;overflow:hidden}
+.league-hero-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.league-hero-meta{font-size:11px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.league-hero-record{font-size:15px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;padding:4px 10px;border-radius:8px;background:var(--accentL);border:1px solid rgba(212,175,55,.25);flex-shrink:0}
+
+/* Command menu + cards */
+.league-rooms-menu{display:flex;flex-direction:column;gap:12px;transition:opacity .18s ease,transform .18s ease}
+.league-rooms-menu.hiding{opacity:0;transform:translateY(-20px);pointer-events:none}
+.league-command-card{width:100%;display:flex;align-items:center;gap:14px;padding:18px 16px;background:var(--bg2);border:1px solid rgba(212,175,55,.22);border-radius:14px;cursor:pointer;font-family:inherit;text-align:left;transition:all .18s;-webkit-tap-highlight-color:transparent;position:relative;overflow:hidden}
+.league-command-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);opacity:0;transition:opacity .18s}
+.league-command-card:hover{border-color:rgba(212,175,55,.55);background:linear-gradient(135deg,rgba(212,175,55,.05),var(--bg2));transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.25),0 0 20px rgba(212,175,55,.08)}
+.league-command-card:hover::before{opacity:1}
+.league-command-card:active{transform:scale(.99)}
+.lcc-icon{font-size:28px;flex-shrink:0;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.18);border-radius:12px}
+.lcc-body{flex:1;min-width:0;overflow:hidden}
+.lcc-title{font-size:15px;font-weight:800;color:var(--text);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.lcc-preview{font-size:13px;color:var(--text2);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lcc-detail{font-size:11px;color:var(--text3);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lcc-chev{color:var(--accent);opacity:.6;flex-shrink:0;transition:transform .18s,opacity .18s}
+.league-command-card:hover .lcc-chev{transform:translateX(4px);opacity:1}
+
+/* Rooms */
+.league-room{opacity:0;transform:translateX(20px);transition:opacity .22s ease,transform .22s ease}
+.league-room.active{opacity:1;transform:translateX(0)}
+.league-room-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 0 12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.league-room-title{font-size:14px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
+.league-room-action{font-size:12px;font-weight:700;color:var(--accent);background:var(--accentL);border:1px solid rgba(212,175,55,.3);border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.league-room-action:hover{background:rgba(212,175,55,.15)}
+
+/* Team grid */
+.league-teams-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+@media (max-width:360px){.league-teams-grid{grid-template-columns:1fr}}
+.league-team-card-mini{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;font-family:inherit;text-align:left;transition:all .15s;-webkit-tap-highlight-color:transparent;width:100%}
+.league-team-card-mini:hover{border-color:rgba(212,175,55,.4);background:var(--bg3)}
+.league-team-card-mini:active{transform:scale(.98)}
+.league-team-card-mini.league-team-card-me{border-color:rgba(212,175,55,.35);background:linear-gradient(135deg,rgba(212,175,55,.05),var(--bg2))}
 
 /* ── League Panel — owner cards ─────────────────────────────── */
 .league-card{display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:11px 14px;margin-bottom:6px;cursor:pointer;transition:all .15s;-webkit-tap-highlight-color:transparent}

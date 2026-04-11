@@ -357,35 +357,8 @@
         </div>
       </div>
 
-      <!-- Top Pickup hero card -->
-      <div id="wv-top-pickup"></div>
-
-      <!-- Generate + AI queue -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <div class="home-sec-title" style="margin-bottom:0">Waiver Queue</div>
-        <button class="btn btn-sm" onclick="runWaiverAgent()" id="wq-btn" style="min-width:90px">Generate</button>
-      </div>
-      <span id="waiver-faab-hint" style="display:none"></span>
-      <span id="available-count-queue" style="display:none"></span>
-      <div id="wq-list" style="margin-bottom:14px">
-        <div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">
-          Tap <strong>Generate</strong> for personalized waiver recommendations.
-        </div>
-      </div>
-
-      <!-- Waiver chat history (input handled by global chat bar) -->
-      <div id="wq-chat-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease;margin-bottom:8px"></div>
-      <input type="text" id="wq-chat-in" style="display:none" onkeydown="if(event.key==='Enter')sendWaiverChat()"/>
-
-      <!-- Top 5 Available -->
-      <div id="waiver-top5-section" style="margin-top:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em">Top Available</div>
-          <div id="waiver-top5-sorts" style="display:flex;gap:4px"></div>
-        </div>
-        <div id="waiver-pos-filters" style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap"></div>
-        <div id="waiver-top5-list"></div>
-      </div>
+      <!-- Alex Top 5 waiver targets — the only waivers surface now -->
+      <div id="waiver-alex-top5"></div>
     </div>
 
     <!-- TRADE FINDER -->
@@ -777,26 +750,58 @@
   </div>
 </div>
 
-<!-- Global Chat Overlay (the "GM bar" — unified search + chat + AI GM surface) -->
+<!-- GM Bar — Claude-style launcher that expands to take over ~70% of the viewport -->
+<div class="gm-bar-scrim" id="gm-bar-scrim" onclick="_gmBarCollapse()"></div>
 <div class="global-chat-overlay" id="global-chat-overlay">
-  <!-- GM bar header: AI GM strategy + Alex Learning + prompt chips (revealed on expand) -->
-  <div class="gm-bar-header">
-    <div id="gm-bar-alex" style="padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;margin-bottom:8px;font-size:12px;color:var(--text2);line-height:1.5"></div>
-    <div class="ctx-chips-row" id="ctx-chips-row">
-      <!-- populated by scout-ui.js renderCtxChips() -->
+  <div class="gm-bar-panel">
+    <!-- Expanded body: launcher + Alex block + chips. Hidden when collapsed. -->
+    <div class="gm-bar-body">
+      <!-- Grab handle + close for expanded state -->
+      <div class="gm-bar-grab">
+        <div class="gm-bar-grab-handle"></div>
+        <button class="gm-bar-close" onclick="_gmBarCollapse()" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <!-- Quick-launch buttons (Waivers / Trades / Draft) -->
+      <div class="gm-bar-launcher">
+        <button class="gm-launch-btn" onclick="_gmLaunchWaivers()">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span>Waivers</span>
+        </button>
+        <button class="gm-launch-btn" onclick="_gmLaunchTrades()">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span>Trades</span>
+        </button>
+        <button class="gm-launch-btn" onclick="_gmLaunchDraft()">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Draft</span>
+        </button>
+      </div>
+
+      <!-- GM Strategy + Alex Learning summary (compact block) -->
+      <div id="gm-bar-alex" class="gm-bar-alex-block"></div>
+
+      <!-- Context prompt chips -->
+      <div class="ctx-chips-row" id="ctx-chips-row">
+        <!-- populated by scout-ui.js renderCtxChips() -->
+      </div>
     </div>
-  </div>
-  <!-- Unified search results dropdown (appears above chat bar) -->
-  <div id="unified-search-results" style="display:none;max-height:240px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:12px 12px 0 0;margin-bottom:-1px;box-shadow:0 -4px 20px rgba(0,0,0,.25)"></div>
-  <div class="global-chat-row">
-    <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Click here to ask Scout…" autocomplete="off"
-      onfocus="_gmBarExpand()"
-      onblur="_gmBarCollapseSoon()"
-      oninput="handleUnifiedInput(this.value)"
-      onkeydown="if(event.key==='Enter')handleUnifiedEnter(event);if(event.key==='Escape'){this.value='';document.getElementById('unified-search-results').style.display='none';this.blur();}"/>
-    <button class="global-chat-send" onclick="sendGlobalChat()" aria-label="Send">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-    </button>
+
+    <!-- Unified search results dropdown (appears above chat input) -->
+    <div id="unified-search-results" style="display:none;max-height:240px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:12px 12px 0 0;margin-bottom:-1px;box-shadow:0 -4px 20px rgba(0,0,0,.25)"></div>
+
+    <!-- Chat input — pinned at the bottom of the panel, visible in both collapsed and expanded states -->
+    <div class="global-chat-row">
+      <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Click here to ask Scout…" autocomplete="off"
+        onfocus="_gmBarExpand()"
+        oninput="handleUnifiedInput(this.value)"
+        onkeydown="if(event.key==='Enter')handleUnifiedEnter(event);if(event.key==='Escape'){this.value='';document.getElementById('unified-search-results').style.display='none';_gmBarCollapse();}"/>
+      <button class="global-chat-send" onclick="sendGlobalChat()" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 

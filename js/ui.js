@@ -503,8 +503,17 @@ function availSort(key){
   renderAvailable();
 }
 
+// Phase 6 v2: renderAvailable/renderTopPickupHero/renderWaiverTop5 are
+// deprecated. They're replaced by renderWaiverAlexTop5 below (defined
+// inline after renderWaivers). These legacy entry points are retained as
+// no-ops so old onclick handlers and tab-switch hooks don't throw.
+function _legacyRenderAvailable_deprecated(){ /* stub */ }
+function _legacyRenderTopPickupHero_deprecated(){ /* stub */ }
+
 function renderAvailable(){
   const tbody=$('avail-tbody');if(!tbody)return;
+  // New behavior: redirect to the Alex top-5 if the new container exists
+  if (document.getElementById('waiver-alex-top5')) { if (typeof renderWaiverAlexTop5 === 'function') renderWaiverAlexTop5(); return; }
 
   if(!LI_LOADED&&Object.keys(S.playerStats||{}).length===0){
     tbody.innerHTML=`<div style="padding:12px">
@@ -934,7 +943,7 @@ function renderTopPickupHero(){
 function renderWaivers(){
   loadMentality();
 
-  // FAAB context banner
+  // FAAB context banner (unchanged — still populates the faab-bar container)
   if(S.myRosterId){
     const faab=getFAAB();
     const slots=getRosterSlots();
@@ -947,7 +956,6 @@ function renderWaivers(){
     })();
     const bar=$('faab-bar');if(bar)bar.style.display='block';
 
-    // Context line
     const ctxLine=$('faab-context-line');
     if(ctxLine){
       if(faab.isFAAB&&faab.budget>0){
@@ -959,7 +967,6 @@ function renderWaivers(){
       }
     }
 
-    // Sub-stats
     const mineEl=$('faab-mine');if(mineEl)mineEl.innerHTML=faab.isFAAB?'FAAB: $'+faab.remaining:'';
     const avgEl=$('faab-avg');if(avgEl)avgEl.innerHTML=faab.isFAAB?'Lg avg: $'+leagueFaab.avg:'';
     const slotsEl=$('bench-slots');if(slotsEl){
@@ -968,28 +975,139 @@ function renderWaivers(){
     const wposEl=$('waiver-pos-display');if(wposEl)wposEl.innerHTML='Priority: #'+(myR()?.settings?.waiver_position||'?');
   }
 
-  // Top pickup hero
-  renderTopPickupHero();
-  renderAvailable();
-  renderWaiverTop5();
-
-
-  // League waiver claims
-  const claimsEl=$('waiver-claims');
-  if(claimsEl){
-  const claims=(S.transactions['w'+S.currentWeek]||[]).filter(t=>t.type==='free_agent'||t.type==='waiver').slice(0,12);
-  claimsEl.innerHTML=claims.length?claims.map(t=>{
-    const adds=Object.keys(t.adds||{});const drops=Object.keys(t.drops||{});
-    const r=S.rosters.find(r=>t.roster_ids?.includes(r.roster_id));
-    const owner=r?getUser(r.owner_id):'?';
-    const isMe=r?.roster_id===S.myRosterId;
-    return`<div class="pr" ${isMe?'style="background:var(--accentL);border-radius:6px;padding:7px 8px;margin:0 -8px"':''}>
-      <span class="pn" style="font-weight:${isMe?500:400}">${owner}${isMe?' (you)':''}</span>
-      <span class="pm">${adds.map(p=>`<span style="color:var(--green)">+${pName(p)}</span>`).join(', ')}${drops.length?' / '+drops.map(p=>`<span style="color:var(--red)">-${pName(p)}</span>`).join(', '):''}${t.settings?.waiver_bid?` <span style="color:var(--amber)">$${t.settings.waiver_bid}</span>`:''}</span>
-    </div>`;
-  }).join(''):'<div class="empty">No claims this week.</div>';
-  }
+  // Phase 6 v2: waiver queue + single hero are gone. One call now.
+  renderWaiverAlexTop5();
 }
+
+// ── Alex Top 5 — the new waivers surface ────────────────────────
+// Five Alex-says-styled cards, each a tappable waiver target with a
+// reason line. Replaces the old renderTopPickupHero + renderAvailable
+// + renderWaiverTop5 trio. Target container: #waiver-alex-top5.
+function renderWaiverAlexTop5() {
+  const el = document.getElementById('waiver-alex-top5');
+  if (!el) return;
+  if (!LI_LOADED || !S.rosters?.length) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">Connect your league to see waiver recommendations.</div>';
+    return;
+  }
+
+  const avail = getAvailablePlayers();
+  if (!avail.length) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">No urgent targets — check back after waivers process.</div>';
+    return;
+  }
+
+  const strat = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
+  const aggression = strat.aggression || 'medium';
+  const aggrMult = aggression === 'high' ? 1.4 : aggression === 'low' ? 0.7 : 1.0;
+  const targetPositions = strat.targetPositions || [];
+  const assess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
+  const faab = getFAAB();
+  const faabMarket = LI_LOADED && LI.faabByPos ? LI.faabByPos : {};
+  const posMapF = p => { if (['DE','DT'].includes(p)) return 'DL'; if (['CB','S'].includes(p)) return 'DB'; return p; };
+  const needPositions = (assess?.needs || []).map(n => typeof n === 'string' ? n : n.pos).filter(Boolean);
+  const topNeed = needPositions[0];
+
+  const floorTeams = S.rosters?.length || 12;
+  const floor = floorTeams >= 14 ? 1800 : floorTeams >= 12 ? 1500 : floorTeams >= 10 ? 1200 : 800;
+
+  // Score every available player. Reasons are precomputed per card.
+  const scored = avail
+    .filter(a => a.val > 0)
+    .map(a => {
+      const mPos = posMapF(a.p.position);
+      const isNeedFit = topNeed && mPos === topNeed;
+      const isTargetFit = targetPositions.includes(mPos);
+      // Soft boost for need/target positions; higher floor penalty for low DHQ
+      let score = a.val;
+      if (isNeedFit) score *= 1.35;
+      else if (isTargetFit) score *= 1.18;
+      if (a.val < floor) score *= 0.7;
+      return { ...a, mPos, score, isNeedFit, isTargetFit };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  if (!scored.length) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">No viable targets yet — adjust position filters or strategy.</div>';
+    return;
+  }
+
+  const urgencyColor = aggression === 'high' ? 'var(--red)' : aggression === 'low' ? 'var(--text3)' : 'var(--amber)';
+  const urgencyLabel = aggression === 'high' ? 'Act now' : aggression === 'low' ? 'Worth a look' : 'This week';
+
+  const cards = scored.map((a, i) => {
+    const { id: pid, p, val, mPos, isNeedFit, isTargetFit } = a;
+    const stats = S.playerStats?.[pid] || {};
+    const sc = S.leagues?.find(l => l.league_id === S.currentLeagueId)?.scoring_settings || {};
+    const isIDP = ['DL','LB','DB'].includes(mPos);
+    const raw = stats?.prevRawStats;
+    const ppg = isIDP && raw ? +(calcIDPScore(raw, sc) / Math.max(1, raw.gp || 17)).toFixed(1) : (stats.seasonAvg || stats.prevAvg || 0);
+    const pk = typeof peakYears === 'function' ? peakYears(pid) : { label: '', desc: '' };
+    const meta = LI.playerMeta?.[pid];
+    const peakYrs = meta?.peakYrsLeft || 0;
+
+    // FAAB bid
+    const market = faabMarket[mPos];
+    let bidAmt = 0;
+    if (market && market.count >= 3 && faab.budget > 0 && faab.isFAAB) {
+      const fl = faab.minBid || 1;
+      const rawBid = Math.round(faab.remaining * 0.12) * aggrMult;
+      bidAmt = Math.max(fl, Math.min(Math.round(rawBid), Math.round(market.avg * (val / 4000) * aggrMult), faab.remaining));
+    } else if (faab.budget > 0 && faab.isFAAB && val > 0) {
+      const fl = faab.minBid || 1;
+      bidAmt = Math.max(fl, Math.min(Math.round(faab.remaining * 0.10 * aggrMult), Math.round(val / 200 * aggrMult), faab.remaining));
+    }
+
+    // Alex-says reason (priority: need > target > tier > ppg > fallback)
+    let reason = '';
+    if (isNeedFit) reason = `Fills your ${mPos} gap.`;
+    else if (isTargetFit) reason = `Hits your ${mPos} strategy target.`;
+    else if (val >= 4000) reason = `Elite dynasty value at ${val.toLocaleString()} DHQ — rare for a waiver.`;
+    else if (ppg >= 12) reason = `${ppg.toFixed(1)} PPG last season — steady producer.`;
+    else if (peakYrs >= 3) reason = `Age ${p.age || '?'} with ${peakYrs} peak years ahead — upside stash.`;
+    else if (val >= 2000) reason = `Solid depth piece at ${val.toLocaleString()} DHQ.`;
+    else reason = `Speculative add — watch for snaps and role growth.`;
+
+    // Headline
+    const headline = bidAmt
+      ? `Bid $${bidAmt} on ${pName(pid)}.`
+      : `Add ${pName(pid)}.`;
+
+    const alignBadge = isNeedFit
+      ? '<span style="font-size:9px;font-weight:700;color:var(--green);padding:1px 6px;border:1px solid rgba(52,211,153,.3);border-radius:6px">NEED</span>'
+      : isTargetFit
+      ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 6px;border:1px solid rgba(212,175,55,.3);border-radius:6px">TARGET</span>'
+      : '';
+
+    const rankBadge = i === 0
+      ? '<span style="font-size:9px;font-weight:700;color:var(--bg1);padding:1px 6px;border-radius:6px;background:var(--accent);letter-spacing:.04em">TOP PICK</span>'
+      : '';
+
+    return `<div class="wv-hero" style="margin-bottom:10px;cursor:pointer" onclick="openPlayerModal('${pid}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Alex says</span>
+        <span style="font-size:10px;color:var(--text3)">·</span>
+        <span style="font-size:10px;font-weight:700;color:${urgencyColor}">${urgencyLabel}</span>
+        ${rankBadge}
+        ${alignBadge}
+      </div>
+      <div style="font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:var(--text)">
+        ${escHtml(headline)}
+      </div>
+      <div style="font-size:14px;color:var(--text2);margin-top:4px;line-height:1.4">${escHtml(reason)}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px;font-family:'JetBrains Mono',monospace">
+        ${mPos} · ${escHtml(fullTeam(p.team) || p.team || 'FA')} · Age ${p.age || '?'} · ${val.toLocaleString()} DHQ${ppg ? ' · ' + ppg.toFixed(1) + ' PPG' : ''}
+      </div>
+      ${bidAmt ? `<div style="margin-top:8px;padding:6px 10px;background:rgba(212,175,55,.08);border-left:2px solid var(--accent);border-radius:4px;font-size:12px;color:var(--text2)">
+        <strong style="color:var(--accent)">Suggested bid: $${bidAmt}</strong>${faab.remaining ? ' of $' + faab.remaining + ' remaining' : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = cards;
+}
+window.renderWaiverAlexTop5 = renderWaiverAlexTop5;
 
 // ── Trades ─────────────────────────────────────────────────────
 function renderTrades(){
@@ -2583,113 +2701,71 @@ function _getHomeWaiverRec() {
   return { id: best.id, p: best.p, val: best.val, pos: posMapF(best.p.position) };
 }
 
-// ── Master home render — v4 components only ──────────────────
-// Phase 3 reshuffle: Field Intel → Next Move → Priorities → Opportunities.
-// Alex Identity, Strategy Sync, and Diagnosis blocks removed from home —
-// they live in the GM bar (Phase 6) and Activity tab respectively.
+// ── Master home render ──────────────────────────────────────────
+// Phase 4 v2: Field Intel (top, calendar-aware) + 5 Priorities only.
+// Alex Identity, Strategy Sync, Diagnosis, Next Move, and Opportunities
+// are all removed from home per user request. The home screen is now a
+// "what should I do next" surface, nothing else.
 function renderMobileHome() {
   const el = document.getElementById('digest-content');
   if (!el) return;
 
-  // Use GMEngine if available
   const engine = window.GMEngine;
-
   if (!engine) {
-    // Fallback to old rendering if engine not loaded
     if (typeof renderScoutBriefing === 'function') renderScoutBriefing();
     if (typeof renderFieldLogCard === 'function') renderFieldLogCard();
     return;
   }
 
-  const nextMove = engine.generateNextMove();
   const priorities = engine.generatePriorities();
-  const opportunities = engine.generateOpportunities();
   const fieldIntel = engine.generateFieldIntel();
+  const cal = window.SeasonCalendar;
+  const phaseInfo = cal?.describe ? cal.describe() : null;
 
   let html = '';
 
-  // ── FIELD INTEL (top) ──
+  // ── FIELD INTEL (top, hero treatment) ──
+  // Larger header, card background, more prominent — this is the
+  // calendar-aware line-of-sight block that tells the user what phase
+  // of the dynasty cycle they're in and what to focus on.
   if (fieldIntel && fieldIntel.length) {
-    html += `<div style="margin:12px 0 14px;"><div style="font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:1px;margin-bottom:8px;">🧠 FIELD INTEL</div>`;
+    const phaseLabel = phaseInfo?.label || 'Field Intel';
+    const milestone = phaseInfo?.nextMilestone && phaseInfo?.weeksToNext != null
+      ? `${phaseInfo.nextMilestone} · ${phaseInfo.weeksToNext} ${phaseInfo.weeksToNext === 1 ? 'week' : 'weeks'}`
+      : '';
+    html += `<div style="margin:14px 0 18px;padding:14px 16px;background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.18);border-radius:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">🧠</span>
+          <span style="font-size:13px;font-weight:800;color:#D4AF37;letter-spacing:1px;text-transform:uppercase">Field Intel</span>
+          <span style="font-size:11px;color:#9090A8;font-weight:600">· ${escHtml(phaseLabel)}</span>
+        </div>
+        ${milestone ? `<span style="font-size:11px;color:#D4AF37;font-weight:700;font-family:'JetBrains Mono',monospace">${escHtml(milestone)}</span>` : ''}
+      </div>`;
     fieldIntel.forEach(fi => {
-      html += `<div style="font-size:12px;color:#9090A8;padding:4px 0;line-height:1.5;">· ${fi}</div>`;
+      html += `<div style="font-size:13px;color:#CCC;padding:5px 0;line-height:1.5">· ${fi}</div>`;
     });
     html += `</div>`;
   }
 
-  // ── NEXT MOVE ──
-  if (nextMove && nextMove.type !== 'hold') {
-    const confColor = nextMove.confidence === 'high' ? '#2ECC71' : nextMove.confidence === 'medium' ? '#F0A500' : '#9090A8';
-    html += `<div style="margin:14px 0;padding:16px;background:#1A1A1A;border:1px solid rgba(212,175,55,0.4);border-radius:10px;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#D4AF37,#B8941F);"></div>
-      <div style="font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:1px;margin-bottom:8px;">⚡ NEXT MOVE</div>
-      <div style="font-size:15px;font-weight:600;color:#E8E8F0;line-height:1.4;">${nextMove.action}</div>
-      <div style="font-size:12px;color:#9090A8;margin-top:6px;">Confidence: <span style="color:${confColor};font-weight:600;">${nextMove.confidence}</span> · Window: ${nextMove.urgency?.replace(/_/g,' ')||'—'}</div>
-      ${nextMove.reasoning ? `<div style="font-size:12px;color:#606078;margin-top:4px;">${nextMove.reasoning}</div>` : ''}
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Build a trade for ${(nextMove.action||'').replace(/'/g,'')}')" style="padding:8px 16px;border-radius:6px;background:#D4AF37;border:none;color:#000;font-size:12px;font-weight:700;cursor:pointer;">Build Trade</button>
-        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Why should I ${(nextMove.action||'').replace(/'/g,'')}')" style="padding:8px 16px;border-radius:6px;background:transparent;border:1px solid rgba(212,175,55,0.3);color:#D4AF37;font-size:12px;font-weight:600;cursor:pointer;">See Why</button>
-      </div>
-    </div>`;
-  }
-
-  // ── PRIORITIES ──
+  // ── PRIORITIES (main content) ──
+  // Bigger rows, bigger buttons — this is the main interaction on home now.
   if (priorities && priorities.length) {
-    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#E74C3C;letter-spacing:1px;margin-bottom:8px;">🎯 PRIORITIES</div>`;
-    priorities.forEach((p,i) => {
-      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="flex:1;"><div style="font-size:13px;color:#E8E8F0;">${i+1}. ${p.problem}</div><div style="font-size:11px;color:#9090A8;">${p.consequence||''}</div></div>
-        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Help me ${p.actionLabel||'fix this'}')" style="padding:6px 14px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">${p.actionLabel||'Fix'}</button>
+    html += `<div style="margin:18px 0">
+      <div style="font-size:13px;font-weight:800;color:#E74C3C;letter-spacing:1px;margin-bottom:12px;text-transform:uppercase">🎯 Priorities</div>`;
+    priorities.forEach((p, i) => {
+      const safeLabel = (p.actionLabel || 'fix this').replace(/'/g, "\\'");
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.05);gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;color:#E8E8F0;font-weight:600;line-height:1.3">
+            <span style="color:#D4AF37;font-weight:800;margin-right:6px">${i + 1}.</span>${p.problem}
+          </div>
+          <div style="font-size:12px;color:#9090A8;margin-top:3px;line-height:1.4">${p.consequence || ''}</div>
+        </div>
+        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Help me ${safeLabel}')" style="padding:9px 16px;border-radius:8px;border:1px solid rgba(212,175,55,0.35);background:rgba(212,175,55,0.08);color:#D4AF37;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit;flex-shrink:0">${escHtml(p.actionLabel || 'Fix')}</button>
       </div>`;
     });
     html += `</div>`;
-  }
-
-  // ── OPPORTUNITIES — top 2 teams + 1 waiver ──
-  // Re-rank opportunities so a target that holds the user's top need position
-  // bubbles to the top, then slice to 2. Append one waiver rec as a third row.
-  let oppHtml = '';
-  if (opportunities && opportunities.length) {
-    const myAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
-    const myTopNeedRaw = myAssess?.needs?.[0];
-    const myTopNeed = typeof myTopNeedRaw === 'string' ? myTopNeedRaw : myTopNeedRaw?.pos;
-
-    const ranked = [...opportunities].sort((a, b) => {
-      if (!myTopNeed) return (b.exploitScore || 0) - (a.exploitScore || 0);
-      const aAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(a.rosterId) : null;
-      const bAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(b.rosterId) : null;
-      const aHas = (aAssess?.strengths || []).some(s => (typeof s === 'string' ? s : s?.pos) === myTopNeed) ? 1 : 0;
-      const bHas = (bAssess?.strengths || []).some(s => (typeof s === 'string' ? s : s?.pos) === myTopNeed) ? 1 : 0;
-      if (aHas !== bHas) return bHas - aHas;
-      return (b.exploitScore || 0) - (a.exploitScore || 0);
-    }).slice(0, 2);
-
-    ranked.forEach(o => {
-      oppHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="width:32px;height:32px;border-radius:50%;background:#242424;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9090A8;">${(o.ownerName||'?').slice(0,2).toUpperCase()}</div>
-        <div style="flex:1;"><div style="font-size:13px;color:#E8E8F0;font-weight:600;">${o.ownerName||'Unknown'}</div><div style="font-size:11px;color:#9090A8;">${o.insight||''}</div></div>
-        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Build a trade with ${(o.ownerName||'').replace(/'/g,'')}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;">Build Trade</button>
-      </div>`;
-    });
-  }
-
-  // Append 1 waiver recommendation as a third opportunity row
-  const waiverRec = _getHomeWaiverRec();
-  if (waiverRec) {
-    const wvName = pName(waiverRec.id);
-    const safeName = (wvName || '').replace(/'/g, "\\'");
-    oppHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-      <div style="width:32px;height:32px;border-radius:50%;background:rgba(52,211,153,.12);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#2ECC71;">FA</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;color:#E8E8F0;font-weight:600;">${wvName} <span style="font-size:9px;font-weight:700;color:#2ECC71;padding:1px 5px;border:1px solid rgba(52,211,153,.3);border-radius:6px;margin-left:4px">WAIVER</span></div>
-        <div style="font-size:11px;color:#9090A8;">${waiverRec.pos} · ${(waiverRec.val||0).toLocaleString()} DHQ — fits your ${waiverRec.pos} need</div>
-      </div>
-      <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Help me claim ${safeName}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;">Add</button>
-    </div>`;
-  }
-
-  if (oppHtml) {
-    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#F0A500;letter-spacing:1px;margin-bottom:8px;">🔥 OPPORTUNITIES</div>${oppHtml}</div>`;
   }
 
   el.innerHTML = html;
