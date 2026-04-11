@@ -94,38 +94,40 @@ function _mflUrl(year, type, leagueId, apiKey, extra) {
   return url;
 }
 
-// CORS proxy chain — MFL API only allows its own origin
-const _CORS_PROXIES = [
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-];
+// ── MFL proxy via Supabase Edge Function ─────────────────────────
+// MFL blocks all cross-origin browser requests (no CORS headers).
+// Route through our own Edge Function which relays server-side.
+function _getProxyUrl() {
+  const base = window.OD?.SUPABASE_URL || window.App?.SUPABASE_URL;
+  return base ? base + '/functions/v1/mfl-proxy' : null;
+}
 
 async function _mflGet(url) {
-  // Try each CORS proxy in order
-  for (const makeProxy of _CORS_PROXIES) {
-    try {
-      const proxyUrl = makeProxy(url);
-      const res = await fetch(proxyUrl);
-      if (res.ok) {
-        const text = await res.text();
-        try { return JSON.parse(text); } catch (_e) { continue; }
-      }
-    } catch (_e) { /* try next proxy */ }
-  }
+  const proxyUrl = _getProxyUrl();
 
-  // Fallback: direct fetch (works on localhost or if MFL fixes CORS)
-  try {
-    const res = await fetch(url);
+  // Primary path: Supabase Edge Function proxy
+  if (proxyUrl) {
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
     if (!res.ok) {
-      if (res.status === 401 || res.status === 403) {
-        throw new Error('This MFL league is private. Provide your API key to connect.');
-      }
-      throw new Error('MFL API error ' + res.status + '. Check your League ID and year.');
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'MFL proxy error ' + res.status);
     }
     return res.json();
-  } catch (_directErr) {
-    throw new Error('Could not connect to MFL. Try refreshing the page or check your League ID.');
   }
+
+  // Fallback: direct fetch (works on localhost or same-origin)
+  const res = await fetch(url);
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('This MFL league is private. Provide your API key to connect.');
+    }
+    throw new Error('MFL API error ' + res.status + '. Check your League ID and year.');
+  }
+  return res.json();
 }
 
 /**
@@ -576,9 +578,13 @@ async function connectLeague(leagueId, year, apiKey, myFranchiseId) {
     fetchDraftResults(leagueId, year, apiKey).catch(() => []),
   ]);
 
-  // Store transactions keyed by week (consistent with Sleeper format)
+  // Store transactions keyed by week (consistent with Sleeper format).
+  // MFL doesn't expose which week a transaction belongs to, so we bucket
+  // every MFL transaction under the current week — that's the key the
+  // League screen (ui.js) reads via `S.transactions['w'+S.currentWeek]`.
   const txnsByWeek = {};
-  txns.forEach(t => { const key = 'w0'; if (!txnsByWeek[key]) txnsByWeek[key] = []; txnsByWeek[key].push(t); });
+  const curWeekKey = 'w' + (S.currentWeek != null ? S.currentWeek : 0);
+  txns.forEach(t => { if (!txnsByWeek[curWeekKey]) txnsByWeek[curWeekKey] = []; txnsByWeek[curWeekKey].push(t); });
   S.transactions = txnsByWeek;
 
   // Extract traded picks from trade transactions
@@ -624,5 +630,12 @@ window.MFL = {
   // Main connect
   connectLeague,
 };
+
+// Expose the current crosswalk via a getter so dhq-providers.js can read
+// window.MFL._crosswalk regardless of call order.
+Object.defineProperty(window.MFL, '_crosswalk', {
+  get: () => _crosswalk,
+  configurable: true,
+});
 
 })();

@@ -153,7 +153,8 @@ const MFLProvider = {
   _getMflConfig() {
     const S = window.App.S || window.S;
     // Extract raw MFL league ID from our prefixed ID (mfl_41969_2026 → 41969)
-    const rawId = (S?.mflLeagueId || '').replace(/^mfl_/, '') || S?.currentLeagueId?.replace(/^mfl_(\d+)_\d+$/, '$1') || '';
+    // Also handles hash fragments like mfl_41969#0_2026
+    const rawId = (S?.mflLeagueId || '').replace(/^mfl_/, '').replace(/#.*$/, '') || S?.currentLeagueId?.replace(/^mfl_(\d+)[#_].*$/, '$1') || '';
     const apiKey = S?._mflApiKey || '';
     return { rawId, apiKey };
   },
@@ -166,24 +167,28 @@ const MFLProvider = {
   },
 
   async _mflGet(url) {
-    // MFL API doesn't support CORS for arbitrary origins — use proxy on localhost
-    const needsProxy = typeof window !== 'undefined' && (window.location.protocol === 'http:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-    const fetchUrl = needsProxy ? `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` : url;
+    // MFL blocks all cross-origin requests — route through our Edge Function proxy
+    const base = window.OD?.SUPABASE_URL || window.App?.SUPABASE_URL;
+    if (base) {
+      try {
+        const res = await fetch(base + '/functions/v1/mfl-proxy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+        if (!res.ok) return null;
+        return res.json();
+      } catch (e) {
+        console.warn('[MFL] Proxy fetch error:', e);
+        return null;
+      }
+    }
+    // Fallback: direct fetch (same-origin only)
     try {
-      const res = await fetch(fetchUrl);
+      const res = await fetch(url);
       if (!res.ok) return null;
       return res.json();
-    } catch (e) {
-      // Fallback: try corsproxy.io if allorigins fails
-      if (needsProxy) {
-        try {
-          const res2 = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-          if (!res2.ok) return null;
-          return res2.json();
-        } catch { return null; }
-      }
-      return null;
-    }
+    } catch { return null; }
   },
 
   async getLeagueChain(leagueId, currentSeason) {

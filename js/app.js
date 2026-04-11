@@ -1056,7 +1056,7 @@ async function loadAllData(){
   prog(5);
   // ── Registry upsert with fresh metadata ───────────────────────
   try{
-    const _plat=S.user?.user_id==='espn_user'?'espn':S.user?.user_id==='yahoo_user'?'yahoo':localStorage.getItem('mfl_league_id')===S.currentLeagueId?'mfl':'sleeper';
+    const _plat=S.platform==='mfl'?'mfl':S.user?.user_id==='espn_user'?'espn':S.user?.user_id==='yahoo_user'?'yahoo':'sleeper';
     const _myR=S.rosters?.find(r=>String(r.roster_id)===String(S.myRosterId));
     const _lObj=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
     if(typeof saveLeagueToRegistry==='function')saveLeagueToRegistry({
