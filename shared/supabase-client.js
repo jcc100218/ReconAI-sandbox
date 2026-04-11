@@ -721,6 +721,172 @@ window.OD.loadFieldLog = async function(leagueId, limit) {
 };
 
 // ══════════════════════════════════════════════════════════════════
+// AI CHAT MEMORY — shared between War Room Scout and War Room (Phase 7B)
+// Run this SQL in Supabase to create the ai_chat_memory table:
+//
+// create table if not exists public.ai_chat_memory (
+//   id uuid primary key default gen_random_uuid(),
+//   username text not null references public.users(sleeper_username) on delete cascade,
+//   league_id text,
+//   ts bigint not null,
+//   session_label text,
+//   summary text not null,
+//   source text default 'scout',
+//   created_at timestamptz default now()
+// );
+// create index if not exists ai_chat_memory_username_ts_idx on public.ai_chat_memory(username, ts desc);
+// ══════════════════════════════════════════════════════════════════
+
+let _chatMemoryDbDisabled = false;
+
+// Save a rolling chat memory summary to Supabase. Non-blocking; failures
+// do not interrupt the in-memory / localStorage path in ai-chat.js.
+window.OD.saveChatMemory = async function(entry) {
+    if (_chatMemoryDbDisabled) return false;
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username || !entry?.summary) return false;
+    try {
+        await ensureUser(username);
+        const { error } = await db.from('ai_chat_memory').insert({
+            username,
+            league_id: entry.leagueId || null,
+            ts: entry.ts || Date.now(),
+            session_label: entry.sessionLabel || null,
+            summary: entry.summary,
+            source: entry.source || 'scout',
+        });
+        if (error) {
+            if (error.code === '42501' || error.message?.includes('row-level security') || error.code === '401') {
+                _chatMemoryDbDisabled = true;
+            }
+            return false;
+        }
+        return true;
+    } catch (e) {
+        _chatMemoryDbDisabled = true;
+        return false;
+    }
+};
+
+// Load the most recent chat memory summaries for the current user/league.
+window.OD.loadChatMemory = async function(leagueId, limit) {
+    if (_chatMemoryDbDisabled) return null;
+    limit = limit || 6;
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return null;
+    try {
+        let query = db.from('ai_chat_memory')
+            .select('id, league_id, ts, session_label, summary, source, created_at')
+            .eq('username', username)
+            .order('ts', { ascending: false })
+            .limit(limit);
+        if (leagueId) query = query.eq('league_id', leagueId);
+        const { data, error } = await query;
+        if (error) {
+            console.warn('[FW] ai_chat_memory load error:', error.message || error.code || JSON.stringify(error));
+            // Kill switch — any error disables further attempts this session
+            // (missing table, RLS denial, auth expired, network). localStorage
+            // remains the authoritative source either way.
+            _chatMemoryDbDisabled = true;
+            return null;
+        }
+        return (data || []).map(row => ({
+            ts: row.ts,
+            sessionLabel: row.session_label || null,
+            summary: row.summary,
+            leagueId: row.league_id || null,
+            source: row.source || 'scout',
+        }));
+    } catch (e) {
+        console.warn('[FW] ai_chat_memory load failed:', e?.message || e);
+        _chatMemoryDbDisabled = true;
+        return null;
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════
+// GM STRATEGY — shared global strategy, synced across devices + apps
+// Run this SQL in Supabase to create the gm_strategy table:
+//
+// create table if not exists public.gm_strategy (
+//   username         text        primary key references public.users(sleeper_username) on delete cascade,
+//   strategy         jsonb       not null,
+//   version          int         not null default 1,
+//   last_synced_at   bigint      not null,
+//   last_synced_from text        default 'scout',
+//   updated_at       timestamptz default now()
+// );
+// alter table public.gm_strategy enable row level security;
+// -- (policies in supabase/migrations/007_gm_strategy.sql)
+// ══════════════════════════════════════════════════════════════════
+
+let _strategyDbDisabled = false;
+
+// Upsert the user's strategy row. Non-blocking — callers fire and forget.
+window.OD.saveStrategy = async function(strategy) {
+    if (_strategyDbDisabled) return false;
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username || !strategy) return false;
+    try {
+        await ensureUser(username);
+        const { error } = await db.from('gm_strategy').upsert({
+            username,
+            strategy,
+            version: strategy.version || 1,
+            last_synced_at: strategy.lastSyncedAt || Date.now(),
+            last_synced_from: strategy.lastSyncedFrom || 'scout',
+        }, { onConflict: 'username' });
+        if (error) {
+            if (error.code === '42501' || error.message?.includes('row-level security') || error.code === '401') {
+                _strategyDbDisabled = true;
+            }
+            return false;
+        }
+        return true;
+    } catch (e) {
+        _strategyDbDisabled = true;
+        return false;
+    }
+};
+
+// Load the user's strategy row. Returns null if no row exists yet.
+window.OD.loadStrategy = async function() {
+    if (_strategyDbDisabled) return null;
+    const username = getCurrentUsername();
+    const db = getClient();
+    if (!db || !isConfigured() || !username) return null;
+    try {
+        const { data, error } = await db.from('gm_strategy')
+            .select('strategy, version, last_synced_at, last_synced_from, updated_at')
+            .eq('username', username)
+            .maybeSingle();
+        if (error) {
+            console.warn('[FW] gm_strategy load error:', error.message || error.code || JSON.stringify(error));
+            // Kill switch — any error disables further attempts this session.
+            // Expected cases: migration not yet run (42P01 relation does not
+            // exist), RLS denial, auth expired, network. localStorage remains
+            // the authoritative source either way.
+            _strategyDbDisabled = true;
+            return null;
+        }
+        if (!data) return null;
+        return {
+            strategy: data.strategy,
+            version: data.version || 0,
+            lastSyncedAt: data.last_synced_at,
+            lastSyncedFrom: data.last_synced_from,
+        };
+    } catch (e) {
+        console.warn('[FW] gm_strategy load failed:', e?.message || e);
+        _strategyDbDisabled = true;
+        return null;
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════
 // LEAGUE DOCS — Commissioner document upload + AI context
 // ══════════════════════════════════════════════════════════════════
 
