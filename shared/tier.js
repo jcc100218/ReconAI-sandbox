@@ -63,7 +63,7 @@ function initTrial() {
 // Returns 'free' | 'trial' | 'paid'
 // DEV_MODE bypass, in-memory cache, OD profile, FW session, trial check.
 function getTier() {
-  if (window.DEV_MODE || ['localhost', '127.0.0.1'].includes(window.location.hostname)) return 'paid';
+  if (window.DEV_MODE || ['localhost', '127.0.0.1'].includes(window.location?.hostname)) return 'paid';
   if (window.App._userTier) return window.App._userTier;
 
   // OD profile tier (set by Supabase auth flow)
