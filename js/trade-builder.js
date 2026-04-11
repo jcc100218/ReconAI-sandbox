@@ -573,14 +573,14 @@ function _logTradeScenario(myPids, theirPids, myPicks, theirPicks, grade) {
     ...(theirPicks || []).map(r => `Rd ${r} pick`),
   ].join(' + ') || 'TBD';
   const gradeStr = grade?.grade || '?';
-  const text = `Trade scenario: ${myNames} for ${theirNames} — Grade: ${gradeStr}`;
+  const text = `Trade option saved: ${myNames} for ${theirNames} — Grade: ${gradeStr}`;
   const allPlayers = [
     ...(myPids || []).map(pid => ({ id: pid, name: getName(pid) })),
     ...(theirPids || []).map(pid => ({ id: pid, name: getName(pid) })),
   ];
   if (typeof window.addFieldLogEntry === 'function') {
-    window.addFieldLogEntry('🔄', text, 'trade', { actionType: 'trade_scenario', players: allPlayers });
-    if (typeof window.showToast === 'function') window.showToast('Trade scenario saved to Field Log');
+    window.addFieldLogEntry('🔄', text, 'trade', { actionType: 'trade_option_saved', players: allPlayers });
+    if (typeof window.showToast === 'function') window.showToast('Trade option saved');
   }
 
   // Check strategy alignment — show override modal if conflict detected

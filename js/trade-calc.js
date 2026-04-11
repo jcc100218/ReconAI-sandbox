@@ -2382,7 +2382,7 @@ function _finderGenerate(pid) {
       });
 
       trades.sort((b,c) => c.likelihood - b.likelihood);
-      if (trades.length) results.push({ assessment: a, dnaKey, trades: trades.slice(0, 1) }); // 1 best per team for War Room Scout
+      if (trades.length) results.push({ assessment: a, dnaKey, trades }); // all viable trades per team, sorted by likelihood
     });
   } else {
     // Acquiring a player — find what I can offer
@@ -2444,16 +2444,16 @@ function _finderGenerate(pid) {
     });
 
     trades.sort((b,c) => c.likelihood - b.likelihood);
-    if (trades.length) results.push({ assessment: theirAssess, dnaKey, trades: trades.slice(0, 3) }); // 3 offers for acquire mode
+    if (trades.length) results.push({ assessment: theirAssess, dnaKey, trades }); // all viable offers, sorted by likelihood
   }
 
-  // Sort teams by best likelihood, take top 3
+  // Sort teams by best likelihood — return every team with at least one viable trade
   results.sort((a,b) => {
     const aMax = Math.max(...a.trades.map(t => t.likelihood));
     const bMax = Math.max(...b.trades.map(t => t.likelihood));
     return bMax - aMax;
   });
-  _finderResults = _finderMode === 'my' ? results.slice(0, 3) : results;
+  _finderResults = results;
   _finderRefresh();
 }
 

@@ -335,19 +335,27 @@ function openPlayerModal(playerId){
       ${ownerDnaHtml}`;
   }
 
-  // Tag section
+  // Tag + note section
   const tagSec=$('pm-tag-section');
   if(tagSec){
     tagSec.style.display='block';
     const tagKey='player_tags_'+(S.currentLeagueId||'');
-    const curTags=JSON.parse(localStorage.getItem(tagKey)||'{}');
+    let curTags={};
+    try{ curTags=JSON.parse(localStorage.getItem(tagKey)||'{}'); }catch(e){ curTags={}; }
     const curTag=curTags[playerId]||'';
     const tagOpts=[{key:'trade',label:'Trade Block'},{key:'cut',label:'Cut'},{key:'untouchable',label:'Untouchable'},{key:'watch',label:'Watch'}];
+    const noteKey='player_notes_'+(S.currentLeagueId||'');
+    let curNotes={};
+    try{ curNotes=JSON.parse(localStorage.getItem(noteKey)||'{}'); }catch(e){ curNotes={}; }
+    const curNote=curNotes[playerId]||'';
     tagSec.innerHTML=`<div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:4px">TAG</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap">${tagOpts.map(t=>{
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">${tagOpts.map(t=>{
         const isActive=curTag===t.key;
         return`<button class="chip" onclick="tagPlayer('${playerId}','${t.key}')" style="${isActive?'background:var(--accentL);color:var(--accent);border-color:var(--accent)':''}">${t.label}</button>`;
-      }).join('')}</div>`;
+      }).join('')}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text3);margin-bottom:4px">NOTE</div>
+      <textarea id="pm-note-text" placeholder="Your notes on this player…" style="width:100%;min-height:60px;padding:8px 10px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box">${escHtml(curNote)}</textarea>
+      <button onclick="addPlayerNote('${playerId}',document.getElementById('pm-note-text').value)" style="margin-top:6px;padding:6px 14px;font-size:12px;font-weight:700;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.3);border-radius:7px;cursor:pointer;font-family:inherit">Save note</button>`;
   }
 
   // Action buttons (hidden stubs — still wired for compat)
@@ -377,8 +385,8 @@ function openPlayerModal(playerId){
     };
   }
 
-  // Log to field log
-  if(window.addFieldLogEntry)window.addFieldLogEntry('👤',`Scouted ${pName(playerId)} (${pos}, ${fullTeam(p.team)})${val>0?' — DHQ '+val.toLocaleString():''}`, 'scout', {players:[playerId]});
+  // Phase 7: opening the player modal is no longer a logged event.
+  // The field log only captures explicit user actions: tag, note, mock save, trade save.
 
   // Show card
   const modal=$('player-modal');
@@ -505,13 +513,45 @@ async function loadPlayerCardStats(playerId){
 function closePlayerModal(){const el=$('player-modal');if(el)el.style.display='none';}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePlayerModal();});
 
+// Phase 7: persist a user note on a player and log it to the field log.
+function addPlayerNote(pid,text){
+  const clean=(text||'').trim();
+  const leagueId=S.currentLeagueId||'';
+  const key='player_notes_'+leagueId;
+  let notes={};
+  try{ notes=JSON.parse(localStorage.getItem(key)||'{}'); }catch(e){ notes={}; }
+  const prev=notes[pid]||'';
+  if(clean){ notes[pid]=clean; } else { delete notes[pid]; }
+  try{ localStorage.setItem(key,JSON.stringify(notes)); }catch(e){}
+  if(typeof showToast==='function')showToast(clean?'Note saved':'Note cleared');
+  // Only log additions / meaningful changes, not empty clears
+  if(clean && clean !== prev && window.addFieldLogEntry){
+    try{
+      const name=typeof pName==='function'?pName(pid):pid;
+      const preview=clean.length>60?clean.slice(0,57)+'…':clean;
+      window.addFieldLogEntry('📝',`Note on ${name}: ${preview}`,'note',{actionType:'note',players:[{id:pid,name}]});
+    }catch(e){}
+  }
+}
+window.addPlayerNote=addPlayerNote;
+
 function tagPlayer(pid,tag){
   const leagueId=S.currentLeagueId||'';
   const key='player_tags_'+leagueId;
-  const tags=JSON.parse(localStorage.getItem(key)||'{}');
-  if(tags[pid]===tag)delete tags[pid];
+  let tags={};
+  try{ tags=JSON.parse(localStorage.getItem(key)||'{}'); }catch(e){ tags={}; }
+  const wasTagged=tags[pid]===tag;
+  if(wasTagged)delete tags[pid];
   else tags[pid]=tag;
   localStorage.setItem(key,JSON.stringify(tags));
+
+  // Phase 7: log tag additions to the field log (not removals)
+  if(!wasTagged&&window.addFieldLogEntry){
+    try{
+      const name=typeof pName==='function'?pName(pid):pid;
+      window.addFieldLogEntry('🏷️',`Tagged ${name} as ${tag}`,'note',{actionType:'tag',players:[{id:pid,name}]});
+    }catch(e){}
+  }
 
   // Sync to Supabase (non-blocking)
   if(window.OD?.savePlayerTags)window.OD.savePlayerTags(leagueId,tags);

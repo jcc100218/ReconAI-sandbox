@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>War Room Scout — Dynasty Intelligence</title>
+<title>Scout — Dynasty Intelligence</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icons/icon-192.svg">
 <link rel="apple-touch-icon" href="icons/icon-192.svg">
@@ -22,7 +22,18 @@
 
 <div class="app">
   <div class="header">
-    <div class="logo">War Room Scout</div>
+    <div class="logo" style="display:flex;align-items:center;gap:8px">
+      <svg viewBox="0 0 192 192" width="22" height="22" style="flex-shrink:0" aria-hidden="true">
+        <circle cx="96" cy="96" r="60" stroke="#D4AF37" stroke-width="6" fill="none" stroke-dasharray="8 5" opacity="0.6"/>
+        <circle cx="96" cy="96" r="30" stroke="#D4AF37" stroke-width="6" fill="none"/>
+        <circle cx="96" cy="96" r="10" fill="#D4AF37"/>
+        <line x1="96" y1="16" x2="96" y2="48" stroke="#D4AF37" stroke-width="5" opacity="0.5"/>
+        <line x1="96" y1="144" x2="96" y2="176" stroke="#D4AF37" stroke-width="5" opacity="0.5"/>
+        <line x1="16" y1="96" x2="48" y2="96" stroke="#D4AF37" stroke-width="5" opacity="0.5"/>
+        <line x1="144" y1="96" x2="176" y2="96" stroke="#D4AF37" stroke-width="5" opacity="0.5"/>
+      </svg>
+      <span>Scout</span>
+    </div>
     <div class="spacer"></div>
     <div style="display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow:hidden">
       <span class="pill pd" id="league-pill" style="font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:160px;padding:4px 10px;display:flex;align-items:center;gap:4px" onclick="switchLeagueMode()" title="Click to switch league"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Not connected</span><span id="platform-badge" style="display:none;font-size:10px;font-weight:700;background:#e03e2d;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">ESPN</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span></span>
@@ -32,19 +43,9 @@
         <span id="agent-txt" class="header-hide-sm">idle</span>
       </div>
       <span id="auth-user-badge" style="display:none;font-size:12px;color:var(--text3);padding:4px 8px;border:1px solid var(--border);border-radius:6px;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;cursor:default" title="Signed in"></span>
-      <a href="https://warroom.fantasy-dynasty-hq.com" onclick="localStorage.setItem('fw_preferred_view','warroom')" class="header-hide-sm wr-glow" style="font-size:13px;color:var(--amber);text-decoration:none;font-weight:700;padding:4px 10px;border:1px solid rgba(251,191,36,.2);border-radius:6px;white-space:nowrap" title="Switch to War Room desktop view">War Room</a>
       <button id="refresh-btn" onclick="handleRefreshClick()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Refresh data"><svg id="refresh-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></button>
-      <button id="global-search-btn" onclick="toggleGlobalSearch()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:8px;flex-shrink:0;min-width:36px;min-height:36px;display:flex;align-items:center;justify-content:center;opacity:.7;transition:all .15s" title="Search players"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       <button onclick="switchTab('settings')" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:10px;transition:color .15s;flex-shrink:0;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
-  </div>
-  <!-- Global player search bar — toggled by search icon, works on all tabs -->
-  <div id="global-search-bar" style="display:none;padding:6px 12px 8px;background:var(--bg1);border-bottom:1px solid var(--border);position:relative;z-index:90">
-    <input type="text" id="gsearch-in" placeholder="Search players by name..." autocomplete="off"
-      oninput="handleGlobalPlayerSearch(this.value)"
-      onkeydown="if(event.key==='Escape'){toggleGlobalSearch();}"
-      style="width:100%;padding:8px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit;outline:none;box-sizing:border-box"/>
-    <div id="gsearch-results" style="display:none;position:absolute;left:12px;right:12px;top:calc(100% - 2px);background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.3);max-height:320px;overflow-y:auto"></div>
   </div>
 
   <!-- Team Bar — slim always-visible roster strip -->
@@ -475,24 +476,17 @@
       <!-- Header (compact) -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <div style="flex:1;font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft</div>
-        <select id="draft-year-sel" onchange="renderDraftNeeds()" style="font-size:13px;padding:4px 8px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;color:var(--text2)">
-          <option value="2026">2026</option>
-          <option value="2025">2025</option>
-          <option value="2027">2027</option>
-        </select>
-        <button class="btn btn-sm" onclick="runDraftScouting()" id="draft-scout-btn" style="font-size:13px;padding:4px 10px">Scout ↗</button>
       </div>
 
-      <div id="draft-subtabs" style="display:flex;gap:6px;margin:8px 0 12px">
-        <button onclick="switchDraftView('board')" id="draft-tab-board" class="draft-subtab active" style="padding:6px 16px;font-size:13px;font-weight:700;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--bg1);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em">Board</button>
-        <button onclick="switchDraftView('mock')" id="draft-tab-mock" class="draft-subtab" style="padding:6px 16px;font-size:13px;font-weight:700;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.04em">Mock Draft</button>
+      <div id="draft-subtabs" style="display:flex;gap:8px;margin:8px 0 14px">
+        <button onclick="switchDraftView('board')" id="draft-tab-board" class="draft-subtab active" style="flex:1;padding:12px 24px;font-size:15px;font-weight:800;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:var(--bg1);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.06em">Board</button>
+        <button onclick="switchDraftView('mock')" id="draft-tab-mock" class="draft-subtab" style="flex:1;padding:12px 24px;font-size:15px;font-weight:800;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.06em">Mock Draft</button>
       </div>
       <div id="draft-board-view">
 
-      <!-- 1. ON THE CLOCK — hero card + all picks in one section -->
-      <div id="draft-best-bet"></div>
+      <!-- Owned picks — single large card, click to expand -->
       <div id="draft-my-picks-section" style="margin-bottom:14px">
-        <div id="draft-my-picks" style="display:flex;flex-wrap:wrap;gap:6px">
+        <div id="draft-my-picks">
           <span style="color:var(--text3);font-size:13px">Connect to see picks</span>
         </div>
       </div>
@@ -757,7 +751,6 @@
           <div style="font-size:18px;font-weight:800;letter-spacing:-.03em">League Intel</div>
           <div style="font-size:13px;color:var(--text3);margin-top:2px">Owner profiles · standings · trade targets</div>
         </div>
-        <button onclick="sendGlobalChat('Which owner in my league is the best trade partner for me right now?')" style="font-size:13px;padding:6px 12px;background:var(--accentL);border:1px solid rgba(212,175,55,.2);border-radius:8px;color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600">Ask Scout</button>
       </div>
       <div id="panel-league-content">
         <div style="text-align:center;padding:40px 20px;color:var(--text3)">
@@ -784,17 +777,23 @@
   </div>
 </div>
 
-<!-- Global Chat Overlay (unified search + chat bar + context chips) -->
+<!-- Global Chat Overlay (the "GM bar" — unified search + chat + AI GM surface) -->
 <div class="global-chat-overlay" id="global-chat-overlay">
-  <div class="ctx-chips-row" id="ctx-chips-row">
-    <!-- populated by scout-ui.js -->
+  <!-- GM bar header: AI GM strategy + Alex Learning + prompt chips (revealed on expand) -->
+  <div class="gm-bar-header">
+    <div id="gm-bar-alex" style="padding:10px 14px;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;margin-bottom:8px;font-size:12px;color:var(--text2);line-height:1.5"></div>
+    <div class="ctx-chips-row" id="ctx-chips-row">
+      <!-- populated by scout-ui.js renderCtxChips() -->
+    </div>
   </div>
   <!-- Unified search results dropdown (appears above chat bar) -->
   <div id="unified-search-results" style="display:none;max-height:240px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:12px 12px 0 0;margin-bottom:-1px;box-shadow:0 -4px 20px rgba(0,0,0,.25)"></div>
   <div class="global-chat-row">
-    <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Search players or ask Scout..." autocomplete="off"
+    <input type="text" id="global-chat-in" class="global-chat-input" placeholder="Click here to ask Scout…" autocomplete="off"
+      onfocus="_gmBarExpand()"
+      onblur="_gmBarCollapseSoon()"
       oninput="handleUnifiedInput(this.value)"
-      onkeydown="if(event.key==='Enter')handleUnifiedEnter(event);if(event.key==='Escape'){this.value='';document.getElementById('unified-search-results').style.display='none';}"/>
+      onkeydown="if(event.key==='Enter')handleUnifiedEnter(event);if(event.key==='Escape'){this.value='';document.getElementById('unified-search-results').style.display='none';this.blur();}"/>
     <button class="global-chat-send" onclick="sendGlobalChat()" aria-label="Send">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
@@ -814,10 +813,6 @@
   <button class="mobile-nav-item" id="mnav-draft" onclick="mobileTab('draftroom',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     Draft
-  </button>
-  <button class="mobile-nav-item" id="mnav-waivers" onclick="mobileTab('waivers',this)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-    Waivers
   </button>
   <button class="mobile-nav-item" id="mnav-fieldlog" onclick="mobileTab('fieldlog',this)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>

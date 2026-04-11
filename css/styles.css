@@ -1125,10 +1125,14 @@ details.settings-section[open]>.settings-summary::after{transform:rotate(-135deg
 .tbar-action-btn.hold{color:var(--green);border-color:rgba(46,204,113,.3)}
 .tbar-action-btn.trade{color:var(--accent);border-color:rgba(212,175,55,.3)}
 
-/* ── Global Chat Overlay (fixed, above mobile nav) ───────────── */
+/* ── Global Chat Overlay / GM Bar (fixed, above mobile nav) ─── */
 .global-chat-overlay{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);width:100%;max-width:680px;z-index:190;padding:0 12px;padding-bottom:env(safe-area-inset-bottom,0px);background:linear-gradient(to top,var(--bg) 55%,transparent);pointer-events:none}
 .global-chat-overlay>*{pointer-events:all}
-.ctx-chips-row{display:flex;gap:7px;overflow-x:auto;padding:10px 0 7px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+/* GM bar expansion: chips + Alex Learning are hidden by default, revealed on .expanded */
+.gm-bar-header{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.4,0,.2,1),opacity .2s;opacity:0;pointer-events:none}
+.global-chat-overlay.expanded .gm-bar-header{max-height:260px;opacity:1;pointer-events:all}
+.ctx-chips-row{display:flex;gap:7px;overflow-x:auto;padding:0 0 7px;scrollbar-width:none;-webkit-overflow-scrolling:touch;max-height:0;opacity:0;transition:max-height .28s cubic-bezier(.4,0,.2,1),opacity .2s,padding .28s}
+.global-chat-overlay.expanded .ctx-chips-row{max-height:80px;opacity:1;padding:8px 0 7px}
 .ctx-chips-row::-webkit-scrollbar{display:none}
 .ctx-chip{flex-shrink:0;background:var(--bg2);border:1px solid var(--border2);border-radius:22px;padding:5px 13px;cursor:pointer;font-family:inherit;transition:all .2s;text-align:left;-webkit-tap-highlight-color:transparent}
 .ctx-chip:hover,.ctx-chip:active{border-color:rgba(212,175,55,.45);background:var(--accentL);transform:translateY(-1px)}
@@ -1289,9 +1293,10 @@ h1,h2,h3,
 /* Tappable name button */
 .tbar-name-btn{flex:1;background:none;border:none;padding:0;margin:0;font-size:13px;color:var(--text);text-align:left;cursor:pointer;font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:color .15s}
 .tbar-name-btn:hover{color:var(--accent)}
-/* PPG + DHQ stacked column */
-.tbar-ppg-col{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;min-width:42px;gap:1px}
-.tbar-dhq{font-size:10px;color:var(--text3);font-variant-numeric:tabular-nums;line-height:1}
+/* DHQ hero + PPG caption column (DHQ is the visual lead on each row) */
+.tbar-ppg-col{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;min-width:56px;gap:1px}
+.tbar-dhq{font-size:15px;font-weight:800;color:var(--accent);font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;line-height:1.05;letter-spacing:-.02em}
+.tbar-dhq-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;line-height:1;margin-top:1px}
 /* Expandable card */
 .tbar-expand{max-height:0;overflow:hidden;transition:max-height .28s cubic-bezier(.4,0,.2,1)}
 .tbar-expand-inner{padding:8px 0 10px 0}

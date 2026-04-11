@@ -51,8 +51,71 @@ function renderCtxChips(tab) {
       <div class="ctx-chip-sub">${_esc(c.sub)}</div>
     </button>`
   ).join('');
+  // Also refresh the GM bar Alex block + dynamic placeholder whenever chips change
+  if (typeof _renderGMBarAlexBlock === 'function') _renderGMBarAlexBlock();
+  if (typeof _updateGlobalChatPlaceholder === 'function') _updateGlobalChatPlaceholder();
 }
 window.renderCtxChips = renderCtxChips;
+
+// ── GM bar (Phase 6) — expanding unified AI surface ────────────
+// The global chat overlay becomes the central prompt hub. When the input is
+// focused, it expands to reveal: (1) GM Strategy + Alex Learning summary,
+// (2) context chips. Placeholder text is dynamic, driven by field intel.
+
+function _renderGMBarAlexBlock() {
+  const el = document.getElementById('gm-bar-alex');
+  if (!el) return;
+  const strat = window.GMStrategy?.getStrategy?.() || {};
+  const eng = window.GMEngine;
+  const fi = eng?.generateFieldIntel?.() || [];
+  const mode = (strat.mode || 'balanced').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const aggr = strat.aggression || 'medium';
+  const targets = (strat.targetPositions || []).join(', ') || '—';
+  const fiBullets = fi.slice(0, 2).map(s => `<div style="font-size:11px;color:var(--text3);padding:2px 0">· ${_esc(s)}</div>`).join('');
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:${fiBullets ? '6px' : '0'}">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);letter-spacing:.06em;text-transform:uppercase">AI GM · Alex ${strat.alexPersonality || 'balanced'}</div>
+      <div style="font-size:11px;color:var(--text3)">${_esc(mode)} · ${_esc(aggr)} · ${_esc(targets)}</div>
+    </div>
+    ${fiBullets}
+  `;
+}
+window._renderGMBarAlexBlock = _renderGMBarAlexBlock;
+
+function _updateGlobalChatPlaceholder() {
+  const inp = document.getElementById('global-chat-in');
+  if (!inp) return;
+  const fi = window.GMEngine?.generateFieldIntel?.() || [];
+  const top = (fi[0] || '').toString().trim();
+  inp.placeholder = top ? `Ask about: ${top.length > 64 ? top.slice(0, 61) + '…' : top}` : 'Click here to ask Scout…';
+}
+window._updateGlobalChatPlaceholder = _updateGlobalChatPlaceholder;
+
+// Expand / collapse handlers
+let _gmBarCollapseTimer = null;
+function _gmBarExpand() {
+  const ov = document.getElementById('global-chat-overlay');
+  if (!ov) return;
+  clearTimeout(_gmBarCollapseTimer);
+  ov.classList.add('expanded');
+  // Refresh content each time in case strategy/intel changed
+  if (typeof _renderGMBarAlexBlock === 'function') _renderGMBarAlexBlock();
+}
+window._gmBarExpand = _gmBarExpand;
+
+function _gmBarCollapseSoon() {
+  // Debounced so a chip tap inside the header doesn't immediately collapse
+  clearTimeout(_gmBarCollapseTimer);
+  _gmBarCollapseTimer = setTimeout(() => {
+    const ov = document.getElementById('global-chat-overlay');
+    if (!ov) return;
+    // Don't collapse if the focus moved to a chip or other child element inside the overlay
+    const active = document.activeElement;
+    if (active && ov.contains(active)) return;
+    ov.classList.remove('expanded');
+  }, 250);
+}
+window._gmBarCollapseSoon = _gmBarCollapseSoon;
 
 // Fill global chat and auto-send
 function fillGlobalChat(text) {
@@ -179,12 +242,20 @@ function renderTeamBar() {
   const S = window.S;
   if (!S || !S.user) return;
 
-  const myRoster = typeof myR === 'function' ? myR() : null;
-  if (!myRoster) return;
-
   const nameEl  = document.getElementById('tbar-name');
   const recEl   = document.getElementById('tbar-record');
   const rankEl  = document.getElementById('tbar-rank');
+
+  const myRoster = typeof myR === 'function' ? myR() : null;
+  if (!myRoster) {
+    // User is logged in but the roster hasn't been resolved yet (S.myRosterId
+    // may populate after S.user on cold start). Show a loading state instead
+    // of leaving the default "— Connect to see your team —" fallback visible.
+    if (nameEl) nameEl.textContent = 'Loading your team…';
+    if (recEl)  recEl.textContent  = '';
+    if (rankEl) rankEl.style.display = 'none';
+    return;
+  }
 
   // Team avatar + name
   const owner = (S.leagueUsers || []).find(u => u.user_id === myRoster.owner_id);
@@ -330,8 +401,8 @@ function renderTeamBarRoster() {
         <button class="tbar-pname tbar-name-btn" onclick="event.stopPropagation();_tbarToggle('${pid}')">${_esc(name)}</button>
         <span class="tbar-pteam">${_esc(team)}</span>
         <div class="tbar-ppg-col">
-          <span class="tbar-ppg">${ppg}</span>
           <span class="tbar-dhq">${dhqStr}</span>
+          <span class="tbar-ppg" title="Points per game">${ppg} ppg</span>
         </div>
       </div>
       <div class="tbar-expand" id="tbar-expand-${pid}">
@@ -791,11 +862,22 @@ function _closeOverrideModal() {
 }
 window._closeOverrideModal = _closeOverrideModal;
 
+// Phase 7: the log displays only these four action types. Older entries
+// (e.g. 'scout', strategy drift acknowledgements) are kept in storage but
+// hidden from this view unless explicitly requested.
+const FIELD_LOG_VISIBLE_ACTIONS = new Set(['tag','note','mock_saved','trade_option_saved','trade_scenario']);
+
 // Full Activity panel
 function renderFieldLogPanel() {
   const container = document.getElementById('panel-fieldlog-content');
   if (!container) return;
-  const log = getFieldLog();
+  const rawLog = getFieldLog();
+  // Filter to the 4 visible action types; fall back to the category field
+  // when actionType is missing (for older entries still in localStorage).
+  const log = (rawLog || []).filter(e => {
+    if (e.actionType && FIELD_LOG_VISIBLE_ACTIONS.has(e.actionType)) return true;
+    return false;
+  });
   const strategy = window.GMStrategy?.getStrategy ? window.GMStrategy.getStrategy() : {};
   const drift = window.GMStrategy?.getDrift ? window.GMStrategy.getDrift() : { conflicts: [] };
   const hasDrift = window.GMStrategy?.hasDrift ? window.GMStrategy.hasDrift() : false;
@@ -956,43 +1038,81 @@ window.renderFieldLogPanel = renderFieldLogPanel;
 function _renderExploitTargets() {
   const eng = window.GMEngine;
   if (!eng) return '';
-  const opps = eng.generateOpportunities();
-  if (!opps.length || !opps[0].rosterId) return '';
+  const oppsRaw = eng.generateOpportunities();
+  if (!oppsRaw.length || !oppsRaw[0].rosterId) return '';
   const ownerProfiles = window.App?.LI?.ownerProfiles || {};
   const S = window.S;
-  return `<div style="margin-bottom:16px">
-    <div style="font-size:11px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">
-      WHO TO EXPLOIT <span style="height:1px;flex:1;background:rgba(231,76,60,.2);display:inline-block;margin-left:4px"></span>
-    </div>
-    ${opps.slice(0, 3).map((o, i) => {
-      const isTop = i === 0;
-      const dna = ownerProfiles[o.rosterId]?.dna || '';
-      const border = isTop ? 'rgba(231,76,60,.5)' : 'var(--border)';
-      const glow = isTop ? ';box-shadow:0 0 14px rgba(231,76,60,.08)' : '';
-      const roster = (S?.rosters || []).find(r => r.roster_id === o.rosterId);
-      const owner = (S?.leagueUsers || []).find(u => u.user_id === roster?.owner_id);
-      const avatarId = owner?.avatar;
-      const initials = (o.ownerName || '?').slice(0, 2).toUpperCase();
-      const avatarHtml = avatarId
-        ? `<img src="https://sleepercdn.com/avatars/thumbs/${avatarId}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
-        : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text3);flex-shrink:0">${initials}</div>`;
-      return `<div style="padding:11px 14px;background:var(--bg2);border:1px solid ${border};border-radius:var(--r);margin-bottom:6px;display:flex;align-items:center;gap:10px${glow}">
-        ${avatarHtml}
+
+  // Re-rank by current user's top positional need so the highest-priority
+  // match bubbles to the top, then slice to 2 teams.
+  const assessFn = typeof window.assessTeamFromGlobal === 'function' ? window.assessTeamFromGlobal : null;
+  const myAssess = assessFn ? assessFn(S?.myRosterId) : null;
+  const myTopNeedRaw = myAssess?.needs?.[0];
+  const myTopNeed = typeof myTopNeedRaw === 'string' ? myTopNeedRaw : myTopNeedRaw?.pos;
+
+  const opps = [...oppsRaw].sort((a, b) => {
+    if (!myTopNeed) return (b.exploitScore || 0) - (a.exploitScore || 0);
+    const aAs = assessFn ? assessFn(a.rosterId) : null;
+    const bAs = assessFn ? assessFn(b.rosterId) : null;
+    const aHas = (aAs?.strengths || []).some(s => (typeof s === 'string' ? s : s?.pos) === myTopNeed) ? 1 : 0;
+    const bHas = (bAs?.strengths || []).some(s => (typeof s === 'string' ? s : s?.pos) === myTopNeed) ? 1 : 0;
+    if (aHas !== bHas) return bHas - aHas;
+    return (b.exploitScore || 0) - (a.exploitScore || 0);
+  }).slice(0, 2);
+
+  const teamCards = opps.map((o, i) => {
+    const isTop = i === 0;
+    const dna = ownerProfiles[o.rosterId]?.dna || '';
+    const border = isTop ? 'rgba(212,175,55,.5)' : 'var(--border)';
+    const glow = isTop ? ';box-shadow:0 0 14px rgba(212,175,55,.08)' : '';
+    const roster = (S?.rosters || []).find(r => r.roster_id === o.rosterId);
+    const owner = (S?.leagueUsers || []).find(u => u.user_id === roster?.owner_id);
+    const avatarId = owner?.avatar;
+    const initials = (o.ownerName || '?').slice(0, 2).toUpperCase();
+    const avatarHtml = avatarId
+      ? `<img src="https://sleepercdn.com/avatars/thumbs/${avatarId}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
+      : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text3);flex-shrink:0">${initials}</div>`;
+    return `<div style="padding:11px 14px;background:var(--bg2);border:1px solid ${border};border-radius:var(--r);margin-bottom:6px;display:flex;align-items:center;gap:10px${glow}">
+      ${avatarHtml}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+          ${isTop ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 5px;border:1px solid rgba(212,175,55,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">BEST TARGET</span>' : ''}
+          <span style="font-size:14px;font-weight:700;color:var(--text)">${_esc(o.ownerName)}</span>
+          ${dna ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dna)}</span>` : ''}
+        </div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.4;font-weight:500">${_esc(o.insight)}</div>
+        ${o.exploitScore >= 75 ? '<div style="font-size:11px;color:var(--accent);margin-top:3px;font-weight:700">Move now</div>' : o.exploitScore >= 50 ? '<div style="font-size:11px;color:var(--amber);margin-top:3px;font-weight:600">Good window</div>' : ''}
+      </div>
+      <button onclick="event.stopPropagation();typeof openTradeBuilder==='function'?openTradeBuilder(${o.rosterId},[],[]):fillGlobalChat(${JSON.stringify('Build me the best trade I can make with ' + o.ownerName)})" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.3);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">Build Trade</button>
+    </div>`;
+  }).join('');
+
+  // Waiver recommendation card (reuses _getHomeWaiverRec from js/ui.js)
+  let waiverCard = '';
+  if (typeof window._getHomeWaiverRec === 'function') {
+    const rec = window._getHomeWaiverRec();
+    if (rec) {
+      const wvName = typeof window.pName === 'function' ? window.pName(rec.id) : rec.id;
+      const safeName = (wvName || '').replace(/'/g, "\\'");
+      waiverCard = `<div style="padding:11px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(52,211,153,.12);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#2ECC71;flex-shrink:0">FA</div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
-            ${isTop ? '<span style="font-size:9px;font-weight:700;color:var(--red);padding:1px 5px;border:1px solid rgba(231,76,60,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">BEST TARGET</span>' : ''}
-            <span style="font-size:14px;font-weight:700;color:var(--text)">${_esc(o.ownerName)}</span>
-            ${dna ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dna)}</span>` : ''}
+            <span style="font-size:9px;font-weight:700;color:#2ECC71;padding:1px 5px;border:1px solid rgba(52,211,153,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">WAIVER</span>
+            <span style="font-size:14px;font-weight:700;color:var(--text)">${_esc(wvName)}</span>
           </div>
-          <div style="font-size:13px;color:var(--text2);line-height:1.4;font-weight:500">${_esc(o.insight)}</div>
-          ${o.exploitScore >= 75 ? '<div style="font-size:11px;color:var(--red);margin-top:3px;font-weight:700">Move now</div>' : o.exploitScore >= 50 ? '<div style="font-size:11px;color:var(--amber);margin-top:3px;font-weight:600">Good window</div>' : ''}
+          <div style="font-size:13px;color:var(--text2);line-height:1.4">${rec.pos} · ${(rec.val||0).toLocaleString()} DHQ — fits your ${rec.pos} need</div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
-          <button onclick="event.stopPropagation();typeof openTradeBuilder==='function'?openTradeBuilder(${o.rosterId},[],[]):fillGlobalChat(${JSON.stringify('Build me the best trade I can make with ' + o.ownerName)})" style="padding:6px 11px;font-size:12px;font-weight:700;background:${isTop ? 'var(--red)' : 'var(--redL)'};color:${isTop ? '#fff' : 'var(--red)'};border:1px solid rgba(231,76,60,.3);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap">Attack</button>
-          <button onclick="event.stopPropagation();fillGlobalChat(${JSON.stringify('Build me the best trade I can make with ' + o.ownerName)})" style="padding:6px 11px;font-size:12px;font-weight:600;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.2);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap">Build Trade</button>
-        </div>
+        <button onclick="event.stopPropagation();fillGlobalChat('Help me claim ${safeName}')" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.3);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">Add</button>
       </div>`;
-    }).join('')}
+    }
+  }
+
+  return `<div style="margin-bottom:16px">
+    <div style="font-size:11px;font-weight:700;color:#F0A500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      OPPORTUNITIES <span style="height:1px;flex:1;background:rgba(240,165,0,.2);display:inline-block;margin-left:4px"></span>
+    </div>
+    ${teamCards}${waiverCard}
   </div>`;
 }
 
@@ -1070,7 +1190,16 @@ function renderLeaguePanel() {
 
   const isLargeLeague = enriched.length > 24;
   let html = _renderExploitTargets();
-  html += `<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">ALL TEAMS <span style="height:1px;flex:1;background:var(--border);display:inline-block;margin-left:4px"></span></div>`;
+
+  // All Teams section is collapsed by default — click the header to expand.
+  // Persist the open/close state per session so re-renders don't thrash.
+  const allTeamsOpen = sessionStorage.getItem('scout_allteams_expanded') === '1';
+  html += `<div id="all-teams-toggle" style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" onclick="_toggleAllTeams()">
+    ALL TEAMS (${enriched.length})
+    <span style="height:1px;flex:1;background:var(--border);display:inline-block;margin-left:4px"></span>
+    <svg id="all-teams-chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform .2s;transform:${allTeamsOpen?'rotate(180deg)':'rotate(0deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
+  </div>`;
+  html += `<div id="all-teams-body" style="overflow:hidden;transition:max-height .28s ease;max-height:${allTeamsOpen?'none':'0'}">`;
   if (isLargeLeague) {
     html += `<div style="margin-bottom:10px"><input type="text" id="league-search" placeholder="Search ${enriched.length} teams..." oninput="filterLeagueCards(this.value)" style="width:100%;padding:10px 14px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);color:var(--text);font-family:inherit;outline:none"></div>`;
   }
@@ -1106,9 +1235,174 @@ function renderLeaguePanel() {
       html += _buildLeagueCard(item, idx, myId);
     });
   }
+  html += '</div>'; // close #all-teams-body
+
+  // Waivers + Trades sub-sections (Phase 5 consolidation)
+  html += '<div id="league-waivers-host" style="margin-top:18px"></div>';
+  html += '<div id="league-trades-host" style="margin-top:18px"></div>';
 
   container.innerHTML = html;
+
+  // If All Teams was expanded, restore scrollHeight-based max-height so it
+  // animates cleanly on the next collapse. `max-height: none` + transition
+  // doesn't animate, so recompute when the body is rendered visible.
+  if (allTeamsOpen) {
+    const body = document.getElementById('all-teams-body');
+    if (body) body.style.maxHeight = body.scrollHeight + 'px';
+  }
+
+  // Hydrate waivers + trades into their hosts
+  if (typeof _renderWaiversInLeague === 'function') _renderWaiversInLeague();
+  if (typeof _renderTradesInLeague === 'function') _renderTradesInLeague();
 }
+
+// ── Phase 5: accordion toggle for All Teams list ────────────
+function _toggleAllTeams() {
+  const body = document.getElementById('all-teams-body');
+  const chev = document.getElementById('all-teams-chev');
+  if (!body) return;
+  const open = body.style.maxHeight && body.style.maxHeight !== '0px';
+  if (open) {
+    body.style.maxHeight = '0';
+    if (chev) chev.style.transform = 'rotate(0deg)';
+    sessionStorage.setItem('scout_allteams_expanded', '0');
+  } else {
+    body.style.maxHeight = body.scrollHeight + 'px';
+    if (chev) chev.style.transform = 'rotate(180deg)';
+    sessionStorage.setItem('scout_allteams_expanded', '1');
+  }
+}
+window._toggleAllTeams = _toggleAllTeams;
+
+// ── Phase 5: Waivers sub-section inside League tab ──────────
+// Physically move the contents of #panel-waivers into #league-waivers-host
+// on first render so renderWaivers() can keep finding its existing IDs
+// (faab-bar, wv-top-pickup, wq-list, waiver-top5-list, …) unchanged.
+function _renderWaiversInLeague() {
+  const host = document.getElementById('league-waivers-host');
+  if (!host) return;
+  const waiversPanel = document.getElementById('panel-waivers');
+  // First invocation: relocate children from the orphaned waivers panel
+  // into the host. Subsequent calls just re-render into the same IDs.
+  if (waiversPanel && waiversPanel.children.length) {
+    host.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">WAIVERS <span style="height:1px;flex:1;background:var(--border);display:inline-block;margin-left:4px"></span></div>';
+    while (waiversPanel.firstChild) host.appendChild(waiversPanel.firstChild);
+  }
+  if (typeof window.renderWaivers === 'function') {
+    try { window.renderWaivers(); } catch (e) { console.warn('[scout] renderWaivers failed:', e); }
+  }
+}
+window._renderWaiversInLeague = _renderWaiversInLeague;
+
+// ── Phase 5: Trades sub-section inside League tab ──────────
+// Shows top 3 trade partners with "why" cards + CTAs for inline trade
+// builder and trade finder. Skips the Trade Calc shell chrome
+// (Overview/Partners/Builder/Tools/Back) entirely.
+function _renderTradesInLeague() {
+  const host = document.getElementById('league-trades-host');
+  if (!host) return;
+  const S = window.S;
+  if (!S?.rosters?.length || !S?.myRosterId) {
+    host.innerHTML = '';
+    return;
+  }
+
+  // Compute assessments if trade-calc hasn't been primed yet
+  let myAssess = window._tcMyAssessment;
+  let allAssess = window._tcAssessments;
+  if ((!myAssess || !allAssess || !allAssess.length) && typeof window.assessAllTeamsFromGlobal === 'function') {
+    allAssess = window.assessAllTeamsFromGlobal();
+    myAssess = (allAssess || []).find(a => a.rosterId === S.myRosterId);
+    window._tcAssessments = allAssess;
+    window._tcMyAssessment = myAssess;
+  }
+  if (!myAssess || !allAssess?.length) {
+    host.innerHTML = '';
+    return;
+  }
+
+  const partners = typeof window.findBestPartners === 'function'
+    ? window.findBestPartners(myAssess, allAssess).slice(0, 3)
+    : [];
+
+  const ownerProfiles = window.App?.LI?.ownerProfiles || {};
+
+  let html = '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px">TRADES <span style="height:1px;flex:1;background:var(--border);display:inline-block;margin-left:4px"></span></div>';
+
+  if (partners.length) {
+    html += '<div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Top 3 partners</div>';
+    partners.forEach((part, i) => {
+      const a = part.assessment;
+      const rid = a.rosterId;
+      const owner = (S.leagueUsers || []).find(u => u.user_id === S.rosters.find(r => r.roster_id === rid)?.owner_id);
+      const avatarId = owner?.avatar;
+      const initials = (a.ownerName || '?').slice(0, 2).toUpperCase();
+      const avatarHtml = avatarId
+        ? `<img src="https://sleepercdn.com/avatars/thumbs/${avatarId}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'"/>`
+        : `<div style="width:36px;height:36px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--text3);flex-shrink:0">${initials}</div>`;
+      const dna = ownerProfiles[rid]?.dna || '';
+      const theyProvide = (part.theyProvide || []).join(', ');
+      const iProvide = (part.iProvide || []).join(', ');
+      const why = theyProvide && iProvide
+        ? `They have ${theyProvide}, need your ${iProvide}`
+        : theyProvide
+        ? `Has ${theyProvide} depth you need`
+        : iProvide
+        ? `Needs ${iProvide} — you have the supply`
+        : 'Roster fit for a 2-for-2 swap';
+      const compatPct = Math.round(part.compatibility || 0);
+      const isTop = i === 0;
+      const border = isTop ? 'rgba(212,175,55,.5)' : 'var(--border)';
+      html += `<div style="padding:11px 14px;background:var(--bg2);border:1px solid ${border};border-radius:var(--r);margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        ${avatarHtml}
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+            ${isTop ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 5px;border:1px solid rgba(212,175,55,.4);border-radius:8px;text-transform:uppercase;letter-spacing:.04em">BEST FIT</span>' : ''}
+            <span style="font-size:14px;font-weight:700;color:var(--text)">${_esc(a.ownerName || 'Team ' + rid)}</span>
+            ${dna ? `<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--accentL);color:var(--accent);font-weight:600">${_esc(dna)}</span>` : ''}
+            <span style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${compatPct}% fit</span>
+          </div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.4">${_esc(why)}</div>
+        </div>
+        <button onclick="event.stopPropagation();typeof openTradeBuilder==='function'?openTradeBuilder(${rid},[],[]):fillGlobalChat('Build a trade with ${_esc(a.ownerName || '').replace(/'/g, "\\'")}')" style="padding:8px 14px;font-size:12px;font-weight:700;background:var(--accentL);color:var(--accent);border:1px solid rgba(212,175,55,.3);border-radius:7px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">Build Trade</button>
+      </div>`;
+    });
+  } else {
+    html += '<div style="padding:14px;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);text-align:center">No partners identified yet.</div>';
+  }
+
+  // Trade builder + finder CTAs (both open the trade builder modal for now —
+  // finder invokes it in "acquire" mode). Keeping the UI tight avoids shell
+  // chrome and lets the existing modal drive the heavy UX.
+  html += `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button onclick="typeof openTradeBuilder==='function'?openTradeBuilder(null,[],[]):fillGlobalChat('Help me build a trade')" style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;background:var(--accent);color:var(--bg1);border:none;border-radius:10px;cursor:pointer;font-family:inherit">+ Trade Builder</button>
+    <button onclick="_openTradeFinder()" style="flex:1;min-width:140px;padding:12px 16px;font-size:13px;font-weight:700;background:var(--bg2);color:var(--accent);border:1px solid var(--accent);border-radius:10px;cursor:pointer;font-family:inherit">🔍 Trade Finder</button>
+  </div>
+  <div id="league-trade-finder-host" style="margin-top:12px"></div>`;
+
+  host.innerHTML = html;
+}
+window._renderTradesInLeague = _renderTradesInLeague;
+
+// Trade Finder inline expand (reuses renderTradeFinder from trade-calc.js).
+function _openTradeFinder() {
+  const finderHost = document.getElementById('league-trade-finder-host');
+  if (!finderHost) return;
+  // Toggle — if it's already populated, collapse it
+  if (finderHost.innerHTML.trim()) {
+    finderHost.innerHTML = '';
+    return;
+  }
+  // Ensure trade-calc state is primed
+  if (!window._tcAssessments?.length && typeof window.assessAllTeamsFromGlobal === 'function') {
+    window._tcAssessments = window.assessAllTeamsFromGlobal();
+    window._tcMyAssessment = (window._tcAssessments || []).find(a => a.rosterId === window.S?.myRosterId);
+  }
+  if (typeof window.renderTradeFinder === 'function') {
+    try { window.renderTradeFinder(finderHost); } catch (e) { console.warn('[scout] renderTradeFinder failed:', e); }
+  }
+}
+window._openTradeFinder = _openTradeFinder;
 
 function _buildLeagueCard({ roster, owner, assess, dna }, idx, myId) {
     const teamName = owner?.metadata?.team_name || owner?.display_name || `Team ${idx + 1}`;
@@ -1334,7 +1628,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   _teamBarInterval = setInterval(() => {
-    if (window.S?.user) _onLeagueReady();
+    // Wait for BOTH S.user and a resolved roster before downgrading to the
+    // slow 15s retry. S.user can be set several seconds before S.myRosterId
+    // populates; calling _onLeagueReady too early leaves the team bar stuck
+    // on "Loading your team…" until the 15s tick.
+    if (window.S?.user && typeof myR === 'function' && myR()) _onLeagueReady();
   }, 500);
   // Safety cutoff after 60s
   setTimeout(() => clearInterval(_teamBarInterval), 60000);

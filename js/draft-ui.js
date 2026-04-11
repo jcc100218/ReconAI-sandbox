@@ -127,8 +127,10 @@ function renderDraftNeeds(){
   }).sort((a,b)=>b.needScore-a.needScore);
 
   // === RENDER: ON THE CLOCK hero ===
+  // Phase 4: On-the-clock card removed from Board view. Its design is
+  // reused inline inside renderMockDraftUI (see js/draft-ui.js mock block).
   const bestBetEl=$('draft-best-bet');
-  if(bestBetEl&&LI_LOADED){
+  if(false&&bestBetEl&&LI_LOADED){
     const earlyRounds=ownPickRounds.filter(r=>r<=3);
     const skipEarly=new Set(['K']);
     const bestEarlyNeed=posAnalysis.find(p=>p.needScore>=20&&!skipEarly.has(p.pos));
@@ -192,7 +194,7 @@ function renderDraftNeeds(){
     }
   }
 
-  // === RENDER: Your Picks (interactive) ===
+  // === RENDER: Your Picks — single large card, click to expand full list ===
   const pickEl=$('draft-my-picks');
   if(pickEl){
     const rosterRanks=S.rosters.map(r=>{
@@ -211,25 +213,59 @@ function renderDraftNeeds(){
       return posAnalysis.find(p=>p.needScore>0&&['DL','LB','DB'].includes(p.pos))?.pos||'BPA';
     };
 
-    let _pickIdx=0;
-    pickEl.innerHTML=ownedPicks.length?ownedPicks.map(p=>{
-      const fromRoster=p.own?S.myRosterId:p.fromRosterId;
-      const estPos=getPickPos(fromRoster);
-      const val=pickValue(year,p.round,teams,estPos);
-      const pickLabel=p.round+'.'+String(estPos).padStart(2,'0');
-      const fromName=p.own?'':'via '+p.from;
-      const target=roundTarget(p.round);
-      const isFirst=_pickIdx===0;
-      _pickIdx++;
-      return`<div class="${isFirst?'pick-next':''}" style="display:inline-flex;align-items:center;gap:6px;background:${p.own?'var(--bg2)':'rgba(212,175,55,.08)'};border:1px solid ${p.own?'var(--border)':'rgba(212,175,55,.2)'};border-radius:10px;padding:8px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s;position:relative" onclick="sendDraftChatMsg('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
-        ${isFirst?'<span style="position:absolute;top:-8px;left:8px;font-size:9px;font-weight:800;color:rgba(212,175,55,0.9);letter-spacing:.06em;text-transform:uppercase;background:var(--bg);padding:0 4px">UP NEXT</span>':''}
-        <div>
-          <div style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'}">${pickLabel}</div>
-          <div style="font-size:13px;color:var(--text3)">${fromName?fromName:'~'+val.toLocaleString()}</div>
-        </div>
-        <span style="font-size:13px;font-weight:700;padding:2px 5px;border-radius:4px;background:var(--accentL);color:var(--accent)">${target}</span>
-      </div>`;
-    }).join(''):`<span style="color:var(--text3);font-size:13px">No picks for ${year}</span>`;
+    if(!ownedPicks.length){
+      pickEl.innerHTML=`<div style="padding:14px;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);text-align:center">No picks for ${year}</div>`;
+    } else {
+      // Summary numbers for the big card
+      const totalPicks=ownedPicks.length;
+      const totalVal=ownedPicks.reduce((s,p)=>{
+        const estPos=getPickPos(p.own?S.myRosterId:p.fromRosterId);
+        return s+pickValue(year,p.round,teams,estPos);
+      },0);
+      const rounds=[...new Set(ownedPicks.map(p=>p.round))].sort((a,b)=>a-b);
+      const rangeLabel=rounds.length===1?`R${rounds[0]}`:`R${rounds[0]}–R${rounds[rounds.length-1]}`;
+
+      // First pick details (UP NEXT)
+      const first=ownedPicks[0];
+      const firstEstPos=getPickPos(first.own?S.myRosterId:first.fromRosterId);
+      const firstLabel=first.round+'.'+String(firstEstPos).padStart(2,'0');
+      const firstTarget=roundTarget(first.round);
+
+      // Expanded list (all picks, compact)
+      const expandedRows=ownedPicks.map((p,i)=>{
+        const fromRoster=p.own?S.myRosterId:p.fromRosterId;
+        const estPos=getPickPos(fromRoster);
+        const val=pickValue(year,p.round,teams,estPos);
+        const pickLabel=p.round+'.'+String(estPos).padStart(2,'0');
+        const fromName=p.own?'':'via '+p.from;
+        const target=roundTarget(p.round);
+        const isFirst=i===0;
+        return`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:${p.own?'var(--bg3)':'rgba(212,175,55,.06)'};border:1px solid ${isFirst?'var(--accent)':'var(--border)'};border-radius:8px;margin-bottom:4px;cursor:pointer" onclick="event.stopPropagation();fillGlobalChat('Who should I take at pick ${pickLabel}? My target position is ${target}.')">
+          <div style="font-size:14px;font-weight:700;color:${p.own?'var(--text)':'var(--accent)'};font-family:'JetBrains Mono',monospace;min-width:46px">${pickLabel}</div>
+          <div style="flex:1;font-size:12px;color:var(--text3)">${fromName||('~'+val.toLocaleString())}${isFirst?' · <span style="color:var(--accent);font-weight:700">UP NEXT</span>':''}</div>
+          <span style="font-size:12px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--accentL);color:var(--accent)">${target}</span>
+        </div>`;
+      }).join('');
+
+      pickEl.innerHTML=`
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);cursor:pointer;overflow:hidden" onclick="_toggleOwnedPicks()">
+          <div style="padding:14px 16px;display:flex;align-items:center;gap:12px">
+            <div style="flex:1">
+              <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Your picks · ${year}</div>
+              <div style="font-size:14px;color:var(--text2)"><span style="color:var(--accent);font-weight:700">${firstLabel}</span> UP NEXT · target ${firstTarget}</div>
+              <div style="font-size:12px;color:var(--text3);margin-top:2px">${rangeLabel} · ~${totalVal.toLocaleString()} DHQ total</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:28px;font-weight:900;color:var(--accent);font-family:'JetBrains Mono',monospace;line-height:1;letter-spacing:-.03em">${totalPicks}</div>
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">picks</div>
+            </div>
+            <svg id="draft-picks-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text3);transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+          <div id="draft-picks-expand" style="max-height:0;overflow:hidden;transition:max-height .28s ease;padding:0 12px">
+            <div style="padding:6px 0 12px 0">${expandedRows}</div>
+          </div>
+        </div>`;
+    }
   }
 
   // === RENDER: Draft Strategy (bar chart) ===
@@ -485,9 +521,8 @@ function renderRookieBoard(){
           </div>
           ${r.csvSummary?'<div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:8px;padding:8px;background:var(--bg3);border-radius:6px">'+r.csvSummary+(r.csvSummary.length>=300?'...':'')+'</div>':''}
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn btn-sm" onclick="sendDraftChatMsg('Full scouting report on ${(r.p.full_name||'').replace(/'/g,"\\'")} (${r.pos}, ${r.college||'Unknown'}). Include strengths, weaknesses, NFL comparison, and where I should draft them.')">Scout Report</button>
+            <button class="btn btn-sm" onclick="fillGlobalChat('Full scouting report on ${(r.p.full_name||'').replace(/'/g,"\\'")} (${r.pos}, ${r.college||'Unknown'}). Include strengths, weaknesses, NFL comparison, and where I should draft them.')">Scout Report</button>
             <button class="btn btn-sm btn-ghost" onclick="openPlayerModal('${r.pid}')">Player Card</button>
-            <button class="btn btn-sm btn-ghost" onclick="sendDraftChatMsg('Should I draft ${(r.p.full_name||'').replace(/'/g,"\\'")} at my next pick?')">Ask Alex</button>
           </div>
         </div>`:''}
       </div>`;
@@ -525,6 +560,64 @@ window._rookieFilter=_rookieFilter;
 window._rookieToggle=_rookieToggle;
 window._rookieShowMore=_rookieShowMore;
 window.renderRookieBoard=renderRookieBoard;
+
+// Toggle expand/collapse on the owned-picks big card (Phase 4).
+function _toggleOwnedPicks(){
+  const el=document.getElementById('draft-picks-expand');
+  const chev=document.getElementById('draft-picks-chev');
+  if(!el)return;
+  const open=el.style.maxHeight&&el.style.maxHeight!=='0px';
+  if(open){
+    el.style.maxHeight='0';
+    if(chev)chev.style.transform='';
+  } else {
+    el.style.maxHeight=el.scrollHeight+'px';
+    if(chev)chev.style.transform='rotate(180deg)';
+  }
+}
+window._toggleOwnedPicks=_toggleOwnedPicks;
+
+// Toggle the "Tendencies" expand card inside the mock draft on-the-clock
+// header (Phase 4). Shows league-wide draft intel — position runs, round
+// hit-rates, round targets — sourced from posAnalysis + LI.leagueHistory.
+function _toggleMockTendencies(){
+  const body=document.getElementById('mock-tendencies-body');
+  if(!body)return;
+  const open=body.style.maxHeight&&body.style.maxHeight!=='0px';
+  if(open){
+    body.style.maxHeight='0';
+    body.style.marginBottom='0';
+    return;
+  }
+  // Lazy-populate on first open
+  if(!body.dataset.populated){
+    const LI_=window.LI||{};
+    const history=LI_.leagueHistory||[];
+    let html='<div style="padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin-bottom:8px">';
+    html+='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">League draft tendencies</div>';
+    if(history.length){
+      // Top 3 position runs by round from league history
+      const byPos={};
+      history.forEach(h=>{const pos=h.pos;if(!pos)return;byPos[pos]=(byPos[pos]||0)+1;});
+      const top=Object.entries(byPos).sort((a,b)=>b[1]-a[1]).slice(0,3);
+      html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">';
+      top.forEach(([pos,ct])=>{
+        html+=`<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--accentL);color:var(--accent)">${pos} × ${ct}</span>`;
+      });
+      html+='</div>';
+      html+=`<div style="font-size:11px;color:var(--text3);line-height:1.5">Based on ${history.length} past picks. Ask the chat for round-by-round hit rates or positional runs.</div>`;
+    } else {
+      html+='<div style="font-size:12px;color:var(--text3);line-height:1.5">No league draft history yet. Ask the chat: "What are the draft tendencies in my league by round?"</div>';
+    }
+    html+='<button onclick="fillGlobalChat(\'Show me league-wide draft tendencies by round and position\')" style="margin-top:8px;padding:6px 12px;font-size:11px;font-weight:700;background:var(--bg4);border:1px solid var(--border2);border-radius:6px;color:var(--accent);cursor:pointer;font-family:inherit">Ask for full breakdown</button>';
+    html+='</div>';
+    body.innerHTML=html;
+    body.dataset.populated='1';
+  }
+  body.style.maxHeight=body.scrollHeight+'px';
+  body.style.marginBottom='8px';
+}
+window._toggleMockTendencies=_toggleMockTendencies;
 
 async function runDraftScouting(){
   if(!hasAnyAI()){switchTab('settings');return;}
@@ -1157,8 +1250,8 @@ function renderMockDraftUI(){
   const recentHtml=picks.slice(-5).map(p=>_mockPickCard(p,true)).join('');
 
   if(isMyPick){
-    // User picks — show available players with Alex recommendation
-    const available=pool.slice(0,12);
+    // User picks — show 8 best available players with Alex recommendation
+    const available=pool.slice(0,8);
     const myProfile=_mockState.teamProfiles?.[S.myRosterId]||{};
     const myNeeds=myProfile.needs||[];
 
@@ -1182,8 +1275,10 @@ function renderMockDraftUI(){
           <div style="font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;font-weight:700">ON THE CLOCK — R${current.round}.${current.pick}</div>
           <div style="font-size:16px;font-weight:800;color:var(--text);margin-top:2px">Your Pick</div>
         </div>
+        <button onclick="_toggleMockTendencies()" title="League draft tendencies" style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);color:var(--text3);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;padding:0" aria-label="Tendencies">📈</button>
         ${pauseBtn}
       </div>
+      <div id="mock-tendencies-body" style="max-height:0;overflow:hidden;transition:max-height .28s ease;margin-bottom:0"></div>
       ${alexPick?`<div style="padding:8px 10px;background:rgba(212,175,55,.08);border:1px solid rgba(212,175,55,.15);border-radius:8px;margin-bottom:8px;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="mockDraftPick('${alexPick.pid}')">
         <div style="font-size:13px">💡</div>
         <div style="flex:1">
@@ -1326,16 +1421,24 @@ function _saveMockTemplate() {
   const myPicks = _mockState.picks.filter(p => p.rosterId === S.myRosterId);
   if (!myPicks.length) return;
   try {
-    const templates = JSON.parse(localStorage.getItem(MOCK_TEMPLATES_KEY()) || '[]');
-    templates.unshift({
+    let templates = [];
+    try { templates = JSON.parse(localStorage.getItem(MOCK_TEMPLATES_KEY()) || '[]'); } catch (e) { templates = []; }
+    const saved = {
       id: Date.now(),
       date: new Date().toLocaleDateString(),
       mode: _mockState.mode || 'rookie',
       picks: myPicks.map(p => ({ name: p.playerName, pos: p.pos, round: p.round, pick: p.pick, val: p.val })),
-    });
+    };
+    templates.unshift(saved);
     localStorage.setItem(MOCK_TEMPLATES_KEY(), JSON.stringify(templates.slice(0, 10)));
     const btn = document.getElementById('save-mock-btn');
     if (btn) { btn.textContent = 'Saved!'; setTimeout(() => btn.textContent = 'Save Draft Template', 1500); }
+    // Phase 7: log mock draft save to the field log
+    if (window.addFieldLogEntry) {
+      try {
+        window.addFieldLogEntry('🎯', `Mock draft saved (${myPicks.length} picks)`, 'draft', { actionType: 'mock_saved', picks: saved.picks });
+      } catch (e) {}
+    }
   } catch (e) { console.warn('[MockDraft] Save error:', e); }
 }
 window._saveMockTemplate = _saveMockTemplate;

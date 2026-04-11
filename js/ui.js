@@ -1341,61 +1341,15 @@ document.addEventListener('click',e=>{
   if(wrap&&!wrap.contains(e.target)){
     const r=$('player-search-results');if(r)r.style.display='none';
   }
-  // Close global search bar if clicking outside it
-  const gsBar=$('global-search-bar');
-  const gsBtn=$('global-search-btn');
-  if(gsBar&&gsBar.style.display!=='none'&&!gsBar.contains(e.target)&&e.target!==gsBtn&&!gsBtn?.contains(e.target)){
-    gsBar.style.display='none';
-    const gsResults=$('gsearch-results');if(gsResults)gsResults.style.display='none';
-    const gsIn=$('gsearch-in');if(gsIn)gsIn.value='';
-  }
 });
 
-// ── Global Player Search (header search bar) ──────────────────
-function toggleGlobalSearch(){
-  const bar=$('global-search-bar');if(!bar)return;
-  const isOpen=bar.style.display!=='none';
-  if(isOpen){
-    bar.style.display='none';
-    const r=$('gsearch-results');if(r)r.style.display='none';
-    const inp=$('gsearch-in');if(inp)inp.value='';
-  }else{
-    bar.style.display='';
-    setTimeout(()=>{const inp=$('gsearch-in');if(inp)inp.focus();},50);
-  }
-}
+// ── Global Player Search (legacy — replaced by global chat bar) ──
+// Kept as no-op stubs in case old deep links or hotkeys still reference them.
+// Player search is now handled by handleUnifiedInput() in scout-ui.js via the global chat bar.
+function toggleGlobalSearch(){ /* removed in Phase 1 — player search lives in the GM bar */ }
 window.toggleGlobalSearch=toggleGlobalSearch;
 
-function handleGlobalPlayerSearch(query){
-  const results=$('gsearch-results');if(!results)return;
-  if(!query||query.length<2){results.innerHTML='';results.style.display='none';return;}
-  results.style.display='block';
-  const q=query.toLowerCase();
-  const posMapS=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
-  const matches=Object.entries(S.players||{})
-    .filter(([id,p])=>{
-      const name=(p.first_name+' '+p.last_name).toLowerCase();
-      return name.includes(q)&&(p.status==='Active'||dynastyValue(id)>0);
-    })
-    .map(([id,p])=>({id,p,name:p.first_name+' '+p.last_name,val:dynastyValue(id)}))
-    .sort((a,b)=>b.val-a.val)
-    .slice(0,10);
-  if(!matches.length){results.innerHTML='<div style="padding:12px;font-size:13px;color:var(--text3)">No players found</div>';return;}
-  results.innerHTML=matches.map(({id,p,name,val})=>{
-    const meta=LI_LOADED?LI.playerMeta?.[id]:null;
-    const isRookie=meta?.source==='FC_ROOKIE';
-    const {col}=tradeValueTier(val);
-    const ini=((p.first_name||'?')[0]+(p.last_name||'?')[0]).toUpperCase();
-    return`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s" onclick="openPlayerModal('${id}');toggleGlobalSearch()" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background=''">
-      <img src="https://sleepercdn.com/content/nfl/players/${id}.jpg" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none';this.insertAdjacentHTML('afterend','<span style=width:32px;height:32px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text3);flex-shrink:0>${ini}</span>')" loading="lazy"/>
-      <div style="flex:1;overflow:hidden;min-width:0">
-        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}${isRookie?'<span style="font-size:12px;color:var(--blue);margin-left:4px">ROOKIE</span>':''}</div>
-        <div style="font-size:12px;color:var(--text3)">${posMapS(p.position)||'?'} · ${p.team||'FA'} · Age ${p.age||'?'}</div>
-      </div>
-      <span style="font-size:13px;font-weight:700;color:${col};font-family:'JetBrains Mono',monospace;flex-shrink:0">${val>0?val.toLocaleString():'—'}</span>
-    </div>`;
-  }).join('');
-}
+function handleGlobalPlayerSearch(_query){ /* removed in Phase 1 — use handleUnifiedInput */ }
 window.handleGlobalPlayerSearch=handleGlobalPlayerSearch;
 
 // ── Home Snapshot ──────────────────────────────────────────────
@@ -2607,14 +2561,38 @@ function renderCrownJewels(){
 
 function toggleJewels(){}
 
+// ── Home waiver recommendation helper ────────────────────────
+// Returns the single best free-agent candidate for the current user,
+// prioritising their top positional need. Reuses getAvailablePlayers()
+// (same source as renderTopPickupHero). Returns null if no league data.
+function _getHomeWaiverRec() {
+  if (!window.LI_LOADED || !S.rosters?.length) return null;
+  if (typeof getAvailablePlayers !== 'function') return null;
+  const avail = getAvailablePlayers();
+  if (!avail.length) return null;
+
+  const assess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
+  const topNeed = assess?.needs?.[0];
+  const needPos = typeof topNeed === 'string' ? topNeed : topNeed?.pos;
+
+  const posMapF = p => { if (['DE','DT'].includes(p)) return 'DL'; if (['CB','S'].includes(p)) return 'DB'; return p; };
+  let best = null;
+  if (needPos) best = avail.find(a => posMapF(a.p.position) === needPos);
+  if (!best) best = avail[0];
+  if (!best) return null;
+  return { id: best.id, p: best.p, val: best.val, pos: posMapF(best.p.position) };
+}
+
 // ── Master home render — v4 components only ──────────────────
+// Phase 3 reshuffle: Field Intel → Next Move → Priorities → Opportunities.
+// Alex Identity, Strategy Sync, and Diagnosis blocks removed from home —
+// they live in the GM bar (Phase 6) and Activity tab respectively.
 function renderMobileHome() {
   const el = document.getElementById('digest-content');
   if (!el) return;
 
   // Use GMEngine if available
   const engine = window.GMEngine;
-  const strategy = window.GMStrategy?.getStrategy?.() || {};
 
   if (!engine) {
     // Fallback to old rendering if engine not loaded
@@ -2626,41 +2604,20 @@ function renderMobileHome() {
   const nextMove = engine.generateNextMove();
   const priorities = engine.generatePriorities();
   const opportunities = engine.generateOpportunities();
-  const diagnosis = engine.generateDiagnosis();
   const fieldIntel = engine.generateFieldIntel();
-  const hasDrift = window.GMStrategy?.hasDrift?.();
 
-  // Build the War Room Brief HTML
   let html = '';
 
-  // Alex Identity Row
-  const personality = strategy.alexPersonality || 'balanced';
-  const persColor = personality === 'aggressive' ? '#E74C3C' : personality === 'value_hunter' ? '#2ECC71' : '#D4AF37';
-  html += `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(212,175,55,0.15);">
-    <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#D4AF37,#B8941F);display:flex;align-items:center;justify-content:center;font-size:18px;">★</div>
-    <div style="flex:1;">
-      <div style="font-size:15px;font-weight:700;color:#E8E8F0;">Alex Ingram <span style="color:${persColor};font-size:12px;font-weight:600;margin-left:4px;">${personality.charAt(0).toUpperCase()+personality.slice(1)} ➤</span></div>
-      <div style="font-size:12px;color:#9090A8;">${(strategy.mode||'balanced').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} · Health ${window.LI?.teamHealth || '--'}</div>
-    </div>
-  </div>`;
-
-  // Strategy Sync Strip
-  html += `<div style="margin:12px 0;padding:10px 14px;background:rgba(212,175,55,0.06);border:1px solid rgba(212,175,55,0.2);border-radius:10px;cursor:pointer;" onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Show me my current strategy settings')">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:12px;font-weight:700;color:#D4AF37;letter-spacing:0.5px;">AI GM STRATEGY</span>
-      <span style="font-size:11px;color:#2ECC71;display:flex;align-items:center;gap:4px;"><span style="width:6px;height:6px;border-radius:50%;background:#2ECC71;display:inline-block;"></span> Synced</span>
-    </div>
-    <div style="font-size:13px;color:#E8E8F0;margin-top:4px;">Strategy: ${(strategy.mode||'balanced').replace(/_/g,' ')} · Target ${(strategy.targetPositions||[]).join(', ')||'—'} · ${strategy.aggression||'medium'} aggression</div>
-  </div>`;
-
-  // Team Diagnosis
-  if (diagnosis && diagnosis.length) {
-    html += `<div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);">`;
-    diagnosis.forEach(d => { html += `<div style="font-size:13px;color:#CCCCCC;line-height:1.5;">${d}</div>`; });
+  // ── FIELD INTEL (top) ──
+  if (fieldIntel && fieldIntel.length) {
+    html += `<div style="margin:12px 0 14px;"><div style="font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:1px;margin-bottom:8px;">🧠 FIELD INTEL</div>`;
+    fieldIntel.forEach(fi => {
+      html += `<div style="font-size:12px;color:#9090A8;padding:4px 0;line-height:1.5;">· ${fi}</div>`;
+    });
     html += `</div>`;
   }
 
-  // NEXT MOVE card
+  // ── NEXT MOVE ──
   if (nextMove && nextMove.type !== 'hold') {
     const confColor = nextMove.confidence === 'high' ? '#2ECC71' : nextMove.confidence === 'medium' ? '#F0A500' : '#9090A8';
     html += `<div style="margin:14px 0;padding:16px;background:#1A1A1A;border:1px solid rgba(212,175,55,0.4);border-radius:10px;position:relative;overflow:hidden;">
@@ -2676,7 +2633,7 @@ function renderMobileHome() {
     </div>`;
   }
 
-  // PRIORITIES
+  // ── PRIORITIES ──
   if (priorities && priorities.length) {
     html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#E74C3C;letter-spacing:1px;margin-bottom:8px;">🎯 PRIORITIES</div>`;
     priorities.forEach((p,i) => {
@@ -2688,26 +2645,51 @@ function renderMobileHome() {
     html += `</div>`;
   }
 
-  // OPPORTUNITIES
+  // ── OPPORTUNITIES — top 2 teams + 1 waiver ──
+  // Re-rank opportunities so a target that holds the user's top need position
+  // bubbles to the top, then slice to 2. Append one waiver rec as a third row.
+  let oppHtml = '';
   if (opportunities && opportunities.length) {
-    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#F0A500;letter-spacing:1px;margin-bottom:8px;">🔥 OPPORTUNITIES</div>`;
-    opportunities.forEach(o => {
-      html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+    const myAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(S.myRosterId) : null;
+    const myTopNeedRaw = myAssess?.needs?.[0];
+    const myTopNeed = typeof myTopNeedRaw === 'string' ? myTopNeedRaw : myTopNeedRaw?.pos;
+
+    const ranked = [...opportunities].sort((a, b) => {
+      if (!myTopNeed) return (b.exploitScore || 0) - (a.exploitScore || 0);
+      const aAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(a.rosterId) : null;
+      const bAssess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(b.rosterId) : null;
+      const aHas = (aAssess?.strengths || []).some(s => (typeof s === 'string' ? s : s?.pos) === myTopNeed) ? 1 : 0;
+      const bHas = (bAssess?.strengths || []).some(s => (typeof s === 'string' ? s : s?.pos) === myTopNeed) ? 1 : 0;
+      if (aHas !== bHas) return bHas - aHas;
+      return (b.exploitScore || 0) - (a.exploitScore || 0);
+    }).slice(0, 2);
+
+    ranked.forEach(o => {
+      oppHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
         <div style="width:32px;height:32px;border-radius:50%;background:#242424;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#9090A8;">${(o.ownerName||'?').slice(0,2).toUpperCase()}</div>
         <div style="flex:1;"><div style="font-size:13px;color:#E8E8F0;font-weight:600;">${o.ownerName||'Unknown'}</div><div style="font-size:11px;color:#9090A8;">${o.insight||''}</div></div>
-        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Build a trade with ${o.ownerName||''}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;">${o.suggestedAction||'Attack'}</button>
+        <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Build a trade with ${(o.ownerName||'').replace(/'/g,'')}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;">Build Trade</button>
       </div>`;
     });
-    html += `</div>`;
   }
 
-  // FIELD INTEL
-  if (fieldIntel && fieldIntel.length) {
-    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#D4AF37;letter-spacing:1px;margin-bottom:8px;">🧠 FIELD INTEL</div>`;
-    fieldIntel.forEach(fi => {
-      html += `<div style="font-size:12px;color:#9090A8;padding:4px 0;">· ${fi}</div>`;
-    });
-    html += `</div>`;
+  // Append 1 waiver recommendation as a third opportunity row
+  const waiverRec = _getHomeWaiverRec();
+  if (waiverRec) {
+    const wvName = pName(waiverRec.id);
+    const safeName = (wvName || '').replace(/'/g, "\\'");
+    oppHtml += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <div style="width:32px;height:32px;border-radius:50%;background:rgba(52,211,153,.12);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#2ECC71;">FA</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;color:#E8E8F0;font-weight:600;">${wvName} <span style="font-size:9px;font-weight:700;color:#2ECC71;padding:1px 5px;border:1px solid rgba(52,211,153,.3);border-radius:6px;margin-left:4px">WAIVER</span></div>
+        <div style="font-size:11px;color:#9090A8;">${waiverRec.pos} · ${(waiverRec.val||0).toLocaleString()} DHQ — fits your ${waiverRec.pos} need</div>
+      </div>
+      <button onclick="if(typeof fillGlobalChat==='function')fillGlobalChat('Help me claim ${safeName}')" style="padding:6px 12px;border-radius:6px;border:1px solid rgba(212,175,55,0.3);background:transparent;color:#D4AF37;font-size:11px;font-weight:600;cursor:pointer;">Add</button>
+    </div>`;
+  }
+
+  if (oppHtml) {
+    html += `<div style="margin:14px 0;"><div style="font-size:11px;font-weight:700;color:#F0A500;letter-spacing:1px;margin-bottom:8px;">🔥 OPPORTUNITIES</div>${oppHtml}</div>`;
   }
 
   el.innerHTML = html;

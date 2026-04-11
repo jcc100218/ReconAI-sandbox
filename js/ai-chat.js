@@ -27,8 +27,37 @@ let tradeBuilderAssets={mine:[],theirs:[]};
 let draftChatHistory=[];
 
 // ── Persistent Conversation Memory ──────────────────────────────
+// Phase 7B: conversation summaries are now rolled up into Supabase so War
+// Room and Scout share context. localStorage remains the primary path
+// (instant) and the remote sync is a fire-and-forget merge on load.
+let _chatMemoryRemoteMerged = false;
 function loadConvMemory(){
-  return DhqStorage.get(STORAGE_KEYS.CONV_SESSIONS, []);
+  const local = DhqStorage.get(STORAGE_KEYS.CONV_SESSIONS, []);
+  // First load per session: merge any remote summaries asynchronously.
+  if (!_chatMemoryRemoteMerged && window.OD?.loadChatMemory) {
+    _chatMemoryRemoteMerged = true;
+    try {
+      const leagueId = window.S?.currentLeagueId || null;
+      window.OD.loadChatMemory(leagueId, 6).then(remote => {
+        if (!Array.isArray(remote) || !remote.length) return;
+        const merged = [...local];
+        const seen = new Set(merged.map(m => m.ts));
+        remote.forEach(r => {
+          if (!seen.has(r.ts)) {
+            merged.push({
+              ts: r.ts,
+              date: new Date(r.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              text: r.summary,
+            });
+            seen.add(r.ts);
+          }
+        });
+        merged.sort((a, b) => a.ts - b.ts);
+        DhqStorage.set(STORAGE_KEYS.CONV_SESSIONS, merged.slice(-6));
+      }).catch(() => {});
+    } catch (e) {}
+  }
+  return local;
 }
 function saveConvMemory(arr){
   DhqStorage.set(STORAGE_KEYS.CONV_SESSIONS, arr.slice(-6));
@@ -36,8 +65,21 @@ function saveConvMemory(arr){
 function addConvMemory(summary){
   if(!summary||summary.length<10)return;
   const arr=loadConvMemory();
-  arr.push({ts:Date.now(),date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),text:summary});
+  const entry = {ts:Date.now(),date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'}),text:summary};
+  arr.push(entry);
   saveConvMemory(arr);
+  // Fire-and-forget remote sync — if it fails, localStorage is still authoritative
+  if (window.OD?.saveChatMemory) {
+    try {
+      window.OD.saveChatMemory({
+        leagueId: window.S?.currentLeagueId || null,
+        ts: entry.ts,
+        sessionLabel: null,
+        summary,
+        source: 'scout',
+      });
+    } catch (e) {}
+  }
 }
 function buildMemoryCtx(){
   const arr=loadConvMemory();
