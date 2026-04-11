@@ -235,9 +235,14 @@
     const S = _S();
     const curYear = parseInt(S.season) || new Date().getFullYear();
 
-    // Offseason detection: roughly Feb (month 1) through Aug (month 7)
-    const _nowMonth = new Date().getMonth(); // 0-indexed: 0=Jan, 1=Feb, ..., 7=Aug
-    const isOffseason = _nowMonth >= 1 && _nowMonth <= 7;
+    // Phase-aware offseason detection (Phase 2 v2). Falls back to the
+    // month heuristic if SeasonCalendar isn't available yet.
+    const calPhase = window.SeasonCalendar?.getPhase ? window.SeasonCalendar.getPhase() : null;
+    const _nowMonth = new Date().getMonth();
+    const isOffseason = calPhase
+      ? ['early_offseason', 'pre_draft', 'draft_week', 'post_draft', 'preseason', 'offseason'].includes(calPhase)
+      : (_nowMonth >= 1 && _nowMonth <= 7);
+    const isPreDraft = calPhase === 'pre_draft' || calPhase === 'draft_week';
 
     // Premium positions by dynasty value (DHQ-weighted)
     const _PREMIUM_POS = ['QB', 'RB', 'WR', 'TE'];
@@ -312,12 +317,46 @@
       }
 
       // Priority 3: Draft prep
-      if (priorities.length < 3) {
+      priorities.push({
+        problem: isPreDraft
+          ? 'Your rookie draft is approaching — lock your target board now'
+          : 'Map your rookie draft targets before ADP firms up',
+        consequence: isPreDraft
+          ? 'ADP is firming up fast. Every week you wait is a week less to spot steals.'
+          : 'Early prep lets you identify steals and avoid reaches. Start your board now.',
+        actionLabel: isPreDraft ? 'Open Big Board' : 'Mock Draft',
+        actionType: 'draft',
+      });
+
+      // Priority 4 (new): secondary positional gap — skip if it duplicates
+      // a position already covered by an earlier priority's action label.
+      if (needs.length > 1) {
+        const pos2 = needs.find((p, i) => i > 0 && !priorities.some(pr => pr.actionLabel?.includes(p)));
+        if (pos2) {
+          priorities.push({
+            problem: `${pos2} is a secondary gap that'll bite mid-season`,
+            consequence: 'Secondary gaps compound when injuries hit. Fix now while prices are calm.',
+            actionLabel: `Target ${pos2}`,
+            actionType: 'trade',
+          });
+        }
+      }
+
+      // Priority 5 (new): strategy hygiene — untouchables list or market posture
+      const untouchables = (strategy.untouchables || []).length;
+      if (untouchables < 3) {
         priorities.push({
-          problem: 'Map your rookie draft targets before ADP firms up',
-          consequence: 'Early prep lets you identify steals and avoid reaches. Start your board now.',
-          actionLabel: 'Mock Draft',
-          actionType: 'draft',
+          problem: 'Untouchables list is thin — you haven\'t told Alex who\'s off-limits',
+          consequence: 'Without an untouchables list, Alex may float your core in trade analysis.',
+          actionLabel: 'Set Untouchables',
+          actionType: 'hold',
+        });
+      } else if (strategy.marketPosture === 'hold') {
+        priorities.push({
+          problem: 'Your market posture is "hold" — no buy or sell direction set',
+          consequence: 'Offseason is the best trade window. Pick a posture so Alex knows what to pitch.',
+          actionLabel: 'Pick Posture',
+          actionType: 'hold',
         });
       }
 
@@ -387,34 +426,57 @@
       }
 
       // Priority 3: Health-based or urgency catch-all
-      if (priorities.length < 3) {
-        if (hs < 65 && hs > 0) {
+      if (hs < 65 && hs > 0) {
+        priorities.push({
+          problem: 'Overall roster health is below contender threshold',
+          consequence: 'Competing teams are pulling ahead every week you wait.',
+          actionLabel: 'Full Rebuild',
+          actionType: 'trade',
+        });
+      } else if (hs >= 80) {
+        priorities.push({
+          problem: 'Protect your franchise players from trade pressure',
+          consequence: 'Elite rosters get picked apart if you\'re not careful about what you trade.',
+          actionLabel: 'Set Untouchables',
+          actionType: 'hold',
+        });
+      } else if (needs.length > 2) {
+        const pos3 = needs[2];
+        priorities.push({
+          problem: `${pos3} is a secondary gap worth monitoring`,
+          consequence: 'Secondary gaps compound. Fix when the right deal appears.',
+          actionLabel: `Monitor ${pos3}`,
+          actionType: 'waiver',
+        });
+      }
+
+      // Priority 4 (new): trade deadline proximity
+      const weeksToDeadline = window.SeasonCalendar?.weeksUntil?.('deadline');
+      if (weeksToDeadline != null && weeksToDeadline > 0 && weeksToDeadline <= 3) {
+        priorities.push({
+          problem: `Trade deadline is ${weeksToDeadline} week${weeksToDeadline === 1 ? '' : 's'} out`,
+          consequence: 'After the deadline, your roster is locked for the playoff run. Make the moves now.',
+          actionLabel: 'Deadline Moves',
+          actionType: 'trade',
+        });
+      }
+
+      // Priority 5 (new): secondary gap from needs array if not already used
+      if (needs.length > 1 && priorities.length < 5) {
+        const pos2 = needs[1];
+        const already = priorities.some(p => p.actionLabel?.includes(pos2));
+        if (!already) {
           priorities.push({
-            problem: 'Overall roster health is below contender threshold',
-            consequence: 'Competing teams are pulling ahead every week you wait.',
-            actionLabel: 'Full Rebuild',
+            problem: `${pos2} depth is thin for the stretch run`,
+            consequence: 'One injury at a thin position can cost you a playoff week.',
+            actionLabel: `Find ${pos2}`,
             actionType: 'trade',
-          });
-        } else if (hs >= 80) {
-          priorities.push({
-            problem: 'Protect your franchise players from trade pressure',
-            consequence: 'Elite rosters get picked apart if you\'re not careful about what you trade.',
-            actionLabel: 'Set Untouchables',
-            actionType: 'hold',
-          });
-        } else if (needs.length > 2) {
-          const pos3 = needs[2];
-          priorities.push({
-            problem: `${pos3} is a secondary gap worth monitoring`,
-            consequence: 'Secondary gaps compound. Fix when the right deal appears.',
-            actionLabel: `Monitor ${pos3}`,
-            actionType: 'waiver',
           });
         }
       }
     }
 
-    return priorities.slice(0, 3);
+    return priorities.slice(0, 5);
   }
 
   function _defaultPriorities() {
@@ -578,6 +640,39 @@
 
     const obs = [];
 
+    // ── Calendar-aware observations (Phase 2 v2) ────────────────
+    // Prepend forward-looking intel based on season phase so April
+    // advice is "scout rookies" not "make a trade this week".
+    const cal = window.SeasonCalendar;
+    if (cal?.describe) {
+      const { phase, weeksToNext, nextMilestone } = cal.describe();
+      const dates = cal.getKeyDates();
+      const hasDraftDate = !!dates.draftDate;
+
+      if (phase === 'pre_draft' && hasDraftDate) {
+        obs.push(`Rookie draft is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} away. This is a draft-planning phase — scout prospects, don't grind waivers.`);
+        if (mode === 'rebuild' || mode === 'balanced_rebuild') {
+          obs.push('Rebuild window: your picks are your biggest lever. Trade veterans for picks, not picks for veterans.');
+        } else {
+          obs.push('Win-now window: identify the 2-3 rookies who could start this year and target those picks.');
+        }
+      } else if (phase === 'draft_week' && hasDraftDate) {
+        obs.push('Rookie draft is this week. Lock your board and your trade-up/down decisions before picks start.');
+      } else if (phase === 'post_draft') {
+        obs.push(`Rookie draft is done. Evaluate your haul — ${nextMilestone ? nextMilestone + ' is ' + weeksToNext + ' weeks out' : 'season kickoff is coming'}.`);
+      } else if (phase === 'preseason' && weeksToNext != null) {
+        obs.push(`NFL Week 1 is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} out. Lock in starters, finalize your lineup order, audit your bench.`);
+      } else if (phase === 'regular_season' && nextMilestone) {
+        obs.push(`${nextMilestone} is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} out. ${weeksToNext <= 3 ? 'Start executing — this is the window.' : 'Stay patient, let the market form.'}`);
+      } else if (phase === 'playoffs') {
+        obs.push('Playoff week — your lineup decisions matter more than any trade right now.');
+      } else if (phase === 'early_offseason' && !hasDraftDate) {
+        obs.push('No rookie draft date set. Ask your commissioner to schedule it so Alex can plan your offseason.');
+      } else if (phase === 'early_offseason') {
+        obs.push(`Early offseason. Rookie draft is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} away — start building your board.`);
+      }
+    }
+
     // Analyze field log
     try {
       const log = JSON.parse(localStorage.getItem('scout_field_log_v1') || '[]');
@@ -659,7 +754,7 @@
       }
     }
 
-    return obs.slice(0, 4);
+    return obs.slice(0, 6);
   }
 
   // ════════════════════════════════════════════════════════════════
