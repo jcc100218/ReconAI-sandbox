@@ -136,7 +136,12 @@ function switchTab(tab,btn){
   const panel=$('panel-'+tab);
   if(panel)panel.classList.add('active');
   if(tab==='waivers'){if(typeof loadMentality==='function')loadMentality();if(typeof renderWaiverTop5==='function')renderWaiverTop5();}
-  if(tab==='draftroom'){if(typeof renderDraftNeeds==='function')renderDraftNeeds();if(typeof onDraftTabOpen==='function')onDraftTabOpen();}
+  if(tab==='draftroom'){
+    // Show entry cards by default (not a half-rendered board or mid-mock)
+    if(typeof window.exitDraftRoom==='function')window.exitDraftRoom();
+    if(typeof window._refreshDraftEntrySubtitles==='function')window._refreshDraftEntrySubtitles();
+    if(typeof window.renderDraftEntryPicks==='function')window.renderDraftEntryPicks();
+  }
   if(tab==='digest'){
     if(typeof renderMobileHome==='function')renderMobileHome();
     else if(typeof renderHomeSnapshot==='function')renderHomeSnapshot();

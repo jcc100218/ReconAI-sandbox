@@ -37,23 +37,125 @@ function leagueHasIDPSlots(league) {
 window.isIDPPosition = isIDPPosition;
 window.leagueHasIDPSlots = leagueHasIDPSlots;
 
-// ── Draft Sub-tabs (Board | Mock Draft) ───────────────────────
+// ── Draft Sub-tabs — legacy stub ──────────────────────────────
+// Replaced by enterDraftRoom(). Kept for backward compat (GM bar
+// launcher, deep links, etc. may still call switchDraftView).
 function switchDraftView(view) {
-    const boardEl = document.getElementById('draft-board-view');
-    const mockEl = document.getElementById('draft-mock-view');
-    const boardBtn = document.getElementById('draft-tab-board');
-    const mockBtn = document.getElementById('draft-tab-mock');
-    if (!boardEl || !mockEl) return;
-    boardEl.style.display = view === 'board' ? '' : 'none';
-    mockEl.style.display = view === 'mock' ? '' : 'none';
-    if (boardBtn) { boardBtn.style.background = view === 'board' ? 'var(--accent)' : 'transparent'; boardBtn.style.color = view === 'board' ? 'var(--bg1)' : 'var(--text2)'; boardBtn.style.borderColor = view === 'board' ? 'var(--accent)' : 'var(--border)'; }
-    if (mockBtn) { mockBtn.style.background = view === 'mock' ? 'var(--accent)' : 'transparent'; mockBtn.style.color = view === 'mock' ? 'var(--bg1)' : 'var(--text2)'; mockBtn.style.borderColor = view === 'mock' ? 'var(--accent)' : 'var(--border)'; }
-    if (view === 'mock' && !_mockState) {
-        // Show start button with mode toggle if mock hasn't begun
-        onDraftTabOpen();
-    }
+  if (typeof enterDraftRoom === 'function') enterDraftRoom(view === 'mock' ? 'mock' : 'board');
 }
 window.switchDraftView = switchDraftView;
+
+// ── Draft Room navigation (entry cards ↔ full-screen rooms) ──
+function enterDraftRoom(mode) {
+  const entry = document.getElementById('draft-entry-view');
+  const board = document.getElementById('draft-board-fullview');
+  const mock  = document.getElementById('draft-mock-fullview');
+  if (!entry || !board || !mock) return;
+
+  entry.style.display = 'none';
+
+  if (mode === 'board') {
+    board.style.display = '';
+    mock.style.display  = 'none';
+    if (typeof renderDraftNeeds === 'function') renderDraftNeeds();
+    if (typeof renderTopProspects === 'function') renderTopProspects();
+  } else {
+    mock.style.display  = '';
+    board.style.display = 'none';
+    if (typeof onDraftTabOpen === 'function') onDraftTabOpen();
+  }
+}
+window.enterDraftRoom = enterDraftRoom;
+
+function exitDraftRoom() {
+  const entry = document.getElementById('draft-entry-view');
+  const board = document.getElementById('draft-board-fullview');
+  const mock  = document.getElementById('draft-mock-fullview');
+  if (entry) entry.style.display = '';
+  if (board) board.style.display = 'none';
+  if (mock)  mock.style.display  = 'none';
+  _refreshDraftEntrySubtitles();
+}
+window.exitDraftRoom = exitDraftRoom;
+
+function _refreshDraftEntrySubtitles() {
+  const boardSub = document.getElementById('draft-entry-board-sub');
+  if (boardSub) {
+    const S = window.S || {};
+    const totalRookies = Object.values(S.players || {}).filter(p => p.years_exp === 0).length;
+    boardSub.textContent = totalRookies > 0
+      ? `${totalRookies} prospects ranked by DHQ`
+      : 'DHQ-ranked prospects · tap to rank';
+  }
+  const mockSub = document.getElementById('draft-entry-mock-sub');
+  if (mockSub) {
+    const LI = window.LI || {};
+    const ownerCount = Object.keys(LI.ownerProfiles || {}).length;
+    const teams = (window.S?.rosters || []).length;
+    mockSub.textContent = ownerCount > 0
+      ? `${ownerCount} owner DNA profiles loaded · ${teams} teams`
+      : `Simulate your draft with AI opponents`;
+  }
+}
+window._refreshDraftEntrySubtitles = _refreshDraftEntrySubtitles;
+
+// ── Entry picks summary card ─────────────────────────────────
+function renderDraftEntryPicks() {
+  const el = document.getElementById('draft-entry-picks');
+  if (!el || !window.S?.myRosterId) return;
+
+  const S = window.S;
+  const year = S.season || new Date().getFullYear();
+  const allTP = S.tradedPicks || [];
+  const myId = S.myRosterId;
+  const teams = S.rosters?.length || 16;
+  const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
+  const draftRounds = league?.settings?.draft_rounds || 7;
+  const ownedPicks = [];
+  for (let rd = 1; rd <= draftRounds; rd++) {
+    const tradedAway = allTP.find(p => String(p.season) === String(year) && p.round === rd && p.roster_id === myId && p.owner_id !== myId);
+    if (!tradedAway) ownedPicks.push({ round: rd, own: true });
+    const acquired = allTP.filter(p => String(p.season) === String(year) && p.round === rd && p.owner_id === myId && p.roster_id !== myId);
+    acquired.forEach(() => ownedPicks.push({ round: rd, own: false }));
+  }
+
+  if (!ownedPicks.length) { el.innerHTML = ''; return; }
+
+  const totalVal = ownedPicks.reduce((s, p) => s + (typeof pickValue === 'function' ? pickValue(year, p.round, teams, Math.ceil(teams / 2)) : 0), 0);
+  const roundBadges = ownedPicks.slice(0, 6).map(p =>
+    `<span style="font-size:12px;font-weight:700;padding:3px 8px;border-radius:6px;background:${p.own ? 'var(--accentL)' : 'rgba(52,211,153,.08)'};color:${p.own ? 'var(--accent)' : 'var(--green)'};border:1px solid ${p.own ? 'rgba(212,175,55,.2)' : 'rgba(52,211,153,.2)'}">R${p.round}</span>`
+  ).join('');
+  const extra = ownedPicks.length > 6 ? `<span style="font-size:12px;color:var(--text3)">+${ownedPicks.length - 6} more</span>` : '';
+
+  el.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Your ${year} Picks</span>
+        <span style="font-size:12px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">~${totalVal.toLocaleString()} DHQ</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">${roundBadges}${extra}</div>
+    </div>`;
+}
+window.renderDraftEntryPicks = renderDraftEntryPicks;
+
+// ── DNA intel strip for mock draft on-the-clock ──────────────
+function _renderDNAIntelStrip(round) {
+  const LI = window.LI || {};
+  const hitRates = LI.hitRateByRound?.[round] || {};
+  const bestPos = (hitRates.bestPos || []).slice(0, 2).map(p => p.pos).join('/');
+  const roundHitRate = hitRates.rate || null;
+
+  if (!bestPos && roundHitRate === null) return '';
+
+  return `<div style="background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.12);border-radius:var(--r);padding:10px 12px;margin-bottom:10px">
+    <div style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Owner DNA · Round ${round}</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      ${bestPos ? `<div style="font-size:13px;color:var(--text2)"><span style="color:var(--text3)">Historically hits at:</span> <span style="font-weight:700;color:var(--text)">${bestPos}</span></div>` : ''}
+      ${roundHitRate !== null ? `<div style="font-size:13px;color:var(--text2)"><span style="color:var(--text3)">League hit rate:</span> <span style="font-weight:700;color:${roundHitRate >= 50 ? 'var(--green)' : roundHitRate >= 25 ? 'var(--amber)' : 'var(--red)'}">${roundHitRate}%</span></div>` : ''}
+    </div>
+  </div>`;
+}
+window._renderDNAIntelStrip = _renderDNAIntelStrip;
 
 // ── Opponent Scouting ──────────────────────────────────────────
 // idealDepth: default depth targets per position (may be overridden by other modules)
@@ -1325,6 +1427,7 @@ function renderMockDraftUI(){
         </div>
         ${_mockPosBadge(alexPick.pos)}
       </div>`:''}
+      ${typeof _renderDNAIntelStrip==='function'?_renderDNAIntelStrip(current.round):''}
       ${recentHtml?'<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Recent Picks</div>'+recentHtml+'</div>':''}
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
         <span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Available Players</span>
