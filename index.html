@@ -444,58 +444,103 @@
       </div>
     </div>
 
-    <!-- DRAFT SCOUTING -->
+    <!-- DRAFT ROOM -->
     <div class="panel" id="panel-draftroom">
-      <!-- Header (compact) -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <div style="flex:1;font-size:16px;font-weight:800;letter-spacing:-.03em">Rookie Draft</div>
+
+      <!-- Draft entry view — shown by default -->
+      <div id="draft-entry-view">
+        <div style="font-size:18px;font-weight:800;letter-spacing:-.03em;margin-bottom:4px">Draft Room</div>
+        <div style="font-size:13px;color:var(--text3);margin-bottom:16px">Rookie prospects · mock drafts · pick strategy</div>
+
+        <!-- Big Board entry card -->
+        <div class="draft-entry-card" onclick="enterDraftRoom('board')" style="margin-bottom:10px">
+          <div class="draft-entry-icon" style="background:rgba(212,175,55,.12)">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--accent)" stroke-width="1.8">
+              <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </div>
+          <div class="draft-entry-body">
+            <div class="draft-entry-title">Big Board</div>
+            <div class="draft-entry-sub" id="draft-entry-board-sub">DHQ-ranked prospects · tap to rank</div>
+          </div>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <!-- Mock Draft entry card -->
+        <div class="draft-entry-card" onclick="enterDraftRoom('mock')" style="margin-bottom:16px">
+          <div class="draft-entry-icon" style="background:rgba(52,211,153,.08)">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--green)" stroke-width="1.8">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div class="draft-entry-body">
+            <div class="draft-entry-title">Mock Draft</div>
+            <div class="draft-entry-sub" id="draft-entry-mock-sub">Owner DNA simulation · 16 teams</div>
+          </div>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text3)" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <!-- Your picks summary (compact, always visible on entry) -->
+        <div id="draft-entry-picks"></div>
       </div>
 
-      <div id="draft-subtabs" style="display:flex;gap:8px;margin:8px 0 14px">
-        <button onclick="switchDraftView('board')" id="draft-tab-board" class="draft-subtab active" style="flex:1;padding:12px 24px;font-size:15px;font-weight:800;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:var(--bg1);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.06em">Board</button>
-        <button onclick="switchDraftView('mock')" id="draft-tab-mock" class="draft-subtab" style="flex:1;padding:12px 24px;font-size:15px;font-weight:800;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit;text-transform:uppercase;letter-spacing:0.06em">Mock Draft</button>
-      </div>
-      <div id="draft-board-view">
+      <!-- Big Board full-screen view -->
+      <div id="draft-board-fullview" style="display:none">
+        <!-- Back header -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <button onclick="exitDraftRoom()" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--text2);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            Draft Room
+          </button>
+          <div style="font-size:16px;font-weight:800;letter-spacing:-.02em">Big Board</div>
+        </div>
 
-      <!-- Owned picks — single large card, click to expand -->
-      <div id="draft-my-picks-section" style="margin-bottom:14px">
-        <div id="draft-my-picks">
-          <span style="color:var(--text3);font-size:13px">Connect to see picks</span>
+        <!-- Your picks card (compact) -->
+        <div id="draft-my-picks" style="margin-bottom:14px"></div>
+
+        <!-- Alex's top pick hero -->
+        <div id="draft-alex-hero" style="margin-bottom:14px"></div>
+
+        <!-- Position filter + rookie list -->
+        <div id="draft-top-prospects"></div>
+
+        <!-- Draft Intel (bar chart + hit rates) -->
+        <div id="draft-summary" style="margin-bottom:14px">
+          <div id="draft-summary-content"></div>
+        </div>
+
+        <!-- Data quality note -->
+        <div style="font-size:12px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-top:14px;line-height:1.5">
+          Rookie rankings improve as the NFL draft approaches. Pre-draft data is speculative.
         </div>
       </div>
 
-      <!-- 2. Scouting Report (AI-generated) -->
-      <div id="draft-scout-content" style="display:none"></div>
+      <!-- Mock Draft full-screen view -->
+      <div id="draft-mock-fullview" style="display:none">
+        <!-- Back header -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <button onclick="exitDraftRoom()" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;color:var(--text2);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            Draft Room
+          </button>
+          <div style="font-size:16px;font-weight:800;letter-spacing:-.02em">Mock Draft</div>
+        </div>
 
-      <!-- 3. Draft Advisor chat -->
-      <div style="position:relative;margin-bottom:8px">
-        <div id="draft-msgs" style="max-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:8px;transition:max-height .3s ease,padding .3s ease"></div>
-        <button id="draft-chat-collapse" onclick="collapseDraftChat()" style="display:none;position:absolute;top:6px;right:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:2px 8px;font-size:11px;color:var(--text3);cursor:pointer;z-index:1" title="Collapse chat">&#9650; Collapse</button>
-      </div>
-      <input type="text" id="draft-chat-in" style="display:none" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
-
-      <!-- Top Prospects -->
-      <div id="draft-top-prospects" style="margin-bottom:14px"></div>
-
-      <!-- 4. Draft Intel (Strategy + History combined) -->
-      <div id="draft-summary" style="display:none;margin-bottom:14px">
-        <div id="draft-summary-content"></div>
-      </div>
-      <div id="draft-history-section" style="display:none;margin-bottom:14px"></div>
-
-      <!-- 5. Scouting Board -->
-      <div id="draft-needs" style="display:none"></div>
-      <div id="rookie-profiles" style="margin-top:0;display:none"></div>
-
-      <!-- Data quality note (bottom, subtle) -->
-      <div style="font-size:13px;color:var(--text3);padding:8px 12px;background:var(--bg2);border-radius:var(--r);margin-top:14px;line-height:1.5">
-        Rookie rankings improve as the NFL draft approaches. Pre-draft data is speculative.
-      </div>
-      </div><!-- end draft-board-view -->
-
-      <div id="draft-mock-view" style="display:none">
+        <!-- Mock draft content (existing mock UI goes here) -->
         <div id="draft-mock" style="margin-bottom:14px"></div>
       </div>
+
+      <!-- Keep these hidden stubs for JS compat -->
+      <div id="draft-needs" style="display:none"></div>
+      <div id="rookie-profiles" style="display:none"></div>
+      <div id="draft-scout-content" style="display:none"></div>
+      <div id="draft-chat-collapse" style="display:none"></div>
+      <div id="draft-msgs" style="display:none"></div>
+      <input type="text" id="draft-chat-in" style="display:none" onkeydown="if(event.key==='Enter')sendDraftChat()"/>
+      <div id="draft-history-section" style="display:none"></div>
+      <div id="draft-best-bet" style="display:none"></div>
     </div>
 
     <!-- AI AGENT -->
@@ -764,22 +809,6 @@
         </button>
       </div>
 
-      <!-- Quick-launch buttons (Waivers / Trades / Draft) -->
-      <div class="gm-bar-launcher">
-        <button class="gm-launch-btn" onclick="_gmLaunchWaivers()">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          <span>Waivers</span>
-        </button>
-        <button class="gm-launch-btn" onclick="_gmLaunchTrades()">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          <span>Trades</span>
-        </button>
-        <button class="gm-launch-btn" onclick="_gmLaunchDraft()">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Draft</span>
-        </button>
-      </div>
-
       <!-- GM Strategy + Alex Learning summary (compact block) -->
       <div id="gm-bar-alex" class="gm-bar-alex-block"></div>
 
@@ -843,6 +872,7 @@
 <script src="shared/team-assess.js"></script>
 <script src="shared/strategy.js"></script>
 <script src="shared/season-calendar.js"></script>
+<script src="shared/roster-snapshot.js"></script>
 <script src="shared/gm-engine.js"></script>
 <script src="shared/analytics-engine.js"></script>
 <script src="shared/dhq-ai.js"></script>

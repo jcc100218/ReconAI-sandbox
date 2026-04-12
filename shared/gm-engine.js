@@ -231,6 +231,12 @@
     const strategy = _strategy();
     const mode = strategy.mode || 'balanced_rebuild';
     const hs = assess.healthScore || 0;
+
+    // Roster snapshot for data-grounded priority text. If unavailable,
+    // the priorities fall through to the old position-label-only behavior
+    // (still useful, just less specific).
+    const snap = typeof window.buildRosterSnapshot === 'function' ? window.buildRosterSnapshot() : null;
+    const posGroups = snap?.positionGroups || {};
     const needs = (assess.needs || []).map(n => typeof n === 'string' ? n : n.pos).filter(Boolean);
     const S = _S();
     const curYear = parseInt(S.season) || new Date().getFullYear();
@@ -256,22 +262,32 @@
     if (isOffseason) {
       // ── OFFSEASON priorities: dynasty asset accumulation, not weekly output ──
 
-      // Priority 1: Biggest positional gap at a premium position
+      // Priority 1: Biggest positional gap — data-grounded via snapshot
       if (_topPremium.length > 0) {
         const pos = _topPremium[0];
+        const pg = posGroups[pos];
+        const gapDetail = pg
+          ? ` Your ${pos} group is ${pg.groupDHQ.toLocaleString()} DHQ (${pg.gapPct > 0 ? '+' : ''}${pg.gapPct}% vs league avg of ${pg.leagueAvgDHQ.toLocaleString()}).`
+          : '';
+        const topPlayer = pg?.players?.[0];
+        const topDetail = topPlayer ? ` Best: ${topPlayer.name} (${topPlayer.dhq.toLocaleString()}).` : '';
         priorities.push({
-          problem: `${pos} room needs a foundational piece before the season`,
-          consequence: _isPPR && pos === 'WR'
+          problem: pg?.count >= 4
+            ? `${pos} has ${pg.count} players but group DHQ is below league average`
+            : `${pos} room needs a foundational piece before the season`,
+          consequence: gapDetail + topDetail || (_isPPR && pos === 'WR'
             ? 'PPR leagues reward deep WR rooms. Build now while prices are lower.'
-            : `${pos} is the engine of dynasty rosters. Lock in your piece now.`,
+            : `${pos} is the engine of dynasty rosters. Lock in your piece now.`),
           actionLabel: `Target ${pos}`,
           actionType: 'trade',
         });
       } else if (needs.length > 0) {
         const pos = needs[0];
+        const pg = posGroups[pos];
+        const gapDetail = pg ? ` ${pg.groupDHQ.toLocaleString()} DHQ — ${Math.abs(pg.gapPct)}% below league avg.` : '';
         priorities.push({
           problem: `${pos} is your thinnest position heading into the season`,
-          consequence: 'Offseason is when roster construction shapes your year. Address now.',
+          consequence: gapDetail || 'Offseason is when roster construction shapes your year. Address now.',
           actionLabel: `Find ${pos}`,
           actionType: 'trade',
         });
@@ -633,124 +649,95 @@
 
   function generateFieldIntel() {
     const strategy = _strategy();
-    const myRoster = _myRoster();
-    const assess = myRoster ? _assess(myRoster.roster_id) : null;
-    const hs = assess?.healthScore || 0;
     const mode = strategy.mode || 'balanced_rebuild';
-
     const obs = [];
 
-    // ── Calendar-aware observations (Phase 2 v2) ────────────────
-    // Prepend forward-looking intel based on season phase so April
-    // advice is "scout rookies" not "make a trade this week".
+    // ── Roster snapshot — every observation below is data-grounded ──
+    // buildRosterSnapshot() returns null if the league isn't connected
+    // yet. Fall back to a minimal calendar-only view if so.
+    const snap = typeof window.buildRosterSnapshot === 'function' ? window.buildRosterSnapshot() : null;
+
+    // ── 1. Calendar-phase context (always first) ──────────────────
     const cal = window.SeasonCalendar;
     if (cal?.describe) {
       const { phase, weeksToNext, nextMilestone } = cal.describe();
-      const dates = cal.getKeyDates();
-      const hasDraftDate = !!dates.draftDate;
+      const hasDraftDate = !!cal.getKeyDates?.()?.draftDate;
+      const pickCount = snap?.pickInventory?.totalPicks;
+      const pickStr = pickCount != null ? ` You hold ${pickCount} pick${pickCount === 1 ? '' : 's'}.` : '';
 
       if (phase === 'pre_draft' && hasDraftDate) {
-        obs.push(`Rookie draft is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} away. This is a draft-planning phase — scout prospects, don't grind waivers.`);
-        if (mode === 'rebuild' || mode === 'balanced_rebuild') {
-          obs.push('Rebuild window: your picks are your biggest lever. Trade veterans for picks, not picks for veterans.');
-        } else {
-          obs.push('Win-now window: identify the 2-3 rookies who could start this year and target those picks.');
-        }
-      } else if (phase === 'draft_week' && hasDraftDate) {
-        obs.push('Rookie draft is this week. Lock your board and your trade-up/down decisions before picks start.');
-      } else if (phase === 'post_draft') {
-        obs.push(`Rookie draft is done. Evaluate your haul — ${nextMilestone ? nextMilestone + ' is ' + weeksToNext + ' weeks out' : 'season kickoff is coming'}.`);
-      } else if (phase === 'preseason' && weeksToNext != null) {
-        obs.push(`NFL Week 1 is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} out. Lock in starters, finalize your lineup order, audit your bench.`);
-      } else if (phase === 'regular_season' && nextMilestone) {
-        obs.push(`${nextMilestone} is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} out. ${weeksToNext <= 3 ? 'Start executing — this is the window.' : 'Stay patient, let the market form.'}`);
-      } else if (phase === 'playoffs') {
-        obs.push('Playoff week — your lineup decisions matter more than any trade right now.');
-      } else if (phase === 'early_offseason' && !hasDraftDate) {
-        obs.push('No rookie draft date set. Ask your commissioner to schedule it so Alex can plan your offseason.');
+        obs.push(`Rookie draft is ${weeksToNext}w away.${pickStr} Focus: prospect scouting, not waivers.`);
+      } else if (phase === 'draft_week') {
+        obs.push(`Rookie draft is this week.${pickStr} Lock your board and trade-up/down decisions.`);
+      } else if (phase === 'early_offseason' && hasDraftDate) {
+        obs.push(`Early offseason — rookie draft in ${weeksToNext}w.${pickStr} Start building your board.`);
       } else if (phase === 'early_offseason') {
-        obs.push(`Early offseason. Rookie draft is ${weeksToNext} week${weeksToNext === 1 ? '' : 's'} away — start building your board.`);
+        obs.push('No rookie draft date set. Ask your commissioner to schedule it so Alex can plan ahead.');
+      } else if (phase === 'preseason' && weeksToNext != null) {
+        obs.push(`NFL Week 1 in ${weeksToNext}w. Audit your bench and finalize starter order.`);
+      } else if (phase === 'regular_season' && nextMilestone) {
+        obs.push(`${nextMilestone} in ${weeksToNext}w. ${weeksToNext <= 3 ? 'Execute now.' : 'Let the market form.'}`);
+      } else if (phase === 'playoffs') {
+        obs.push('Playoff week — lineup decisions matter more than any trade.');
       }
     }
 
-    // Analyze field log
-    try {
-      const log = JSON.parse(localStorage.getItem('scout_field_log_v1') || '[]');
-      const now = Date.now();
-      const twoWeeksAgo = now - 14 * 24 * 60 * 60 * 1000;
-      const recent = log.filter(e => e.ts >= twoWeeksAgo);
-
-      // Trade frequency
-      const trades = recent.filter(e => e.actionType === 'trade' || e.category === 'trade');
-      const waivers = recent.filter(e => e.actionType === 'waiver' || e.category === 'waivers');
-
-      if (trades.length === 0 && recent.length > 0) {
-        obs.push("You've made no trades in 2 weeks — potential missed opportunities building up.");
-      } else if (trades.length >= 3) {
-        obs.push(`You've been active — ${trades.length} trades logged in 2 weeks.`);
-      }
-
-      // Position patterns from traded players
-      const posCounts = {};
-      trades.forEach(e => {
-        (e.players || []).forEach(p => {
-          if (p.pos) posCounts[p.pos] = (posCounts[p.pos] || 0) + 1;
-        });
-      });
-      const topTradedPos = Object.entries(posCounts).sort((a, b) => b[1] - a[1])[0];
-      if (topTradedPos && topTradedPos[1] >= 2) {
-        obs.push(`Your recent trades have concentrated on ${topTradedPos[0]}s — watch for tunnel vision.`);
-      }
-
-      // FAAB / waiver activity
-      if (waivers.length === 0 && recent.length > 0) {
-        obs.push("Waiver activity has been minimal — hidden gems may be available.");
-      } else if (waivers.length >= 3) {
-        obs.push(`High waiver activity — ${waivers.length} moves logged recently. Good market awareness.`);
-      }
-    } catch (e) {
-      // localStorage unavailable
+    if (!snap) {
+      // No roster data — return early with just the calendar observation
+      return obs.length ? obs : ['Connect your league to see roster-specific intel.'];
     }
 
-    // Strategy drift observation
-    const drift = window.GMStrategy?.getDrift ? window.GMStrategy.getDrift() : { conflicts: [] };
-    const recentDrift = (drift.conflicts || []).filter(c => Date.now() - c.timestamp < 7 * 24 * 60 * 60 * 1000);
-    if (recentDrift.length >= 2) {
-      obs.push(`${recentDrift.length} recent actions conflicted with your stated strategy — check your plan.`);
+    // ── 2. Position group observations — cite real data ──────────
+    const posGroups = snap.positionGroups || {};
+    // Find the weakest position group by gap %
+    const weakest = Object.entries(posGroups)
+      .filter(([, g]) => g.gap === 'weakness')
+      .sort((a, b) => a[1].gapPct - b[1].gapPct)[0];
+    if (weakest) {
+      const [pos, g] = weakest;
+      const topPlayer = g.players[0];
+      obs.push(`${pos} group (${g.groupDHQ.toLocaleString()} DHQ) is ${Math.abs(g.gapPct)}% below league avg (${g.leagueAvgDHQ.toLocaleString()}).${topPlayer ? ' Best: ' + topPlayer.name + ' at ' + topPlayer.dhq.toLocaleString() + '.' : ''}`);
     }
 
-    // Mode-aligned observations
-    if (mode === 'rebuild' || mode === 'balanced_rebuild') {
-      const LI = _LI();
-      const ownerProfiles = LI.ownerProfiles || {};
-      const myId = myRoster?.roster_id;
-      if (myId && ownerProfiles[myId]) {
-        const profile = ownerProfiles[myId];
-        if (profile.picksAcquired < profile.picksSold) {
-          obs.push("You've sold more picks than you've acquired — inconsistent with rebuild mode.");
-        } else if (profile.picksAcquired > 2) {
-          obs.push(`You've accumulated ${profile.picksAcquired} picks via trade — rebuild capital is building.`);
-        }
-      }
-      if (obs.length < 3) {
-        obs.push("Young WR/RB acquisitions compound over time — favor upside over short-term production.");
-      }
-    } else {
-      if (hs >= 80) {
-        obs.push("Elite health means your next trade should be surgical, not reactionary.");
-      } else if (obs.length < 3) {
-        obs.push("Win-now window requires decisive action — indecision is its own risk.");
+    // Find the strongest position group
+    const strongest = Object.entries(posGroups)
+      .filter(([, g]) => g.gap === 'strength')
+      .sort((a, b) => b[1].gapPct - a[1].gapPct)[0];
+    if (strongest) {
+      const [pos, g] = strongest;
+      obs.push(`${pos} is a strength (${g.groupDHQ.toLocaleString()} DHQ, +${g.gapPct}% vs league). Consider selling depth here for needs.`);
+    }
+
+    // ── 3. Pick capital ──────────────────────────────────────────
+    const picks = snap.pickInventory;
+    if (picks) {
+      if (picks.pickStrength === 'above average') {
+        obs.push(`You hold ${picks.totalPicks} picks (~${picks.totalPickDHQ.toLocaleString()} DHQ) — above league average. Strong draft capital.`);
+      } else if (picks.pickStrength === 'below average') {
+        obs.push(`Pick inventory is thin: ${picks.totalPicks} picks, ${picks.totalPickDHQ.toLocaleString()} DHQ — below league avg of ${picks.leagueAvgPickDHQ.toLocaleString()}.`);
       }
     }
 
-    // Health trend filler
-    if (obs.length < 3) {
-      if (hs < 65 && hs > 0) {
-        obs.push("Roster health trending down — full evaluation recommended this week.");
-      } else if (hs >= 80) {
-        obs.push("Top-tier health — maintain depth and push for wins.");
-      } else {
-        obs.push("Draft capital usage rate is below the league's top contenders.");
+    // ── 4. Aging risks — cite specific players ───────────────────
+    if (snap.agingRisks?.length) {
+      const top2 = snap.agingRisks.slice(0, 2);
+      const names = top2.map(p => `${p.name} (${p.position}, age ${p.age}, ${p.dhq.toLocaleString()} DHQ)`).join(' and ');
+      obs.push(`Aging risk: ${names}${top2.length < snap.agingRisks.length ? ` + ${snap.agingRisks.length - top2.length} more` : ''}.`);
+    }
+
+    // ── 5. Sell candidates ───────────────────────────────────────
+    if (snap.sellCandidates?.length) {
+      const top = snap.sellCandidates[0];
+      obs.push(`Sell window: ${top.name} (${top.position}, ${top.dhq.toLocaleString()} DHQ) — ${top.reason}.`);
+    }
+
+    // ── 6. League standing context ───────────────────────────────
+    if (snap.leagueRank && snap.leagueSize) {
+      const pct = Math.round((snap.leagueRank / snap.leagueSize) * 100);
+      if (pct <= 25) {
+        obs.push(`Ranked #${snap.leagueRank} of ${snap.leagueSize} by total DHQ. You're in the top tier — protect your core.`);
+      } else if (pct >= 75) {
+        obs.push(`Ranked #${snap.leagueRank} of ${snap.leagueSize} by total DHQ (${snap.totalDHQ.toLocaleString()}). Aggressive rebuilding moves are justified.`);
       }
     }
 

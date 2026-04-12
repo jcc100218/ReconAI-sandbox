@@ -85,9 +85,7 @@ window._renderGMBarAlexBlock = _renderGMBarAlexBlock;
 function _updateGlobalChatPlaceholder() {
   const inp = document.getElementById('global-chat-in');
   if (!inp) return;
-  const fi = window.GMEngine?.generateFieldIntel?.() || [];
-  const top = (fi[0] || '').toString().trim();
-  inp.placeholder = top ? `Ask about: ${top.length > 64 ? top.slice(0, 61) + '…' : top}` : 'Click here to ask Scout…';
+  inp.placeholder = 'Ask Scout anything about your team…';
 }
 window._updateGlobalChatPlaceholder = _updateGlobalChatPlaceholder;
 
@@ -116,36 +114,6 @@ function _gmBarCollapse() {
   if (inp && document.activeElement === inp) inp.blur();
 }
 window._gmBarCollapse = _gmBarCollapse;
-
-// Launcher button handlers — switch tab, then nudge the sub-view,
-// then collapse the GM bar. Each call is chained so the user lands in
-// the exact destination they asked for.
-function _gmLaunchWaivers() {
-  _gmBarCollapse();
-  if (typeof window.mobileTab === 'function') window.mobileTab('league');
-  setTimeout(() => {
-    if (typeof window._leagueEnterRoom === 'function') window._leagueEnterRoom('waivers');
-  }, 180);
-}
-window._gmLaunchWaivers = _gmLaunchWaivers;
-
-function _gmLaunchTrades() {
-  _gmBarCollapse();
-  if (typeof window.mobileTab === 'function') window.mobileTab('league');
-  setTimeout(() => {
-    if (typeof window._leagueEnterRoom === 'function') window._leagueEnterRoom('trades');
-  }, 180);
-}
-window._gmLaunchTrades = _gmLaunchTrades;
-
-function _gmLaunchDraft() {
-  _gmBarCollapse();
-  if (typeof window.mobileTab === 'function') window.mobileTab('draftroom');
-  setTimeout(() => {
-    if (typeof window.switchDraftView === 'function') window.switchDraftView('board');
-  }, 180);
-}
-window._gmLaunchDraft = _gmLaunchDraft;
 
 // Legacy no-op kept for any leftover references (Phase 6 v1 had a blur-debounced collapse)
 function _gmBarCollapseSoon() { /* replaced by scrim click / Esc / programmatic collapse */ }
@@ -946,6 +914,9 @@ function renderFieldLogPanel() {
   const tradeFreq = _getTradeFrequency(log);
   const faabStyle = _getFaabStyle(log);
   const posBias   = _getPositionBias(log);
+  const snap = typeof window.buildRosterSnapshot === 'function' ? window.buildRosterSnapshot() : null;
+  const rankStr = snap?.leagueRank && snap?.leagueSize ? `#${snap.leagueRank}/${snap.leagueSize}` : '—';
+  const dhqStr = snap?.totalDHQ ? snap.totalDHQ.toLocaleString() : '—';
 
   html += `<div class="activity-learning-section">
     <div class="activity-section-header">
@@ -975,6 +946,14 @@ function renderFieldLogPanel() {
         <div class="activity-profile-stat">
           <div class="activity-profile-label">Pos Bias</div>
           <div class="activity-profile-value">${_esc(posBias)}</div>
+        </div>
+        <div class="activity-profile-stat">
+          <div class="activity-profile-label">Rank</div>
+          <div class="activity-profile-value">${_esc(rankStr)}</div>
+        </div>
+        <div class="activity-profile-stat">
+          <div class="activity-profile-label">Total DHQ</div>
+          <div class="activity-profile-value">${_esc(dhqStr)}</div>
         </div>
       </div>
     </div>
