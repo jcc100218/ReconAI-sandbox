@@ -79,6 +79,75 @@
     return 0.5; // Balanced
   }
 
+  // ── Strategy + personality helpers ─────────────────────────────
+
+  function _alexStyle() {
+    const key = localStorage.getItem('wr_alex_style') || 'default';
+    const styles = window.ALEX_STYLES || {};
+    return { key, ...(styles[key] || styles.default || { name: 'Default' }) };
+  }
+
+  function _gmStrategy() {
+    return window.GMStrategy?.getStrategy?.() || {
+      mode: 'balanced_rebuild', targetPositions: [], sellPositions: [],
+      aggression: 'medium', untouchables: [],
+    };
+  }
+
+  function _urgencyText(strat) {
+    if (strat.aggression === 'high') return "Move now — don't wait for the perfect deal.";
+    if (strat.aggression === 'low') return 'Be patient — only act if the deal is clearly in your favor.';
+    return 'Act before values shift.';
+  }
+
+  function _modeLabelMap(label, mode) {
+    if (mode === 'rebuild' || mode === 'balanced_rebuild') {
+      const map = {
+        'Target QB': 'Acquire QB Asset', 'Shop Veterans': 'Convert to Picks',
+        'Mock Draft': 'Map Draft Board', 'Target RB': 'Acquire RB Asset',
+        'Target WR': 'Acquire WR Asset', 'Target TE': 'Acquire TE Asset',
+        'Target DL': 'Acquire DL Asset', 'Target LB': 'Acquire LB Asset',
+        'Target DB': 'Acquire DB Asset',
+      };
+      return map[label] || label;
+    }
+    if (mode === 'win_now' || mode === 'compete') {
+      const map = {
+        'Mock Draft': 'Scout Rookies', 'Target QB': 'Upgrade QB Now',
+        'Target RB': 'Upgrade RB Now', 'Target WR': 'Upgrade WR Now',
+        'Target TE': 'Upgrade TE Now', 'Target DL': 'Upgrade DL Now',
+        'Target LB': 'Upgrade LB Now', 'Target DB': 'Upgrade DB Now',
+      };
+      return map[label] || label;
+    }
+    return label;
+  }
+
+  function _styleObs(obs) {
+    const key = localStorage.getItem('wr_alex_style') || 'default';
+    switch (key) {
+      case 'general':
+        return obs
+          .replace('Consider selling', 'Sell.')
+          .replace('you should', 'you will')
+          .replace('Fix now while prices are calm.', 'Fix it. Now.');
+      case 'closer':
+        return obs.replace('may be', 'is').replace('could', 'will').replace('consider', 'do this:');
+      case 'strategist':
+        return /DHQ|%|avg/.test(obs) ? 'Data: ' + obs : obs;
+      case 'enthusiast':
+        return /strength|elite/i.test(obs) ? obs + " Let's GO!" : obs;
+      case 'wit':
+        return /gap|below|aging|risk/i.test(obs) ? obs + ' Shocking, truly.' : obs;
+      case 'bayou':
+        return obs
+          .replace('Consider', "I'm telling you, you oughta")
+          .replace('Fix now', 'Get after it now');
+      default:
+        return obs;
+    }
+  }
+
   // ════════════════════════════════════════════════════════════════
   // 1. NEXT MOVE ENGINE
   // ════════════════════════════════════════════════════════════════
@@ -238,6 +307,13 @@
     const snap = typeof window.buildRosterSnapshot === 'function' ? window.buildRosterSnapshot() : null;
     const posGroups = snap?.positionGroups || {};
     const needs = (assess.needs || []).map(n => typeof n === 'string' ? n : n.pos).filter(Boolean);
+
+    // Strategy + personality integration
+    const strat = _gmStrategy();
+    const targetPositions = strat.targetPositions || [];
+    const sellPositions = strat.sellPositions || [];
+    const stratUntouchables = strat.untouchables || [];
+    const stratMode = strat.mode || mode;
     const S = _S();
     const curYear = parseInt(S.season) || new Date().getFullYear();
 
@@ -262,9 +338,15 @@
     if (isOffseason) {
       // ── OFFSEASON priorities: dynasty asset accumulation, not weekly output ──
 
-      // Priority 1: Biggest positional gap — data-grounded via snapshot
+      // Priority 1: Biggest positional gap — data-grounded, strategy-aware
       if (_topPremium.length > 0) {
-        const pos = _topPremium[0];
+        // Honor targetPositions from GM Strategy — if the user has flagged
+        // a position as a target AND it's also a need, prioritize it.
+        let pos = _topPremium[0];
+        if (targetPositions.length > 0) {
+          const targetNeed = _topPremium.find(p => targetPositions.includes(p));
+          if (targetNeed) pos = targetNeed;
+        }
         const pg = posGroups[pos];
         const gapDetail = pg
           ? ` Your ${pos} group is ${pg.groupDHQ.toLocaleString()} DHQ (${pg.gapPct > 0 ? '+' : ''}${pg.gapPct}% vs league avg of ${pg.leagueAvgDHQ.toLocaleString()}).`
@@ -275,10 +357,10 @@
           problem: pg?.count >= 4
             ? `${pos} has ${pg.count} players but group DHQ is below league average`
             : `${pos} room needs a foundational piece before the season`,
-          consequence: gapDetail + topDetail || (_isPPR && pos === 'WR'
+          consequence: _styleObs(gapDetail + topDetail || (_isPPR && pos === 'WR'
             ? 'PPR leagues reward deep WR rooms. Build now while prices are lower.'
-            : `${pos} is the engine of dynasty rosters. Lock in your piece now.`),
-          actionLabel: `Target ${pos}`,
+            : `${pos} is the engine of dynasty rosters. Lock in your piece now.`)),
+          actionLabel: _modeLabelMap(`Target ${pos}`, stratMode),
           actionType: 'trade',
         });
       } else if (needs.length > 0) {
@@ -287,8 +369,8 @@
         const gapDetail = pg ? ` ${pg.groupDHQ.toLocaleString()} DHQ — ${Math.abs(pg.gapPct)}% below league avg.` : '';
         priorities.push({
           problem: `${pos} is your thinnest position heading into the season`,
-          consequence: gapDetail || 'Offseason is when roster construction shapes your year. Address now.',
-          actionLabel: `Find ${pos}`,
+          consequence: _styleObs(gapDetail || 'Offseason is when roster construction shapes your year. Address now.'),
+          actionLabel: _modeLabelMap(`Find ${pos}`, stratMode),
           actionType: 'trade',
         });
       }
@@ -310,15 +392,18 @@
         if (futurePicks < 6) {
           priorities.push({
             problem: 'Draft capital is below rebuild minimum',
-            consequence: 'Rookie drafts are the core of a rebuild. Stack picks before the window closes.',
-            actionLabel: 'Acquire Picks',
+            consequence: _styleObs('Rookie drafts are the core of a rebuild. Stack picks before the window closes.'),
+            actionLabel: _modeLabelMap('Acquire Picks', stratMode),
             actionType: 'trade',
           });
         } else {
+          const sellStr = sellPositions.length > 0
+            ? `You've flagged ${sellPositions.join(', ')} as sell positions. Win-now teams are buying — move now.`
+            : 'Win-now teams are buying. Convert veterans into youth or picks before values drop.';
           priorities.push({
             problem: 'Trade window is open — move aging assets now',
-            consequence: `Win-now teams are buying. Convert veterans into youth or picks before values drop.`,
-            actionLabel: 'Shop Veterans',
+            consequence: _styleObs(_urgencyText(strat) + ' ' + sellStr),
+            actionLabel: _modeLabelMap('Shop Veterans', stratMode),
             actionType: 'trade',
           });
         }
@@ -326,8 +411,8 @@
         // Win-now: offseason is for shoring up weaknesses
         priorities.push({
           problem: 'Trade window is open — upgrade before rosters lock in',
-          consequence: 'Offseason is prime trading time. Contenders who wait pay a premium in-season.',
-          actionLabel: 'Build Trade',
+          consequence: _styleObs('Offseason is prime trading time. Contenders who wait pay a premium in-season.'),
+          actionLabel: _modeLabelMap('Build Trade', stratMode),
           actionType: 'trade',
         });
       }
@@ -337,40 +422,39 @@
         problem: isPreDraft
           ? 'Your rookie draft is approaching — lock your target board now'
           : 'Map your rookie draft targets before ADP firms up',
-        consequence: isPreDraft
+        consequence: _styleObs(isPreDraft
           ? 'ADP is firming up fast. Every week you wait is a week less to spot steals.'
-          : 'Early prep lets you identify steals and avoid reaches. Start your board now.',
-        actionLabel: isPreDraft ? 'Open Big Board' : 'Mock Draft',
+          : 'Early prep lets you identify steals and avoid reaches. Start your board now.'),
+        actionLabel: _modeLabelMap(isPreDraft ? 'Open Big Board' : 'Mock Draft', stratMode),
         actionType: 'draft',
       });
 
-      // Priority 4 (new): secondary positional gap — skip if it duplicates
+      // Priority 4: secondary positional gap — skip if it duplicates
       // a position already covered by an earlier priority's action label.
       if (needs.length > 1) {
         const pos2 = needs.find((p, i) => i > 0 && !priorities.some(pr => pr.actionLabel?.includes(p)));
         if (pos2) {
           priorities.push({
             problem: `${pos2} is a secondary gap that'll bite mid-season`,
-            consequence: 'Secondary gaps compound when injuries hit. Fix now while prices are calm.',
-            actionLabel: `Target ${pos2}`,
+            consequence: _styleObs('Secondary gaps compound when injuries hit. Fix now while prices are calm.'),
+            actionLabel: _modeLabelMap(`Target ${pos2}`, stratMode),
             actionType: 'trade',
           });
         }
       }
 
-      // Priority 5 (new): strategy hygiene — untouchables list or market posture
-      const untouchables = (strategy.untouchables || []).length;
-      if (untouchables < 3) {
+      // Priority 5: strategy hygiene — untouchables list or market posture
+      if (stratUntouchables.length < 3) {
         priorities.push({
           problem: 'Untouchables list is thin — you haven\'t told Alex who\'s off-limits',
-          consequence: 'Without an untouchables list, Alex may float your core in trade analysis.',
+          consequence: _styleObs('Without an untouchables list, Alex may float your core in trade analysis.'),
           actionLabel: 'Set Untouchables',
           actionType: 'hold',
         });
       } else if (strategy.marketPosture === 'hold') {
         priorities.push({
           problem: 'Your market posture is "hold" — no buy or sell direction set',
-          consequence: 'Offseason is the best trade window. Pick a posture so Alex knows what to pitch.',
+          consequence: _styleObs('Offseason is the best trade window. Pick a posture so Alex knows what to pitch.'),
           actionLabel: 'Pick Posture',
           actionType: 'hold',
         });
@@ -384,12 +468,12 @@
         const pos = needs[0];
         const isDeficit = (assess.needs || []).find(n => (typeof n === 'string' ? n : n.pos) === pos)?.urgency === 'deficit';
         const consequence = isDeficit
-          ? `Fix within 2 weeks or you're leaving wins on the table.`
-          : `Address before your next tough matchup.`;
+          ? _styleObs(`Fix within 2 weeks or you're leaving wins on the table.`)
+          : _styleObs(`Address before your next tough matchup.`);
         priorities.push({
           problem: `${pos} is your weakest position group`,
           consequence,
-          actionLabel: `Fix ${pos}`,
+          actionLabel: _modeLabelMap(`Fix ${pos}`, stratMode),
           actionType: 'trade',
         });
       }
@@ -410,15 +494,15 @@
         if (futurePicks < 6) {
           priorities.push({
             problem: 'Draft capital is below rebuild minimum',
-            consequence: 'Rebuilds stall without enough future picks. Every week costs you.',
-            actionLabel: 'Acquire Picks',
+            consequence: _styleObs('Rebuilds stall without enough future picks. Every week costs you.'),
+            actionLabel: _modeLabelMap('Acquire Picks', stratMode),
             actionType: 'trade',
           });
         } else {
           priorities.push({
             problem: 'Deploy your pick capital — don\'t let it sit idle',
-            consequence: `You have ${futurePicks} picks. Map a target list now or trade up.`,
-            actionLabel: 'Plan Draft',
+            consequence: _styleObs(`You have ${futurePicks} picks. Map a target list now or trade up.`),
+            actionLabel: _modeLabelMap('Plan Draft', stratMode),
             actionType: 'draft',
           });
         }
@@ -427,15 +511,15 @@
         if (pos2) {
           priorities.push({
             problem: `${pos2} depth is thin for a deep playoff run`,
-            consequence: 'One injury ends your season. Depth is championship insurance.',
-            actionLabel: `Find ${pos2}`,
+            consequence: _styleObs('One injury ends your season. Depth is championship insurance.'),
+            actionLabel: _modeLabelMap(`Find ${pos2}`, stratMode),
             actionType: needs.length > 1 ? 'trade' : 'waiver',
           });
         } else {
           priorities.push({
             problem: 'Sell your surplus into the market now',
-            consequence: 'Peak window means buyers are aggressive. Convert excess into wins.',
-            actionLabel: 'Build Trade',
+            consequence: _styleObs('Peak window means buyers are aggressive. Convert excess into wins.'),
+            actionLabel: _modeLabelMap('Build Trade', stratMode),
             actionType: 'trade',
           });
         }
@@ -445,14 +529,14 @@
       if (hs < 65 && hs > 0) {
         priorities.push({
           problem: 'Overall roster health is below contender threshold',
-          consequence: 'Competing teams are pulling ahead every week you wait.',
-          actionLabel: 'Full Rebuild',
+          consequence: _styleObs('Competing teams are pulling ahead every week you wait.'),
+          actionLabel: _modeLabelMap('Full Rebuild', stratMode),
           actionType: 'trade',
         });
       } else if (hs >= 80) {
         priorities.push({
           problem: 'Protect your franchise players from trade pressure',
-          consequence: 'Elite rosters get picked apart if you\'re not careful about what you trade.',
+          consequence: _styleObs('Elite rosters get picked apart if you\'re not careful about what you trade.'),
           actionLabel: 'Set Untouchables',
           actionType: 'hold',
         });
@@ -460,32 +544,32 @@
         const pos3 = needs[2];
         priorities.push({
           problem: `${pos3} is a secondary gap worth monitoring`,
-          consequence: 'Secondary gaps compound. Fix when the right deal appears.',
-          actionLabel: `Monitor ${pos3}`,
+          consequence: _styleObs('Secondary gaps compound. Fix when the right deal appears.'),
+          actionLabel: _modeLabelMap(`Monitor ${pos3}`, stratMode),
           actionType: 'waiver',
         });
       }
 
-      // Priority 4 (new): trade deadline proximity
+      // Priority 4: trade deadline proximity
       const weeksToDeadline = window.SeasonCalendar?.weeksUntil?.('deadline');
       if (weeksToDeadline != null && weeksToDeadline > 0 && weeksToDeadline <= 3) {
         priorities.push({
           problem: `Trade deadline is ${weeksToDeadline} week${weeksToDeadline === 1 ? '' : 's'} out`,
-          consequence: 'After the deadline, your roster is locked for the playoff run. Make the moves now.',
-          actionLabel: 'Deadline Moves',
+          consequence: _styleObs(_urgencyText(strat) + ' After the deadline, your roster is locked for the playoff run.'),
+          actionLabel: _modeLabelMap('Deadline Moves', stratMode),
           actionType: 'trade',
         });
       }
 
-      // Priority 5 (new): secondary gap from needs array if not already used
+      // Priority 5: secondary gap from needs array if not already used
       if (needs.length > 1 && priorities.length < 5) {
         const pos2 = needs[1];
         const already = priorities.some(p => p.actionLabel?.includes(pos2));
         if (!already) {
           priorities.push({
             problem: `${pos2} depth is thin for the stretch run`,
-            consequence: 'One injury at a thin position can cost you a playoff week.',
-            actionLabel: `Find ${pos2}`,
+            consequence: _styleObs('One injury at a thin position can cost you a playoff week.'),
+            actionLabel: _modeLabelMap(`Find ${pos2}`, stratMode),
             actionType: 'trade',
           });
         }
@@ -652,10 +736,16 @@
     const mode = strategy.mode || 'balanced_rebuild';
     const obs = [];
 
+    // Strategy + personality integration
+    const strat = _gmStrategy();
+    const targetPositions = strat.targetPositions || [];
+    const sellPositions = strat.sellPositions || [];
+    const isAggressive = strat.aggression === 'high';
+    const isConservative = strat.aggression === 'low';
+
     // ── Roster snapshot — every observation below is data-grounded ──
-    // buildRosterSnapshot() returns null if the league isn't connected
-    // yet. Fall back to a minimal calendar-only view if so.
     const snap = typeof window.buildRosterSnapshot === 'function' ? window.buildRosterSnapshot() : null;
+    const myRoster = _myRoster();
 
     // ── 1. Calendar-phase context (always first) ──────────────────
     const cal = window.SeasonCalendar;
@@ -666,78 +756,114 @@
       const pickStr = pickCount != null ? ` You hold ${pickCount} pick${pickCount === 1 ? '' : 's'}.` : '';
 
       if (phase === 'pre_draft' && hasDraftDate) {
-        obs.push(`Rookie draft is ${weeksToNext}w away.${pickStr} Focus: prospect scouting, not waivers.`);
+        obs.push(_styleObs(`Rookie draft is ${weeksToNext}w away.${pickStr} Focus: prospect scouting, not waivers.`));
       } else if (phase === 'draft_week') {
-        obs.push(`Rookie draft is this week.${pickStr} Lock your board and trade-up/down decisions.`);
+        obs.push(_styleObs(`Rookie draft is this week.${pickStr} Lock your board and trade-up/down decisions.`));
       } else if (phase === 'early_offseason' && hasDraftDate) {
-        obs.push(`Early offseason — rookie draft in ${weeksToNext}w.${pickStr} Start building your board.`);
+        obs.push(_styleObs(`Early offseason — rookie draft in ${weeksToNext}w.${pickStr} Start building your board.`));
       } else if (phase === 'early_offseason') {
-        obs.push('No rookie draft date set. Ask your commissioner to schedule it so Alex can plan ahead.');
+        obs.push(_styleObs('No rookie draft date set. Ask your commissioner to schedule it so Alex can plan ahead.'));
       } else if (phase === 'preseason' && weeksToNext != null) {
-        obs.push(`NFL Week 1 in ${weeksToNext}w. Audit your bench and finalize starter order.`);
+        obs.push(_styleObs(`NFL Week 1 in ${weeksToNext}w. Audit your bench and finalize starter order.`));
       } else if (phase === 'regular_season' && nextMilestone) {
-        obs.push(`${nextMilestone} in ${weeksToNext}w. ${weeksToNext <= 3 ? 'Execute now.' : 'Let the market form.'}`);
+        obs.push(_styleObs(`${nextMilestone} in ${weeksToNext}w. ${weeksToNext <= 3 ? 'Execute now.' : 'Let the market form.'}`));
       } else if (phase === 'playoffs') {
-        obs.push('Playoff week — lineup decisions matter more than any trade.');
+        obs.push(_styleObs('Playoff week — lineup decisions matter more than any trade.'));
       }
     }
 
     if (!snap) {
-      // No roster data — return early with just the calendar observation
       return obs.length ? obs : ['Connect your league to see roster-specific intel.'];
     }
 
-    // ── 2. Position group observations — cite real data ──────────
+    // ── 2. Strategy-driven observations ─────────────────────────
+    // Inject target + sell position signals from GM Strategy before
+    // the generic position-group analysis so strategy intel comes first.
+    if (targetPositions.length > 0 && myRoster) {
+      const tp = targetPositions[0];
+      const posPlayers = _rosterPlayersAtPos(myRoster.players, tp);
+      const groupDHQ = posPlayers.reduce((s, p) => s + p.dhq, 0);
+      if (groupDHQ > 0) {
+        obs.push(_styleObs(
+          `You've flagged ${tp} as a target position. Current group DHQ: ${groupDHQ.toLocaleString()} (best: ${posPlayers[0]?.name || '—'} at ${posPlayers[0]?.dhq?.toLocaleString() || '—'}).`
+        ));
+      } else {
+        obs.push(_styleObs(
+          `You've flagged ${tp} as a target position but have no established players there. Priority acquisition.`
+        ));
+      }
+    }
+
+    if (sellPositions.length > 0 && myRoster) {
+      const sp = sellPositions[0];
+      const posPlayers = _rosterPlayersAtPos(myRoster.players, sp);
+      const topPlayer = posPlayers[0];
+      if (topPlayer) {
+        obs.push(_styleObs(
+          `Sell signal active for ${sp}: ${topPlayer.name} (${topPlayer.dhq.toLocaleString()} DHQ) is your most tradeable asset at this position.`
+        ));
+      }
+    }
+
+    // ── 3. Position group observations — cite real data ──────────
     const posGroups = snap.positionGroups || {};
-    // Find the weakest position group by gap %
     const weakest = Object.entries(posGroups)
       .filter(([, g]) => g.gap === 'weakness')
       .sort((a, b) => a[1].gapPct - b[1].gapPct)[0];
     if (weakest) {
       const [pos, g] = weakest;
       const topPlayer = g.players[0];
-      obs.push(`${pos} group (${g.groupDHQ.toLocaleString()} DHQ) is ${Math.abs(g.gapPct)}% below league avg (${g.leagueAvgDHQ.toLocaleString()}).${topPlayer ? ' Best: ' + topPlayer.name + ' at ' + topPlayer.dhq.toLocaleString() + '.' : ''}`);
+      obs.push(_styleObs(`${pos} group (${g.groupDHQ.toLocaleString()} DHQ) is ${Math.abs(g.gapPct)}% below league avg (${g.leagueAvgDHQ.toLocaleString()}).${topPlayer ? ' Best: ' + topPlayer.name + ' at ' + topPlayer.dhq.toLocaleString() + '.' : ''}`));
     }
 
-    // Find the strongest position group
     const strongest = Object.entries(posGroups)
       .filter(([, g]) => g.gap === 'strength')
       .sort((a, b) => b[1].gapPct - a[1].gapPct)[0];
     if (strongest) {
       const [pos, g] = strongest;
-      obs.push(`${pos} is a strength (${g.groupDHQ.toLocaleString()} DHQ, +${g.gapPct}% vs league). Consider selling depth here for needs.`);
+      obs.push(_styleObs(`${pos} is a strength (${g.groupDHQ.toLocaleString()} DHQ, +${g.gapPct}% vs league). Consider selling depth here for needs.`));
     }
 
-    // ── 3. Pick capital ──────────────────────────────────────────
+    // ── 4. Pick capital ──────────────────────────────────────────
     const picks = snap.pickInventory;
     if (picks) {
       if (picks.pickStrength === 'above average') {
-        obs.push(`You hold ${picks.totalPicks} picks (~${picks.totalPickDHQ.toLocaleString()} DHQ) — above league average. Strong draft capital.`);
+        obs.push(_styleObs(`You hold ${picks.totalPicks} picks (~${picks.totalPickDHQ.toLocaleString()} DHQ) — above league average. Strong draft capital.`));
       } else if (picks.pickStrength === 'below average') {
-        obs.push(`Pick inventory is thin: ${picks.totalPicks} picks, ${picks.totalPickDHQ.toLocaleString()} DHQ — below league avg of ${picks.leagueAvgPickDHQ.toLocaleString()}.`);
+        obs.push(_styleObs(`Pick inventory is thin: ${picks.totalPicks} picks, ${picks.totalPickDHQ.toLocaleString()} DHQ — below league avg of ${picks.leagueAvgPickDHQ.toLocaleString()}.`));
       }
     }
 
-    // ── 4. Aging risks — cite specific players ───────────────────
+    // ── 5. Aging risks — cite specific players ───────────────────
     if (snap.agingRisks?.length) {
       const top2 = snap.agingRisks.slice(0, 2);
       const names = top2.map(p => `${p.name} (${p.position}, age ${p.age}, ${p.dhq.toLocaleString()} DHQ)`).join(' and ');
-      obs.push(`Aging risk: ${names}${top2.length < snap.agingRisks.length ? ` + ${snap.agingRisks.length - top2.length} more` : ''}.`);
+      obs.push(_styleObs(`Aging risk: ${names}${top2.length < snap.agingRisks.length ? ` + ${snap.agingRisks.length - top2.length} more` : ''}.`));
     }
 
-    // ── 5. Sell candidates ───────────────────────────────────────
+    // ── 6. Sell candidates ───────────────────────────────────────
     if (snap.sellCandidates?.length) {
       const top = snap.sellCandidates[0];
-      obs.push(`Sell window: ${top.name} (${top.position}, ${top.dhq.toLocaleString()} DHQ) — ${top.reason}.`);
+      obs.push(_styleObs(`Sell window: ${top.name} (${top.position}, ${top.dhq.toLocaleString()} DHQ) — ${top.reason}.`));
     }
 
-    // ── 6. League standing context ───────────────────────────────
+    // ── 7. League standing — aggression-aware framing ────────────
     if (snap.leagueRank && snap.leagueSize) {
       const pct = Math.round((snap.leagueRank / snap.leagueSize) * 100);
       if (pct <= 25) {
-        obs.push(`Ranked #${snap.leagueRank} of ${snap.leagueSize} by total DHQ. You're in the top tier — protect your core.`);
+        obs.push(_styleObs(
+          isAggressive
+            ? `Ranked #${snap.leagueRank} of ${snap.leagueSize} — attack the market now. You're in position to win, don't wait.`
+            : `Ranked #${snap.leagueRank} of ${snap.leagueSize} by total DHQ. You're in the top tier — protect your core.`
+        ));
       } else if (pct >= 75) {
-        obs.push(`Ranked #${snap.leagueRank} of ${snap.leagueSize} by total DHQ (${snap.totalDHQ.toLocaleString()}). Aggressive rebuilding moves are justified.`);
+        obs.push(_styleObs(
+          isAggressive
+            ? `Ranked #${snap.leagueRank} of ${snap.leagueSize}. Rebuild aggressively — target picks that project as starters in 1-2 years.`
+            : isConservative
+            ? `Ranked #${snap.leagueRank} of ${snap.leagueSize}. Rebuild is a patience game — stack picks, develop youth, let the market come to you.`
+            : `Ranked #${snap.leagueRank} of ${snap.leagueSize} by total DHQ (${snap.totalDHQ.toLocaleString()}). Aggressive rebuilding moves are justified.`
+        ));
       }
     }
 

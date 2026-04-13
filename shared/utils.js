@@ -97,3 +97,41 @@ window.isElitePlayer      = isElitePlayer;
 window.countElitePlayers  = countElitePlayers;
 window.dhqLog             = dhqLog;
 window.App.dhqLog         = dhqLog;
+
+// ── League-Aware Position Helper ──
+// ONE function that EVERY filter, button list, and pool builder calls.
+// No more hardcoded position arrays anywhere.
+function getLeaguePositions(opts) {
+  opts = opts || {};
+  const league = opts.league || window.S?.leagues?.find(l => l.league_id === window.S?.currentLeagueId) || window.S?.league;
+  const rp = league?.roster_positions || [];
+
+  // Base offensive positions (always present in fantasy)
+  const positions = ['QB', 'RB', 'WR', 'TE'];
+
+  // K — only if league rosters kickers
+  if (rp.some(s => s === 'K')) positions.push('K');
+
+  // IDP — only if league has IDP slots
+  if (rp.some(s => ['DL','DE','DT','LB','DB','CB','S','SS','FS','IDP_FLEX'].includes(s))) {
+    positions.push('DL', 'LB', 'DB');
+  }
+
+  // Return formats based on opts
+  if (opts.asSet) return new Set(positions);
+  if (opts.withAll) return ['All', ...positions]; // for filter button lists
+  if (opts.withBlank) return ['', ...positions];  // for filter with blank = ALL
+  return positions;
+}
+
+// Also expose a normPos-safe check
+function isValidLeaguePosition(pos) {
+  const np = typeof normPos === 'function' ? normPos(pos) : pos;
+  if (!np) return false;
+  return getLeaguePositions({ asSet: true }).has(np);
+}
+
+window.getLeaguePositions = getLeaguePositions;
+window.isValidLeaguePosition = isValidLeaguePosition;
+window.App.getLeaguePositions = getLeaguePositions;
+window.App.isValidLeaguePosition = isValidLeaguePosition;
