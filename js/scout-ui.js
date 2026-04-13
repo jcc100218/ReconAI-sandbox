@@ -45,13 +45,25 @@ function renderCtxChips(tab) {
   const container = document.getElementById('ctx-chips-row');
   if (!container) return;
   const chips = TAB_CHIPS[tab] || TAB_CHIPS.digest;
-  container.innerHTML = chips.map(c =>
-    `<button class="ctx-chip" onclick="fillGlobalChat(${JSON.stringify(c.title + ': ' + c.sub)})">
+  // Use data attributes + delegated click instead of inline onclick to
+  // avoid HTML attribute escaping issues (JSON.stringify produces " which
+  // the HTML parser reads as end-of-attribute, truncating the handler).
+  container.innerHTML = chips.map((c, i) =>
+    `<button class="ctx-chip" data-chip-idx="${i}">
       <div class="ctx-chip-title">${_esc(c.title)}</div>
       <div class="ctx-chip-sub">${_esc(c.sub)}</div>
     </button>`
   ).join('');
-  // Also refresh the GM bar Alex block + dynamic placeholder whenever chips change
+  // Delegated click handler
+  container.onclick = (e) => {
+    const btn = e.target.closest('.ctx-chip');
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.chipIdx);
+    const chip = chips[idx];
+    if (chip && typeof fillGlobalChat === 'function') {
+      fillGlobalChat(chip.title + ': ' + chip.sub);
+    }
+  };
   if (typeof _renderGMBarAlexBlock === 'function') _renderGMBarAlexBlock();
   if (typeof _updateGlobalChatPlaceholder === 'function') _updateGlobalChatPlaceholder();
 }
