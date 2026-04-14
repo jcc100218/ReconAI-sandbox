@@ -76,11 +76,11 @@ async function loadLeagueIntel(){
   const sc=league?.scoring_settings||{};
   const rp=league?.roster_positions||[];
   const totalTeams=S.rosters?.length||16;
-  const positions=['QB','RB','WR','TE','DL','LB','DB'];
+  const positions=['QB','RB','WR','TE','K','DL','LB','DB'];
   const posMapLocal=p=>{if(['DE','DT'].includes(p))return'DL';if(['CB','S'].includes(p))return'DB';return p;};
 
   // Starter counts per position (with flex weighting)
-  const starterCounts={QB:0,RB:0,WR:0,TE:0,DL:0,LB:0,DB:0};
+  const starterCounts={QB:0,RB:0,WR:0,TE:0,K:0,DL:0,LB:0,DB:0};
   rp.forEach(slot=>{
     if(slot==='DE'||slot==='DT')starterCounts.DL++;
     else if(slot==='CB'||slot==='S')starterCounts.DB++;
@@ -543,10 +543,11 @@ async function loadLeagueIntel(){
       if(pos==='QB'&&isSF)mult=Math.max(mult,1.25); // SF QB premium
       else if(pos==='TE')mult=Math.max(mult,1.15); // TE scarcity
       else if(pos==='WR')mult=Math.min(mult,1.0); // deepest position
+      else if(pos==='K')mult=Math.min(mult,0.90); // kickers are highly replaceable
       else if(['DL','LB','DB'].includes(pos)){
         // IDP scarcity cap depends on how many IDP starters the league requires
         const idpStarters=(starterCounts.DL||0)+(starterCounts.LB||0)+(starterCounts.DB||0);
-        const idpCap=idpStarters>=6?1.05:idpStarters>=3?1.0:0.92;
+        const idpCap=idpStarters>=6?1.05:idpStarters>=3?1.0:0.96;
         mult=Math.min(mult,idpCap);
       }
       scarcityMult[pos]=+mult.toFixed(3);
@@ -589,7 +590,7 @@ async function loadLeagueIntel(){
         // Elite pedigree floor: protects PROVEN ELITE dynasty assets from one bad year.
         // Requirements: 4+ starter seasons AND an elite best season avg (QB>22, RB/WR>16, TE>13)
         // REDUCED for aging vets: 30+ get weaker protection, 33+ get none
-        const eliteThresh={QB:22,RB:16,WR:16,TE:13,DL:8,LB:8,DB:8};
+        const eliteThresh={QB:22,RB:16,WR:16,TE:13,K:9,DL:8,LB:8,DB:8};
         const age=pAge(pid)||26;
         // Compute starter seasons early so pedigree check can use it
         const realStarterLineEarly=(avgThresh[pos]?.avgStarter||100)*0.70;
@@ -597,9 +598,9 @@ async function loadLeagueIntel(){
         const isElitePedigree=starterSeasonsEarly>=4&&bestSeason.avg>=(eliteThresh[pos]||15);
         let pedigreeFloor=0;
         if(isElitePedigree){
-          // QB market value drops faster — start reducing pedigree at 28 instead of 30
-          const pedigreeAgeStart=pos==='QB'?28:30;
-          const pedigreeAgeEnd=pos==='QB'?32:33;
+          // Pedigree starts fading at 30 for all positions, gone at 33 (QB: 34)
+          const pedigreeAgeStart=30;
+          const pedigreeAgeEnd=pos==='QB'?34:33;
           if(age>=pedigreeAgeEnd) pedigreeFloor=0;
           else if(age>=pedigreeAgeStart) pedigreeFloor=bestSeason.avg*(0.30-0.10*((age-pedigreeAgeStart)/(pedigreeAgeEnd-pedigreeAgeStart)));
           else pedigreeFloor=bestSeason.avg*0.50;
@@ -661,11 +662,11 @@ async function loadLeagueIntel(){
         if(recentPPG>0){
           const pctOfStarter=recentPPG/posStarterPPG;
           if(pctOfStarter<0.30){
-            sitMult*=0.65; // Deep backup: barely relevant
+            sitMult*=pos==='QB'?0.45:0.65; // Deep backup (QB: rarely see the field)
           }else if(pctOfStarter<0.50){
-            sitMult*=0.75; // Low-end backup
+            sitMult*=pos==='QB'?0.55:0.75; // Low-end backup (QB: clipboard holder)
           }else if(pctOfStarter<0.70){
-            sitMult*=0.85; // Fringe starter / high backup
+            sitMult*=pos==='QB'?0.70:0.85; // Fringe starter / high backup
           }else if(pctOfStarter>=1.30){
             sitMult*=1.10; // Premium starter
           }
@@ -1059,7 +1060,7 @@ async function loadLeagueIntel(){
           const val=d.value||0;
           if(!sid||!pos||pos==='PICK'||val<=0)return;
           const mappedPos=posMapLocal(pos);
-          if(!positions.includes(mappedPos)&&pos!=='K')return;
+          if(!positions.includes(mappedPos))return;
           const fcScaled=Math.round(val*scaleFactor);
 
           if(playerScores[sid]){
@@ -1143,6 +1144,82 @@ async function loadLeagueIntel(){
         console.log(`FC blend: ${vetBlendCount} veterans (deviation-aware), ${rookieCount} rookies (scale: ${scaleFactor.toFixed(3)}, matched: ${fcMatched.length})`);
       }
     }catch(e){console.warn('FC blend failed:',e);}
+
+    // ═══════════════════════════════════════════════════════════════
+    // STEP 12b: IDP & K rookie values (FC doesn't cover these positions)
+    //   FantasyCalc only returns QB/RB/WR/TE — IDP and K rookies need
+    //   a separate path using prospect consensus rank + veteran ladder.
+    // ═══════════════════════════════════════════════════════════════
+    try{
+      const hasIDP=(starterCounts.DL||0)>0||(starterCounts.LB||0)>0||(starterCounts.DB||0)>0;
+      const hasK=rp.includes('K');
+      if(hasIDP||hasK){
+        // Build position ladders from scored veterans
+        const ladders={};
+        ['DL','LB','DB','K'].forEach(pos=>{
+          ladders[pos]=Object.entries(playerScores)
+            .filter(([pid])=>playerMeta[pid]?.pos===pos&&playerScores[pid]>0)
+            .sort((a,b)=>b[1]-a[1]).map(([,val])=>val);
+        });
+
+        const idpKPositions=new Set(hasIDP?['DL','LB','DB']:[]);
+        if(hasK)idpKPositions.add('K');
+
+        // Vet offsets: how many vets rank above #1 rookie at each pos in startups
+        const vetOffsets={DL:8,LB:6,DB:8,K:2};
+        let idpKRookieCount=0;
+
+        Object.entries(S.players||{}).forEach(([pid,p])=>{
+          if(p.years_exp!==0)return;
+          if(playerScores[pid])return;
+          const rawPos=p.position||'';
+          const pos=posMapLocal(rawPos);
+          if(!idpKPositions.has(pos))return;
+
+          // Get prospect rank from CSV data
+          const prospect=typeof window.findProspect==='function'
+            ?window.findProspect(p.full_name||((p.first_name||'')+' '+(p.last_name||'')).trim())
+            :null;
+          const consensusRank=prospect?.consensusRank||prospect?.rank||999;
+
+          // Position rank among rookies at this position
+          const posRank=prospect?.rookiePosRank||Math.ceil(consensusRank/(pos==='K'?8:4));
+          const offset=vetOffsets[pos]||8;
+          const ladder=ladders[pos]||[];
+
+          let rookieDHQ;
+          if(ladder.length>=3){
+            const idx=Math.min(posRank+offset-1,ladder.length-1);
+            rookieDHQ=ladder[idx]||ladder[ladder.length-1]||0;
+          }else{
+            // Sparse ladder fallback: rank-based estimate scaled by position weight
+            const posWeight={DL:0.55,LB:0.45,DB:0.50,K:0.20};
+            const topDHQ=Math.max(...Object.values(playerScores),1);
+            rookieDHQ=Math.round(topDHQ*(posWeight[pos]||0.3)*Math.max(0.05,(120-consensusRank)/120));
+          }
+
+          // Unproven discount (same tiers as FC rookies)
+          const discount=consensusRank<=5?0.97:consensusRank<=15?0.93:consensusRank<=32?0.90:consensusRank<=64?0.87:0.82;
+          rookieDHQ=Math.round(rookieDHQ*discount);
+
+          if(rookieDHQ<50)return;
+          playerScores[pid]=Math.min(10000,rookieDHQ);
+          playerMeta[pid]={
+            pos,ppg:0,age:p.age||21,
+            ageFactor:1.0,sitMult:1.0,
+            peakYrsLeft:(peakWindows[pos]||[23,29])[1]-(p.age||21),
+            starterSeasons:0,recentGP:0,
+            source:'PROSPECT_ROOKIE',consensusRank,
+            unprovenDiscount:discount
+          };
+          idpKRookieCount++;
+        });
+        if(idpKRookieCount){
+          rookieCount+=idpKRookieCount;
+          console.log(`IDP/K rookies: ${idpKRookieCount} valued from prospect data`);
+        }
+      }
+    }catch(e){console.warn('IDP/K rookie step failed:',e);}
 
     // ═══════════════════════════════════════════════════════════════
     // STORE EVERYTHING

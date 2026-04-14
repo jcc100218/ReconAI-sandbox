@@ -49,11 +49,12 @@ window.App.PEAK_CURVES={
 // ── Age curves: position-specific peak windows (DHQ engine) ──
 // Research-backed 90%+ production windows (EPA/PPG study)
 // QB: flat 23-39 (17yr), RB: 21-31 (cliff after 31), WR: 21-33 (longest plateau),
-// TE: 21-34 (late bloomer), DL: 26-33 (tightest window), LB: 26-32 (80%+ window, 90%=28 only), DB: 21-34 (earliest peak, long tail)
-window.App.peakWindows={QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],DL:[26,33],LB:[26,32],DB:[21,34]};
+// TE: 21-34 (late bloomer), K: 26-38 (longest career, very slow decline),
+// DL: 26-33 (tightest window), LB: 26-32 (80%+ window, 90%=28 only), DB: 21-34 (earliest peak, long tail)
+window.App.peakWindows={QB:[23,39],RB:[21,31],WR:[21,33],TE:[21,34],K:[26,38],DL:[26,33],LB:[26,32],DB:[21,34]};
 
 // ── Position-specific decay rates (per year past peak end) ──
-window.App.decayRates={QB:0.06,RB:0.25,WR:0.14,TE:0.12,DL:0.15,LB:0.15,DB:0.14};
+window.App.decayRates={QB:0.06,RB:0.25,WR:0.14,TE:0.12,K:0.05,DL:0.15,LB:0.15,DB:0.14};
 
 // ── Draft pick values ──────────────────────────────────────────
 // Standard dynasty pick values (approximate DLF/KTC scale)
