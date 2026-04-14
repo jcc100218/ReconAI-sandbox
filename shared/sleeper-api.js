@@ -72,20 +72,26 @@ async function fetchSeasonStats(season) {
 }
 
 // ── Projections cache per season ─────────────────────────────────
-const _projectionsCache = {};
+// Renamed from _projectionsCache to avoid a top-level identifier
+// collision with War Room's js/core.js which declares its own
+// `let _projectionsCache = {};` at the same global script scope.
+// Two top-level bindings with the same name (one const, one let)
+// throw SyntaxError at parse time and halt core.js before it sets
+// window.App.WrStorage, which then breaks the whole War Room render.
+const _sleeperProjectionsCache = {};
 
 async function fetchSeasonProjections(season) {
-  if (_projectionsCache[season]) return _projectionsCache[season];
+  if (_sleeperProjectionsCache[season]) return _sleeperProjectionsCache[season];
   try {
     const cached = sessionStorage.getItem('fw_projections_' + season);
     if (cached) {
       const d = JSON.parse(cached);
-      _projectionsCache[season] = d;
+      _sleeperProjectionsCache[season] = d;
       return d;
     }
   } catch (e) {}
   const data = await sleeperFetch('/projections/nfl/regular/' + season);
-  _projectionsCache[season] = data;
+  _sleeperProjectionsCache[season] = data;
   try {
     sessionStorage.setItem('fw_projections_' + season, JSON.stringify(data));
   } catch (e) {}
