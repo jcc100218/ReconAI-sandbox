@@ -184,6 +184,29 @@ function calcFantasyPts(stats, sc) {
   return Math.round(pts * 10) / 10;
 }
 
+// ── Normalize traded picks: owner_id can be roster_id OR user_id ─
+// Sleeper's /traded_picks API is ambiguous — detect which type and
+// convert to roster_id so all downstream code can compare safely.
+function normalizeTradedPicks(rosters, tradedPicks) {
+  if (!tradedPicks?.length || !rosters?.length) return tradedPicks || [];
+  const rosterIds = new Set(rosters.map(r => String(r.roster_id)));
+  const userIds   = new Set(rosters.map(r => String(r.owner_id)));
+  let rosterHits = 0, userHits = 0;
+  for (const tp of tradedPicks) {
+    const oid = String(tp.owner_id ?? '');
+    if (rosterIds.has(oid)) rosterHits++;
+    if (userIds.has(oid))   userHits++;
+  }
+  if (rosterHits >= userHits) return tradedPicks; // already roster_ids
+  // Convert user_ids → roster_ids
+  const userToRoster = {};
+  for (const r of rosters) userToRoster[String(r.owner_id)] = String(r.roster_id);
+  return tradedPicks.map(tp => {
+    const rid = userToRoster[String(tp.owner_id ?? '')];
+    return rid ? { ...tp, owner_id: rid } : tp;
+  });
+}
+
 // ── Expose on window ─────────────────────────────────────────────
 var SleeperAPI = {
   SLEEPER_BASE:       SLEEPER_BASE,
@@ -205,6 +228,7 @@ var SleeperAPI = {
   fetchWinnersBracket:fetchWinnersBracket,
   fetchLosersBracket: fetchLosersBracket,
   calcFantasyPts:     calcFantasyPts,
+  normalizeTradedPicks: normalizeTradedPicks,
 };
 
 window.App.Sleeper = SleeperAPI;
@@ -215,3 +239,4 @@ window.sf = sleeperFetch;
 window.App.SLEEPER = SLEEPER_BASE;
 // Expose calcFantasyPts as a bare global so js/sleeper-api.js callers can use it without the Sleeper prefix
 window.calcFantasyPts = calcFantasyPts;
+window.normalizeTradedPicks = normalizeTradedPicks;

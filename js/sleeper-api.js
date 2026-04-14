@@ -1,3 +1,4 @@
+/* global normalizeTradedPicks */
 // ── Sleeper API layer ───────────────────────────────────────────
 // Extracted from index.html.bak — all Sleeper fetch helpers and stat loaders.
 // Plan B: functions defined at module level; S, LI, etc. live on window
@@ -48,7 +49,8 @@ async function loadLeague(leagueId,userId){
   ]);
   // Clear league-scoped data from previous league (prevents stale stats bleeding)
   S.playerStats={};S.posRanks={};S.matchups={};S.transactions={};
-  S.rosters=rosters||[];S.leagueUsers=users||[];S.tradedPicks=tradedPicks||[];
+  S.rosters=rosters||[];S.leagueUsers=users||[];
+  S.tradedPicks=(typeof normalizeTradedPicks==='function')?normalizeTradedPicks(rosters,tradedPicks):tradedPicks||[];
   S.drafts=drafts||[];S.bracket={w:bracketW||[],l:bracketL||[]};
   S.matchups['w'+week]=matchups||[];
   S.transactions['w'+week]=txns||[];

@@ -1429,14 +1429,14 @@ async function runDraftScouting(){
       return`${pos}: ${posPlayers.length} rostered / ${starterSlots[pos]} slots${aging?' ('+aging+' aging)':''}`;
     }).join(', ');
 
-    const myPicks=S.tradedPicks.filter(p=>p.owner_id===S.myRosterId&&String(p.season)===year);
     const draftRounds=league?.settings?.draft_rounds||5;
-    const tradedAway=S.tradedPicks.filter(p=>p.previous_owner_id===S.myRosterId&&String(p.season)===year);
     const pickRounds=[];
     for(let rd=1;rd<=draftRounds;rd++){
-      if(!tradedAway.some(p=>p.round===rd))pickRounds.push('R'+rd);
+      const tradedAway=S.tradedPicks.find(p=>String(p.season)===year&&p.round===rd&&p.roster_id===S.myRosterId&&p.owner_id!==S.myRosterId);
+      if(!tradedAway)pickRounds.push('R'+rd);
+      const acquired=S.tradedPicks.filter(p=>String(p.season)===year&&p.round===rd&&p.owner_id===S.myRosterId&&p.roster_id!==S.myRosterId);
+      acquired.forEach(p=>{const k='R'+p.round;if(!pickRounds.includes(k))pickRounds.push(k);});
     }
-    myPicks.forEach(p=>{const k='R'+p.round;if(!pickRounds.includes(k))pickRounds.push(k);});
     const pickStr=pickRounds.join(', ')||'Unknown';
 
     let historyCtx='';
