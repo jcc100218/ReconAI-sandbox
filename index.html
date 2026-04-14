@@ -35,8 +35,8 @@
       <span>Scout</span>
     </div>
     <div class="spacer"></div>
-    <div style="display:flex;align-items:center;gap:6px;flex-shrink:1;min-width:0;overflow:hidden">
-      <span class="pill pd" id="league-pill" style="font-size:13px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;max-width:160px;padding:4px 10px;display:flex;align-items:center;gap:4px" onclick="switchLeagueMode()" title="Click to switch league"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Not connected</span><span id="platform-badge" style="display:none;font-size:10px;font-weight:700;background:#e03e2d;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">ESPN</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span></span>
+    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+      <span class="pill pd" id="league-pill" style="font-size:13px;cursor:pointer;padding:4px 10px;display:flex;align-items:center;gap:4px;flex-shrink:1;min-width:0" onclick="switchLeagueMode()" title="Click to switch league"><span style="white-space:nowrap">Not connected</span><span id="platform-badge" style="display:none;font-size:10px;font-weight:700;background:#e03e2d;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">ESPN</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span></span>
       <span class="pill pd header-hide-sm" id="week-pill" style="display:none;font-size:13px;padding:4px 10px">—</span>
       <div class="agent-status" id="agent-status" style="font-size:13px;display:none">
         <div class="status-dot" id="agent-dot"></div>
@@ -809,14 +809,14 @@
         </button>
       </div>
 
-      <!-- GM Strategy + Alex Learning summary (compact block) -->
-      <div id="gm-bar-alex" class="gm-bar-alex-block"></div>
-
       <!-- Context prompt chips -->
       <div class="ctx-chips-row" id="ctx-chips-row">
         <!-- populated by scout-ui.js renderCtxChips() -->
       </div>
     </div>
+
+    <!-- Chat messages — lives inside the bar so conversation stays in-panel -->
+    <div id="gm-bar-msgs" style="display:none;flex:1;overflow-y:auto;padding:10px 14px;flex-direction:column;gap:8px"></div>
 
     <!-- Unified search results dropdown (appears above chat input) -->
     <div id="unified-search-results" style="display:none;max-height:240px;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:12px 12px 0 0;margin-bottom:-1px;box-shadow:0 -4px 20px rgba(0,0,0,.25)"></div>

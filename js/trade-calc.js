@@ -2296,12 +2296,13 @@ async function initTradeCalc() {
 let _finderMode = 'my'; // 'my' or 'acquire'
 let _finderSelectedPid = null;
 let _finderResults = null;
+let _finderContainer = null; // track last render target
 
 function _finderSetMode(mode) {
   _finderMode = mode;
   _finderSelectedPid = null;
   _finderResults = null;
-  const el = $('tc-view-content');
+  const el = _finderContainer || $('tc-view-content') || $('league-trade-finder-host');
   if (el) renderTradeFinder(el);
 }
 window._finderSetMode = _finderSetMode;
@@ -2458,13 +2459,14 @@ function _finderGenerate(pid) {
 }
 
 function _finderRefresh() {
-  const el = $('tc-view-content');
+  const el = _finderContainer || $('tc-view-content') || $('league-trade-finder-host');
   if (el) renderTradeFinder(el);
 }
 
 function renderTradeFinder(container) {
-  if (!container) container = $('tc-view-content');
+  if (!container) container = _finderContainer || $('tc-view-content');
   if (!container) return;
+  _finderContainer = container;
 
   const myRosterId = S.myRosterId;
   const myPlayers = (S.rosters?.find(r => r.roster_id === myRosterId)?.players || [])

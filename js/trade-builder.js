@@ -419,8 +419,52 @@ function _tbEnsureOverlay() {
   div.id = 'trade-builder-overlay';
   div.style.cssText = 'display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.75);align-items:flex-end;justify-content:center;font-family:"DM Sans",sans-serif';
   div.onclick = e => { if (e.target === div) closeTradeBuilder(); };
-  div.innerHTML = `<div id="trade-builder-panel" style="width:100%;max-width:480px;max-height:84vh;background:var(--bg2);border-radius:16px 16px 0 0;overflow-y:auto;padding:16px 16px 28px;-webkit-overflow-scrolling:touch"></div>`;
+  div.innerHTML = `<div id="trade-builder-panel" style="width:100%;max-width:560px;max-height:90vh;background:var(--bg2);border-radius:16px 16px 0 0;overflow-y:auto;padding:16px 16px 28px;-webkit-overflow-scrolling:touch"></div>`;
   document.body.appendChild(div);
+}
+
+// ── Partner Insight Card ─────────────────────────────────────
+function _tbPartnerInsight(targetRosterId, targetName) {
+  if (!targetRosterId) return '';
+  const profile = window.App?.LI?.ownerProfiles?.[targetRosterId];
+  if (!profile || profile.trades < 1) return '';
+
+  const dna = profile.dna || 'Unknown';
+  const record = `${profile.tradesWon || 0}W-${profile.tradesLost || 0}L-${profile.tradesFair || 0}F`;
+  const totalTrades = profile.trades || 0;
+
+  // What positions they historically acquire (= what they want)
+  const topNeeds = Object.entries(profile.posAcquired || {})
+    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([pos]) => pos);
+
+  // Tendency line from avgValueDiff
+  const avg = profile.avgValueDiff || 0;
+  let tendency;
+  if (avg > 300) tendency = 'Historically overpays in trades';
+  else if (avg > 0) tendency = 'Tends to give slightly more than they get';
+  else if (avg > -300) tendency = 'Trades close to fair value';
+  else tendency = 'Shrewd negotiator — rarely overpays';
+
+  // Tactical tip based on DNA + needs
+  let tip = '';
+  if (topNeeds.length && profile.picksAcquired > profile.picksSold)
+    tip = `Rebuilding — values picks. Offer players at positions they need (${topNeeds.join(', ')}) to extract picks.`;
+  else if (topNeeds.length)
+    tip = `Targets ${topNeeds.join(', ')} in trades. Bundle depth at those positions for leverage.`;
+  else if (dna.includes('Active'))
+    tip = 'High-volume trader — likely to engage. Start with a fair offer.';
+  else
+    tip = 'Limited trade history — lead with a balanced offer to build trust.';
+
+  return `<div style="background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.15);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.05em">Partner Intel</div>
+      <div style="font-size:11px;color:var(--text3)">${totalTrades} trade${totalTrades !== 1 ? 's' : ''} · ${_tbEsc(record)}</div>
+    </div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:4px">${_tbEsc(tendency)}</div>
+    ${topNeeds.length ? `<div style="font-size:11px;color:var(--text3);margin-bottom:4px">Targets: ${topNeeds.map(p => `<span style="color:var(--accent);font-weight:600">${p}</span>`).join(', ')}</div>` : ''}
+    <div style="font-size:11px;color:var(--green);line-height:1.4">💡 ${tip}</div>
+  </div>`;
 }
 
 // ── Render panel ──────────────────────────────────────────────
@@ -492,7 +536,44 @@ function _tbRenderPanel() {
   const myPidsSorted    = [...myPlayers].sort((a, b) => getVal(b) - getVal(a));
   const theirPidsSorted = [...theirPlayers].sort((a, b) => getVal(b) - getVal(a));
 
-  const pickOpts = [1,2,3,4,5].map(r => `<option value="${r}">Rd ${r} (~${_tbPickDHQ(r).toLocaleString()})</option>`).join('');
+  // Build owned picks for each side from S.tradedPicks
+  const league = S?.leagues?.find(l => l.league_id === S.currentLeagueId);
+  const draftRounds = league?.settings?.draft_rounds || 5;
+  const nextSeason = String((league?.season ? parseInt(league.season) + 1 : new Date().getFullYear() + 1));
+  const allTP = S?.tradedPicks || [];
+
+  function _tbOwnedPicks(rosterId, alreadyAdded) {
+    const picks = [];
+    for (let rd = 1; rd <= Math.min(draftRounds, 5); rd++) {
+      // A pick originally belonging to rosterId is traded away if someone else now owns it
+      const tradedAway = allTP.find(p => String(p.season) === nextSeason && p.round === rd && p.roster_id === rosterId && p.owner_id !== rosterId);
+      // Picks acquired: originally someone else's but now owned by rosterId
+      const acquired = allTP.filter(p => String(p.season) === nextSeason && p.round === rd && p.owner_id === rosterId && p.roster_id !== rosterId);
+      // Own pick still held
+      if (!tradedAway) picks.push({ round: rd, from: null });
+      // Acquired picks
+      acquired.forEach(p => {
+        const fromRoster = (S?.rosters || []).find(r => r.roster_id === p.roster_id);
+        const fromUser = (S?.leagueUsers || []).find(u => u.user_id === fromRoster?.owner_id);
+        const fromName = fromUser?.display_name || fromUser?.metadata?.team_name || 'unknown';
+        picks.push({ round: rd, from: fromName });
+      });
+    }
+    // Filter out rounds already added to the trade
+    const addedCounts = {};
+    alreadyAdded.forEach(r => addedCounts[r] = (addedCounts[r] || 0) + 1);
+    const result = [];
+    const usedCounts = {};
+    picks.forEach(pk => {
+      usedCounts[pk.round] = (usedCounts[pk.round] || 0) + 1;
+      if ((addedCounts[pk.round] || 0) < usedCounts[pk.round]) result.push(pk);
+    });
+    return result;
+  }
+  const myOwnedPicks = _tbOwnedPicks(S.myRosterId, myPicks);
+  const theirOwnedPicks = targetRosterId ? _tbOwnedPicks(targetRosterId, theirPicks) : [];
+  const myPickOpts = myOwnedPicks.map(pk => `<option value="${pk.round}">Rd ${pk.round}${pk.from ? ' (from ' + _tbEsc(pk.from) + ')' : ''} (~${_tbPickDHQ(pk.round).toLocaleString()})</option>`).join('');
+  const theirPickOpts = theirOwnedPicks.map(pk => `<option value="${pk.round}">Rd ${pk.round}${pk.from ? ' (from ' + _tbEsc(pk.from) + ')' : ''} (~${_tbPickDHQ(pk.round).toLocaleString()})</option>`).join('');
 
   panel.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -506,6 +587,8 @@ function _tbRenderPanel() {
       </div>
       <button onclick="closeTradeBuilder()" style="background:var(--bg4);border:1px solid var(--border);cursor:pointer;color:var(--text2);width:30px;height:30px;border-radius:50%;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1">×</button>
     </div>
+
+    ${_tbPartnerInsight(targetRosterId, targetName)}
 
     ${(myTotal > 0 || theirTotal > 0) ? `
     <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px">
@@ -533,7 +616,7 @@ function _tbRenderPanel() {
         ${myPicks.map((r, i) => pickChip(r, 'mine', i)).join('')}
         ${!myPidsSorted.length && !myPicks.length ? '<div style="font-size:12px;color:var(--text3);padding:3px 0">Nothing yet</div>' : ''}
         ${sel(myAvail.map(pid => `<option value="${pid}">${_tbEsc(getName(pid))} · ${getVal(pid) > 0 ? getVal(pid).toLocaleString() : '—'}</option>`).join(''), "if(this.value){tbAddPlayer('mine',this.value);this.value=''}", '+ My player')}
-        ${sel(pickOpts, "if(this.value){tbAddPick('mine',this.value);this.value=''}", '+ My pick')}
+        ${sel(myPickOpts, "if(this.value){tbAddPick('mine',this.value);this.value=''}", '+ My pick')}
       </div>
       <div>
         <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${_tbEsc(targetName)} Gives</div>
@@ -541,7 +624,7 @@ function _tbRenderPanel() {
         ${theirPicks.map((r, i) => pickChip(r, 'theirs', i)).join('')}
         ${!theirPidsSorted.length && !theirPicks.length ? '<div style="font-size:12px;color:var(--text3);padding:3px 0">Nothing yet</div>' : ''}
         ${sel(theirAvail.map(pid => `<option value="${pid}">${_tbEsc(getName(pid))} · ${getVal(pid) > 0 ? getVal(pid).toLocaleString() : '—'}</option>`).join(''), "if(this.value){tbAddPlayer('theirs',this.value);this.value=''}", '+ Their player')}
-        ${sel(pickOpts, "if(this.value){tbAddPick('theirs',this.value);this.value=''}", '+ Their pick')}
+        ${sel(theirPickOpts, "if(this.value){tbAddPick('theirs',this.value);this.value=''}", '+ Their pick')}
       </div>
     </div>
 

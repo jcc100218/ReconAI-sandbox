@@ -258,10 +258,9 @@ function collapseDraftChat(){
 function homeAsk(text){
   if(!hasAnyAI(false)){
     if(typeof showToast==='function')showToast('Sign in or subscribe to enable AI chat');
+    return;
   }
-  const input=$('home-chat-in');
-  if(input)input.value=text;
-  sendHomeChat();
+  sendHomeChat(text);
 }
 function goAsk(text){
   // Close player modal if open
@@ -297,10 +296,21 @@ function _updateChatPlaceholder() {
 }
 window._updateChatPlaceholder = _updateChatPlaceholder;
 
-async function sendHomeChat(){
+async function sendHomeChat(passedText){
+  // Use GM bar messages panel for chat (stays in the bar)
+  const msgsEl=$('gm-bar-msgs');
+  if(!msgsEl) return;
+
+  // Show messages area, hide Alex block + chips to make room
+  msgsEl.style.display='flex';
+  const body=document.querySelector('.gm-bar-body');
+  if(body)body.style.display='none';
+
+  // Keep the GM bar expanded
+  if(typeof window._gmBarExpand==='function')window._gmBarExpand();
+
   if(!hasAnyAI(false)){
-    const msgs=$('home-chat-msgs');
-    if(msgs){expandChat(msgs);const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='AI chat requires a subscription. <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Sign in or subscribe in Settings</a>.';msgs.appendChild(m);msgs.scrollTop=99999;}
+    const m=document.createElement('div');m.className='hc-msg-a';m.style.fontSize='13px';m.innerHTML='AI chat requires a subscription. <a onclick="switchTab(\'settings\')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Sign in or subscribe in Settings</a>.';msgsEl.appendChild(m);msgsEl.scrollTop=99999;
     return;
   }
 
@@ -310,66 +320,58 @@ async function sendHomeChat(){
     const lim = window.FREE_CHAT_DAILY_LIMIT || 3;
     const remaining = typeof getDailyChatRemaining === 'function' ? getDailyChatRemaining() : lim;
     if (remaining <= 0) {
-      const msgs = $('home-chat-msgs');
-      if (msgs) {
-        expandChat(msgs);
-        const m = document.createElement('div');
-        m.className = 'hc-msg-a';
-        m.style.fontSize = '13px';
-        m.innerHTML = `You've used your ${lim} free messages today. <a onclick="showUpgradePrompt('${FEATURES?.UNLIMITED_CHAT || 'unlimited_chat'}')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Upgrade for unlimited →</a>`;
-        msgs.appendChild(m);
-        msgs.scrollTop = 99999;
-      }
+      const m = document.createElement('div');
+      m.className = 'hc-msg-a';
+      m.style.fontSize = '13px';
+      m.innerHTML = `You've used your ${lim} free messages today. <a onclick="showUpgradePrompt('${FEATURES?.UNLIMITED_CHAT || 'unlimited_chat'}')" style="color:var(--accent);cursor:pointer;text-decoration:underline">Upgrade for unlimited →</a>`;
+      msgsEl.appendChild(m);
+      msgsEl.scrollTop = 99999;
       return;
     }
     if (typeof incrementDailyChat === 'function') incrementDailyChat();
     if (typeof _updateChatPlaceholder === 'function') _updateChatPlaceholder();
   }
 
-  const input=$('home-chat-in');const text=(input?.value||'').trim();if(!text)return;
+  // Accept text from parameter (global chat routing) or from input element
+  const input=$('home-chat-in');const text=passedText||(input?.value||'').trim();if(!text)return;
   if(input)input.value='';
   if(typeof trackUsage==='function')trackUsage('ai_chats_sent');
 
-  const msgsEl=$('home-chat-msgs');
-  expandChat(msgsEl);
-  if(msgsEl){
-    msgsEl.style.display='flex';
-    const um=document.createElement('div');um.className='hc-msg-u';um.textContent=text;
-    msgsEl.appendChild(um);
-    // Inject trade card if message looks like a trade request
-    if(typeof window.tryInjectTradeCard==='function')window.tryInjectTradeCard(text,msgsEl);
-    const lm=document.createElement('div');lm.className='hc-msg-a';
-    lm.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
-    msgsEl.appendChild(lm);
-    msgsEl.scrollTop=99999;
+  const um=document.createElement('div');um.className='hc-msg-u';um.textContent=text;
+  msgsEl.appendChild(um);
+  // Inject trade card if message looks like a trade request
+  if(typeof window.tryInjectTradeCard==='function')window.tryInjectTradeCard(text,msgsEl);
+  const lm=document.createElement('div');lm.className='hc-msg-a';
+  lm.innerHTML='<span class="ld"><span>.</span><span>.</span><span>.</span></span>';
+  msgsEl.appendChild(lm);
+  msgsEl.scrollTop=99999;
 
-    try{
-      homeChatHistory.push({role:'user',content:text});
-      // Keep history short to stay under token limits
-      if(homeChatHistory.length>4)homeChatHistory=homeChatHistory.slice(-4);
-      // Build compact context — attach to latest message only
-      const ctxStr=dhqCompactContext();
-      // Supplement with league format data for contextual valuations
-      const _hcLeague=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
-      const _hcExtra=_hcLeague?'\nROSTER_POSITIONS:'+(_hcLeague.roster_positions||[]).join(',')+'\nSCORING:'+JSON.stringify(_hcLeague.scoring_settings||{}).substring(0,200):'';
-      const msgs=homeChatHistory.map((m,i)=>{
-        // Attach context to the LAST user message only
-        if(m.role==='user'&&i===homeChatHistory.length-1){
-          return{role:'user',content:ctxStr+_hcExtra+'\n\n'+m.content};
-        }
-        // Trim old assistant messages to save tokens
-        if(m.role==='assistant'&&m.content.length>400){
-          return{role:'assistant',content:m.content.substring(0,400)+'...'};
-        }
-        return m;
-      });
-      const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor|SEARCH FOR CURRENT|Scout Report|current situation|dynasty outlook|2026/i.test(text);
-      const reply=await callClaude(msgs,needsSearch,2,500);
-      homeChatHistory.push({role:'assistant',content:reply});
-      lm.innerHTML=_sanitizeAIResponse(reply);
-    }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${escHtml(e.message)}</span>`;}
-    msgsEl.scrollTop=99999;
-  }
+  try{
+    homeChatHistory.push({role:'user',content:text});
+    // Keep history short to stay under token limits
+    if(homeChatHistory.length>4)homeChatHistory=homeChatHistory.slice(-4);
+    // Build compact context — attach to latest message only
+    const ctxStr=dhqCompactContext();
+    // Supplement with league format data for contextual valuations
+    const _hcLeague=S.leagues?.find(l=>l.league_id===S.currentLeagueId);
+    const _hcExtra=_hcLeague?'\nROSTER_POSITIONS:'+(_hcLeague.roster_positions||[]).join(',')+'\nSCORING:'+JSON.stringify(_hcLeague.scoring_settings||{}).substring(0,200):'';
+    const msgs=homeChatHistory.map((m,i)=>{
+      // Attach context to the LAST user message only
+      if(m.role==='user'&&i===homeChatHistory.length-1){
+        return{role:'user',content:ctxStr+_hcExtra+'\n\n'+m.content};
+      }
+      // Trim old assistant messages to save tokens
+      if(m.role==='assistant'&&m.content.length>400){
+        return{role:'assistant',content:m.content.substring(0,400)+'...'};
+      }
+      return m;
+    });
+    const needsSearch=/search for|look up|find news|injury report|breaking news|trade rumor|SEARCH FOR CURRENT|Scout Report|current situation|dynasty outlook|2026/i.test(text);
+    const reply=await callClaude(msgs,needsSearch,2,500);
+    homeChatHistory.push({role:'assistant',content:reply});
+    lm.innerHTML=_sanitizeAIResponse(reply);
+  }catch(e){lm.innerHTML=`<span style="color:var(--red)">Error: ${escHtml(e.message)}</span>`;}
+  msgsEl.scrollTop=99999;
 }
 
 // ── Trade Chat ─────────────────────────────────────────────────

@@ -1167,7 +1167,7 @@ function renderRookieBoard(){
   // Apply sort
   rookies.sort((a,b)=>{
     const k=_rookieSort.key,d=_rookieSort.dir;
-    if(k==='dhq'){const aR=a.csvRank||9999,bR=b.csvRank||9999;if(aR!==bR)return(aR-bR)*d;return(b.dhq-a.dhq)*d;}
+    if(k==='dhq')return(a.dhq-b.dhq)*d;
     if(k==='name')return d*((a.p.full_name||'').localeCompare(b.p.full_name||''));
     if(k==='pos')return d*((a.pos||'').localeCompare(b.pos||''));
     if(k==='age')return d*((a.age||99)-(b.age||99));
@@ -1231,7 +1231,7 @@ function renderRookieBoard(){
     </div>`;
   }
 
-  el.innerHTML=_rbHero+`
+  el.innerHTML=`
     <div class="home-sec-title" style="margin-bottom:8px">Rookie Board</div>
     <!-- Position filters + Group by Pos toggle -->
     <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
@@ -1577,21 +1577,35 @@ function renderTopProspects(){
     ? allRookies.find(r => needPositions.includes(r.pos)) || bestAvail
     : bestAvail;
 
-  // Get user's next pick info
+  // Get user's next pick info — build full owned picks list
   const league = S.leagues?.find(l => l.league_id === S.currentLeagueId);
   const draftRounds = league?.settings?.draft_rounds || 4;
   const teams = S.rosters?.length || 12;
   const year = S.season || String(new Date().getFullYear());
   const allTP = S.tradedPicks || [];
-  let nextRound = null, nextPick = null;
+  const rosterRanks = S.rosters.map(r => ({ rid: r.roster_id, val: (r.players || []).reduce((s, pid) => s + dynastyValue(pid), 0) })).sort((a, b) => a.val - b.val);
+  const getPickPos = rid => { const idx = rosterRanks.findIndex(r => r.rid === rid); return idx >= 0 ? idx + 1 : Math.ceil(teams / 2); };
+
+  // Build owned picks: own picks not traded away + acquired picks
+  const myOwnedDraftPicks = [];
   for (let rd = 1; rd <= draftRounds; rd++) {
     const tradedAway = allTP.find(p => String(p.season) === year && p.round === rd && p.roster_id === S.myRosterId && p.owner_id !== S.myRosterId);
-    if (!tradedAway) { nextRound = rd; break; }
+    if (!tradedAway) myOwnedDraftPicks.push({ round: rd, fromRosterId: S.myRosterId });
+    const acquired = allTP.filter(p => String(p.season) === year && p.round === rd && p.owner_id === S.myRosterId && p.roster_id !== S.myRosterId);
+    acquired.forEach(p => myOwnedDraftPicks.push({ round: rd, fromRosterId: p.roster_id }));
   }
-  if (nextRound) {
-    const rosterRanks = S.rosters.map(r => ({ rid: r.roster_id, val: (r.players || []).reduce((s, pid) => s + dynastyValue(pid), 0) })).sort((a, b) => a.val - b.val);
-    const estPos = rosterRanks.findIndex(r => r.rid === S.myRosterId) + 1 || Math.ceil(teams / 2);
-    nextPick = estPos;
+  // Sort by overall pick position
+  myOwnedDraftPicks.sort((a, b) => {
+    const aOverall = (a.round - 1) * teams + getPickPos(a.fromRosterId);
+    const bOverall = (b.round - 1) * teams + getPickPos(b.fromRosterId);
+    return aOverall - bOverall;
+  });
+
+  let nextRound = null, nextPick = null;
+  if (myOwnedDraftPicks.length) {
+    const first = myOwnedDraftPicks[0];
+    nextRound = first.round;
+    nextPick = getPickPos(first.fromRosterId);
   }
 
   // Position filter for prospect grid — dynamic based on league roster slots
@@ -1667,85 +1681,119 @@ function renderTopProspects(){
     </div>`;
   };
 
-  // Build HTML — Alex Pick card first
+  // Hide the separate picks card — we'll inline it here
+  const _myPicksEl = $('draft-my-picks');
+  if (_myPicksEl) _myPicksEl.style.display = 'none';
+
+  // Count all owned picks for summary row
+  let _ownedCount = 0;
+  const _ownedRounds = [];
+  for (let rd = 1; rd <= draftRounds; rd++) {
+    const away = allTP.find(p => String(p.season) === year && p.round === rd && p.roster_id === S.myRosterId && p.owner_id !== S.myRosterId);
+    const acq = allTP.filter(p => String(p.season) === year && p.round === rd && p.owner_id === S.myRosterId && p.roster_id !== S.myRosterId);
+    if (!away) { _ownedCount++; _ownedRounds.push(rd); }
+    _ownedCount += acq.length;
+    acq.forEach(() => { if (!_ownedRounds.includes(rd)) _ownedRounds.push(rd); });
+  }
+  _ownedRounds.sort((a, b) => a - b);
+  const _picksRange = _ownedRounds.length === 1 ? 'R' + _ownedRounds[0] : _ownedRounds.length ? 'R' + _ownedRounds[0] + '–R' + _ownedRounds[_ownedRounds.length - 1] : '';
+
+  // Build HTML — single consolidated draft intel card
   let html = '';
 
-  // ALEX'S PICK — decisive recommendation
+  // Estimate how many rookies will be drafted before user's pick
+  const overallPick = nextRound ? (nextRound - 1) * teams + (nextPick || Math.ceil(teams / 2)) : 0;
+  // In a rookie draft, each pick before us takes one prospect off the board.
+  // Cap at the number of available rookies so we always have candidates.
+  const picksBeforeMe = Math.min(Math.max(0, overallPick - 1), Math.max(0, allRookies.length - 5));
+  const likelyAvailable = allRookies.slice(picksBeforeMe);
+  const realisticBestAvail = likelyAvailable[0] || allRookies[allRookies.length - 1];
+  const realisticBestFit = needPositions.length
+    ? likelyAvailable.find(r => needPositions.includes(r.pos)) || realisticBestAvail
+    : realisticBestAvail;
+
+  // ALEX'S PICK — realistic recommendation based on pick position
+  const alexPool = likelyAvailable.length ? likelyAvailable : allRookies;
   const alexPick = draftStyle === 'need'
-    ? (allRookies.find(r => needPositions.includes(r.pos)) || bestFit)
+    ? (alexPool.find(r => needPositions.includes(r.pos)) || realisticBestFit)
     : draftStyle === 'mix'
-    ? (allRookies.find(r => needPositions.includes(r.pos) || targetPos.includes(r.pos)) || bestAvail)
-    : bestAvail;
+    ? (alexPool.find(r => needPositions.includes(r.pos) || targetPos.includes(r.pos)) || realisticBestAvail)
+    : realisticBestAvail;
 
   const alexPickNeedFit = needPositions.includes(alexPick.pos);
   const alexPickTargetFit = targetPos.includes(alexPick.pos);
   const alexWhyParts = [];
   if(alexPickNeedFit) alexWhyParts.push('Fills your biggest '+alexPick.pos+' gap');
   else if(alexPickTargetFit) alexWhyParts.push('Hits your target position');
-  else alexWhyParts.push('#1 overall value at '+alexPick.val.toLocaleString()+' DHQ');
+  else alexWhyParts.push('Best projected available at pick ' + overallPick);
   if(alexPick.val>=5000) alexWhyParts.push('Elite dynasty upside');
   else if(alexPick.val>=3000) alexWhyParts.push('Strong dynasty value');
+  else if(alexPick.val>=1500) alexWhyParts.push('Solid depth add');
   const alexWhy = alexWhyParts.slice(0,2).join('. ');
-  const alexPickLabel = draftStyle==='bpa'?'Best Player Available':draftStyle==='need'?'Best Fit for Your Needs':'Alex\'s Pick';
 
-  html += `<div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:var(--rl);padding:14px;margin-bottom:14px;cursor:pointer" onclick="openPlayerModal('${alexPick.pid}')">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">Alex says</span>
-      <span style="font-size:10px;color:var(--text3)">·</span>
-      <span style="font-size:10px;color:var(--text3);font-weight:600">${escHtml(alexPickLabel)}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px">
-      <img src="https://sleepercdn.com/content/nfl/players/thumb/${alexPick.pid}.jpg" onerror="this.style.display='none'" style="width:56px;height:56px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--bg4)" loading="lazy"/>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.02em;line-height:1.1">Take ${escHtml(alexPick.name)}.</div>
-        <div style="font-size:13px;color:var(--text2);margin-top:4px;line-height:1.4">${escHtml(alexWhy)}. Don't overthink it.</div>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-          <span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(212,175,55,.15);color:var(--accent)">${alexPick.pos}</span>
-          <span style="font-size:11px;font-weight:700;color:var(--accent);font-family:'JetBrains Mono',monospace">${alexPick.val.toLocaleString()}</span>
-          ${alexPickNeedFit||alexPickTargetFit?'<span style="font-size:9px;font-weight:700;color:var(--green);padding:1px 5px;border:1px solid rgba(52,211,153,.3);border-radius:6px">ALIGNED</span>':''}
-        </div>
-      </div>
-    </div>
-  </div>`;
+  // Consolidated card: picks + Alex recommendation + best available
+  html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;margin-bottom:14px">`;
 
-  // ON THE CLOCK hero
-  if (nextRound) {
-    const pickLabel = nextRound + '.' + String(nextPick || '??').toString().padStart(2, '0');
-    const needPills = needPositions.slice(0, 4).map(p =>
-      `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--accentL);color:var(--accent)">${p}</span>`
+  // Row 1: All owned picks listed + needs by urgency
+  {
+    // Build pick labels for each owned pick
+    const pickBadges = myOwnedDraftPicks.map((pk, i) => {
+      const pos = getPickPos(pk.fromRosterId);
+      const label = pk.round + '.' + String(pos).padStart(2, '0');
+      const isFirst = i === 0;
+      const isAcquired = pk.fromRosterId !== S.myRosterId;
+      return `<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;font-family:'JetBrains Mono',monospace;${isFirst ? 'background:var(--accent);color:var(--bg)' : 'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}">${label}</span>`;
+    }).join('');
+
+    // Needs pills — already sorted by urgency (most pressing first)
+    const needPills = needPositions.slice(0, 5).map((p, i) =>
+      `<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;${i === 0 ? 'background:rgba(231,76,60,.12);color:var(--red)' : 'background:var(--accentL);color:var(--accent)'}">${p}</span>`
     ).join('');
-    html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 14px;margin-bottom:12px">
+
+    html += `<div style="margin-bottom:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:13px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.08em">On the Clock</span>
-        <span style="font-size:13px;font-weight:700;color:var(--text);font-family:'JetBrains Mono',monospace">Round ${nextRound}, Pick ${nextPick || '??'}</span>
+        <span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Your ${year} Picks</span>
+        <span style="font-size:11px;color:var(--text3)">${_ownedCount} pick${_ownedCount !== 1 ? 's' : ''}</span>
       </div>
-      ${needPositions.length ? `<div style="display:flex;align-items:center;gap:4px;margin-bottom:10px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--text3)">Your team needs:</span>${needPills}
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">${pickBadges}</div>
+      ${needPills ? `<div style="display:flex;align-items:center;gap:3px;flex-wrap:wrap">
+        <span style="font-size:10px;color:var(--text3)">Needs:</span>${needPills}
       </div>` : ''}
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${heroCard(bestAvail, 'Best Available')}
-        ${bestFit.pid !== bestAvail.pid ? heroCard(bestFit, 'Best Fit') : ''}
-      </div>
     </div>`;
   }
 
-  // Position filter buttons
-  html += `<div style="display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap">
-    ${posFilters.map(pos => {
-      const val = pos === 'All' ? '' : pos;
-      const isActive = _draftPosFilter === val;
-      return `<button onclick="_setDraftPosFilter('${val}')" style="padding:4px 12px;font-size:12px;font-weight:700;border-radius:14px;cursor:pointer;border:1px solid ${isActive ? 'var(--accent)' : 'var(--border2)'};background:${isActive ? 'var(--accentL)' : 'transparent'};color:${isActive ? 'var(--accent)' : 'var(--text3)'};font-family:inherit;text-transform:uppercase;letter-spacing:.04em">${pos}</button>`;
-    }).join('')}
+  // Row 2: Alex's pick — the main recommendation
+  html += `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.25);border-radius:10px;cursor:pointer;margin-bottom:10px" onclick="openPlayerModal('${alexPick.pid}')">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Alex says: take ${escHtml(alexPick.name)}</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.4">${escHtml(alexWhy)}.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+      <span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:6px;background:rgba(212,175,55,.12);color:var(--accent)">${alexPick.pos}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--accent)">${alexPick.val.toLocaleString()}</span>
+      ${alexPickNeedFit||alexPickTargetFit?'<span style="font-size:9px;font-weight:700;color:var(--green);padding:1px 4px;border:1px solid rgba(52,211,153,.3);border-radius:5px">ALIGNED</span>':''}
+    </div>
   </div>`;
 
-  // Prospect grid (2x4)
-  if (gridRookies.length) {
-    html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
-      ${gridRookies.map(r => gridCard(r)).join('')}
+  // Row 3: Best Available + Best Fit (realistic, compact, side by side)
+  if (realisticBestFit.pid !== realisticBestAvail.pid) {
+    html += `<div style="display:flex;gap:6px">
+      <div style="flex:1;padding:6px 8px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:12px" onclick="openPlayerModal('${realisticBestAvail.pid}')">
+        <span style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase">BPA</span>
+        <span style="font-weight:600;color:var(--text);margin-left:4px">${escHtml(realisticBestAvail.name)}</span>
+        <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;margin-left:4px">${realisticBestAvail.val.toLocaleString()}</span>
+      </div>
+      <div style="flex:1;padding:6px 8px;background:var(--bg3);border-radius:8px;cursor:pointer;font-size:12px" onclick="openPlayerModal('${realisticBestFit.pid}')">
+        <span style="font-size:9px;font-weight:700;color:var(--green);text-transform:uppercase">Fit</span>
+        <span style="font-weight:600;color:var(--text);margin-left:4px">${escHtml(realisticBestFit.name)}</span>
+        <span style="color:var(--text3);font-family:'JetBrains Mono',monospace;margin-left:4px">${realisticBestFit.val.toLocaleString()}</span>
+      </div>
     </div>`;
-  } else {
-    html += `<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px">No prospects match this filter</div>`;
   }
+
+  html += `</div>`;
+
+  // Prospect grid removed — rookie board table below has the full sortable list
 
   el.innerHTML = html + '<div id="rookie-board-mount"></div>';
   // Render the full sortable rookie table below the hero cards

@@ -983,6 +983,29 @@ function renderWaivers(){
 // Five Alex-says-styled cards, each a tappable waiver target with a
 // reason line. Replaces the old renderTopPickupHero + renderAvailable
 // + renderWaiverTop5 trio. Target container: #waiver-alex-top5.
+// ── Waiver Wire board state ──────────────────────────────────
+let _waiverSort = { key: 'dhq', dir: -1 };
+let _waiverPosFilter = '';
+let _waiverShowAll = false;
+let _waiverAvailCache = null;
+
+function _waiverSortBy(key) {
+  if (_waiverSort.key === key) _waiverSort.dir *= -1;
+  else { _waiverSort = { key, dir: key === 'name' ? 1 : -1 }; }
+  renderWaiverAlexTop5();
+}
+window._waiverSortBy = _waiverSortBy;
+
+function _waiverFilterPos(pos) {
+  _waiverPosFilter = _waiverPosFilter === pos ? '' : pos;
+  _waiverShowAll = false;
+  renderWaiverAlexTop5();
+}
+window._waiverFilterPos = _waiverFilterPos;
+
+function _waiverShowMore() { _waiverShowAll = true; renderWaiverAlexTop5(); }
+window._waiverShowMore = _waiverShowMore;
+
 function renderWaiverAlexTop5() {
   const el = document.getElementById('waiver-alex-top5');
   if (!el) return;
@@ -992,6 +1015,7 @@ function renderWaiverAlexTop5() {
   }
 
   const avail = getAvailablePlayers();
+  _waiverAvailCache = avail;
   if (!avail.length) {
     el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">No urgent targets — check back after waivers process.</div>';
     return;
@@ -1011,101 +1035,103 @@ function renderWaiverAlexTop5() {
   const floorTeams = S.rosters?.length || 12;
   const floor = floorTeams >= 14 ? 1800 : floorTeams >= 12 ? 1500 : floorTeams >= 10 ? 1200 : 800;
 
-  // Score every available player. Reasons are precomputed per card.
+  // Score every available player
   const scored = avail
     .filter(a => a.val > 0)
     .map(a => {
       const mPos = posMapF(a.p.position);
       const isNeedFit = topNeed && mPos === topNeed;
       const isTargetFit = targetPositions.includes(mPos);
-      // Soft boost for need/target positions; higher floor penalty for low DHQ
       let score = a.val;
       if (isNeedFit) score *= 1.35;
       else if (isTargetFit) score *= 1.18;
       if (a.val < floor) score *= 0.7;
-      return { ...a, mPos, score, isNeedFit, isTargetFit };
+      // FAAB bid
+      const market = faabMarket[mPos];
+      let bidAmt = 0;
+      if (market && market.count >= 3 && faab.budget > 0 && faab.isFAAB) {
+        const fl = faab.minBid || 1;
+        const rawBid = Math.round(faab.remaining * 0.12) * aggrMult;
+        bidAmt = Math.max(fl, Math.min(Math.round(rawBid), Math.round(market.avg * (a.val / 4000) * aggrMult), faab.remaining));
+      } else if (faab.budget > 0 && faab.isFAAB && a.val > 0) {
+        const fl = faab.minBid || 1;
+        bidAmt = Math.max(fl, Math.min(Math.round(faab.remaining * 0.10 * aggrMult), Math.round(a.val / 200 * aggrMult), faab.remaining));
+      }
+      return { ...a, mPos, score, isNeedFit, isTargetFit, bidAmt };
     })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+    .sort((a, b) => b.score - a.score);
 
-  if (!scored.length) {
-    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text3);font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl)">No viable targets yet — adjust position filters or strategy.</div>';
-    return;
+  const top5 = scored.slice(0, 5);
+
+  // ── Section A: Alex's Top Picks (compact) ──
+  let html = '';
+  if (top5.length) {
+    html += `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:10px 12px;margin-bottom:14px">
+      <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Alex's Top Picks</div>`;
+    top5.forEach((a, i) => {
+      const badge = a.isNeedFit ? '<span style="font-size:9px;font-weight:700;color:var(--green);padding:0 4px;border:1px solid rgba(52,211,153,.3);border-radius:4px;margin-left:4px">NEED</span>'
+        : a.isTargetFit ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:0 4px;border:1px solid rgba(212,175,55,.3);border-radius:4px;margin-left:4px">TARGET</span>' : '';
+      const bidStr = a.bidAmt ? `<span style="color:var(--accent);font-weight:700">$${a.bidAmt}</span>` : '';
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;border-radius:6px;transition:background .15s${i < 4 ? ';border-bottom:1px solid var(--border)' : ''}" onclick="openPlayerModal('${a.id}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">
+        <span style="font-size:11px;font-weight:700;color:var(--text3);width:16px;text-align:center;flex-shrink:0">${i + 1}</span>
+        <span style="font-size:10px;padding:1px 5px;border-radius:5px;font-weight:700;background:rgba(212,175,55,.1);color:var(--accent);flex-shrink:0">${a.mPos}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(pName(a.id))}${badge}</span>
+        <span style="font-size:11px;color:var(--text3);flex-shrink:0">${a.p.age || '?'}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);flex-shrink:0;min-width:40px;text-align:right">${a.val.toLocaleString()}</span>
+        ${bidStr ? `<span style="font-size:11px;flex-shrink:0;min-width:30px;text-align:right">${bidStr}</span>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
   }
 
-  const urgencyColor = aggression === 'high' ? 'var(--red)' : aggression === 'low' ? 'var(--text3)' : 'var(--amber)';
-  const urgencyLabel = aggression === 'high' ? 'Act now' : aggression === 'low' ? 'Worth a look' : 'This week';
+  // ── Section B: Full Waiver Wire board ──
+  const positions = ['QB','RB','WR','TE','K','DL','LB','DB'];
+  const allScored = scored.filter(a => !_waiverPosFilter || a.mPos === _waiverPosFilter);
 
-  const cards = scored.map((a, i) => {
-    const { id: pid, p, val, mPos, isNeedFit, isTargetFit } = a;
-    const stats = S.playerStats?.[pid] || {};
-    const sc = S.leagues?.find(l => l.league_id === S.currentLeagueId)?.scoring_settings || {};
-    const isIDP = ['DL','LB','DB'].includes(mPos);
-    const raw = stats?.prevRawStats;
-    const ppg = isIDP && raw ? +(calcIDPScore(raw, sc) / Math.max(1, raw.gp || 17)).toFixed(1) : (stats.seasonAvg || stats.prevAvg || 0);
-    const pk = typeof peakYears === 'function' ? peakYears(pid) : { label: '', desc: '' };
-    const meta = LI.playerMeta?.[pid];
-    const peakYrs = meta?.peakYrsLeft || 0;
+  // Sort
+  const sk = _waiverSort.key;
+  const sd = _waiverSort.dir;
+  allScored.sort((a, b) => {
+    if (sk === 'dhq') return (a.val - b.val) * sd;
+    if (sk === 'name') return pName(a.id).localeCompare(pName(b.id)) * sd;
+    if (sk === 'pos') return a.mPos.localeCompare(b.mPos) * sd;
+    if (sk === 'age') return ((a.p.age || 99) - (b.p.age || 99)) * sd;
+    return (a.val - b.val) * sd;
+  });
 
-    // FAAB bid
-    const market = faabMarket[mPos];
-    let bidAmt = 0;
-    if (market && market.count >= 3 && faab.budget > 0 && faab.isFAAB) {
-      const fl = faab.minBid || 1;
-      const rawBid = Math.round(faab.remaining * 0.12) * aggrMult;
-      bidAmt = Math.max(fl, Math.min(Math.round(rawBid), Math.round(market.avg * (val / 4000) * aggrMult), faab.remaining));
-    } else if (faab.budget > 0 && faab.isFAAB && val > 0) {
-      const fl = faab.minBid || 1;
-      bidAmt = Math.max(fl, Math.min(Math.round(faab.remaining * 0.10 * aggrMult), Math.round(val / 200 * aggrMult), faab.remaining));
-    }
+  const shown = _waiverShowAll ? allScored.slice(0, 15) : allScored.slice(0, 5);
+  const arrow = k => _waiverSort.key === k ? (_waiverSort.dir > 0 ? ' ▲' : ' ▼') : '';
 
-    // Alex-says reason (priority: need > target > tier > ppg > fallback)
-    let reason = '';
-    if (isNeedFit) reason = `Fills your ${mPos} gap.`;
-    else if (isTargetFit) reason = `Hits your ${mPos} strategy target.`;
-    else if (val >= 4000) reason = `Elite dynasty value at ${val.toLocaleString()} DHQ — rare for a waiver.`;
-    else if (ppg >= 12) reason = `${ppg.toFixed(1)} PPG last season — steady producer.`;
-    else if (peakYrs >= 3) reason = `Age ${p.age || '?'} with ${peakYrs} peak years ahead — upside stash.`;
-    else if (val >= 2000) reason = `Solid depth piece at ${val.toLocaleString()} DHQ.`;
-    else reason = `Speculative add — watch for snaps and role growth.`;
-
-    // Headline
-    const headline = bidAmt
-      ? `Bid $${bidAmt} on ${pName(pid)}.`
-      : `Add ${pName(pid)}.`;
-
-    const alignBadge = isNeedFit
-      ? '<span style="font-size:9px;font-weight:700;color:var(--green);padding:1px 6px;border:1px solid rgba(52,211,153,.3);border-radius:6px">NEED</span>'
-      : isTargetFit
-      ? '<span style="font-size:9px;font-weight:700;color:var(--accent);padding:1px 6px;border:1px solid rgba(212,175,55,.3);border-radius:6px">TARGET</span>'
-      : '';
-
-    const rankBadge = i === 0
-      ? '<span style="font-size:9px;font-weight:700;color:var(--bg1);padding:1px 6px;border-radius:6px;background:var(--accent);letter-spacing:.04em">TOP PICK</span>'
-      : '';
-
-    return `<div class="wv-hero" style="margin-bottom:10px;cursor:pointer" onclick="openPlayerModal('${pid}')">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-        <span style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em">Alex says</span>
-        <span style="font-size:10px;color:var(--text3)">·</span>
-        <span style="font-size:10px;font-weight:700;color:${urgencyColor}">${urgencyLabel}</span>
-        ${rankBadge}
-        ${alignBadge}
-      </div>
-      <div style="font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.2;color:var(--text)">
-        ${escHtml(headline)}
-      </div>
-      <div style="font-size:14px;color:var(--text2);margin-top:4px;line-height:1.4">${escHtml(reason)}</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:6px;font-family:'JetBrains Mono',monospace">
-        ${mPos} · ${escHtml(fullTeam(p.team) || p.team || 'FA')} · Age ${p.age || '?'} · ${val.toLocaleString()} DHQ${ppg ? ' · ' + ppg.toFixed(1) + ' PPG' : ''}
-      </div>
-      ${bidAmt ? `<div style="margin-top:8px;padding:6px 10px;background:rgba(212,175,55,.08);border-left:2px solid var(--accent);border-radius:4px;font-size:12px;color:var(--text2)">
-        <strong style="color:var(--accent)">Suggested bid: $${bidAmt}</strong>${faab.remaining ? ' of $' + faab.remaining + ' remaining' : ''}
-      </div>` : ''}
+  html += `<div style="margin-top:4px">
+    <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Waiver Wire · ${allScored.length} available</div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn btn-sm ${!_waiverPosFilter ? '' : 'btn-ghost'}" onclick="_waiverFilterPos('')" style="font-size:11px;padding:2px 8px">All</button>
+      ${positions.map(p => `<button class="btn btn-sm ${_waiverPosFilter === p ? '' : 'btn-ghost'}" onclick="_waiverFilterPos('${p}')" style="font-size:11px;padding:2px 8px">${p}</button>`).join('')}
+    </div>
+    <div style="display:flex;gap:0;padding:0 4px;margin-bottom:2px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none">
+      <span style="width:36px;flex-shrink:0" onclick="_waiverSortBy('pos')">Pos${arrow('pos')}</span>
+      <span style="flex:1" onclick="_waiverSortBy('name')">Player${arrow('name')}</span>
+      <span style="width:32px;text-align:right" onclick="_waiverSortBy('age')">Age${arrow('age')}</span>
+      <span style="width:52px;text-align:right" onclick="_waiverSortBy('dhq')">DHQ${arrow('dhq')}</span>
     </div>`;
-  }).join('');
 
-  el.innerHTML = cards;
+  if (_waiverShowAll) html += `<div style="max-height:420px;overflow-y:auto">`;
+  shown.forEach(a => {
+    html += `<div style="display:flex;align-items:center;gap:0;padding:5px 4px;cursor:pointer;border-radius:6px;border-bottom:1px solid rgba(255,255,255,.03);transition:background .12s" onclick="openPlayerModal('${a.id}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='none'">
+      <span style="font-size:10px;padding:1px 5px;border-radius:5px;font-weight:700;background:rgba(212,175,55,.1);color:var(--accent);width:30px;text-align:center;flex-shrink:0">${a.mPos}</span>
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:6px">${escHtml(pName(a.id))}<span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:4px">${escHtml(a.p.team || 'FA')}</span></span>
+      <span style="font-size:11px;color:var(--text3);width:32px;text-align:right;flex-shrink:0">${a.p.age || '?'}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);width:52px;text-align:right;flex-shrink:0">${a.val.toLocaleString()}</span>
+    </div>`;
+  });
+  if (_waiverShowAll) html += `</div>`;
+
+  if (!_waiverShowAll && allScored.length > 5) {
+    html += `<button onclick="_waiverShowMore()" class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px;font-size:12px">Show top 15 of ${allScored.length}</button>`;
+  }
+  html += `</div>`;
+
+  el.innerHTML = html;
 }
 window.renderWaiverAlexTop5 = renderWaiverAlexTop5;
 
@@ -2733,7 +2759,7 @@ function renderMobileHome() {
     const milestone = phaseInfo?.nextMilestone && phaseInfo?.weeksToNext != null
       ? `${phaseInfo.nextMilestone} · ${phaseInfo.weeksToNext} ${phaseInfo.weeksToNext === 1 ? 'week' : 'weeks'}`
       : '';
-    html += `<div style="margin:14px 0 18px;padding:14px 16px;background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.18);border-radius:12px">
+    html += `<div id="home-field-intel" style="margin:14px 0 18px;padding:14px 16px;background:rgba(212,175,55,0.05);border:1px solid rgba(212,175,55,0.18);border-radius:12px;transition:max-height .3s ease,opacity .3s ease;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:16px">🧠</span>
@@ -2742,7 +2768,7 @@ function renderMobileHome() {
         </div>
         ${milestone ? `<span style="font-size:11px;color:#D4AF37;font-weight:700;font-family:'JetBrains Mono',monospace">${escHtml(milestone)}</span>` : ''}
       </div>`;
-    fieldIntel.forEach(fi => {
+    fieldIntel.slice(0, 3).forEach(fi => {
       html += `<div style="font-size:13px;color:#CCC;padding:5px 0;line-height:1.5">· ${fi}</div>`;
     });
     html += `</div>`;
@@ -2751,9 +2777,9 @@ function renderMobileHome() {
   // ── PRIORITIES (main content) ──
   // Bigger rows, bigger buttons — this is the main interaction on home now.
   if (priorities && priorities.length) {
-    html += `<div style="margin:18px 0">
+    html += `<div id="home-priorities" style="margin:18px 0;transition:max-height .3s ease,opacity .3s ease;overflow:hidden">
       <div style="font-size:13px;font-weight:800;color:#E74C3C;letter-spacing:1px;margin-bottom:12px;text-transform:uppercase">🎯 Priorities</div>`;
-    priorities.forEach((p, i) => {
+    priorities.slice(0, 3).forEach((p, i) => {
       const safeLabel = (p.actionLabel || 'fix this').replace(/'/g, "\\'");
       html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.05);gap:10px">
         <div style="flex:1;min-width:0">

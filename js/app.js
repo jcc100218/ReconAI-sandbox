@@ -437,7 +437,7 @@ window.selectESPNTeam = selectESPNTeam;
 
 function _updateLeaguePillESPN(leagueName){
   const lp=$('league-pill');
-  if(lp)lp.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#e03e2d;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">ESPN</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
+  if(lp)lp.innerHTML=`<span style="white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#e03e2d;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">ESPN</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
 }
 
 // ── MFL Connect ───────────────────────────────────────────────
@@ -555,7 +555,7 @@ window.selectMFLTeam = selectMFLTeam;
 
 function _updateLeaguePillMFL(leagueName){
   const lp=$('league-pill');
-  if(lp)lp.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#0057b8;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">MFL</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
+  if(lp)lp.innerHTML=`<span style="white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#0057b8;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">MFL</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
 }
 
 // ── Yahoo Connect ──────────────────────────────────────────────
@@ -724,7 +724,7 @@ window.selectYahooTeam = selectYahooTeam;
 
 function _updateLeaguePillYahoo(leagueName){
   const lp=$('league-pill');
-  if(lp)lp.innerHTML=`<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#6001d2;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">YAHOO</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
+  if(lp)lp.innerHTML=`<span style="white-space:nowrap">${escHtml(leagueName)}</span><span id="platform-badge" style="font-size:10px;font-weight:700;background:#6001d2;color:#fff;border-radius:4px;padding:1px 5px;flex-shrink:0;letter-spacing:.04em">YAHOO</span><span style="opacity:.5;font-size:13px;flex-shrink:0">⇄</span>`;
 }
 
 // Auto-restore ESPN session on page load
@@ -1021,9 +1021,9 @@ async function selectLeague(leagueId,userId){
   S.currentLeagueId=leagueId;
   DhqStorage.setStr(STORAGE_KEYS.LEAGUE, leagueId);
   const league=S.leagues.find(l=>l.league_id===leagueId);
-  const leagueName=(league?.name||'League').substring(0,20);
+  const leagueName=league?.name||'League';
   const isDynasty=league?.settings?.type===2;
-  const lpEl=$('league-pill');if(lpEl)lpEl.innerHTML='<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(leagueName)+(isDynasty?'':' (Redraft)')+'</span><span style="opacity:.5;font-size:13px;flex-shrink:0">\u21C4</span>';
+  const lpEl=$('league-pill');if(lpEl)lpEl.innerHTML='<span style="white-space:nowrap">'+escHtml(leagueName)+(isDynasty?'':' (Redraft)')+'</span><span style="opacity:.5;font-size:13px;flex-shrink:0">\u21C4</span>';
   const sbEl=$('setup-block');if(sbEl)sbEl.innerHTML=`<div style="text-align:center;padding:20px 0">
     <div style="margin:0 auto 16px;width:52px;height:52px;background:linear-gradient(135deg,#d4af37,#b8941f);border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 24px rgba(212,175,55,0.3)">
       <span style="display:inline-block;width:24px;height:24px;border:2.5px solid rgba(255,255,255,.2);border-top-color:#d4af37;border-radius:50%;animation:spin .7s linear infinite"></span>

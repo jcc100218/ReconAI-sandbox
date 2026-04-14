@@ -124,6 +124,11 @@ function _gmBarCollapse() {
   document.body.classList.remove('gm-bar-active');
   const inp = document.getElementById('global-chat-in');
   if (inp && document.activeElement === inp) inp.blur();
+  // Hide chat messages, restore Alex block + chips for next expand
+  const msgs = document.getElementById('gm-bar-msgs');
+  if (msgs) msgs.style.display = 'none';
+  const body = document.querySelector('.gm-bar-body');
+  if (body) body.style.display = '';
 }
 window._gmBarCollapse = _gmBarCollapse;
 
@@ -213,27 +218,13 @@ function sendGlobalChat() {
   if (!text) return;
   if (inp) inp.value = '';
 
-  // Switch to home tab so user sees the response
-  const activeTab = window._activeTab;
-  if (activeTab !== 'digest') {
-    mobileTab('digest');
-    // Small delay to let panel render
-    setTimeout(() => _routeToHomeChat(text), 80);
-  } else {
-    _routeToHomeChat(text);
-  }
+  // Chat stays in the GM bar panel — no tab switch needed
+  if (typeof sendHomeChat === 'function') sendHomeChat(text);
 }
 window.sendGlobalChat = sendGlobalChat;
 
 function _routeToHomeChat(text) {
-  const homeIn = document.getElementById('home-chat-in');
-  if (homeIn) homeIn.value = text;
-  if (typeof sendHomeChat === 'function') sendHomeChat();
-  // Scroll to chat area so user can see the response
-  setTimeout(() => {
-    const msgs = document.getElementById('home-chat-msgs');
-    if (msgs) msgs.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, 200);
+  if (typeof sendHomeChat === 'function') sendHomeChat(text);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1535,8 +1526,20 @@ function _renderLeagueRoomWaivers(host) {
   if (mount && waiversPanel && waiversPanel.children.length) {
     while (waiversPanel.firstChild) mount.appendChild(waiversPanel.firstChild);
   }
+  // Ensure FAAB bar + waiver targets mount exist (may be lost on re-render)
+  if (mount && !document.getElementById('waiver-alex-top5')) {
+    if (!document.getElementById('faab-bar')) {
+      const fb = document.createElement('div'); fb.id = 'faab-bar'; fb.style.marginBottom = '12px';
+      mount.appendChild(fb);
+    }
+    const at = document.createElement('div'); at.id = 'waiver-alex-top5';
+    mount.appendChild(at);
+  }
   if (typeof window.renderWaivers === 'function') {
     try { window.renderWaivers(); } catch (e) { console.warn('[scout] renderWaivers failed:', e); }
+  }
+  if (typeof window.renderWaiverAlexTop5 === 'function') {
+    try { window.renderWaiverAlexTop5(); } catch (e) { console.warn('[scout] renderWaiverAlexTop5 failed:', e); }
   }
 }
 
