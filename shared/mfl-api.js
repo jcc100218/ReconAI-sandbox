@@ -354,8 +354,15 @@ function buildCrosswalk(sleeperPlayers, mflPlayers, year) {
     if (sleeperPid) map[p.id] = sleeperPid;
   });
 
+  // Skip caching empty maps — callers sometimes pass an empty sleeperPlayers
+  // dict (e.g., War Room's handleMFLConnect before LeagueDetail loads the DB).
+  // Caching that would poison the cache for 24h and prevent rebuild against
+  // the real Sleeper DB. Only persist maps that actually resolved at least
+  // one player.
   try {
-    localStorage.setItem(cacheKey, JSON.stringify({ map, _ts: Date.now() }));
+    if (Object.keys(map).length > 0) {
+      localStorage.setItem(cacheKey, JSON.stringify({ map, _ts: Date.now() }));
+    }
   } catch (e) {}
 
   _crosswalk = map;
@@ -614,6 +621,194 @@ async function connectLeague(leagueId, year, apiKey, myFranchiseId) {
   return { players, rosters, league, leagueUsers, raw };
 }
 
+// ── PlatformProvider adapter ──────────────────────────────────────
+// Implements the unified PlatformProvider interface (see
+// shared/platform-provider.js). War Room's LeagueDetail calls
+// provider.hydrate() uniformly across all four platforms instead of
+// hand-rolled platform branches.
+
+// Per-session cache of raw fetchLeague payloads keyed by leagueId+year
+// so that connect() → hydrate() doesn't re-fetch the same data.
+const _rawLeagueStash = {};
+function _stashRaw(leagueId, year, raw) {
+  _rawLeagueStash[leagueId + '_' + year] = { raw, ts: Date.now() };
+}
+function _getStashedRaw(leagueId, year) {
+  const entry = _rawLeagueStash[leagueId + '_' + year];
+  if (!entry) return null;
+  // Stale after 5 minutes — force a re-fetch to ensure transactions etc. are fresh
+  if (Date.now() - entry.ts > 5 * 60 * 1000) return null;
+  return entry.raw;
+}
+
+const MflProvider = {
+  id: 'mfl',
+  displayName: 'MyFantasyLeague',
+  capabilities: {
+    hasTransactions: true,
+    hasDrafts: true,
+    hasTradedPicks: true,
+    hasMatchups: false,           // MFL rosters export doesn't include lineup data
+    hasBracket: false,
+    hasYearChain: false,          // same league ID across years, queried directly
+    hasFaab: false,               // MFL transactions don't structurally expose FAAB bids
+    hasTrending: false,
+    hasPlayerStats: false,
+    requiresOAuth: false,
+    requiresFranchisePicker: true,
+  },
+
+  // ── Credentials ─────────────────────────────────────────────────
+  saveCredentials(leagueKey, creds) {
+    try {
+      localStorage.setItem('mfl_creds_' + leagueKey, JSON.stringify(creds));
+      // Legacy keys for backward compat until Phase 3 unification
+      if (creds.leagueId) localStorage.setItem('mfl_league_id', String(creds.leagueId));
+      if (creds.year) localStorage.setItem('mfl_year', String(creds.year));
+      if (creds.apiKey) localStorage.setItem('mfl_api_key', creds.apiKey);
+    } catch (e) {}
+  },
+  loadCredentials(leagueKey) {
+    try {
+      const raw = localStorage.getItem('mfl_creds_' + leagueKey);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    // Legacy fallback — read the old flat keys
+    const id = localStorage.getItem('mfl_league_id');
+    if (!id) return null;
+    return {
+      leagueId: id,
+      year: localStorage.getItem('mfl_year') || String(new Date().getFullYear()),
+      apiKey: localStorage.getItem('mfl_api_key') || null,
+    };
+  },
+  clearCredentials(leagueKey) {
+    try {
+      localStorage.removeItem('mfl_creds_' + leagueKey);
+    } catch (e) {}
+  },
+
+  // ── Phase 1: CONNECT ────────────────────────────────────────────
+  async connect(creds) {
+    const { leagueId, year, apiKey } = creds || {};
+    if (!leagueId) throw new Error('MFL league ID required');
+    const yr = year || String(new Date().getFullYear());
+    const raw = await fetchLeague(leagueId, yr, apiKey || null);
+    if (!raw?.leagueData?.league) {
+      throw new Error('Invalid MFL league data. Check your League ID and year.');
+    }
+    // Cache the raw payload so hydrate() can reuse it without re-fetching
+    _stashRaw(leagueId, yr, raw);
+
+    const franchises = raw.leagueData.league.franchises?.franchise || [];
+    const franchiseArr = Array.isArray(franchises) ? franchises : [franchises];
+
+    return {
+      leagues: [{
+        id: 'mfl_' + leagueId + '_' + yr,
+        name: raw.leagueData.league.name || 'MFL League ' + leagueId,
+        season: String(yr),
+        _platform: 'mfl',
+        _mfl: true,                    // legacy flag for back-compat
+        _mflLeagueId: String(leagueId),
+        _platformCreds: { leagueId: String(leagueId), year: String(yr), apiKey: apiKey || null },
+        _franchises: franchiseArr.map(f => ({
+          id: f.id,
+          name: f.name || ('Team ' + f.id),
+          owner: f.owner_name || '',
+        })),
+      }],
+      needsFranchisePicker: true,
+    };
+  },
+
+  // ── Phase 2: HYDRATE ────────────────────────────────────────────
+  async hydrate(league, ctx) {
+    const creds = league._platformCreds || this.loadCredentials(league.id) || {};
+    const leagueId = creds.leagueId || league._mflLeagueId;
+    const year = creds.year || league.season || String(new Date().getFullYear());
+    const apiKey = creds.apiKey || null;
+    if (!leagueId) throw new Error('MFL league credentials missing');
+
+    const context = ctx || {};
+    const sleeperPlayers = context.sleeperPlayers || {};
+    const currentWeek = context.currentWeek != null ? context.currentWeek : 0;
+
+    // Reuse stashed raw payload if connect() was just called, else fetch fresh
+    const raw = _getStashedRaw(leagueId, year) || await fetchLeague(leagueId, year, apiKey);
+    if (!raw?.leagueData?.league) throw new Error('MFL league fetch returned no data');
+
+    const mflPlayerArr = raw.playersData?.players?.player || [];
+    const allMflPlayers = Array.isArray(mflPlayerArr) ? mflPlayerArr : [mflPlayerArr];
+
+    // Clear any stale (possibly empty) crosswalk cache and rebuild against the
+    // real Sleeper player DB. This is the whole reason connect→hydrate is a
+    // two-phase split — at connect time the Sleeper DB isn't loaded yet.
+    try { localStorage.removeItem('mfl_crosswalk_' + year); } catch (e) {}
+    const crosswalk = buildCrosswalk(sleeperPlayers, allMflPlayers, year);
+
+    const mapped = mapToSleeperState(raw, leagueId, year, crosswalk);
+
+    // Fetch transactions + draft results in parallel. Non-blocking — a
+    // private league without an API key can still render rosters even if
+    // transactions/drafts fail.
+    const [txns, draftPicks] = await Promise.all([
+      fetchTransactions(leagueId, year, apiKey).catch(e => {
+        console.warn('[MFL] transactions fetch failed:', e?.message || e);
+        return [];
+      }),
+      fetchDraftResults(leagueId, year, apiKey).catch(e => {
+        console.warn('[MFL] draft results fetch failed:', e?.message || e);
+        return [];
+      }),
+    ]);
+
+    // Bucket all transactions under the current week key — matches the
+    // Sleeper shape that LeagueDetail + free-agency.js + flash-brief.js read.
+    const wkKey = 'w' + currentWeek;
+    const transactionsByWeek = txns.length ? { [wkKey]: txns } : {};
+
+    // Extract traded picks from trade transactions. MFL doesn't expose
+    // which round/season is being swapped in the trade payload — we bucket
+    // them all under (current year, round 1) which is good enough for the
+    // UI to show that assets changed hands. Capped at 50 to stay performant.
+    const tradedPicks = txns
+      .filter(t => t.type === 'trade')
+      .map((t, i) => ({
+        season: parseInt(year, 10),
+        round: 1,
+        roster_id: t.roster_ids?.[0],
+        owner_id: t.roster_ids?.[1],
+        _idx: i,
+      }))
+      .slice(0, 50);
+
+    const drafts = draftPicks.length
+      ? [{ draft_id: 'mfl_draft_' + year, picks: draftPicks }]
+      : [];
+
+    return {
+      league: mapped.league,
+      rosters: mapped.rosters,
+      leagueUsers: mapped.leagueUsers,
+      players: mapped.players || {},
+      transactions: transactionsByWeek,
+      tradedPicks,
+      drafts,
+      matchups: [],
+      nflState: {},
+      _extras: {},
+    };
+  },
+};
+
+// Register with the unified platform registry (if loaded)
+if (window.App?.Platforms?.register) {
+  window.App.Platforms.register(MflProvider);
+} else {
+  console.warn('[MFL] platform-provider.js not loaded — provider will not be registered');
+}
+
 // ── Expose on window.MFL ──────────────────────────────────────────
 window.MFL = {
   BASE_URL: MFL_BASE,
@@ -635,8 +830,11 @@ window.MFL = {
   buildCrosswalk,
   lookupSleeperPlayerId,
 
-  // Main connect
+  // Main connect (legacy — prefer .provider for new code)
   connectLeague,
+
+  // Unified PlatformProvider interface
+  provider: MflProvider,
 };
 
 // Expose the current crosswalk via a getter so dhq-providers.js can read

@@ -334,9 +334,12 @@ function buildCrosswalk(sleeperPlayers, espnEntries, year) {
     if (sleeperPid) map[espnId] = sleeperPid;
   });
 
-  // Cache result
+  // Skip caching empty maps — callers sometimes pass an empty sleeperPlayers
+  // dict. Caching would poison the cache for 24h and prevent rebuild.
   try {
-    localStorage.setItem(cacheKey, JSON.stringify({ map, _ts: Date.now() }));
+    if (Object.keys(map).length > 0) {
+      localStorage.setItem(cacheKey, JSON.stringify({ map, _ts: Date.now() }));
+    }
   } catch (e) {}
 
   _crosswalk = map;
@@ -480,6 +483,159 @@ async function connectLeague(leagueId, year, espnS2, swid, myTeamId) {
   return { players, rosters, league, leagueUsers, raw };
 }
 
+// ── PlatformProvider adapter ──────────────────────────────────────
+// Implements the unified PlatformProvider interface (see
+// shared/platform-provider.js). Wraps the existing ESPN fetch/map
+// functions and fills in transactions that connectLeague() historically
+// left empty.
+
+const _espnRawStash = {};
+function _stashEspnRaw(leagueId, year, raw) {
+  _espnRawStash[leagueId + '_' + year] = { raw, ts: Date.now() };
+}
+function _getEspnStashedRaw(leagueId, year) {
+  const entry = _espnRawStash[leagueId + '_' + year];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > 5 * 60 * 1000) return null;
+  return entry.raw;
+}
+
+const EspnProvider = {
+  id: 'espn',
+  displayName: 'ESPN',
+  capabilities: {
+    hasTransactions: true,
+    hasDrafts: false,
+    hasTradedPicks: false,
+    hasMatchups: false,
+    hasBracket: false,
+    hasYearChain: false,
+    hasFaab: false,
+    hasTrending: false,
+    hasPlayerStats: false,
+    requiresOAuth: false,
+    requiresFranchisePicker: false,
+  },
+
+  // ── Credentials ─────────────────────────────────────────────────
+  saveCredentials(leagueKey, creds) {
+    try {
+      localStorage.setItem('espn_creds_' + leagueKey, JSON.stringify(creds));
+      // Legacy flat keys
+      if (creds.espnS2) localStorage.setItem('espn_s2', creds.espnS2);
+      if (creds.swid) localStorage.setItem('espn_swid', creds.swid);
+    } catch (e) {}
+  },
+  loadCredentials(leagueKey) {
+    try {
+      const raw = localStorage.getItem('espn_creds_' + leagueKey);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return {
+      espnS2: localStorage.getItem('espn_s2') || null,
+      swid: localStorage.getItem('espn_swid') || null,
+    };
+  },
+  clearCredentials(leagueKey) {
+    try {
+      localStorage.removeItem('espn_creds_' + leagueKey);
+    } catch (e) {}
+  },
+
+  // ── Phase 1: CONNECT ────────────────────────────────────────────
+  async connect(creds) {
+    const { leagueId, year, espnS2, swid } = creds || {};
+    if (!leagueId) throw new Error('ESPN league ID required');
+    const numericId = String(leagueId).replace(/\D/g, '');
+    if (!numericId) throw new Error('ESPN league ID must be numeric');
+    const yr = year || String(new Date().getFullYear());
+
+    const raw = await fetchLeague(numericId, yr, espnS2 || null, swid || null);
+    if (!raw || !raw.teams) {
+      throw new Error('Invalid ESPN league data. Check your League ID.');
+    }
+    _stashEspnRaw(numericId, yr, raw);
+
+    const settings = raw.settings || {};
+    return {
+      leagues: [{
+        id: 'espn_' + numericId + '_' + yr,
+        name: settings.name || 'ESPN League ' + numericId,
+        season: String(yr),
+        _platform: 'espn',
+        _espn: true,                   // legacy flag
+        _espnLeagueId: String(numericId),
+        _platformCreds: {
+          leagueId: String(numericId),
+          year: String(yr),
+          espnS2: espnS2 || null,
+          swid: swid || null,
+        },
+      }],
+      needsFranchisePicker: false,
+    };
+  },
+
+  // ── Phase 2: HYDRATE ────────────────────────────────────────────
+  async hydrate(league, ctx) {
+    const creds = league._platformCreds || this.loadCredentials(league.id) || {};
+    const leagueId = creds.leagueId || league._espnLeagueId;
+    const year = creds.year || league.season || String(new Date().getFullYear());
+    const espnS2 = creds.espnS2 || null;
+    const swid = creds.swid || null;
+    if (!leagueId) throw new Error('ESPN league credentials missing');
+
+    const context = ctx || {};
+    const sleeperPlayers = context.sleeperPlayers || {};
+    const currentWeek = context.currentWeek != null ? context.currentWeek : 0;
+
+    const raw = _getEspnStashedRaw(leagueId, year) || await fetchLeague(leagueId, year, espnS2, swid);
+    if (!raw || !raw.teams) throw new Error('ESPN league fetch returned no data');
+
+    // Rebuild crosswalk against the real Sleeper player DB
+    try { localStorage.removeItem('espn_crosswalk_' + year); } catch (e) {}
+    const allEspnEntries = (raw.teams || []).flatMap(t => t.roster?.entries || []);
+    const crosswalk = buildCrosswalk(sleeperPlayers, allEspnEntries, year);
+
+    const mapped = mapToSleeperState(raw, leagueId, year, crosswalk);
+
+    // Fetch transactions — ESPN provides trades via mTransactions2 view.
+    // connectLeague() historically left this empty; the provider fills it.
+    let txns = [];
+    try {
+      const txnRaw = await fetchTransactions(leagueId, year, espnS2, swid);
+      const topics = txnRaw?.topics || [];
+      txns = topics
+        .map(t => mapESPNTrade(t))
+        .filter(Boolean);
+    } catch (e) {
+      console.warn('[ESPN] transactions fetch failed:', e?.message || e);
+    }
+
+    const wkKey = 'w' + currentWeek;
+    const transactionsByWeek = txns.length ? { [wkKey]: txns } : {};
+
+    return {
+      league: mapped.league,
+      rosters: mapped.rosters,
+      leagueUsers: mapped.leagueUsers,
+      players: mapped.players || {},
+      transactions: transactionsByWeek,
+      tradedPicks: [],
+      drafts: [],
+      matchups: [],
+      nflState: {},
+      _extras: {},
+    };
+  },
+};
+
+if (window.App?.Platforms?.register) {
+  window.App.Platforms.register(EspnProvider);
+} else {
+  console.warn('[ESPN] platform-provider.js not loaded — provider will not be registered');
+}
+
 // ── Expose on window.ESPN ─────────────────────────────────────────
 window.ESPN = {
   BASE_URL: ESPN_BASE,
@@ -503,8 +659,11 @@ window.ESPN = {
   buildCrosswalk,
   lookupSleeperPlayerId,
 
-  // Main connect
+  // Main connect (legacy — prefer .provider for new code)
   connectLeague,
+
+  // Unified PlatformProvider interface
+  provider: EspnProvider,
 };
 
 })();

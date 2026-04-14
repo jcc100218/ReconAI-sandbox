@@ -71,6 +71,27 @@ async function fetchSeasonStats(season) {
   return data;
 }
 
+// ── Projections cache per season ─────────────────────────────────
+const _projectionsCache = {};
+
+async function fetchSeasonProjections(season) {
+  if (_projectionsCache[season]) return _projectionsCache[season];
+  try {
+    const cached = sessionStorage.getItem('fw_projections_' + season);
+    if (cached) {
+      const d = JSON.parse(cached);
+      _projectionsCache[season] = d;
+      return d;
+    }
+  } catch (e) {}
+  const data = await sleeperFetch('/projections/nfl/regular/' + season);
+  _projectionsCache[season] = data;
+  try {
+    sessionStorage.setItem('fw_projections_' + season, JSON.stringify(data));
+  } catch (e) {}
+  return data;
+}
+
 // ── Common fetch helpers ─────────────────────────────────────────
 async function fetchUser(username)              { return sleeperFetch('/user/' + encodeURIComponent(username)); }
 async function fetchLeagues(userId, season)     { return sleeperFetch('/user/' + userId + '/leagues/nfl/' + season); }
@@ -207,12 +228,161 @@ function normalizeTradedPicks(rosters, tradedPicks) {
   });
 }
 
+// ── PlatformProvider adapter ──────────────────────────────────────
+// Implements the unified PlatformProvider interface (see
+// shared/platform-provider.js). Wraps the Sleeper-native fetch
+// pipeline that War Room's LeagueDetail used to do inline, so that
+// LeagueDetail can consume all four platforms uniformly.
+
+// STATS_YEAR_FALLBACK: prior season used as a baseline when the
+// current season has little data yet (early offseason). War Room
+// passes its own value via ctx.prevSeason when available; we fall
+// back to (currentSeason - 1) otherwise.
+const STATS_YEAR_FALLBACK_DEFAULT = String(new Date().getFullYear() - 1);
+
+async function _sleeperFetchAllWeeklyTransactions(leagueId, nflState, currentWeek) {
+  // Sleeper splits transactions into per-week endpoints. During the
+  // offseason we fetch all 18 weeks to pick up offseason trades; in
+  // season we fetch up to the current week.
+  const isOffseason = !nflState?.season_type || nflState.season_type === 'off' || currentWeek <= 1;
+  const maxWeek = isOffseason ? 18 : Math.min(18, currentWeek);
+  const weekFetches = [];
+  for (let w = 0; w <= maxWeek; w++) {
+    weekFetches.push(fetchTransactions(leagueId, w).catch(() => []));
+  }
+  const weekResults = await Promise.all(weekFetches);
+  return weekResults.flat().filter(t => t && t.type && t.status !== 'failed');
+}
+
+const SleeperProvider = {
+  id: 'sleeper',
+  displayName: 'Sleeper',
+  capabilities: {
+    hasTransactions: true,
+    hasDrafts: true,
+    hasTradedPicks: true,
+    hasMatchups: true,
+    hasBracket: true,
+    hasYearChain: true,
+    hasFaab: true,
+    hasTrending: true,
+    hasPlayerStats: true,
+    requiresOAuth: false,
+    requiresFranchisePicker: false,
+  },
+
+  // Sleeper uses a single global auth (od_auth_v1 / Sleeper username)
+  // rather than per-league credentials — these are no-ops.
+  saveCredentials() {},
+  loadCredentials() { return null; },
+  clearCredentials() {},
+
+  // ── Phase 1: CONNECT ────────────────────────────────────────────
+  async connect(creds) {
+    const { username, season } = creds || {};
+    if (!username) throw new Error('Sleeper username required');
+    const user = await fetchUser(username);
+    if (!user?.user_id) throw new Error('Sleeper user not found: ' + username);
+    const yr = season || String(new Date().getFullYear());
+    const leagues = (await fetchLeagues(user.user_id, yr)) || [];
+    return {
+      leagues: leagues.map(l => ({
+        id: l.league_id,
+        name: l.name,
+        season: String(l.season || yr),
+        _platform: 'sleeper',
+        _platformCreds: {},        // Sleeper uses global auth
+        // Keep the raw Sleeper league shape — LeagueDetail already understands it
+        ...l,
+      })),
+      needsFranchisePicker: false,
+    };
+  },
+
+  // ── Phase 2: HYDRATE ────────────────────────────────────────────
+  async hydrate(league, ctx) {
+    const context = ctx || {};
+    const currentSeason = context.currentSeason || league.season || String(new Date().getFullYear());
+    const prevSeason = context.prevSeason || STATS_YEAR_FALLBACK_DEFAULT;
+
+    // First, fetch NFL state so we know the current week for transactions
+    const nflState = context.nflState || await fetchNflState().catch(() => ({}));
+    const currentWeek = context.currentWeek != null
+      ? context.currentWeek
+      : (nflState?.display_week || nflState?.week || 1);
+
+    // Fire the main pipeline in parallel — Sleeper can handle it
+    const [
+      stats,
+      projections,
+      prevStats,
+      rosters,
+      leagueUsers,
+      tradedPicks,
+      matchups,
+      rawTxns,
+      trendingAdds,
+      trendingDrops,
+    ] = await Promise.all([
+      fetchSeasonStats(currentSeason).catch(() => ({})),
+      fetchSeasonProjections(currentSeason).catch(() => ({})),
+      fetchSeasonStats(prevSeason).catch(() => ({})),
+      fetchRosters(league.league_id || league.id).catch(() => []),
+      fetchLeagueUsers(league.league_id || league.id).catch(() => []),
+      fetchTradedPicks(league.league_id || league.id).catch(() => []),
+      fetchMatchups(league.league_id || league.id, currentWeek).catch(() => []),
+      _sleeperFetchAllWeeklyTransactions(league.league_id || league.id, nflState, currentWeek),
+      fetchTrending('add', 24, 15).catch(() => []),
+      fetchTrending('drop', 24, 15).catch(() => []),
+    ]);
+
+    // Normalize traded picks (Sleeper's /traded_picks API is ambiguous
+    // about roster_id vs user_id in owner_id — fix it here).
+    const normalizedTradedPicks = normalizeTradedPicks(rosters, tradedPicks);
+
+    // Bucket transactions by week — Sleeper already gives them with a
+    // `leg` field that says which week. Fallback to 'w0' if missing.
+    const transactionsByWeek = {};
+    rawTxns
+      .sort((a, b) => (b.created || 0) - (a.created || 0))
+      .forEach(t => {
+        const wkKey = 'w' + (t.leg ?? t.week ?? 0);
+        if (!transactionsByWeek[wkKey]) transactionsByWeek[wkKey] = [];
+        transactionsByWeek[wkKey].push(t);
+      });
+
+    // The league object passed in is already Sleeper-shaped — pass it
+    // through unchanged so LeagueDetail sees the same shape it used to
+    // get from its hand-rolled pipeline.
+    return {
+      league,
+      rosters,
+      leagueUsers,
+      players: {},                 // Sleeper DB is loaded separately by the caller
+      transactions: transactionsByWeek,
+      tradedPicks: normalizedTradedPicks,
+      drafts: [],                  // LeagueDetail fetches drafts via its own path when needed
+      matchups,
+      nflState,
+      trending: { adds: trendingAdds || [], drops: trendingDrops || [] },
+      _extras: { stats, projections, prevStats },
+    };
+  },
+};
+
+if (window.App?.Platforms?.register) {
+  window.App.Platforms.register(SleeperProvider);
+} else {
+  console.warn('[Sleeper] platform-provider.js not loaded — provider will not be registered');
+}
+
 // ── Expose on window ─────────────────────────────────────────────
 var SleeperAPI = {
   SLEEPER_BASE:       SLEEPER_BASE,
   sleeperFetch:       sleeperFetch,
   fetchPlayers:       fetchPlayers,
   fetchSeasonStats:   fetchSeasonStats,
+  fetchSeasonProjections: fetchSeasonProjections,
   fetchUser:          fetchUser,
   fetchLeagues:       fetchLeagues,
   fetchRosters:       fetchRosters,
@@ -229,6 +399,9 @@ var SleeperAPI = {
   fetchLosersBracket: fetchLosersBracket,
   calcFantasyPts:     calcFantasyPts,
   normalizeTradedPicks: normalizeTradedPicks,
+
+  // Unified PlatformProvider interface
+  provider: SleeperProvider,
 };
 
 window.App.Sleeper = SleeperAPI;

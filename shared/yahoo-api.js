@@ -466,8 +466,12 @@ function buildCrosswalk(sleeperPlayers, yahooPlayers, year) {
     if (sleeperPid) map[yahooId] = sleeperPid;
   });
 
+  // Skip caching empty maps — callers sometimes pass an empty sleeperPlayers
+  // dict. Caching would poison the cache for 24h and prevent rebuild.
   try {
-    localStorage.setItem(cacheKey, JSON.stringify({ map, _ts: Date.now() }));
+    if (Object.keys(map).length > 0) {
+      localStorage.setItem(cacheKey, JSON.stringify({ map, _ts: Date.now() }));
+    }
   } catch (e) {}
 
   _crosswalk = map;
@@ -654,6 +658,198 @@ async function connectLeague(leagueKey, teamKey) {
   return { players, rosters, league, leagueUsers };
 }
 
+// ── PlatformProvider adapter ──────────────────────────────────────
+// Implements the unified PlatformProvider interface (see
+// shared/platform-provider.js). Yahoo OAuth initiation still lives
+// in Scout — the War Room connect card redirects there for initial
+// auth. Once the session token is in shared localStorage
+// (yahoo_session_id), War Room's provider can list leagues and
+// hydrate them directly.
+
+function _hasYahooSession() {
+  return !!_getSessionId();
+}
+
+const _yahooRawStash = {};
+function _stashYahooRaw(leagueKey, raw) {
+  _yahooRawStash[leagueKey] = { raw, ts: Date.now() };
+}
+function _getYahooStashedRaw(leagueKey) {
+  const entry = _yahooRawStash[leagueKey];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > 5 * 60 * 1000) return null;
+  return entry.raw;
+}
+
+const YahooProvider = {
+  id: 'yahoo',
+  displayName: 'Yahoo',
+  capabilities: {
+    hasTransactions: true,
+    hasDrafts: false,
+    hasTradedPicks: false,
+    hasMatchups: false,
+    hasBracket: false,
+    hasYearChain: false,
+    hasFaab: false,
+    hasTrending: false,
+    hasPlayerStats: false,
+    requiresOAuth: true,
+    requiresFranchisePicker: false,
+  },
+
+  // ── Credentials ─────────────────────────────────────────────────
+  // Yahoo uses a single shared session token (yahoo_session_id) rather
+  // than per-league credentials. saveCredentials is a no-op; the
+  // session lives in localStorage and is shared with Scout.
+  saveCredentials(leagueKey, creds) {
+    if (creds?.sessionId) {
+      try { localStorage.setItem('yahoo_session_id', creds.sessionId); } catch (e) {}
+    }
+  },
+  loadCredentials(_leagueKey) {
+    const sessionId = _getSessionId();
+    return sessionId ? { sessionId } : null;
+  },
+  clearCredentials(_leagueKey) {
+    try { localStorage.removeItem('yahoo_session_id'); } catch (e) {}
+  },
+
+  isAuthenticated: _hasYahooSession,
+
+  // ── Phase 1: CONNECT ────────────────────────────────────────────
+  async connect(_creds) {
+    // Initial OAuth lives in Scout — if no session, return a sentinel
+    // so the War Room connect card can render "Sign in via Scout".
+    if (!_hasYahooSession()) {
+      return {
+        leagues: [],
+        needsAuth: true,
+        authUrl: 'https://jcc100218.github.io/ReconAI/?yahoo_auth=1',
+        needsFranchisePicker: false,
+      };
+    }
+
+    // Session exists — fetch the user's leagues
+    const rawList = await fetchUserLeagues();
+    const stubs = parseUserLeagues(rawList);
+
+    return {
+      leagues: stubs.map(s => ({
+        id: 'yahoo_' + s.leagueKey,
+        name: s.name,
+        season: s.season,
+        _platform: 'yahoo',
+        _yahoo: true,                    // legacy flag
+        _yahooLeagueKey: s.leagueKey,
+        _platformCreds: { leagueKey: s.leagueKey },
+      })),
+      needsFranchisePicker: false,
+    };
+  },
+
+  // ── Phase 2: HYDRATE ────────────────────────────────────────────
+  async hydrate(league, ctx) {
+    if (!_hasYahooSession()) {
+      throw new Error('Yahoo session expired — please re-authenticate via Scout');
+    }
+    const creds = league._platformCreds || this.loadCredentials(league.id) || {};
+    const leagueKey = creds.leagueKey || league._yahooLeagueKey;
+    if (!leagueKey) throw new Error('Yahoo league key missing');
+
+    const context = ctx || {};
+    const sleeperPlayers = context.sleeperPlayers || {};
+    const currentWeek = context.currentWeek != null ? context.currentWeek : 0;
+
+    // Reuse stashed raw if connect() was just called
+    let leagueData, teamsData, rostersData;
+    const stashed = _getYahooStashedRaw(leagueKey);
+    if (stashed) {
+      ({ leagueData, teamsData, rostersData } = stashed);
+    } else {
+      const [lgRes, rostersRes] = await Promise.all([
+        fetchLeague(leagueKey),
+        fetchRosters(leagueKey),
+      ]);
+      leagueData = lgRes.leagueData;
+      teamsData = lgRes.teamsData;
+      rostersData = rostersRes;
+      _stashYahooRaw(leagueKey, { leagueData, teamsData, rostersData });
+    }
+
+    // Extract year from league metadata
+    const lgMeta = _yahooMeta(leagueData?.fantasy_content?.league || []);
+    const year = parseInt(lgMeta?.season || context.currentSeason || new Date().getFullYear(), 10);
+
+    // Extract Yahoo players for crosswalk
+    const rostersFC = rostersData?.fantasy_content || {};
+    const rostersLg = rostersFC.league || [];
+    const rostersD  = _yahooData(Array.isArray(rostersLg) ? rostersLg : [rostersLg]);
+    const rTeamsArr = _yahooArr(rostersD?.teams || {});
+
+    const yahooPlayersForCW = [];
+    rTeamsArr.forEach(tEntry => {
+      if (!tEntry?.team) return;
+      const tData     = _yahooData(tEntry.team);
+      const rosterObj = tData?.roster || {};
+      const rPart     = rosterObj['0'] || rosterObj;
+      _yahooArr(rPart?.players || {}).forEach(pEntry => {
+        const mapped = mapYahooPlayer({ player: pEntry?.player });
+        if (mapped && mapped._yahoo_id) yahooPlayersForCW.push(mapped);
+      });
+    });
+
+    // Rebuild crosswalk against real Sleeper DB
+    try { localStorage.removeItem('yahoo_crosswalk_' + year); } catch (e) {}
+    const crosswalk = buildCrosswalk(sleeperPlayers, yahooPlayersForCW, year);
+
+    const mapped = mapToSleeperState(leagueData, teamsData, rostersData, leagueKey, year, crosswalk);
+
+    // Transactions — trade-only from Yahoo
+    let txns = [];
+    try {
+      const txRaw = await fetchTransactions(leagueKey);
+      const txFc  = txRaw?.fantasy_content || {};
+      const txLg  = txFc.league || [];
+      const txD   = _yahooData(Array.isArray(txLg) ? txLg : [txLg]);
+      const txArr = _yahooArr(txD?.transactions || {});
+      txns = txArr
+        .map(tEntry => {
+          const tx = tEntry?.transaction;
+          if (!tx) return null;
+          const tMeta = _yahooMeta(Array.isArray(tx) ? tx : [tx]);
+          const tData = _yahooData(Array.isArray(tx) ? tx : [tx]);
+          return mapYahooTrade({ ...tMeta, ...tData });
+        })
+        .filter(Boolean);
+    } catch (e) {
+      console.warn('[Yahoo] transactions fetch failed:', e?.message || e);
+    }
+
+    const wkKey = 'w' + currentWeek;
+    const transactionsByWeek = txns.length ? { [wkKey]: txns } : {};
+
+    return {
+      league: mapped.league,
+      rosters: mapped.rosters,
+      leagueUsers: mapped.leagueUsers,
+      players: mapped.players || {},
+      transactions: transactionsByWeek,
+      tradedPicks: [],
+      drafts: [],
+      matchups: [],
+      nflState: {},
+      _extras: {},
+    };
+  },
+};
+
+if (window.App?.Platforms?.register) {
+  window.App.Platforms.register(YahooProvider);
+} else {
+  console.warn('[Yahoo] platform-provider.js not loaded — provider will not be registered');
+}
+
 // ── Expose on window.Yahoo ────────────────────────────────────────
 window.Yahoo = {
   BASE_URL: YAHOO_BASE,
@@ -664,6 +860,7 @@ window.Yahoo = {
   // Auth
   startAuth,
   handleCallback,
+  hasSession: _hasYahooSession,
 
   // Fetch
   apiRequest,
@@ -687,8 +884,11 @@ window.Yahoo = {
   buildCrosswalk,
   lookupSleeperPlayerId,
 
-  // Main connect
+  // Main connect (legacy — prefer .provider for new code)
   connectLeague,
+
+  // Unified PlatformProvider interface
+  provider: YahooProvider,
 };
 
 })();
