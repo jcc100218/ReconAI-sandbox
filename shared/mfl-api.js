@@ -104,12 +104,20 @@ function _getProxyUrl() {
 
 async function _mflGet(url) {
   const proxyUrl = _getProxyUrl();
+  const anonKey  = window.OD?.SUPABASE_ANON || window.App?.SUPABASE_ANON;
+  const token    = window.OD?.getSessionToken?.() || null;
 
-  // Primary path: Supabase Edge Function proxy
-  if (proxyUrl) {
+  // Primary path: Supabase Edge Function proxy. Supabase's gateway requires
+  // an Authorization header (verify_jwt defaults to true) — pass the anon
+  // key if there's no user session, same pattern as ai-analyze.
+  if (proxyUrl && anonKey) {
     const res = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token || anonKey}`,
+        'apikey': anonKey,
+      },
       body: JSON.stringify({ url }),
     });
     if (!res.ok) {

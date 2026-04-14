@@ -828,8 +828,13 @@ let _strategyDbDisabled = false;
 window.OD.saveStrategy = async function(strategy) {
     if (_strategyDbDisabled) return false;
     const username = getCurrentUsername();
+    const token    = getSessionToken();
     const db = getClient();
     if (!db || !isConfigured() || !username || !strategy) return false;
+    // RLS on gm_strategy requires a JWT whose `sub` claim matches the
+    // username. Without a session token we'd hit the anon client and get
+    // 401 every time — skip silently and let localStorage stay authoritative.
+    if (!token) return false;
     try {
         await ensureUser(username);
         const { error } = await db.from('gm_strategy').upsert({
@@ -856,8 +861,12 @@ window.OD.saveStrategy = async function(strategy) {
 window.OD.loadStrategy = async function() {
     if (_strategyDbDisabled) return null;
     const username = getCurrentUsername();
+    const token    = getSessionToken();
     const db = getClient();
     if (!db || !isConfigured() || !username) return null;
+    // Same RLS requirement as saveStrategy — quietly return null for anon
+    // users instead of hitting the server and flipping the kill switch.
+    if (!token) return null;
     try {
         const { data, error } = await db.from('gm_strategy')
             .select('strategy, version, last_synced_at, last_synced_from, updated_at')

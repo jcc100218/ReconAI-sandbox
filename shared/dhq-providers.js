@@ -167,13 +167,22 @@ const MFLProvider = {
   },
 
   async _mflGet(url) {
-    // MFL blocks all cross-origin requests — route through our Edge Function proxy
-    const base = window.OD?.SUPABASE_URL || window.App?.SUPABASE_URL;
-    if (base) {
+    // MFL blocks all cross-origin requests — route through our Edge Function proxy.
+    // Supabase's gateway requires Authorization + apikey headers even for public
+    // functions (verify_jwt defaults to true) — pass the anon key when there's
+    // no user session, same pattern as shared/mfl-api.js _mflGet and ai-analyze.
+    const base    = window.OD?.SUPABASE_URL || window.App?.SUPABASE_URL;
+    const anonKey = window.OD?.SUPABASE_ANON || window.App?.SUPABASE_ANON;
+    const token   = window.OD?.getSessionToken?.() || null;
+    if (base && anonKey) {
       try {
         const res = await fetch(base + '/functions/v1/mfl-proxy', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || anonKey}`,
+            'apikey': anonKey,
+          },
           body: JSON.stringify({ url }),
         });
         if (!res.ok) return null;
