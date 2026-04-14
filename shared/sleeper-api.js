@@ -240,6 +240,25 @@ function normalizeTradedPicks(rosters, tradedPicks) {
 // back to (currentSeason - 1) otherwise.
 const STATS_YEAR_FALLBACK_DEFAULT = String(new Date().getFullYear() - 1);
 
+// Capture fetch function references by closure at module load time.
+// Classic <script src=> at top level registers `async function X` on
+// the global object, so a later-loaded script (e.g. War Room's
+// js/core.js) that redeclares `fetchLeagueUsers` / `fetchRosters` etc.
+// can overwrite those globals. Using this local alias ensures the
+// Sleeper provider always calls sleeper-api.js's versions, not any
+// shadowed variant with a different SLEEPER_BASE_URL.
+const _SP = {
+  fetchSeasonStats,
+  fetchSeasonProjections,
+  fetchRosters,
+  fetchLeagueUsers,
+  fetchTradedPicks,
+  fetchMatchups,
+  fetchTransactions,
+  fetchNflState,
+  fetchTrending,
+};
+
 async function _sleeperFetchAllWeeklyTransactions(leagueId, nflState, currentWeek) {
   // Sleeper splits transactions into per-week endpoints. During the
   // offseason we fetch all 18 weeks to pick up offseason trades; in
@@ -248,7 +267,7 @@ async function _sleeperFetchAllWeeklyTransactions(leagueId, nflState, currentWee
   const maxWeek = isOffseason ? 18 : Math.min(18, currentWeek);
   const weekFetches = [];
   for (let w = 0; w <= maxWeek; w++) {
-    weekFetches.push(fetchTransactions(leagueId, w).catch(() => []));
+    weekFetches.push(_SP.fetchTransactions(leagueId, w).catch(() => []));
   }
   const weekResults = await Promise.all(weekFetches);
   return weekResults.flat().filter(t => t && t.type && t.status !== 'failed');
@@ -304,14 +323,17 @@ const SleeperProvider = {
     const context = ctx || {};
     const currentSeason = context.currentSeason || league.season || String(new Date().getFullYear());
     const prevSeason = context.prevSeason || STATS_YEAR_FALLBACK_DEFAULT;
+    const leagueId = league.league_id || league.id;
 
     // First, fetch NFL state so we know the current week for transactions
-    const nflState = context.nflState || await fetchNflState().catch(() => ({}));
+    const nflState = context.nflState || await _SP.fetchNflState().catch(() => ({}));
     const currentWeek = context.currentWeek != null
       ? context.currentWeek
       : (nflState?.display_week || nflState?.week || 1);
 
-    // Fire the main pipeline in parallel — Sleeper can handle it
+    // Fire the main pipeline in parallel — Sleeper can handle it.
+    // All fetches go through _SP (closure-captured) instead of bare
+    // identifiers to avoid global shadowing by consumer apps.
     const [
       stats,
       projections,
@@ -324,16 +346,16 @@ const SleeperProvider = {
       trendingAdds,
       trendingDrops,
     ] = await Promise.all([
-      fetchSeasonStats(currentSeason).catch(() => ({})),
-      fetchSeasonProjections(currentSeason).catch(() => ({})),
-      fetchSeasonStats(prevSeason).catch(() => ({})),
-      fetchRosters(league.league_id || league.id).catch(() => []),
-      fetchLeagueUsers(league.league_id || league.id).catch(() => []),
-      fetchTradedPicks(league.league_id || league.id).catch(() => []),
-      fetchMatchups(league.league_id || league.id, currentWeek).catch(() => []),
-      _sleeperFetchAllWeeklyTransactions(league.league_id || league.id, nflState, currentWeek),
-      fetchTrending('add', 24, 15).catch(() => []),
-      fetchTrending('drop', 24, 15).catch(() => []),
+      _SP.fetchSeasonStats(currentSeason).catch(() => ({})),
+      _SP.fetchSeasonProjections(currentSeason).catch(() => ({})),
+      _SP.fetchSeasonStats(prevSeason).catch(() => ({})),
+      _SP.fetchRosters(leagueId).catch(() => []),
+      _SP.fetchLeagueUsers(leagueId).catch(() => []),
+      _SP.fetchTradedPicks(leagueId).catch(() => []),
+      _SP.fetchMatchups(leagueId, currentWeek).catch(() => []),
+      _sleeperFetchAllWeeklyTransactions(leagueId, nflState, currentWeek),
+      _SP.fetchTrending('add', 24, 15).catch(() => []),
+      _SP.fetchTrending('drop', 24, 15).catch(() => []),
     ]);
 
     // Normalize traded picks (Sleeper's /traded_picks API is ambiguous
