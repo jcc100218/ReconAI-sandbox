@@ -784,74 +784,32 @@ function calcTradeValue(playerIds, picks, faab) {
  * - Overpaying by 20% should be 70-85%
  * - Psych taxes are CAPPED at +/- 15 total to prevent runaway inflation
  */
-function calcAcceptanceLikelihood(myValue, theirValue, theirDnaKey, psychTaxes, myAssessment, theirAssessment) {
-  let likelihood = 50;
-  const totalA = myValue;  // what I'm giving
-  const totalB = theirValue;  // what I'm receiving
-  if (totalA > 0 && totalB > 0) {
-    const diff = totalA - totalB;
-    const maxSide = Math.max(totalA, totalB, 1);
-    const nd = diff / maxSide; // +0.2 = I overpay 20%, -0.3 = I underpay 30%
-
-    if (theirDnaKey === 'FLEECER') {
-      // Fleecers only accept when they clearly win. Reject anything close to fair.
-      likelihood = nd > 0.15
-        ? Math.min(92, 70 + Math.round(nd * 80))   // I overpay 15%+ = they'll take it
-        : nd > 0 ? 35 + Math.round(nd * 200)        // slight overpay = lukewarm
-        : Math.max(3, 20 + Math.round(nd * 80));    // I'm winning = hard reject
-    } else if (theirDnaKey === 'DOMINATOR') {
-      // Dominators need to feel like they won. Fair trades feel like losses to them.
-      likelihood = nd > 0.10
-        ? Math.min(85, 60 + Math.round(nd * 70))   // I overpay 10%+ = they feel like winners
-        : nd > 0 ? 40 + Math.round(nd * 150)        // tiny overpay = maybe
-        : Math.max(3, 25 + Math.round(nd * 100));   // I'm winning = drops fast
-    } else if (theirDnaKey === 'STALWART') {
-      // Stalwarts ONLY accept fair trades. ANY gap over 15% = rejection.
-      const absGap = Math.abs(nd);
-      likelihood = absGap <= 0.05 ? 65 :             // within 5% = solid chance
-                   absGap <= 0.10 ? 50 :              // within 10% = coin flip
-                   absGap <= 0.15 ? 30 :              // within 15% = unlikely
-                   absGap <= 0.25 ? 15 :              // 15-25% gap = very unlikely
-                   5;                                  // 25%+ gap = no chance
-    } else if (theirDnaKey === 'ACCEPTOR') {
-      // Acceptors are more lenient but still won't give away the farm.
-      likelihood = nd >= 0
-        ? Math.min(90, 55 + Math.round(nd * 100))    // I overpay = rises steadily
-        : Math.max(5, 45 + Math.round(nd * 150));    // I'm winning = drops faster than before
-    } else if (theirDnaKey === 'DESPERATE') {
-      // Desperate teams will overpay if the trade fills a critical need.
-      const fitsNeed = theirAssessment?.needs?.some(n => (myAssessment?.strengths || []).includes(n.pos));
-      const needBonus = fitsNeed ? 10 : 0;           // reduced from 15 to 10
-      likelihood = nd >= 0
-        ? Math.min(90, 50 + needBonus + Math.round(nd * 80))
-        : Math.max(5, 35 + needBonus + Math.round(nd * 120));
-    } else {
-      // NONE / default — smooth sigmoid centered at 50% for fair trades (nd=0 → 50%)
-      likelihood = Math.round(5 + 90 / (1 + Math.exp(-7 * nd)));
-    }
-
-    // Apply psych tax total — CAPPED at +/- 15 to prevent runaway inflation
-    const rawTax = (psychTaxes || []).reduce((s, t) => s + t.impact, 0);
-    const cappedTax = Math.max(-15, Math.min(15, rawTax));
-    likelihood += cappedTax;
+function calcAcceptanceLikelihood(myValue, theirValue, theirDnaKey, psychTaxes, myAssessment, theirAssessment, opts) {
+  // Delegate to shared trade engine (canonical implementation)
+  if (window.App?.TradeEngine?.calcAcceptanceLikelihood) {
+    return window.App.TradeEngine.calcAcceptanceLikelihood(myValue, theirValue, theirDnaKey, psychTaxes, myAssessment, theirAssessment, opts);
   }
-  return Math.round(Math.max(3, Math.min(95, likelihood)));
+  // Emergency fallback — sigmoid only (shared module should always be loaded)
+  const maxSide = Math.max(myValue, theirValue, 1);
+  const nd = (myValue - theirValue) / maxSide;
+  return Math.round(Math.max(3, Math.min(95, 5 + 90 / (1 + Math.exp(-7 * nd)))));
 }
 
 /**
  * Grade a trade's fairness
  */
 function fairnessGrade(myValue, theirValue) {
-  if (myValue === 0 && theirValue === 0) return { grade: '--', color: 'var(--text3)' };
-  const max = Math.max(myValue, theirValue, 1);
-  const pct = Math.abs(myValue - theirValue) / max;
-  if (pct <= 0.05) return { grade: 'A+', color: 'var(--green)' };
-  if (pct <= 0.10) return { grade: 'A',  color: 'var(--green)' };
-  if (pct <= 0.15) return { grade: 'B+', color: '#2ECC71' };
-  if (pct <= 0.22) return { grade: 'B',  color: 'var(--accent)' };
-  if (pct <= 0.30) return { grade: 'C',  color: 'var(--amber)' };
-  if (pct <= 0.40) return { grade: 'D',  color: '#F0A500' };
-  return { grade: 'F', color: 'var(--red)' };
+  // Delegate to shared trade engine (canonical ratio-based grading)
+  if (window.App?.TradeEngine?.fairnessGrade) {
+    return window.App.TradeEngine.fairnessGrade(myValue, theirValue);
+  }
+  // Emergency fallback
+  if (myValue === 0 && theirValue === 0) return { grade: '--', color: '#95A5A6' };
+  const ratio = theirValue / Math.max(myValue, 1);
+  if (ratio >= 1.15) return { grade: 'A', color: '#2ECC71' };
+  if (ratio >= 0.95) return { grade: 'B', color: '#D4AF37' };
+  if (ratio >= 0.85) return { grade: 'C', color: '#F0A500' };
+  return { grade: 'F', color: '#E74C3C' };
 }
 
 

@@ -543,11 +543,11 @@ async function loadLeagueIntel(){
       if(pos==='QB'&&isSF)mult=Math.max(mult,1.25); // SF QB premium
       else if(pos==='TE')mult=Math.max(mult,1.15); // TE scarcity
       else if(pos==='WR')mult=Math.min(mult,1.0); // deepest position
-      else if(pos==='K')mult=Math.min(mult,0.90); // kickers are highly replaceable
+      else if(pos==='K')mult=Math.min(mult,0.80); // kickers: dynasty weight handles main discount, scarcity stays low
       else if(['DL','LB','DB'].includes(pos)){
-        // IDP scarcity cap depends on how many IDP starters the league requires
+        // IDP scarcity: let supply/demand push value up in deep IDP leagues
         const idpStarters=(starterCounts.DL||0)+(starterCounts.LB||0)+(starterCounts.DB||0);
-        const idpCap=idpStarters>=6?1.05:idpStarters>=3?1.0:0.96;
+        const idpCap=idpStarters>=6?1.10:idpStarters>=3?1.0:0.90;
         mult=Math.min(mult,idpCap);
       }
       scarcityMult[pos]=+mult.toFixed(3);
@@ -745,13 +745,22 @@ async function loadLeagueIntel(){
           peakYrsLeft,seasons:totalSeasons,starterSeasons,recentGP,posRank,posTotal,trend};
       })
       .filter(p=>p.wPPG>0)
-      .sort((a,b)=>(b.wPPG*b.ageFactor*b.sitMult)-(a.wPPG*a.ageFactor*a.sitMult));
+      .sort((a,b)=>(b.wPPG*b.ageFactor*b.sitMult)-(a.wPPG*a.ageFactor*a.sitMult)); // sort by raw composite; dynasty weight applied below
 
     // ─── FINAL VALUE ASSEMBLY ───
     // Combine all components into 0-10000 scale
-    const topComposite=recentPlayers[0]?(recentPlayers[0].wPPG*recentPlayers[0].ageFactor*recentPlayers[0].sitMult):1;
+
+    // Dynasty market value weight by position — reflects how replaceable
+    // production is at each position. A kicker's 8 PPG is fungible (waiver
+    // kickers score 6-8), while an RB's 8 PPG represents real roster value.
+    // IDP weight scales with league format (more IDP starters = more valuable).
+    const _idpSt=(starterCounts.DL||0)+(starterCounts.LB||0)+(starterCounts.DB||0);
+    const _idpWt=_idpSt>=6?0.80:_idpSt>=3?0.65:0.50;
+    const posDynastyWeight={QB:1.0,RB:1.0,WR:1.0,TE:0.95,K:0.30,DL:_idpWt,LB:_idpWt,DB:_idpWt};
+
+    const topComposite=recentPlayers[0]?(recentPlayers[0].wPPG*recentPlayers[0].ageFactor*recentPlayers[0].sitMult*(posDynastyWeight[recentPlayers[0].pos]||0.80)):1;
     recentPlayers.forEach((p)=>{
-      const composite=p.wPPG*p.ageFactor*p.sitMult;
+      const composite=p.wPPG*p.ageFactor*p.sitMult*(posDynastyWeight[p.pos]||0.80);
 
       // Production + Age + Situation (75% of value)
       const coreScore=(composite/topComposite)*7500;

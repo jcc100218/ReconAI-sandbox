@@ -636,85 +636,45 @@ function _getDraftDNAForRoster(rosterId) {
 }
 window._getDraftDNAForRoster = _getDraftDNAForRoster;
 
-function _mockDNAInformedPick(rosterId, available, round) {
+function _mockDNAInformedPick(rosterId, available, round, pickNumber) {
   if (!available.length) return available[0] || null;
-  const LI = window.LI || {};
-  const assess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(rosterId) : null;
-  const needPositions = (assess?.needs || []).map(n => typeof n === 'string' ? n : n.pos);
-  const strengthPositions = (assess?.strengths || []).map(s => typeof s === 'string' ? s : s?.pos).filter(Boolean);
-  const healthScore = assess?.healthScore || 70;
 
-  const dna = _getDraftDNAForRoster(rosterId);
-  const posPct = dna?.posPct || {};
-  const label = dna?.label || 'Balanced';
-  const r1Positions = dna?.r1Positions || [];
+  // Delegate to shared MockEngine when available (canonical 10-layer engine)
+  if (window.App?.MockEngine?.personaPick) {
+    const LI = window.LI || {};
+    const assess = typeof assessTeamFromGlobal === 'function' ? assessTeamFromGlobal(rosterId) : null;
+    const dna = _getDraftDNAForRoster(rosterId);
+    const ownerProfile = LI.ownerProfiles?.[rosterId] || {};
+    const tradeDnaKey = ownerProfile.tradeDna || ownerProfile.dna || 'NONE';
+    const posture = window.App?.TradeEngine?.calcOwnerPosture?.(assess, tradeDnaKey) || { key: 'NEUTRAL' };
 
-  const draftOutcomes = LI.draftOutcomes || [];
-  const theirRoundPicks = draftOutcomes.filter(d => (d.roster_id === rosterId || d.rosterId === rosterId) && d.round === round);
-  const roundPosByFreq = {};
-  theirRoundPicks.forEach(d => { const p = d.pos || d.position || ''; if (p) roundPosByFreq[p] = (roundPosByFreq[p] || 0) + 1; });
+    // Build persona (same shape War Room's persona.js produces)
+    const persona = {
+      draftDna: dna || {},
+      tradeDna: { key: tradeDnaKey },
+      assessment: assess || {},
+      posture: posture,
+    };
 
-  const roundHitRates = LI.hitRateByRound?.[round] || {};
-  const leagueBestPos = (roundHitRates.bestPos || []).slice(0, 2).map(p => p.pos);
+    // Pass League Intelligence data for enrichment (Scout-only feature)
+    const liData = {
+      draftOutcomes: LI.draftOutcomes || [],
+      hitRateByRound: LI.hitRateByRound || {},
+    };
 
-  // BPA floor: the best available player's DHQ sets the scale.
-  // No modifier should let a low-DHQ player beat a high-DHQ one by more than ~25%.
-  const topDHQ = available.length ? Math.max(...available.slice(0, 5).map(p => p.val || 0), 1) : 1;
-  const bpaFloor = topDHQ * 0.40; // never pick below 40% of BPA value
+    const result = window.App.MockEngine.personaPick(persona, available, round, pickNumber || 0, {
+      teamRoster: [],
+      rosterId: rosterId,
+      liData: liData,
+    });
+    return result?.player || available[0];
+  }
 
-  // Round-appropriate position priors: in early rounds (1-2), offensive skill
-  // positions dominate real drafts. IDP in R1 is extremely rare — penalize unless
-  // the owner has actual history of doing it.
-  const earlyOffensePrior = round <= 2 ? { QB: 1.0, RB: 1.0, WR: 1.0, TE: 0.95, K: 0.3, DL: 0.5, LB: 0.5, DB: 0.4 } : null;
-
-  let best = null, bestScore = -Infinity;
+  // Emergency fallback — BPA only (shared module should always be loaded)
+  let best = available[0], bestVal = best?.val || 0;
   for (const p of available) {
     const val = p.val || 0;
-    // Skip players far below the BPA floor (unless pool is very thin)
-    if (val < bpaFloor && available.length > 5) continue;
-
-    // Base score IS the DHQ value — this is the dominant signal
-    let score = val;
-
-    // Apply early-round position prior (scales the base value)
-    if (earlyOffensePrior && earlyOffensePrior[p.pos] != null) {
-      score *= earlyOffensePrior[p.pos];
-    }
-
-    // --- Roster need signals (proportional to DHQ, not flat) ---
-    const needIdx = needPositions.indexOf(p.pos);
-    if (needIdx === 0) score *= 1.25;       // primary need: 25% boost
-    else if (needIdx > 0) score *= 1.10;    // secondary need: 10% boost
-    if (healthScore < 55 && needIdx >= 0) score *= 1.15; // desperate: extra 15%
-    if (strengthPositions.includes(p.pos)) score *= 0.85; // surplus: 15% penalty
-
-    // --- Draft DNA signals (small nudges, not overrides) ---
-    const ownerPosPref = posPct[p.pos] || 0;
-    score *= 1 + (ownerPosPref / 200); // 38% pref = +19% nudge, 5% pref = +2.5%
-
-    // R1 tendency: mild boost if they historically draft this pos in R1
-    if (round <= 2 && r1Positions.includes(p.pos)) {
-      const r1Count = r1Positions.filter(rp => rp === p.pos).length;
-      score *= 1 + (r1Count * 0.08); // each historical R1 pick = +8%
-    }
-
-    // Label-specific nudges (small — 10-15% max)
-    if (label === 'DEF-Early' && round <= 3 && ['DL','LB','DB'].includes(p.pos)) score *= 1.12;
-    if (label === 'QB-Hunter' && p.pos === 'QB' && round <= 2) score *= 1.15;
-    if (label === 'QB-Avoider' && p.pos === 'QB' && round <= 3) score *= 0.80;
-    if (label === 'TE-Premium' && p.pos === 'TE' && round <= 3) score *= 1.10;
-
-    // Per-round history from LI.draftOutcomes (small nudge)
-    if (roundPosByFreq[p.pos]) score *= 1 + (roundPosByFreq[p.pos] * 0.05);
-
-    // League-wide hit rates (very small nudge)
-    if (leagueBestPos[0] === p.pos) score *= 1.05;
-    else if (leagueBestPos[1] === p.pos) score *= 1.02;
-
-    // Variance: ±5% so picks aren't perfectly deterministic
-    score *= 0.95 + Math.random() * 0.10;
-
-    if (score > bestScore) { bestScore = score; best = p; }
+    if (val > bestVal) { best = p; bestVal = val; }
   }
   return best;
 }
