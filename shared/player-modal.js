@@ -223,15 +223,19 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
   const isRB = pos === 'RB';
   const isK = pos === 'K';
 
+  // Per-season TEAM column was removed — Sleeper career payload doesn't include
+  // team-by-year, so it was always displaying the player's CURRENT team for
+  // every row (misleading, e.g., Kenneth Walker showing Chiefs for every year).
+  // PPG (fpts / gp) is computed per row + totals row in parseRow.
   let cols = [];
-  if (isQB) cols = [{k:'gp',l:'GP'},{k:'pass_cmp',l:'CMP'},{k:'pass_att',l:'ATT'},{k:'pass_yd',l:'YDS'},{k:'pass_td',l:'TD'},{k:'pass_int',l:'INT'},{k:'rush_yd',l:'RUSH'},{k:'fpts',l:'FPTS'}];
-  else if (isRB) cols = [{k:'gp',l:'GP'},{k:'rush_att',l:'ATT'},{k:'rush_yd',l:'YDS'},{k:'rush_td',l:'TD'},{k:'rec',l:'REC'},{k:'rec_yd',l:'REC YD'},{k:'rec_tgt',l:'TGT'},{k:'fpts',l:'FPTS'}];
-  else if (['WR','TE'].includes(pos)) cols = [{k:'gp',l:'GP'},{k:'rec_tgt',l:'TGT'},{k:'rec',l:'REC'},{k:'rec_yd',l:'YDS'},{k:'rec_td',l:'TD'},{k:'rush_yd',l:'RUSH'},{k:'fpts',l:'FPTS'}];
-  else if (isK) cols = [{k:'gp',l:'GP'},{k:'fgm',l:'FGM'},{k:'fga',l:'FGA'},{k:'fgm_50p',l:'50+'},{k:'xpm',l:'XPM'},{k:'xpa',l:'XPA'},{k:'fpts',l:'FPTS'}];
-  else if (isIDP) cols = [{k:'gp',l:'GP'},{k:'idp_tkl',l:'TKL'},{k:'idp_sack',l:'SACK'},{k:'idp_int',l:'INT'},{k:'idp_pass_def',l:'PD'},{k:'idp_qb_hit',l:'QBH'},{k:'idp_ff',l:'FF'},{k:'fpts',l:'FPTS'}];
-  else cols = [{k:'gp',l:'GP'},{k:'fpts',l:'FPTS'}];
+  if (isQB) cols = [{k:'gp',l:'GP'},{k:'ppg',l:'PPG'},{k:'pass_cmp',l:'CMP'},{k:'pass_att',l:'ATT'},{k:'pass_yd',l:'YDS'},{k:'pass_td',l:'TD'},{k:'pass_int',l:'INT'},{k:'rush_yd',l:'RUSH'},{k:'fpts',l:'FPTS'}];
+  else if (isRB) cols = [{k:'gp',l:'GP'},{k:'ppg',l:'PPG'},{k:'rush_att',l:'ATT'},{k:'rush_yd',l:'YDS'},{k:'rush_td',l:'TD'},{k:'rec',l:'REC'},{k:'rec_yd',l:'REC YD'},{k:'rec_tgt',l:'TGT'},{k:'fpts',l:'FPTS'}];
+  else if (['WR','TE'].includes(pos)) cols = [{k:'gp',l:'GP'},{k:'ppg',l:'PPG'},{k:'rec_tgt',l:'TGT'},{k:'rec',l:'REC'},{k:'rec_yd',l:'YDS'},{k:'rec_td',l:'TD'},{k:'rush_yd',l:'RUSH'},{k:'fpts',l:'FPTS'}];
+  else if (isK) cols = [{k:'gp',l:'GP'},{k:'ppg',l:'PPG'},{k:'fgm',l:'FGM'},{k:'fga',l:'FGA'},{k:'fgm_50p',l:'50+'},{k:'xpm',l:'XPM'},{k:'xpa',l:'XPA'},{k:'fpts',l:'FPTS'}];
+  else if (isIDP) cols = [{k:'gp',l:'GP'},{k:'ppg',l:'PPG'},{k:'idp_tkl',l:'TKL'},{k:'idp_sack',l:'SACK'},{k:'idp_int',l:'INT'},{k:'idp_pass_def',l:'PD'},{k:'idp_qb_hit',l:'QBH'},{k:'idp_ff',l:'FF'},{k:'fpts',l:'FPTS'}];
+  else cols = [{k:'gp',l:'GP'},{k:'ppg',l:'PPG'},{k:'fpts',l:'FPTS'}];
 
-  const gridCols = `38px 30px ${cols.map(() => '1fr').join(' ')}`;
+  const gridCols = `38px ${cols.map(() => '1fr').join(' ')}`;
 
   const years = Object.keys(careerData).sort((a,b) => b-a);
   if (!years.length) return `<div style="color:${_wr.text3};font-size:13px;padding:4px 0">No career stats available.</div>`;
@@ -242,8 +246,9 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
     const gp = g('gp','games_played') || 0;
     if (gp === 0 && !g('pass_yd') && !g('rush_yd') && !g('rec_yd') && !g('idp_tkl_solo')) return null;
     const fpts = _fwCalcPts(raw, sc);
+    const ppg = gp > 0 ? +(fpts / gp).toFixed(1) : 0;
     return {
-      yr, gp, fpts: +fpts.toFixed(1),
+      yr, gp, fpts: +fpts.toFixed(1), ppg,
       pass_cmp: g('pass_cmp'), pass_att: g('pass_att'), pass_yd: g('pass_yd'), pass_td: g('pass_td'), pass_int: g('pass_int'),
       rush_att: g('rush_att'), rush_yd: g('rush_yd'), rush_td: g('rush_td'),
       rec: g('rec'), rec_yd: g('rec_yd'), rec_td: g('rec_td'), rec_tgt: g('rec_tgt','targets','tgt'),
@@ -264,6 +269,11 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
   const fmt = (v, k) => {
     if (v == null || (v === 0 && k !== 'pass_int')) return `<span style="color:${_wr.text3}">\u2014</span>`;
     if (k === 'fpts') return `<span style="color:${_wr.gold};font-weight:700">${v}</span>`;
+    if (k === 'ppg') {
+      // Color PPG by tier: elite >= 18, solid >= 12, low otherwise
+      const col = v >= 18 ? _wr.green : v >= 12 ? _wr.gold : _wr.text2;
+      return `<span style="color:${col};font-weight:600">${v.toFixed(1)}</span>`;
+    }
     if (['pass_yd','rush_yd','rec_yd'].includes(k)) return `<strong>${Math.round(v).toLocaleString()}</strong>`;
     if (['idp_sack','idp_int','idp_ff','idp_qb_hit'].includes(k) && v >= 5) return `<span style="color:${_wr.green};font-weight:600">${Number.isInteger(v)?v:v.toFixed(1)}</span>`;
     if (k === 'idp_tkl' && v >= 80) return `<span style="color:${_wr.green};font-weight:600">${Math.round(v)}</span>`;
@@ -273,18 +283,18 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
   // Career totals row
   let totalsRow = '';
   if (rows.length >= 2) {
-    const totals = { yr: 'TOT', gp: 0, fpts: 0 };
-    cols.forEach(c => { if (c.k !== 'gp' && c.k !== 'fpts') totals[c.k] = 0; });
+    const totals = { yr: 'TOT', gp: 0, fpts: 0, ppg: 0 };
+    cols.forEach(c => { if (!['gp','fpts','ppg'].includes(c.k)) totals[c.k] = 0; });
     rows.forEach(r => {
       totals.gp += r.gp || 0;
       totals.fpts += r.fpts || 0;
-      cols.forEach(c => { if (c.k !== 'gp' && c.k !== 'fpts') totals[c.k] = (totals[c.k]||0) + (r[c.k]||0); });
+      cols.forEach(c => { if (!['gp','fpts','ppg'].includes(c.k)) totals[c.k] = (totals[c.k]||0) + (r[c.k]||0); });
     });
     totals.fpts = +totals.fpts.toFixed(1);
+    totals.ppg = totals.gp > 0 ? +(totals.fpts / totals.gp).toFixed(1) : 0;
     totalsRow = `
       <div class="fwpm-career-row" style="grid-template-columns:${gridCols};border-top:2px solid ${_wr.border};padding-top:6px;font-weight:700">
         <div style="font-size:13px;font-weight:800;color:${_wr.gold}">TOT</div>
-        <div></div>
         ${cols.map(c => `<div style="text-align:right;color:${_wr.text}">${fmt(totals[c.k], c.k)}</div>`).join('')}
       </div>`;
   }
@@ -292,13 +302,11 @@ function _fwBuildCareerTable(pid, careerData, pos, sc, playerObj) {
   return `
     <div class="fwpm-career-row" style="grid-template-columns:${gridCols};padding-bottom:5px;border-bottom:2px solid ${_wr.border};margin-bottom:2px">
       <div class="fwpm-career-hdr">YR</div>
-      <div class="fwpm-career-hdr">TM</div>
       ${cols.map(c => `<div class="fwpm-career-hdr" style="text-align:right">${c.l}</div>`).join('')}
     </div>
     ${rows.map(r => `
       <div class="fwpm-career-row" style="grid-template-columns:${gridCols}">
         <div style="font-weight:700;color:${_wr.text3}">${r.yr}</div>
-        <div style="font-weight:700;padding:1px 3px;border-radius:3px;background:${_wr.goldBg};color:${_wr.text3};text-align:center;font-size:13px">${playerObj.team||'FA'}</div>
         ${cols.map(c => `<div style="font-weight:600;text-align:right;color:${_wr.text}">${fmt(r[c.k], c.k)}</div>`).join('')}
       </div>`).join('')}
     ${totalsRow}`;
